@@ -3252,20 +3252,29 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
             _logger_agents.warning("lookup cancel: storage restore unavailable: %s", e)
     for raw in raw_ids[:16]:
         lookup_id = _coerce_lookup_id(raw)
-        _mark_lookup_cancelled(user_id, lookup_id)
-        cancelled.append(lookup_id)
         if _durable_job_repository is not None:
             job = await _durable_job_repository.get_by_idempotency_key(
                 user_id=user_id,
                 idempotency_key=_lookup_idempotency_key(user_id, lookup_id),
             )
             if job is not None:
-                cancelled_job = await _durable_job_repository.cancel(
-                    user_id=user_id,
-                    job_id=job.job_id,
-                )
+                try:
+                    cancelled_job = await _durable_job_repository.cancel(
+                        user_id=user_id,
+                        job_id=job.job_id,
+                    )
+                except LookupOutcomeStoreUnavailable as exc:
+                    raise HTTPException(
+                        status_code=503,
+                        detail={
+                            "status": "unavailable",
+                            "reason": "lookup_outcome_store_unavailable",
+                        },
+                    ) from exc
                 if cancelled_job is not None:
                     cancelled_job_ids.append(job.job_id)
+        _mark_lookup_cancelled(user_id, lookup_id)
+        cancelled.append(lookup_id)
         if isinstance(storage, SupabaseStartupsStorage):
             restored = await asyncio.to_thread(storage.mark_existing_rerun_cancelled, lookup_id)
             if restored:

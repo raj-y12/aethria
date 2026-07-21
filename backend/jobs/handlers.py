@@ -19,7 +19,7 @@ from jobs.models import (
     JobType,
     PipelineCyclePayload,
 )
-from jobs.lookup_outcomes import LookupAttemptOutcome, record_lookup_attempt
+from jobs.lookup_outcomes import LookupAttemptDisposition, LookupAttemptOutcome
 from jobs.fencing import assert_job_ownership
 from evidence.repository import EvidenceRepository
 from evaluation_v2.prerequisites import (
@@ -50,13 +50,6 @@ async def _checkpoint(repository, job, stage, status, metadata):
         output_metadata=metadata,
     )
     await _raise_if_cancelled(repository, job)
-
-
-async def _persist_lookup_attempt(
-    outcome: LookupAttemptOutcome,
-) -> LookupAttemptOutcome:
-    """Keep blocking Supabase I/O off the worker event loop without hiding errors."""
-    return await asyncio.to_thread(record_lookup_attempt, outcome)
 
 
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
@@ -282,47 +275,50 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
     return result
 
 
-async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
+async def company_lookup_handler(
+    repository: Any, job: AgentJob
+) -> LookupAttemptOutcome:
     """Execute one lookup attempt with a lossless, central lifecycle record."""
-    await _persist_lookup_attempt(LookupAttemptOutcome.accepted_for_job(job))
     try:
         result = await _execute_company_lookup(repository, job)
-    except JobExecutionCancelled:
-        await _persist_lookup_attempt(
-            LookupAttemptOutcome.cancelled_for_job(
-                job, detail="The lookup job was cancelled before completion."
-            )
+    except JobExecutionCancelled as exc:
+        exc.lookup_outcome = LookupAttemptOutcome.cancelled_for_job(
+            job, detail="The lookup job was cancelled before completion."
         )
         raise
     except JobExecutionBlocked as exc:
-        await _persist_lookup_attempt(
-            LookupAttemptOutcome.blocked_for_job(
-                job,
-                code=exc.code,
-                detail=exc.detail or "Lookup execution is blocked.",
-                recovery_action=exc.recovery_action,
-            )
+        exc.lookup_outcome = LookupAttemptOutcome.blocked_for_job(
+            job,
+            code=exc.code,
+            detail=exc.detail or "Lookup execution is blocked.",
+            recovery_action=exc.recovery_action,
         )
         raise
     except Exception as exc:
-        await _persist_lookup_attempt(
-            LookupAttemptOutcome.failed_for_job(
-                job,
-                detail=str(exc).strip() or "Lookup attempt failed unexpectedly.",
-                recovery_action="Retry the lookup after checking worker and provider availability.",
-            )
+        exc.lookup_outcome = LookupAttemptOutcome.failed_for_job(
+            job,
+            detail=str(exc).strip() or "Lookup attempt failed unexpectedly.",
+            recovery_action="Retry the lookup after checking worker and provider availability.",
         )
         raise
 
-    await _persist_lookup_attempt(LookupAttemptOutcome.from_pipeline_result(job, result))
+    lookup_outcome = LookupAttemptOutcome.from_pipeline_result(job, result)
     if result.state is PipelineExecutionState.BLOCKED:
         raise JobExecutionBlocked(
             code=result.code,
             detail=result.detail,
             recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
+            lookup_outcome=lookup_outcome,
         )
     if result.state is PipelineExecutionState.FAILED_STAGE:
-        raise RuntimeError(f"{result.code}: {result.detail}")
+        exc = RuntimeError(f"{result.code}: {result.detail}")
+        exc.lookup_outcome = lookup_outcome
+        raise exc
+    if lookup_outcome.disposition is LookupAttemptDisposition.CANCELLED:
+        exc = JobExecutionCancelled(result.detail)
+        exc.lookup_outcome = lookup_outcome
+        raise exc
+    return lookup_outcome
 
 
 async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:

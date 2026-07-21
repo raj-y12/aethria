@@ -8,12 +8,18 @@ from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 import metrics
+from jobs.lookup_outcomes import (
+    LookupAttemptDisposition,
+    LookupAttemptOutcome,
+    LookupOutcomeStoreUnavailable,
+)
 from jobs.models import (
     AgentJob,
     CheckpointStatus,
     DomainOutboxEvent,
     JobCheckpoint,
     JobStatus,
+    JobType,
 )
 from tenant_context import require_user_id
 from utils.timeutil import utcnow
@@ -56,6 +62,44 @@ def _outbox_from_row(row: Any) -> Optional[DomainOutboxEvent]:
 class DurableJobRepository:
     def __init__(self, pool: Any):
         self.pool = pool
+
+    async def _upsert_lookup_outcome(
+        self, conn: Any, outcome: LookupAttemptOutcome
+    ) -> None:
+        validated = LookupAttemptOutcome.model_validate(outcome)
+        try:
+            await conn.execute(
+                """
+                insert into public.lookup_job_outcomes (
+                  user_id, id, data, created_at
+                ) values ($1, $2, $3::jsonb, now())
+                on conflict (user_id, id) do update
+                set data = excluded.data
+                """,
+                validated.user_id,
+                validated.id,
+                json.dumps(validated.model_dump(mode="json")),
+            )
+        except Exception as exc:
+            raise LookupOutcomeStoreUnavailable(
+                "Atomic durable job/lookup outcome write failed"
+            ) from exc
+
+    @staticmethod
+    def _validate_lookup_outcome(
+        *, job: AgentJob, outcome: LookupAttemptOutcome
+    ) -> LookupAttemptOutcome:
+        validated = LookupAttemptOutcome.model_validate(outcome)
+        if job.job_type is not JobType.COMPANY_LOOKUP:
+            raise ValueError("lookup outcomes require a company lookup job")
+        if (
+            validated.user_id != job.user_id
+            or validated.job_id != job.job_id
+            or validated.pipeline_run_id != job.pipeline_run_id
+            or validated.attempt != max(1, job.attempts)
+        ):
+            raise ValueError("lookup outcome does not match the transitioned job attempt")
+        return validated
 
     async def _insert_outbox(
         self,
@@ -134,6 +178,10 @@ class DurableJobRepository:
                     raise RuntimeError("Idempotent job enqueue returned no row")
                 accepted = _job_from_row(row)
                 if inserted:
+                    if accepted.job_type is JobType.COMPANY_LOOKUP:
+                        await self._upsert_lookup_outcome(
+                            conn, LookupAttemptOutcome.accepted_for_job(accepted)
+                        )
                     await self._insert_outbox(
                         conn,
                         user_id=accepted.user_id,
@@ -188,13 +236,34 @@ class DurableJobRepository:
                         recovery_action = null
                     from candidate
                     where jobs.job_id = candidate.job_id
-                    returning jobs.*
+                    returning jobs.*, candidate.status as previous_status,
+                              candidate.attempts as previous_attempts,
+                              candidate.lease_owner as previous_lease_owner
                     """,
                     worker_id,
                     max(1, int(lease_seconds)),
                 )
                 claimed = _job_from_row(row)
                 if claimed is not None:
+                    if claimed.job_type is JobType.COMPANY_LOOKUP:
+                        row_data = db_row(row)
+                        if row_data.get("previous_status") == JobStatus.RUNNING.value:
+                            expired_attempt = claimed.model_copy(
+                                update={
+                                    "status": JobStatus.RUNNING,
+                                    "attempts": int(row_data["previous_attempts"]),
+                                    "lease_owner": row_data.get("previous_lease_owner"),
+                                }
+                            )
+                            await self._upsert_lookup_outcome(
+                                conn,
+                                LookupAttemptOutcome.lease_expired_for_job(
+                                    expired_attempt
+                                ),
+                            )
+                        await self._upsert_lookup_outcome(
+                            conn, LookupAttemptOutcome.accepted_for_job(claimed)
+                        )
                     metrics.inc_durable_job(
                         job_type=claimed.job_type.value, transition="claimed"
                     )
@@ -216,10 +285,18 @@ class DurableJobRepository:
                     where status = 'running'
                       and lease_expires_at <= now()
                       and attempts >= max_attempts
-                    returning job_id, user_id, job_type
+                    returning *
                     """
                 )
                 for row in rows:
+                    if str(row["job_type"]) == JobType.COMPANY_LOOKUP.value:
+                        exhausted_job = _job_from_row(row)
+                        if exhausted_job is None:
+                            raise RuntimeError("Dead-lettered lookup returned no job")
+                        await self._upsert_lookup_outcome(
+                            conn,
+                            LookupAttemptOutcome.lease_expired_for_job(exhausted_job),
+                        )
                     await self._insert_outbox(
                         conn,
                         user_id=str(row["user_id"]),
@@ -305,7 +382,12 @@ class DurableJobRepository:
             return checkpoint
 
     async def succeed(
-        self, *, user_id: str, job_id: str, worker_id: str
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        worker_id: str,
+        lookup_outcome: Optional[LookupAttemptOutcome] = None,
     ) -> bool:
         uid = require_user_id(user_id, context="DurableJobRepository.succeed")
         async with self.pool.acquire() as conn:
@@ -317,7 +399,7 @@ class DurableJobRepository:
                         lease_owner = null, lease_expires_at = null, heartbeat_at = now()
                     where job_id = $1 and user_id = $2 and lease_owner = $3
                       and status = 'running'
-                    returning job_id, job_type
+                    returning *
                     """,
                     job_id,
                     uid,
@@ -325,6 +407,21 @@ class DurableJobRepository:
                 )
                 if row is None:
                     return False
+                transitioned_job = _job_from_row(row)
+                if transitioned_job is None:
+                    raise RuntimeError("Succeeded job transition returned no job")
+                if transitioned_job.job_type is JobType.COMPANY_LOOKUP:
+                    if lookup_outcome is None:
+                        raise ValueError("lookup success requires its terminal outcome")
+                    validated_outcome = self._validate_lookup_outcome(
+                        job=transitioned_job, outcome=lookup_outcome
+                    )
+                    if validated_outcome.disposition not in {
+                        LookupAttemptDisposition.SUCCEEDED,
+                        LookupAttemptDisposition.SKIPPED,
+                    }:
+                        raise ValueError("lookup success has an incompatible outcome")
+                    await self._upsert_lookup_outcome(conn, validated_outcome)
                 await self._insert_outbox(
                     conn,
                     user_id=uid,
@@ -333,7 +430,7 @@ class DurableJobRepository:
                     payload={"job_id": job_id, "status": "succeeded"},
                 )
                 metrics.inc_durable_job(
-                    job_type=str(row["job_type"]), transition="completed"
+                    job_type=transitioned_job.job_type.value, transition="completed"
                 )
                 return True
 
@@ -345,6 +442,7 @@ class DurableJobRepository:
         worker_id: str,
         error: str,
         base_delay_seconds: int = 5,
+        lookup_outcome: Optional[LookupAttemptOutcome] = None,
     ) -> Optional[AgentJob]:
         uid = require_user_id(user_id, context="DurableJobRepository.retry")
         async with self.pool.acquire() as conn:
@@ -370,6 +468,23 @@ class DurableJobRepository:
                     max(1, int(base_delay_seconds)),
                 )
                 job = _job_from_row(row)
+                if job is not None and job.job_type is JobType.COMPANY_LOOKUP:
+                    candidate_outcome = lookup_outcome or LookupAttemptOutcome.failed_for_job(
+                        job,
+                        detail=str(error or "").strip() or "Lookup attempt failed.",
+                        recovery_action="Retry the lookup after checking worker and provider availability.",
+                    )
+                    validated_outcome = self._validate_lookup_outcome(
+                        job=job, outcome=candidate_outcome
+                    )
+                    expected_disposition = (
+                        LookupAttemptDisposition.TERMINAL_FAILURE
+                        if job.status is JobStatus.DEAD_LETTER
+                        else LookupAttemptDisposition.RETRYABLE_FAILURE
+                    )
+                    if validated_outcome.disposition is not expected_disposition:
+                        raise ValueError("lookup retry has an incompatible outcome")
+                    await self._upsert_lookup_outcome(conn, validated_outcome)
                 if job and job.status is JobStatus.DEAD_LETTER:
                     await self._insert_outbox(
                         conn,
@@ -417,6 +532,7 @@ class DurableJobRepository:
         code: str,
         detail: str,
         recovery_action: str,
+        lookup_outcome: Optional[LookupAttemptOutcome] = None,
     ) -> Optional[AgentJob]:
         uid = require_user_id(user_id, context="DurableJobRepository.block")
         safe_code = str(code or "").strip().lower()[:80]
@@ -454,6 +570,19 @@ class DurableJobRepository:
                 job = _job_from_row(row)
                 if job is None:
                     return None
+                if job.job_type is JobType.COMPANY_LOOKUP:
+                    candidate_outcome = lookup_outcome or LookupAttemptOutcome.blocked_for_job(
+                        job,
+                        code=safe_code,
+                        detail=safe_detail or "Lookup execution is blocked.",
+                        recovery_action=safe_recovery,
+                    )
+                    validated_outcome = self._validate_lookup_outcome(
+                        job=job, outcome=candidate_outcome
+                    )
+                    if validated_outcome.disposition is not LookupAttemptDisposition.BLOCKED:
+                        raise ValueError("lookup block has an incompatible outcome")
+                    await self._upsert_lookup_outcome(conn, validated_outcome)
                 await self._insert_outbox(
                     conn,
                     user_id=uid,
@@ -471,18 +600,75 @@ class DurableJobRepository:
                 )
                 return job
 
+    async def cancel_owned(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        worker_id: str,
+        lookup_outcome: LookupAttemptOutcome,
+    ) -> Optional[AgentJob]:
+        """Cancel only the exact running lease and publish its outcome atomically."""
+        uid = require_user_id(user_id, context="DurableJobRepository.cancel_owned")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """
+                    update public.agent_jobs
+                    set status = 'cancelled',
+                        completed_at = coalesce(completed_at, now()),
+                        lease_owner = null, lease_expires_at = null,
+                        heartbeat_at = now()
+                    where job_id = $1 and user_id = $2 and lease_owner = $3
+                      and status = 'running'
+                    returning *
+                    """,
+                    job_id,
+                    uid,
+                    worker_id,
+                )
+                job = _job_from_row(row)
+                if job is None:
+                    return None
+                validated_outcome = self._validate_lookup_outcome(
+                    job=job, outcome=lookup_outcome
+                )
+                if validated_outcome.disposition is not LookupAttemptDisposition.CANCELLED:
+                    raise ValueError("lookup cancellation has an incompatible outcome")
+                await self._upsert_lookup_outcome(conn, validated_outcome)
+                await self._insert_outbox(
+                    conn,
+                    user_id=uid,
+                    aggregate_id=job_id,
+                    event_type="agent_job.cancelled",
+                    payload={"job_id": job_id, "status": "cancelled"},
+                )
+                metrics.inc_durable_job(
+                    job_type=job.job_type.value, transition="cancelled"
+                )
+                return job
+
     async def cancel(self, *, user_id: str, job_id: str) -> Optional[AgentJob]:
         uid = require_user_id(user_id, context="DurableJobRepository.cancel")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(
                     """
-                    update public.agent_jobs
-                    set status = 'cancelled', completed_at = coalesce(completed_at, now()),
+                    with candidate as (
+                      select * from public.agent_jobs
+                      where job_id = $1 and user_id = $2
+                        and status not in ('succeeded', 'cancelled')
+                      for update
+                    )
+                    update public.agent_jobs as jobs
+                    set status = 'cancelled',
+                        completed_at = coalesce(jobs.completed_at, now()),
                         lease_owner = null, lease_expires_at = null
-                    where job_id = $1 and user_id = $2
-                      and status not in ('succeeded', 'cancelled')
-                    returning *
+                    from candidate
+                    where jobs.job_id = candidate.job_id
+                      and jobs.user_id = candidate.user_id
+                    returning jobs.*, candidate.status as previous_status,
+                              candidate.attempts as previous_attempts
                     """,
                     job_id,
                     uid,
@@ -496,6 +682,27 @@ class DurableJobRepository:
                     )
                 job = _job_from_row(row)
                 if transitioned and job and job.status is JobStatus.CANCELLED:
+                    if job.job_type is JobType.COMPANY_LOOKUP:
+                        row_data = db_row(row)
+                        previous_status = JobStatus(
+                            row_data.get("previous_status") or JobStatus.RUNNING.value
+                        )
+                        previous_attempts = int(
+                            row_data.get("previous_attempts", job.attempts)
+                        )
+                        planning_job = job.model_copy(
+                            update={
+                                "status": previous_status,
+                                "attempts": previous_attempts,
+                            }
+                        )
+                        await self._upsert_lookup_outcome(
+                            conn,
+                            LookupAttemptOutcome.cancelled_for_job(
+                                planning_job,
+                                detail="The lookup job was cancelled by the operator.",
+                            ),
+                        )
                     await self._insert_outbox(
                         conn,
                         user_id=uid,
@@ -537,6 +744,10 @@ class DurableJobRepository:
                 job = _job_from_row(row)
                 if job is None:
                     return None
+                if job.job_type is JobType.COMPANY_LOOKUP:
+                    await self._upsert_lookup_outcome(
+                        conn, LookupAttemptOutcome.accepted_for_job(job)
+                    )
                 await self._insert_outbox(
                     conn,
                     user_id=uid,

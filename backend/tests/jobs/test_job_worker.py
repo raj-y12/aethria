@@ -5,11 +5,14 @@ import pytest
 
 from jobs.models import (
     AgentJob,
+    CompanyLookupPayload,
     JobExecutionBlocked,
     JobExecutionCancelled,
     JobType,
     PipelineCyclePayload,
 )
+from jobs.lookup_outcomes import LookupAttemptOutcome
+from pipeline_execution import PipelineExecutionResult
 
 
 def _job(user_id="user-a"):
@@ -18,6 +21,22 @@ def _job(user_id="user-a"):
         job_type=JobType.PIPELINE_CYCLE,
         idempotency_key=f"cycle:{user_id}:1",
         payload=PipelineCyclePayload(user_id=user_id),
+        attempts=1,
+        status="running",
+        lease_owner="worker-a",
+    )
+
+
+def _lookup_job():
+    return AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:atomic-outcome",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-atomic-outcome",
+        ),
         attempts=1,
         status="running",
         lease_owner="worker-a",
@@ -297,3 +316,67 @@ async def test_missing_handler_rejected_retry_is_lease_loss(monkeypatch):
     await worker.execute(_job())
 
     assert outcomes == ["lease_lost"]
+
+
+@pytest.mark.asyncio
+async def test_lookup_terminal_outcome_is_handed_to_conditional_success_transition():
+    worker_module = importlib.import_module("jobs.worker")
+    job = _lookup_job()
+    repository = _Repository(job)
+    outcome = LookupAttemptOutcome.from_pipeline_result(
+        job,
+        PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="startup-1",
+        ),
+    )
+
+    async def handler(_job):
+        return outcome
+
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={JobType.COMPANY_LOOKUP: handler},
+        worker_id="worker-a",
+        heartbeat_seconds=60,
+    )
+
+    await worker.execute(job)
+
+    assert repository.succeeded[0]["lookup_outcome"] == outcome
+
+
+@pytest.mark.asyncio
+async def test_lookup_cooperative_cancellation_uses_owned_atomic_transition():
+    worker_module = importlib.import_module("jobs.worker")
+    job = _lookup_job()
+    repository = _Repository(job)
+    repository.cancelled_owned = []
+
+    async def cancel_owned(**kwargs):
+        repository.cancelled_owned.append(kwargs)
+        return job.model_copy(update={"status": "cancelled"})
+
+    repository.cancel_owned = cancel_owned
+    outcome = LookupAttemptOutcome.cancelled_for_job(
+        job, detail="Lookup was cancelled at a safe boundary."
+    )
+
+    async def handler(_job):
+        exc = JobExecutionCancelled("cancelled")
+        exc.lookup_outcome = outcome
+        raise exc
+
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={JobType.COMPANY_LOOKUP: handler},
+        worker_id="worker-a",
+        heartbeat_seconds=60,
+    )
+
+    await worker.execute(job)
+
+    assert repository.cancelled_owned[0]["lookup_outcome"] == outcome
+    assert repository.succeeded == []
+    assert repository.retried == []

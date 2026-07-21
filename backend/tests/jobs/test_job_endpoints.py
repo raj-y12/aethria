@@ -47,6 +47,7 @@ def _lookup_job(*, user_id="user-a", status=JobStatus.DEAD_LETTER):
 class _Repository:
     def __init__(self, jobs):
         self.jobs = {job.job_id: job for job in jobs}
+        self.atomic_outcomes = []
 
     async def get_job(self, *, user_id, job_id):
         job = self.jobs.get(job_id)
@@ -77,6 +78,12 @@ class _Repository:
             }
         )
         self.jobs[job_id] = updated
+        if updated.job_type is JobType.COMPANY_LOOKUP:
+            from jobs.lookup_outcomes import LookupAttemptOutcome
+
+            self.atomic_outcomes.append(
+                LookupAttemptOutcome.accepted_for_job(updated)
+            )
         return updated
 
     async def cancel(self, *, user_id, job_id):
@@ -87,6 +94,14 @@ class _Repository:
             return job
         updated = job.model_copy(update={"status": JobStatus.CANCELLED})
         self.jobs[job_id] = updated
+        if updated.job_type is JobType.COMPANY_LOOKUP:
+            from jobs.lookup_outcomes import LookupAttemptOutcome
+
+            self.atomic_outcomes.append(
+                LookupAttemptOutcome.cancelled_for_job(
+                    job, detail="The lookup job was cancelled by the operator."
+                )
+            )
         return updated
 
 
@@ -172,14 +187,11 @@ def test_retry_reuses_same_job_and_adds_one_safe_attempt(monkeypatch):
     assert response.json()["max_attempts"] == 4
 
 
-def test_lookup_retry_publishes_new_attempt_before_returning_accepted(monkeypatch):
+def test_lookup_retry_uses_repository_atomic_outcome_before_returning_accepted(monkeypatch):
     import routers.jobs as jobs_router
 
-    captured = []
-
-    async def persist(outcome):
-        captured.append(outcome)
-        return outcome
+    async def persist(_outcome):
+        raise AssertionError("router must not publish outside the job transaction")
 
     monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
     repository = _Repository([_lookup_job()])
@@ -190,19 +202,18 @@ def test_lookup_retry_publishes_new_attempt_before_returning_accepted(monkeypatc
     )
 
     assert response.status_code == 202
-    assert captured[0].lookup_id == "lookup-contract-1"
-    assert captured[0].attempt == 4
-    assert captured[0].disposition.value == "accepted"
+    assert repository.atomic_outcomes[0].lookup_id == "lookup-contract-1"
+    assert repository.atomic_outcomes[0].attempt == 4
+    assert repository.atomic_outcomes[0].disposition.value == "accepted"
 
 
 def test_lookup_retry_explicitly_fails_if_attempt_status_cannot_be_persisted(monkeypatch):
-    import routers.jobs as jobs_router
-
-    async def persist(_outcome):
-        raise LookupOutcomeStoreUnavailable("write failed")
-
-    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
     repository = _Repository([_lookup_job()])
+
+    async def fail_atomic_requeue(**_kwargs):
+        raise LookupOutcomeStoreUnavailable("atomic lookup outcome write failed")
+
+    repository.requeue = fail_atomic_requeue
 
     response = _client(monkeypatch, repository).post(
         "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/retry",
@@ -211,6 +222,25 @@ def test_lookup_retry_explicitly_fails_if_attempt_status_cannot_be_persisted(mon
 
     assert response.status_code == 503
     assert response.json()["detail"]["reason"] == "lookup_outcome_store_unavailable"
+
+
+def test_lookup_cancel_uses_repository_atomic_outcome_without_router_write(monkeypatch):
+    import routers.jobs as jobs_router
+
+    async def persist(_outcome):
+        raise AssertionError("router must not publish outside the job transaction")
+
+    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
+    repository = _Repository([_lookup_job(status=JobStatus.RUNNING)])
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/cancel",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 202
+    assert repository.atomic_outcomes[0].disposition.value == "cancelled"
+    assert repository.atomic_outcomes[0].attempt == 3
 
 
 def test_succeeded_job_cannot_be_retried_or_cancelled(monkeypatch):

@@ -303,6 +303,31 @@ class LookupAttemptOutcome(BaseModel):
             recovery_action=recovery_action,
         )
 
+    @classmethod
+    def lease_expired_for_job(cls, job: AgentJob) -> "LookupAttemptOutcome":
+        terminal = job.attempts >= job.max_attempts
+        return cls._for_job(
+            job,
+            attempt=max(1, job.attempts),
+            status=LookupExecutionStatus.FAILED,
+            disposition=(
+                LookupAttemptDisposition.TERMINAL_FAILURE
+                if terminal
+                else LookupAttemptDisposition.RETRYABLE_FAILURE
+            ),
+            code="lookup_attempt_lease_expired",
+            detail=(
+                "The worker lease expired after the final lookup attempt."
+                if terminal
+                else "The worker lease expired before the lookup attempt completed."
+            ),
+            recovery_action=(
+                "Inspect worker health, then explicitly retry the lookup."
+                if terminal
+                else "The durable worker will retry this lookup attempt."
+            ),
+        )
+
 
 def _require_store() -> None:
     if not env_config.use_supabase_storage():

@@ -31,13 +31,21 @@ class JobLeaseLost(RuntimeError):
 class JobExecutionBlocked(RuntimeError):
     """Execution cannot continue until an explicit operator action is complete."""
 
-    def __init__(self, *, code: str, detail: str, recovery_action: str):
+    def __init__(
+        self,
+        *,
+        code: str,
+        detail: str,
+        recovery_action: str,
+        lookup_outcome: Any = None,
+    ):
         normalized_code = str(code or "").strip().lower()
         if not normalized_code or not normalized_code.replace("_", "a").isalnum():
             raise ValueError("blocked job code must be lowercase snake_case")
         self.code = normalized_code[:80]
         self.detail = str(detail or "").strip()[:1000]
         self.recovery_action = str(recovery_action or "").strip()[:1000]
+        self.lookup_outcome = lookup_outcome
         if not self.recovery_action:
             raise ValueError("blocked job recovery_action is required")
         super().__init__(f"{self.code}: {self.detail or self.recovery_action}")

@@ -52,11 +52,6 @@ def _admit_evaluation_prerequisites(monkeypatch):
 
     monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
 
-    async def persist(outcome):
-        return outcome
-
-    monkeypatch.setattr(handlers, "_persist_lookup_attempt", persist)
-
 
 class _JobRepository:
     pool = object()

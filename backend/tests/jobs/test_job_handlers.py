@@ -185,7 +185,7 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
         lease_owner="worker-a",
     )
 
-    await handlers.company_lookup_handler(repository, job)
+    terminal_outcome = await handlers.company_lookup_handler(repository, job)
 
     assert calls[0][0:2] == ("user-a", "Acme")
     assert calls[0][2]["pipeline_run_id"] == job.pipeline_run_id
@@ -204,9 +204,45 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert repository.checkpoints[1]["stage"] == "scout"
     assert repository.checkpoints[-1]["stage"] == "lookup_result"
     assert repository.checkpoints[-1]["output_metadata"]["state"] == "completed"
-    assert [
-        item.disposition.value for item in _capture_lookup_attempt_outcomes
-    ] == ["accepted", "succeeded"]
+    assert _capture_lookup_attempt_outcomes == []
+    assert terminal_outcome.disposition.value == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_returns_block_outcome_to_atomic_worker_transition(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:blocked-outcome",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            website="https://acme.example",
+        ),
+        attempts=1,
+        status=JobStatus.RUNNING,
+        lease_owner="worker-a",
+    )
+
+    async def execute(_repository, _job):
+        raise JobExecutionBlocked(
+            code="published_policy_required",
+            detail="A published policy is required.",
+            recovery_action="Publish policy and retry.",
+        )
+
+    monkeypatch.setattr(handlers, "_execute_company_lookup", execute)
+
+    with pytest.raises(JobExecutionBlocked) as exc:
+        await handlers.company_lookup_handler(repository, job)
+
+    assert _capture_lookup_attempt_outcomes == []
+    assert exc.value.lookup_outcome.disposition.value == "blocked"
+    assert exc.value.lookup_outcome.attempt == 1
 
 
 @pytest.mark.asyncio
@@ -390,12 +426,11 @@ async def test_lookup_handler_observes_cancellation_between_checkpoints(
 
     repository.get_job = get_job
 
-    with pytest.raises(JobExecutionCancelled):
+    with pytest.raises(JobExecutionCancelled) as exc:
         await handlers.company_lookup_handler(repository, job)
 
-    assert [
-        item.disposition.value for item in _capture_lookup_attempt_outcomes
-    ] == ["accepted", "cancelled"]
+    assert _capture_lookup_attempt_outcomes == []
+    assert exc.value.lookup_outcome.disposition.value == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -567,9 +602,8 @@ async def test_lookup_handler_preserves_identity_then_blocks_before_legacy_looku
     assert exc.value.code == code
     assert events == ["identity", "prerequisites"]
     assert repository.checkpoints[-1]["stage"] == "identity"
-    assert [
-        item.disposition.value for item in _capture_lookup_attempt_outcomes
-    ] == ["accepted", "blocked"]
+    assert _capture_lookup_attempt_outcomes == []
+    assert exc.value.lookup_outcome.disposition.value == "blocked"
 
 
 @pytest.mark.asyncio
@@ -597,12 +631,11 @@ async def test_lookup_handler_records_retryable_failure_for_unexpected_pre_run_e
         status=JobStatus.RUNNING,
     )
 
-    with pytest.raises(RuntimeError, match="resolver unavailable"):
+    with pytest.raises(RuntimeError, match="resolver unavailable") as exc:
         await handlers.company_lookup_handler(repository, job)
 
-    assert [
-        item.disposition.value for item in _capture_lookup_attempt_outcomes
-    ] == ["accepted", "retryable_failure"]
+    assert _capture_lookup_attempt_outcomes == []
+    assert exc.value.lookup_outcome.disposition.value == "retryable_failure"
 
 
 @pytest.mark.asyncio

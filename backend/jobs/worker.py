@@ -17,6 +17,7 @@ from jobs.fencing import (
     reset_lease_fence,
 )
 from jobs.models import AgentJob, JobExecutionBlocked, JobExecutionCancelled, JobType
+from jobs.lookup_outcomes import LookupAttemptOutcome
 from jobs.postgres import database_dsn
 from utils.timeutil import utcnow
 
@@ -130,11 +131,16 @@ class DurableJobWorker:
                     )
                 )
                 try:
-                    await handler_task
+                    handler_result = await handler_task
                     transitioned = await self.repository.succeed(
                         user_id=job.user_id,
                         job_id=job.job_id,
                         worker_id=self.worker_id,
+                        lookup_outcome=(
+                            handler_result
+                            if isinstance(handler_result, LookupAttemptOutcome)
+                            else None
+                        ),
                     )
                     if not transitioned:
                         lease_fence.lose("Job completion was rejected by the lease fence.")
@@ -146,8 +152,27 @@ class DurableJobWorker:
                     outcome = "cancelled"
                     handler_task.cancel()
                     raise
-                except JobExecutionCancelled:
-                    outcome = "cancelled"
+                except JobExecutionCancelled as exc:
+                    lookup_outcome = getattr(exc, "lookup_outcome", None)
+                    cancel_owned = getattr(self.repository, "cancel_owned", None)
+                    if isinstance(lookup_outcome, LookupAttemptOutcome) and callable(
+                        cancel_owned
+                    ):
+                        transitioned = await cancel_owned(
+                            user_id=job.user_id,
+                            job_id=job.job_id,
+                            worker_id=self.worker_id,
+                            lookup_outcome=lookup_outcome,
+                        )
+                        if transitioned is None:
+                            lease_fence.lose(
+                                "Lookup cancellation was rejected by the lease fence."
+                            )
+                            outcome = "lease_lost"
+                        else:
+                            outcome = "cancelled"
+                    else:
+                        outcome = "cancelled"
                 except JobExecutionBlocked as exc:
                     transitioned = await self.repository.block(
                         user_id=job.user_id,
@@ -156,6 +181,7 @@ class DurableJobWorker:
                         code=exc.code,
                         detail=exc.detail,
                         recovery_action=exc.recovery_action,
+                        lookup_outcome=getattr(exc, "lookup_outcome", None),
                     )
                     if not transitioned:
                         lease_fence.lose("Job block transition was rejected by the lease fence.")
@@ -166,6 +192,7 @@ class DurableJobWorker:
                         job_id=job.job_id,
                         worker_id=self.worker_id,
                         error=str(exc),
+                        lookup_outcome=getattr(exc, "lookup_outcome", None),
                     )
                     if not transitioned:
                         lease_fence.lose("Job retry transition was rejected by the lease fence.")
