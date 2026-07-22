@@ -353,6 +353,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     (companyResolution?.founder_names?.length ? companyResolution.founder_names : null) ??
     displayStartup?.scout.founder_names ??
     [];
+  const founderTeamItems = (displayStartup?.review?.team_analysis ?? []).filter(
+    (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
+  );
+  const founderSignal = (displayStartup?.scout.founder_signal ?? '').trim();
+  const founderQuote = (displayStartup?.scout.founder_quote ?? '').trim();
   const resolutionStatus = (
     displayStartup?.scout.resolution_status ??
     companyResolution?.resolution_status ??
@@ -690,10 +695,47 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </motion.section>
             )}
 
+            {/* ── Founder ── */}
+            {(founderNames.length > 0 || founderTeamItems.length > 0 || founderSignal || founderQuote) && (
+              <motion.section {...sectionReveal} className="memoDocSection memoFounderSection" aria-labelledby="memo-founder">
+                <MemoSectionTitle number="02" id="memo-founder">Founder</MemoSectionTitle>
+                {founderNames.length > 0 ? (
+                  <p className="memoDocSubhead">{founderNames.join(', ')}</p>
+                ) : null}
+                {founderSignal ? (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">The read</p>
+                    <p className="memoDocProse">{renderWithMonoNumbers(founderSignal)}</p>
+                  </div>
+                ) : null}
+                {founderQuote ? (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">In their words</p>
+                    <p className="memoDocProse">{'“'}{founderQuote}{'”'}</p>
+                  </div>
+                ) : null}
+                {founderTeamItems.length > 0 ? (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">Team assessment</p>
+                    <ExpandableList
+                      items={founderTeamItems}
+                      cap={3}
+                      renderItem={(item, i) => (
+                        <li key={i} className="memoListItem">
+                          <span className="memoBullet" aria-hidden>·</span>
+                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
+                        </li>
+                      )}
+                    />
+                  </div>
+                ) : null}
+              </motion.section>
+            )}
+
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (
               <motion.section {...sectionReveal} className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
-                <MemoSectionTitle number="02" id="memo-case">Why Now</MemoSectionTitle>
+                <MemoSectionTitle number="03" id="memo-case">Why Now</MemoSectionTitle>
                 <ol className="memoCaseList">
                   {investmentCasePoints.map((point, i) => (
                     <li key={i} className={`memoCasePoint${i === 0 ? ' memoCasePoint--lead' : ''}`}>
@@ -707,7 +749,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Investment killers ── */}
             {memoKillers.length > 0 && (
               <motion.section {...sectionReveal} className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
-                <MemoSectionTitle number="03" id="memo-killers">What Limits Conviction</MemoSectionTitle>
+                <MemoSectionTitle number="04" id="memo-killers">What Limits Conviction</MemoSectionTitle>
                 <ol className="memoKillerList">
                   {memoKillers.map((killer, i) => (
                     <li key={i} className={`memoKiller memoKiller--${killer.severity}`}>
@@ -722,14 +764,12 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Assessment ── */}
             {(() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
-              const teamItems = (displayStartup.review?.team_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
               const showScores = config.memo.includeScoreReasoning && hasScores;
               const improvements = (displayStartup.review?.improvement_to_9 ?? []).filter((s) => String(s ?? '').trim());
               const assessmentReadouts = [
-                { label: 'Team', items: teamItems },
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
@@ -741,7 +781,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               }
               return (
                 <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
+                  <MemoSectionTitle number="05" id="memo-scoring">Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
                       <AssessmentScorecard
@@ -818,7 +858,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Fund thesis alignment ── */}
             {thesisSection.visible && (
               <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
-                <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
+                <MemoSectionTitle number="06" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
                   {(thesisSection.score != null || thesisSection.headlineTag) && (
                     <p className="memoScoreHeadline">
@@ -864,7 +904,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Risk register ── */}
             {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
               <motion.section {...sectionReveal} className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
-                <MemoSectionTitle number="06" id="memo-risk-register">Risks</MemoSectionTitle>
+                <MemoSectionTitle number="07" id="memo-risk-register">Risks</MemoSectionTitle>
                 {adverseRegister.length > 0 && (
                   <p className="memoEvStatLine">
                     {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}

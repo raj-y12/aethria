@@ -67,6 +67,10 @@ export interface Scout {
   location?: string;
   est_tam?: string;
   founder_names?: string[];
+  /** Optional founder-signal read + quote; enrichment/gathering populates these,
+   *  and the memo Founder section renders them only when present. */
+  founder_signal?: string;
+  founder_quote?: string;
   references?: string[];
   source_evidence?: Array<{
     reference: string;

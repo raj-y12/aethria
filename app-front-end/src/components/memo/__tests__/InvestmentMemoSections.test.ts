@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest';
 import memoSource from '../../InvestmentMemoContent.tsx?raw';
 
 describe('Investment memo section order', () => {
-  it('promotes thesis alignment to section 05 and moves risks to section 06', () => {
+  it('makes founder section 02 and shifts thesis to 06 and risks to 07', () => {
     expect(memoSource).toMatch(
-      /<MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment<\/MemoSectionTitle>/,
+      /<MemoSectionTitle number="02" id="memo-founder">Founder<\/MemoSectionTitle>/,
     );
     expect(memoSource).toMatch(
-      /<MemoSectionTitle number="06" id="memo-risk-register">Risks<\/MemoSectionTitle>/,
+      /<MemoSectionTitle number="06" id="memo-thesis-alignment">Thesis alignment<\/MemoSectionTitle>/,
+    );
+    expect(memoSource).toMatch(
+      /<MemoSectionTitle number="07" id="memo-risk-register">Risks<\/MemoSectionTitle>/,
     );
   });
 
