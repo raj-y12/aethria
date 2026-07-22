@@ -11,9 +11,17 @@ import logging
 import os
 import random
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Protocol, Tuple
 
-from models import EvaluationManifest, Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
+from models import (
+    EvaluationManifest,
+    EvaluationManifestIdentity,
+    Startup,
+    ScoutInfo,
+    ReviewInfo,
+    PartnerInfo,
+    Financials,
+)
 from pipeline_state import get_pipeline_state_row, pipeline_stage_log, upsert_pipeline_state
 from agent_trace import (
     build_partner_trace,
@@ -27,6 +35,79 @@ from utils.partner_codes import normalize_recommendation
 from utils.storage import _merge_startup_dict_patch
 
 logger = logging.getLogger(__name__)
+
+
+class OwnershipFence(Protocol):
+    def ensure_owned(self) -> None: ...
+
+
+_MUTATING_QUERY_METHODS = frozenset({"delete", "insert", "update", "upsert"})
+
+
+class _LeaseFencedQuery:
+    """Proxy a PostgREST query and fence every mutation at execution time."""
+
+    def __init__(
+        self,
+        query: Any,
+        fence: OwnershipFence,
+        *,
+        mutating: bool = False,
+    ) -> None:
+        self._query = query
+        self._fence = fence
+        self._mutating = mutating
+
+    def _wrap(self, value: Any, *, mutating: bool) -> Any:
+        if value is self._query:
+            self._mutating = self._mutating or mutating
+            return self
+        if callable(getattr(value, "execute", None)):
+            return _LeaseFencedQuery(
+                value,
+                self._fence,
+                mutating=self._mutating or mutating,
+            )
+        return value
+
+    def execute(self, *args: Any, **kwargs: Any) -> Any:
+        if self._mutating:
+            self._fence.ensure_owned()
+        return self._query.execute(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        attribute = getattr(self._query, name)
+        mutating = name in _MUTATING_QUERY_METHODS
+        if not callable(attribute):
+            return self._wrap(attribute, mutating=mutating)
+
+        def invoke(*args: Any, **kwargs: Any) -> Any:
+            if mutating:
+                self._fence.ensure_owned()
+            return self._wrap(
+                attribute(*args, **kwargs),
+                mutating=mutating,
+            )
+
+        return invoke
+
+
+class _LeaseFencedClient:
+    """Keep reads transparent while closing every table-mutation boundary."""
+
+    def __init__(self, client: Any, fence: OwnershipFence) -> None:
+        self._client = client
+        self._fence = fence
+
+    def table(self, *args: Any, **kwargs: Any) -> _LeaseFencedQuery:
+        return _LeaseFencedQuery(
+            self._client.table(*args, **kwargs),
+            self._fence,
+        )
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._client, name)
+
 
 TABLE = "startups"
 # errno 11 (EAGAIN, Linux) / 35 (EAGAIN/EWOULDBLOCK, macOS): transient client-side
@@ -240,10 +321,39 @@ class SupabaseStartupsStorage:
     Same public surface as utils.storage.Storage where used by the pipeline/API.
     """
 
-    def __init__(self, client: Any, user_id: str) -> None:
+    def __init__(
+        self,
+        client: Any,
+        user_id: str,
+        *,
+        ownership_fence: Optional[OwnershipFence] = None,
+    ) -> None:
         self._client = client
         self._user_id = user_id
+        self._ownership_fence: Optional[OwnershipFence] = None
         self.logger = logger
+        if ownership_fence is not None:
+            self.bind_ownership_fence(ownership_fence)
+
+    def _ensure_write_owned(self) -> None:
+        """Reject an authoritative mutation after its durable lease is lost.
+
+        ``asyncio.to_thread`` copies context variables but cancelling the awaiting
+        coroutine does not stop the worker thread.  The storage instance therefore
+        retains the mutable fence captured when it was built and checks it at the
+        final synchronous write boundary.
+        """
+        fence = getattr(self, "_ownership_fence", None)
+        if fence is not None:
+            fence.ensure_owned()
+
+    def bind_ownership_fence(self, fence: OwnershipFence) -> None:
+        """Attach the durable ownership token captured by the runner."""
+        self._ownership_fence = fence
+        if isinstance(self._client, _LeaseFencedClient):
+            self._client._fence = fence
+            return
+        self._client = _LeaseFencedClient(self._client, fence)
 
     def _is_transient_error(self, exc: BaseException) -> bool:
         if isinstance(exc, OSError) and getattr(exc, "errno", None) in _TRANSIENT_ERRNOS:
@@ -309,11 +419,13 @@ class SupabaseStartupsStorage:
 
     def upsert_startup_dict(self, d: dict) -> None:
         """Single-row upsert on (user_id, startup_id)."""
+        self._ensure_write_owned()
         row = _dict_to_row(d, self._user_id)
         legacy = dict(row)
         warned: set[str] = set()
         for _ in range(4):
             try:
+                self._ensure_write_owned()
                 self._client.table(TABLE).upsert(
                     legacy, on_conflict="user_id,startup_id", returning="minimal"
                 ).execute()
@@ -392,15 +504,25 @@ class SupabaseStartupsStorage:
         self,
         startup_id: str,
         manifest: EvaluationManifest,
+        *,
+        manifest_identity: EvaluationManifestIdentity | Dict[str, Any],
+        partner_execution_prompt_version: Optional[str],
     ) -> bool:
         """Merge one portable evaluation manifest into the startup's agent trace."""
         if not startup_id:
             return False
+        from evaluation.manifest import validate_evaluation_manifest_for_persistence
+
+        validated = validate_evaluation_manifest_for_persistence(
+            manifest,
+            manifest_identity=manifest_identity,
+            partner_execution_prompt_version=partner_execution_prompt_version,
+            user_id=self._user_id,
+        )
         st = self.get_startup(startup_id)
         if st is None:
             self.logger.error("Startup %s not found for evaluation manifest", startup_id)
             return False
-        validated = EvaluationManifest.model_validate(manifest)
         trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
         trace["evaluation_manifest"] = validated.model_dump(mode="json")
         st.agent_trace = trace
@@ -421,6 +543,7 @@ class SupabaseStartupsStorage:
         stage handoff. Mirrors upsert_startup_dict's legacy-column fallback so it
         degrades gracefully on not-yet-migrated schemas.
         """
+        self._ensure_write_owned()
         # Keep None values (e.g. clearing unresolved_at); only strip identity/immutable keys.
         payload = {
             k: v
@@ -434,6 +557,7 @@ class SupabaseStartupsStorage:
             if not payload:
                 return
             try:
+                self._ensure_write_owned()
                 (
                     self._client.table(TABLE)
                     .update(payload, returning="minimal")
@@ -979,8 +1103,16 @@ class SupabaseStartupsStorage:
         *,
         investment_memo_markdown: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
+        evaluation_manifest_identity: Optional[
+            EvaluationManifestIdentity | Dict[str, Any]
+        ] = None,
+        partner_execution_prompt_version: Optional[str] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
+        if pr and evaluation_manifest_identity is None:
+            raise ValueError(
+                "evaluation_manifest_identity is required for governed persistence"
+            )
         st = self.get_startup(startup_id)
         if st is None:
             self.logger.error("Startup %s not found for partner decision", startup_id)
@@ -1009,7 +1141,10 @@ class SupabaseStartupsStorage:
             ),
         )
         if pr:
-            from evaluation.manifest import build_evaluation_manifest
+            from evaluation.manifest import (
+                build_evaluation_manifest,
+                validate_evaluation_manifest_for_persistence,
+            )
 
             if str(getattr(st.scout_info, "operator_context", None) or "").strip():
                 evaluation_path = "rerun"
@@ -1021,11 +1156,14 @@ class SupabaseStartupsStorage:
                 st,
                 pipeline_run_id=pr,
                 evaluation_path=evaluation_path,
-                model_metadata={
-                    "scout": os.getenv("SCOUT_MODEL", "gpt-5-nano"),
-                    "reviewer": os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
-                    "partner": os.getenv("PARTNER_MODEL", "gpt-5-nano"),
-                },
+                manifest_identity=evaluation_manifest_identity,
+                partner_execution_prompt_version=partner_execution_prompt_version,
+            )
+            manifest = validate_evaluation_manifest_for_persistence(
+                manifest,
+                manifest_identity=evaluation_manifest_identity,
+                partner_execution_prompt_version=partner_execution_prompt_version,
+                user_id=self._user_id,
             )
             trace = dict(st.agent_trace) if isinstance(st.agent_trace, dict) else {}
             trace["evaluation_manifest"] = manifest.model_dump(mode="json")

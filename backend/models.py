@@ -3,7 +3,7 @@ Pydantic models for AETHRIA multi-stage startup intelligence.
 
 Enforces strict validation and nested structure for Scout → Reviewer → Partner pipeline.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List, Literal, Any, Dict
 from datetime import datetime
 from utils.timeutil import utcnow, ensure_aware
@@ -12,20 +12,244 @@ from uuid import uuid4
 RulingDecision = Literal["YES", "NO", "MAYBE"]
 
 
-class EvaluationManifest(BaseModel):
-    """Portable dependency manifest for one completed current-pipeline evaluation."""
+_EVALUATION_MODEL_STAGES = frozenset(("scout", "reviewer", "partner"))
+_EVALUATION_CONSTRUCTION_PROMPTS = frozenset(
+    (
+        "scout.market_driven",
+        "scout.builder_technical",
+        "scout.pain_point",
+        "scout.contrarian",
+        "reviewer.DefaultReviewer",
+        "reviewer.SkepticalReviewer",
+        "reviewer.OpportunistReviewer",
+        "partner.template",
+    )
+)
+class _FrozenDict(dict):
+    """JSON-serializable mapping that rejects post-validation mutation."""
 
-    manifest_version: Literal["evaluation-manifest-v1"] = "evaluation-manifest-v1"
-    pipeline_run_id: str
+    @staticmethod
+    def _immutable(*_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("evaluation identity mappings are immutable")
+
+    __setitem__ = _immutable
+    __delitem__ = _immutable
+    __ior__ = _immutable
+    clear = _immutable
+    pop = _immutable
+    popitem = _immutable
+    setdefault = _immutable
+    update = _immutable
+
+
+def _require_exact_non_empty_string_map(
+    values: Dict[str, str], *, expected: frozenset[str], field_name: str
+) -> None:
+    if set(values) != expected:
+        raise ValueError(
+            f"{field_name} must contain exactly {sorted(expected)!r}"
+        )
+    if any(not str(value or "").strip() for value in values.values()):
+        raise ValueError(f"{field_name} values must be non-empty")
+
+
+class EvaluationDependencyIdentity(BaseModel):
+    """Complete immutable identity for dependencies consumed by one evaluation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    user_id: str = Field(min_length=1)
+    thesis_id: str = Field(min_length=1)
+    thesis_version_id: str = Field(min_length=1)
+    thesis_hash: str = Field(min_length=1)
+    policy_id: str = Field(min_length=1)
+    policy_version_id: str = Field(min_length=1)
+    policy_hash: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    partner_rules_id: str = Field(min_length=1)
+    partner_rules_version: str = Field(min_length=1)
+    partner_rules_hash: str = Field(min_length=1)
+    scoring_runtime_version: str = Field(min_length=1)
+    scoring_runtime_hash: str = Field(min_length=1)
+
+
+class EvaluationModelIdentity(BaseModel):
+    """Exact model provider and non-secret request configuration identity."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    provider_id: str = Field(min_length=1)
+    model_id: str = Field(min_length=1)
+    configuration_id: str = Field(min_length=1)
+    configuration_hash: str = Field(min_length=1)
+
+
+class EvaluationManifestIdentity(BaseModel):
+    """Construction-time identity later bound to execution prompt evidence."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    dependency_identity: EvaluationDependencyIdentity
+    model_identities: Dict[str, EvaluationModelIdentity]
+    construction_prompt_versions: Dict[str, str]
+
+    @model_validator(mode="after")
+    def validate_complete_identity(self) -> "EvaluationManifestIdentity":
+        if set(self.model_identities) != _EVALUATION_MODEL_STAGES:
+            raise ValueError(
+                "model_identities must contain exactly scout, reviewer, and partner"
+            )
+        _require_exact_non_empty_string_map(
+            self.construction_prompt_versions,
+            expected=_EVALUATION_CONSTRUCTION_PROMPTS,
+            field_name="construction_prompt_versions",
+        )
+        object.__setattr__(
+            self, "model_identities", _FrozenDict(self.model_identities)
+        )
+        object.__setattr__(
+            self,
+            "construction_prompt_versions",
+            _FrozenDict(self.construction_prompt_versions),
+        )
+        return self
+
+
+EvaluationExecutionState = Literal["executed", "reused", "not_run"]
+
+
+class EvaluationPromptIdentity(BaseModel):
+    """Prompt provenance for one logical stage/persona invocation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    execution_state: EvaluationExecutionState
+    construction_prompt_key: Optional[str] = None
+    construction_prompt_version: Optional[str] = None
+    execution_prompt_version: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_prompt_identity(self) -> "EvaluationPromptIdentity":
+        construction_key = str(self.construction_prompt_key or "").strip()
+        construction_version = str(
+            self.construction_prompt_version or ""
+        ).strip()
+        execution_version = str(self.execution_prompt_version or "").strip()
+        if self.execution_state == "not_run":
+            if construction_key or construction_version or execution_version:
+                raise ValueError("not_run prompt identities cannot record versions")
+            return self
+        if self.execution_state == "executed":
+            if not construction_key or not construction_version or not execution_version:
+                raise ValueError(
+                    "executed prompt identities require construction and execution versions"
+                )
+            return self
+        if not execution_version:
+            raise ValueError("reused prompt identities require an execution version")
+        if bool(construction_key) != bool(construction_version):
+            raise ValueError(
+                "reused prompt construction key and version must be supplied together"
+            )
+        return self
+
+
+class EvaluationStageIdentity(BaseModel):
+    """What a completed evaluation actually executed or reused for one stage."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    execution_state: EvaluationExecutionState
+    source_pipeline_run_id: Optional[str] = None
+    model_identity: Optional[EvaluationModelIdentity] = None
+    prompt_identities: Dict[str, EvaluationPromptIdentity]
+
+    @model_validator(mode="after")
+    def validate_stage_identity(self) -> "EvaluationStageIdentity":
+        source_run = str(self.source_pipeline_run_id or "").strip()
+        prompt_states = {
+            prompt.execution_state for prompt in self.prompt_identities.values()
+        }
+        if not self.prompt_identities:
+            raise ValueError("stage prompt identities cannot be empty")
+        if self.execution_state == "not_run":
+            if source_run or self.model_identity is not None:
+                raise ValueError("not_run stages cannot record a source or model")
+            if prompt_states != {"not_run"}:
+                raise ValueError("not_run stages can contain only not_run prompts")
+        elif self.execution_state == "executed":
+            if not source_run:
+                raise ValueError("executed stages require a source pipeline run")
+            if "reused" in prompt_states:
+                raise ValueError("executed stages cannot contain reused prompts")
+        else:
+            if "executed" in prompt_states:
+                raise ValueError("reused stages cannot contain executed prompts")
+            if "reused" not in prompt_states:
+                raise ValueError("reused stages require reused prompt evidence")
+        object.__setattr__(
+            self, "prompt_identities", _FrozenDict(self.prompt_identities)
+        )
+        return self
+
+
+class EvaluationManifest(BaseModel):
+    """Portable exact identity for one completed current-pipeline evaluation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    manifest_version: Literal["evaluation-manifest-v3"] = "evaluation-manifest-v3"
+    pipeline_run_id: str = Field(min_length=1)
     evaluation_path: Literal["manual_lookup", "autonomous_discovery", "rerun"]
-    models: Dict[str, str]
-    prompt_versions: Dict[str, str]
-    policy_version_id: Optional[str] = None
-    policy_hash: Optional[str] = None
-    rubric_version: Optional[str] = None
-    partner_rules_version: str
-    partner_rules_hash: str
+    user_id: str = Field(min_length=1)
+    thesis_id: str = Field(min_length=1)
+    thesis_version_id: str = Field(min_length=1)
+    thesis_hash: str = Field(min_length=1)
+    policy_id: str = Field(min_length=1)
+    policy_version_id: str = Field(min_length=1)
+    policy_hash: str = Field(min_length=1)
+    rubric_version: str = Field(min_length=1)
+    partner_rules_id: str = Field(min_length=1)
+    partner_rules_version: str = Field(min_length=1)
+    partner_rules_hash: str = Field(min_length=1)
+    scoring_runtime_version: str = Field(min_length=1)
+    scoring_runtime_hash: str = Field(min_length=1)
+    stage_identities: Dict[str, EvaluationStageIdentity]
     created_at: datetime = Field(default_factory=utcnow)
+
+    @model_validator(mode="after")
+    def validate_complete_manifest(self) -> "EvaluationManifest":
+        if set(self.stage_identities) != _EVALUATION_MODEL_STAGES:
+            raise ValueError(
+                "stage_identities must contain exactly scout, reviewer, and partner"
+            )
+        expected_prompts = {
+            "scout": {"discovery"},
+            "reviewer": {
+                "DefaultReviewer",
+                "SkepticalReviewer",
+                "OpportunistReviewer",
+            },
+            "partner": {"decision"},
+        }
+        for stage, prompts in expected_prompts.items():
+            if set(self.stage_identities[stage].prompt_identities) != prompts:
+                raise ValueError(
+                    f"stage_identities.{stage}.prompt_identities must contain "
+                    f"exactly {sorted(prompts)!r}"
+                )
+            stage_identity = self.stage_identities[stage]
+            if (
+                stage_identity.execution_state == "executed"
+                and stage_identity.source_pipeline_run_id != self.pipeline_run_id
+            ):
+                raise ValueError(
+                    f"executed {stage} identity must use this pipeline_run_id"
+                )
+        object.__setattr__(
+            self, "stage_identities", _FrozenDict(self.stage_identities)
+        )
+        return self
 
 
 class ScoreBandConfig(BaseModel):
@@ -213,11 +437,11 @@ class SingleReview(BaseModel):
     Used by ReviewerEngine for multi-persona consensus and surfaced to the memo.
     """
     reviewer_type: Literal["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
-    market_score: int = Field(ge=1, le=10)
-    product_score: int = Field(ge=1, le=10)
-    technical_score: int = Field(ge=1, le=10)
-    execution_score: int = Field(ge=1, le=10)
-    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)
+    market_score: Optional[float] = Field(default=None, ge=0, le=10)
+    product_score: Optional[float] = Field(default=None, ge=0, le=10)
+    technical_score: Optional[float] = Field(default=None, ge=0, le=10)
+    execution_score: Optional[float] = Field(default=None, ge=0, le=10)
+    defensibility_score: Optional[float] = Field(default=None, ge=0, le=10)
     overall_summary: str
     key_risks: List[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]
@@ -263,11 +487,11 @@ class AethriaView(BaseModel):
 
 class ReviewInfo(BaseModel):
     """Reviewer evaluation information."""
-    market_score: int = Field(ge=1, le=10)
-    product_score: int = Field(ge=1, le=10)
-    technical_score: int = Field(ge=1, le=10)
-    execution_score: int = Field(ge=1, le=10)
-    defensibility_score: Optional[int] = Field(default=None, ge=1, le=10)  # Calculated by reviewer
+    market_score: Optional[float] = Field(default=None, ge=0, le=10)
+    product_score: Optional[float] = Field(default=None, ge=0, le=10)
+    technical_score: Optional[float] = Field(default=None, ge=0, le=10)
+    execution_score: Optional[float] = Field(default=None, ge=0, le=10)
+    defensibility_score: Optional[float] = Field(default=None, ge=0, le=10)  # Calculated by reviewer
     overall_summary: str
     key_risks: List[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]

@@ -25,6 +25,8 @@ export interface TriggerResult {
 export interface AgentsStatus {
   worker_ready: boolean;
   lookup_worker_ready?: boolean;
+  agents_infrastructure_ready: boolean;
+  lookup_infrastructure_ready: boolean;
   agent_queue_size?: number | null;
   lookup_queue_size?: number | null;
   durable_jobs_required?: boolean;
@@ -34,10 +36,17 @@ export interface AgentsStatus {
   supabase_configured: boolean;
   openai_configured: boolean;
   agents_will_run: boolean;
+  lookup_will_run: boolean;
+  execution_prerequisites_ready: boolean;
+  execution_prerequisite_code?: string | null;
+  execution_prerequisite_detail?: string | null;
+  execution_prerequisite_recovery_action?: string | null;
   mandate_published?: boolean;
   thesis_ready?: boolean;
   active_thesis_version_id?: string | null;
   thesis_error?: string | null;
+  published_policy_ready: boolean;
+  active_policy_version_id?: string | null;
 }
 
 /** Live state of the per-user persistent background loop. */

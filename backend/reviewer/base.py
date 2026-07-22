@@ -4,7 +4,7 @@ Reviewers evaluate Scout discoveries and emit structured assessments.
 Uses /resources for scoring thresholds, red flag definitions, and evaluation guidance.
 """
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Mapping
 import json
 import os
 import env_config
@@ -478,6 +478,7 @@ class Reviewer(ABC):
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
         structured_scoring_enabled: bool = False,
+        structured_signal_grounding: Optional[Mapping[str, Any]] = None,
     ):
         """
         Initialize a Reviewer.
@@ -498,6 +499,11 @@ class Reviewer(ABC):
         self._tenant_user_id = (tenant_user_id or "").strip()
         self._use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self._structured_scoring_enabled = bool(structured_scoring_enabled)
+        self._structured_signal_grounding = (
+            dict(structured_signal_grounding)
+            if structured_signal_grounding is not None
+            else None
+        )
         reviewer_rules, rubric = _load_reviewer_resources()
         self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
@@ -891,7 +897,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             if "structured_signals" not in data or not isinstance(data.get("structured_signals"), dict):
                 data["structured_signals"] = {}
             data["structured_signals"] = clamp_structured_signals_evidence(
-                self.scout_output, data["structured_signals"]
+                self.scout_output,
+                data["structured_signals"],
+                grounding_contract=self._structured_signal_grounding,
             )
             data = _normalize_structured_signals_contract(data)
             # When scores were intentionally omitted from the prompt, inject neutral

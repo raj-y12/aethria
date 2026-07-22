@@ -6,7 +6,12 @@ const { authedFetch } = vi.hoisted(() => ({
 
 vi.mock('../auth', () => ({ authedFetch }));
 
-import { queueOnDemandLookup, resolveLookupCandidates } from '../startups';
+import {
+  fetchLookupJobStatus,
+  isLookupTerminalStatus,
+  queueOnDemandLookup,
+  resolveLookupCandidates,
+} from '../startups';
 
 describe('lookup resolution handoff', () => {
   beforeEach(() => {
@@ -56,6 +61,107 @@ describe('lookup resolution handoff', () => {
     const request = authedFetch.mock.calls[1][1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({
       resolution_token: 'resolution-token-123',
+    });
+  });
+});
+
+describe('lookup execution status contract', () => {
+  beforeEach(() => {
+    authedFetch.mockReset();
+  });
+
+  it.each([
+    ['pending', false, false],
+    ['accepted', false, false],
+    ['completed', true, false],
+    ['blocked', true, true],
+    ['skipped', true, false],
+    ['failed_stage', true, true],
+    ['failed', true, true],
+    ['already_in_deal_flow', true, false],
+  ] as const)(
+    'preserves %s instead of coercing it to pending',
+    async (status, terminal, failed) => {
+      authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+        lookup_id: 'lookup-status-1',
+        status,
+        terminal,
+        failed,
+      }), { status: 200 }));
+
+      const result = await fetchLookupJobStatus('lookup-status-1');
+
+      expect(result.status).toBe(status);
+      expect(result.terminal).toBe(terminal);
+      expect(result.failed).toBe(failed);
+      expect(isLookupTerminalStatus(result.status)).toBe(terminal);
+    },
+  );
+
+  it('preserves actionable blocked and failed-stage metadata', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      lookup_id: 'lookup-status-2',
+      status: 'failed_stage',
+      terminal: true,
+      failed: true,
+      code: 'reviewer_stage_failed',
+      failed_stage: 'reviewer',
+      detail: 'Reviewer could not complete.',
+      recovery_action: 'Inspect Reviewer logs and retry.',
+    }), { status: 200 }));
+
+    await expect(fetchLookupJobStatus('lookup-status-2')).resolves.toMatchObject({
+      status: 'failed_stage',
+      terminal: true,
+      failed: true,
+      code: 'reviewer_stage_failed',
+      failed_stage: 'reviewer',
+      detail: 'Reviewer could not complete.',
+      recovery_action: 'Inspect Reviewer logs and retry.',
+    });
+  });
+
+  it('preserves attempt identity and server-authoritative retryable semantics', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      lookup_id: 'lookup-status-4',
+      job_id: 'job-status-4',
+      pipeline_run_id: 'pipeline-status-4',
+      attempt: 2,
+      disposition: 'retryable_failure',
+      recorded_at: '2026-07-21T12:00:00Z',
+      status: 'failed_stage',
+      terminal: false,
+      failed: false,
+      code: 'reviewer_stage_failed',
+      failed_stage: 'reviewer',
+      detail: 'Reviewer could not complete this attempt.',
+      recovery_action: 'The durable worker will retry.',
+    }), { status: 200 }));
+
+    await expect(fetchLookupJobStatus('lookup-status-4')).resolves.toMatchObject({
+      lookup_id: 'lookup-status-4',
+      job_id: 'job-status-4',
+      pipeline_run_id: 'pipeline-status-4',
+      attempt: 2,
+      disposition: 'retryable_failure',
+      recorded_at: '2026-07-21T12:00:00Z',
+      status: 'failed_stage',
+      terminal: false,
+      failed: false,
+    });
+  });
+
+  it('fails closed on an unknown persisted status', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      lookup_id: 'lookup-status-3',
+      status: 'mystery_state',
+    }), { status: 200 }));
+
+    await expect(fetchLookupJobStatus('lookup-status-3')).resolves.toMatchObject({
+      status: 'failed',
+      terminal: true,
+      failed: true,
+      code: 'lookup_status_invalid',
     });
   });
 });

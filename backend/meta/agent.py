@@ -13,10 +13,12 @@ from utils.timeutil import utcnow
 from tenant_context import TenantContext, require_user_id
 from meta.analyser import MetaAnalyser
 from meta.mutator import PromptMutator, _append_to_json_list
+from meta.schema import PromptMutationTargetOutcome, PromptMutationTargetState
 from meta.reweighter import ScoutReweighter
 from meta.calibrator import ThresholdCalibrator
 from supabase_doc_store import doc_get_int, doc_set_int
 from utils.job_schedule import claim_due_jobs
+from pipeline_execution import MetaCycleResult, StageExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -46,21 +48,110 @@ class MetaAgent:
         doc_set_int(_CYCLE_COUNTER_TABLE, cycle, user_id=self.user_id)
         return cycle
 
-    async def run_cycle(self, *, force: bool = False) -> Optional[Dict]:
+    async def run_cycle(self, *, force: bool = False) -> MetaCycleResult:
         if not self.enabled:
             self.logger.info("[MetaAgent] Disabled via META_AGENT_ENABLED=false")
-            return None
-        due = await asyncio.to_thread(
-            claim_due_jobs,
-            self.user_id,
-            {"meta": 0 if force else self.interval},
-        )
+            return MetaCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="meta",
+                    code="meta_disabled",
+                    detail="The Meta stage is disabled for this tenant.",
+                )
+            )
+        try:
+            due = await asyncio.to_thread(
+                claim_due_jobs,
+                self.user_id,
+                {"meta": 0 if force else self.interval},
+            )
+        except Exception as exc:
+            self.logger.error("[MetaAgent] Schedule claim failed: %s", exc, exc_info=True)
+            return MetaCycleResult(
+                outcome=StageExecutionResult.failed_result(
+                    stage="meta",
+                    code="meta_schedule_unavailable",
+                    detail="The Meta schedule could not be claimed.",
+                    recovery_action=(
+                        "Restore the durable schedule store and retry the Meta cycle."
+                    ),
+                    attempted=1,
+                    failed=1,
+                )
+            )
         if "meta" not in due:
             self.logger.debug("[MetaAgent] Daily interval has not elapsed")
-            return None
+            return MetaCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="meta",
+                    code="meta_not_due",
+                    detail="The Meta analysis interval has not elapsed.",
+                )
+            )
         # The whole cycle is blocking doc-store/analysis I/O — one hop off the
         # serving event loop rather than dozens of per-call thread hops.
-        return await asyncio.to_thread(self._run_cycle_sync)
+        try:
+            report = await asyncio.to_thread(self._run_cycle_sync)
+            if not isinstance(report, dict):
+                raise RuntimeError("Meta analysis returned no report")
+            target_outcomes = [
+                PromptMutationTargetOutcome.model_validate(item)
+                for item in (report.get("prompt_target_outcomes") or [])
+            ]
+        except Exception as exc:
+            self.logger.error("[MetaAgent] Analysis cycle failed: %s", exc, exc_info=True)
+            return MetaCycleResult(
+                outcome=StageExecutionResult.failed_result(
+                    stage="meta",
+                    code="meta_cycle_failed",
+                    detail="The Meta analysis cycle did not produce a report.",
+                    recovery_action=(
+                        "Inspect Meta analysis and persistence logs, restore the "
+                        "failed dependency, and retry."
+                    ),
+                    attempted=1,
+                    failed=1,
+                )
+            )
+        if target_outcomes:
+            failed = sum(
+                outcome.state is PromptMutationTargetState.FAILED
+                for outcome in target_outcomes
+            )
+            succeeded = len(target_outcomes) - failed
+            if failed:
+                return MetaCycleResult(
+                    outcome=StageExecutionResult.failed_result(
+                        stage="meta",
+                        code="meta_target_failures",
+                        detail=(
+                            "The Meta analysis completed, but one or more prompt "
+                            "mutation targets failed."
+                        ),
+                        recovery_action=(
+                            "Inspect prompt_target_outcomes, restore the failed LLM "
+                            "or persistence dependency, and retry the Meta cycle."
+                        ),
+                        attempted=len(target_outcomes),
+                        succeeded=succeeded,
+                        failed=failed,
+                    ),
+                    report=report,
+                )
+            attempted = len(target_outcomes)
+            succeeded = attempted
+        else:
+            attempted = 1
+            succeeded = 1
+        return MetaCycleResult(
+            outcome=StageExecutionResult.completed(
+                stage="meta",
+                code="meta_completed",
+                detail="The Meta analysis cycle produced an analysis-only report.",
+                attempted=attempted,
+                succeeded=succeeded,
+            ),
+            report=report,
+        )
 
     def _run_cycle_sync(self) -> Optional[Dict]:
         self.logger.info(
@@ -79,6 +170,7 @@ class MetaAgent:
         total_decisions = sufficiency.get("total_decisions", 0)
 
         mutations = []
+        prompt_target_outcomes = []
         weight_updates = []
         calibrations = []
 
@@ -107,7 +199,16 @@ class MetaAgent:
                 calibrations = calibrator.decide()
 
                 if mutation_targets:
-                    mutations = mutator.apply(mutation_targets, self.scout_engine, self.reviewer_engine)
+                    mutation_batch = mutator.apply(
+                        mutation_targets,
+                        self.scout_engine,
+                        self.reviewer_engine,
+                    )
+                    mutations = mutation_batch.proposals
+                    prompt_target_outcomes = [
+                        outcome.model_dump(mode="json")
+                        for outcome in mutation_batch.outcomes
+                    ]
                 else:
                     self._no_action_reasons.append("No prompt mutations needed")
 
@@ -127,6 +228,7 @@ class MetaAgent:
             "analysis_only": True,
             "production_mutations_applied": 0,
             "prompt_proposals": mutations,
+            "prompt_target_outcomes": prompt_target_outcomes,
             "mutations_applied": [],
             "weight_proposals": weight_updates,
             "calibration_proposals": calibrations,

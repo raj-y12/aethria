@@ -50,7 +50,12 @@ vi.mock('../../api/agents', async () => {
       supabase_configured: true,
       openai_configured: true,
       worker_ready: true,
+      agents_infrastructure_ready: true,
+      lookup_infrastructure_ready: true,
+      execution_prerequisites_ready: true,
+      published_policy_ready: true,
       agents_will_run: true,
+      lookup_will_run: true,
     })),
   };
 });
@@ -204,6 +209,12 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).not.toContain('btn-aethria-solid min-h-11');
     expect(topBarSource).toContain('btn-aethria-solid shrink-0 disabled');
     expect(topBarSource).not.toContain('btn-aethria-solid min-h-11');
+  });
+
+  it('shows exact execution-policy readiness separately from infrastructure', () => {
+    expect(source).toContain('agentsStatus.execution_prerequisites_ready');
+    expect(source).toContain('agentsStatus.execution_prerequisite_detail');
+    expect(source).toContain('label="Execution policy"');
   });
 });
 

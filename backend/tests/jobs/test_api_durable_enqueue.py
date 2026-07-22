@@ -2,7 +2,14 @@ from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
-from jobs.models import AgentJob, JobStatus, JobType
+from jobs.models import (
+    AgentJob,
+    JobCancellationDisposition,
+    JobCancellationResult,
+    JobStatus,
+    JobType,
+)
+from jobs.lookup_outcomes import LookupAttemptOutcome, LookupOutcomeStoreUnavailable
 from security.rate_limiter import InMemorySecurityStore
 
 
@@ -10,6 +17,7 @@ class _Repository:
     def __init__(self):
         self.enqueued = []
         self.cancelled = []
+        self.atomic_outcomes = []
 
     async def enqueue(self, job):
         self.enqueued.append(job)
@@ -25,8 +33,28 @@ class _Repository:
         self.cancelled.append((user_id, job_id))
         for job in self.enqueued:
             if job.user_id == user_id and job.job_id == job_id:
-                return job.model_copy(update={"status": JobStatus.CANCELLED})
-        return None
+                if job.status is JobStatus.SUCCEEDED:
+                    return JobCancellationResult(
+                        disposition=JobCancellationDisposition.REJECTED,
+                        job=job,
+                    )
+                if job.status is JobStatus.CANCELLED:
+                    return JobCancellationResult(
+                        disposition=JobCancellationDisposition.ALREADY_CANCELLED,
+                        job=job,
+                    )
+                self.atomic_outcomes.append(
+                    LookupAttemptOutcome.cancelled_for_job(
+                        job, detail="The lookup job was cancelled by the operator."
+                    )
+                )
+                return JobCancellationResult(
+                    disposition=JobCancellationDisposition.TRANSITIONED,
+                    job=job.model_copy(update={"status": JobStatus.CANCELLED}),
+                )
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.NOT_FOUND,
+        )
 
     async def tenant_queue_depths(self, *, user_id):
         assert user_id == "user_a"
@@ -200,7 +228,84 @@ def test_lookup_cancel_cancels_the_matching_durable_job(monkeypatch):
 
     assert response.status_code == 202
     assert repository.cancelled == [("user_a", job.job_id)]
+    assert repository.atomic_outcomes[0].attempt == 1
+    assert repository.atomic_outcomes[0].disposition.value == "cancelled"
     assert response.json()["job_ids"] == [job.job_id]
+
+
+def test_primary_lookup_cancel_surfaces_atomic_outcome_store_failure(monkeypatch):
+    import api
+
+    monkeypatch.setattr(api, "_cancelled_lookup_ids", set())
+    repository = _Repository()
+    _configure_durable(monkeypatch, api, repository)
+    job = AgentJob(
+        user_id="user_a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user_a:lookup-cancel-failure",
+        payload={
+            "user_id": "user_a",
+            "company_name": "Acme",
+            "lookup_id": "lookup-cancel-failure",
+        },
+    )
+    repository.enqueued.append(job)
+
+    async def fail_atomic_cancel(**_kwargs):
+        raise LookupOutcomeStoreUnavailable("atomic outcome write failed")
+
+    repository.cancel = fail_atomic_cancel
+    response = TestClient(api.app, raise_server_exceptions=False).post(
+        "/api/startups/lookup/cancel",
+        json={"lookup_id": "lookup-cancel-failure"},
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "lookup_outcome_store_unavailable"
+    assert api._is_lookup_cancelled("user_a", "lookup-cancel-failure") is False
+
+
+def test_primary_lookup_cancel_does_not_mark_running_job_that_won_success_race(
+    monkeypatch,
+):
+    import api
+
+    monkeypatch.setattr(api, "_cancelled_lookup_ids", set())
+    repository = _Repository()
+    _configure_durable(monkeypatch, api, repository)
+    job = AgentJob(
+        user_id="user_a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user_a:lookup-cancel-race",
+        payload={
+            "user_id": "user_a",
+            "company_name": "Acme",
+            "lookup_id": "lookup-cancel-race",
+        },
+        status=JobStatus.RUNNING,
+        attempts=1,
+    )
+    repository.enqueued.append(job)
+
+    async def finish_before_cancel(**_kwargs):
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.REJECTED,
+            job=job.model_copy(update={"status": JobStatus.SUCCEEDED}),
+        )
+
+    repository.cancel = finish_before_cancel
+    response = TestClient(api.app).post(
+        "/api/startups/lookup/cancel",
+        json={"lookup_id": "lookup-cancel-race"},
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["status"] == "conflict"
+    assert response.json()["cancelled"] == []
+    assert repository.atomic_outcomes == []
+    assert api._is_lookup_cancelled("user_a", "lookup-cancel-race") is False
 
 
 def test_system_status_reports_durable_job_and_outbox_counts(monkeypatch):

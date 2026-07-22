@@ -29,7 +29,17 @@ class MetaAgentEngine:
         )
         while self.running:
             try:
-                await self.meta_agent.run_cycle()
+                result = await self.meta_agent.run_cycle()
+                outcome = result.outcome
+                self.logger.info(
+                    "Meta cycle state=%s code=%s attempted=%s succeeded=%s failed=%s skipped=%s",
+                    outcome.state.value,
+                    outcome.code,
+                    outcome.attempted,
+                    outcome.succeeded,
+                    outcome.failed,
+                    outcome.skipped,
+                )
             except Exception as e:
                 self.logger.error(f"[MetaAgentEngine] Cycle error: {e}", exc_info=True)
             if self.running:

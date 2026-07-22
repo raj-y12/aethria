@@ -7,7 +7,14 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from jobs.models import AgentJob, JobStatus
+from jobs.lookup_outcomes import (
+    LookupOutcomeStoreUnavailable,
+)
+from jobs.models import (
+    AgentJob,
+    JobCancellationDisposition,
+    JobStatus,
+)
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -122,7 +129,16 @@ async def retry_job(request: Request, job_id: str):
         raise HTTPException(status_code=404, detail="Job not found")
     if current.status not in _RETRYABLE:
         raise HTTPException(status_code=409, detail="Job is not retryable in its current state")
-    job = await repository.requeue(user_id=user_id, job_id=job_id)
+    try:
+        job = await repository.requeue(user_id=user_id, job_id=job_id)
+    except LookupOutcomeStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unavailable",
+                "reason": "lookup_outcome_store_unavailable",
+            },
+        ) from exc
     if job is None:
         raise HTTPException(status_code=409, detail="Job state changed; refresh before retrying")
     return JSONResponse(status_code=202, content=_serialize(job))
@@ -133,12 +149,19 @@ async def cancel_job(request: Request, job_id: str):
     validate_route_id(job_id, field_name="job_id")
     user_id = require_authenticated_user(request)
     repository = _repository(request)
-    current = await repository.get_job(user_id=user_id, job_id=job_id)
-    if current is None:
+    try:
+        result = await repository.cancel(user_id=user_id, job_id=job_id)
+    except LookupOutcomeStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unavailable",
+                "reason": "lookup_outcome_store_unavailable",
+            },
+        ) from exc
+    if result.disposition is JobCancellationDisposition.NOT_FOUND:
         raise HTTPException(status_code=404, detail="Job not found")
-    if current.status is JobStatus.SUCCEEDED:
-        raise HTTPException(status_code=409, detail="A succeeded job cannot be cancelled")
-    job = await repository.cancel(user_id=user_id, job_id=job_id)
-    if job is None:
+    if not result.cancellation_won:
         raise HTTPException(status_code=409, detail="Job state changed; refresh before cancelling")
-    return JSONResponse(status_code=202, content=_serialize(job))
+    assert result.job is not None
+    return JSONResponse(status_code=202, content=_serialize(result.job))

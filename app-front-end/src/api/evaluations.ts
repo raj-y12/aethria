@@ -1,5 +1,7 @@
 import { apiRequest, encodedId } from './client';
 
+export type RecommendationState = 'advance' | 'monitor' | 'pass' | 'insufficient_evidence';
+
 export interface EvaluationRun {
   evaluation_id: string;
   evidence_snapshot_hash: string;
@@ -27,7 +29,7 @@ export interface CriterionAssessment {
 
 export interface RecommendationRecord {
   recommendation_id: string;
-  recommended_state: 'advance' | 'monitor' | 'pass' | 'insufficient_evidence';
+  recommended_state: RecommendationState;
   attention_priority: number;
   confidence: number;
   decision_drivers: string[];

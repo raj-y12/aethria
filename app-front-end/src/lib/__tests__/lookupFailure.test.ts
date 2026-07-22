@@ -22,4 +22,21 @@ describe('resolveLookupFailure', () => {
       }),
     ).toBe('Partner persistence failed.');
   });
+
+  it.each(['blocked', 'failed_stage'] as const)(
+    'does not surface %s as terminal when the attempt is explicitly retryable',
+    (status) => {
+      expect(
+        resolveLookupFailure({
+          hasMatchedStartup: false,
+          jobStatus: {
+            status,
+            failed: false,
+            detail: 'Evaluation could not continue.',
+            recovery_action: 'Correct the configuration and retry.',
+          },
+        }),
+      ).toBeUndefined();
+    },
+  );
 });

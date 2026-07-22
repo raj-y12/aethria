@@ -1,0 +1,116 @@
+{
+  "version": "2.0",
+  "description": "Partner decision rules: verdict mapping, score thresholds, mandate-fit gate, critical risks, contradictory scores, red flags, and LLM fallback triggers.",
+  "mandate_fit": {
+    "_comment": "Separates company quality (avg score) from fund fit (thesis alignment). A strong company that is off-thesis is HELD for an explicit IC exception rather than auto-recommended INVEST. Alignment thresholds are 0-1 (reviewer thesis_alignment_score).",
+    "enabled": true,
+    "strong_fit_min": 0.7,
+    "partial_fit_min": 0.5,
+    "weak_fit_min": 0.3,
+    "gate_invest_below": 0.3,
+    "held_recommendation": "MONITOR",
+    "held_next_action": "Mandate exception review - strong company, off-thesis. IC must grant an explicit exception to proceed.",
+    "low_confidence_max": 0.4
+  },
+  "quality_labels": {
+    "STRONG": "Investment-grade",
+    "MEDIUM": "Promising but incomplete",
+    "WEAK": "Early and unproven"
+  },
+  "verdict_rules": {
+    "WEAK": {
+      "decision": "NO",
+      "conviction_level": 9,
+      "next_action": "Pass - Market too crowded / Low quality",
+      "human_review_required": false
+    },
+    "STRONG": {
+      "min_avg_for_yes": 8.0,
+      "decision_yes": "YES",
+      "conviction_level_yes": 8,
+      "human_review_required_yes": true,
+      "decision_below_strong_yes_bar": "MAYBE",
+      "conviction_level_below_strong_yes_bar": 6,
+      "next_action_below_strong_yes_bar": "Monitor market and track progress",
+      "human_review_required_below_strong_yes_bar": false
+    },
+    "MEDIUM": {
+      "min_avg_for_maybe": 7.0,
+      "min_avg_for_borderline": 6.0,
+      "decision_maybe": "MAYBE",
+      "conviction_level_maybe": 6,
+      "conviction_level_borderline": 5,
+      "decision_borderline_no_llm": "MAYBE",
+      "next_action_borderline": "Monitor market and track progress"
+    }
+  },
+  "score_thresholds": {
+    "min_avg_pass": 6.0,
+    "min_avg_strong_yes": 8.0,
+    "min_avg_medium_maybe": 7.0,
+    "min_avg_borderline_low": 6.0,
+    "max_avg_borderline_high": 7.0,
+    "grey_zone_min": 6.5,
+    "grey_zone_max": 7.5
+  },
+  "critical_risk_keywords": [
+    "regulatory",
+    "regulation",
+    "legal impossibility",
+    "execution impossibility",
+    "cannot be executed",
+    "regulatory ban",
+    "prohibited by law"
+  ],
+  "contradictory_scores": {
+    "min_gap": 4,
+    "high_threshold": 8,
+    "low_threshold": 4
+  },
+  "red_flag_keywords": [
+    "missing",
+    "red flag"
+  ],
+  "next_actions": {
+    "critical_risks": "Pass - Critical risks too high",
+    "low_scores": "Pass - Low scores",
+    "default_no": "Pass - Does not meet criteria",
+    "request_cap_table": "Request Cap Table",
+    "request_cap_table_and_review": "Request Cap Table + Technical Code Review",
+    "monitor": "Monitor market and track progress",
+    "human_review_monitor": "Human review required - monitor closely",
+    "human_review_contradictions": "Human review required - analyze contradictions"
+  },
+  "llm_fallback_triggers": {
+    "contradictory_scores": true,
+    "medium_borderline_avg": true,
+    "medium_borderline_edge_window": 0.8,
+    "low_score_near_threshold": true,
+    "low_score_near_threshold_window": 0.25,
+    "missing_assumptions_affecting_decision": true,
+    "missing_critical_qualitative": true,
+    "reviewer_disagreement": true,
+    "grey_zone_deep_dive": true
+  },
+  "missing_qualitative_keywords": ["[MISSING]", "missing", "absent", "n/a"],
+  "assumption_risk_keywords": [
+    "critical unknown",
+    "unvalidated assumption",
+    "weak assumption",
+    "could invalidate",
+    "unresolved",
+    "missing validation"
+  ],
+  "decision_safety": {
+    "evidence_eligibility": {
+      "allowed_assertion_classes": ["externally_verified", "operator_asserted", "founder_asserted"],
+      "allowed_relationships": ["supports", "partially_establishes"],
+      "require_verified_evidence": true,
+      "min_support_strength": 0.5,
+      "min_source_quality": 0.4,
+      "blocked_trust_classes": ["model", "unknown"]
+    },
+    "critical_risk_claim_types": ["critical_risk", "regulatory_blocker", "execution_impossibility"],
+    "hard_exclusion_claim_types": ["mandate_exclusion", "excluded_sector", "excluded_geography", "excluded_stage"]
+  }
+}

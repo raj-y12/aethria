@@ -50,7 +50,7 @@ async def test_complete_flow():
         model="gpt-5-nano",
     )
     
-    discoveries = await scout_engine.run_cycle()
+    discoveries = (await scout_engine.run_cycle()).discoveries
     print(f"✓ Discovered {len(discoveries)} startup ideas")
     print()
     
@@ -68,7 +68,7 @@ async def test_complete_flow():
         batch_size=len(discoveries),  # Review all
     )
     
-    reviewed_count = await reviewer_engine.run_cycle()
+    reviewed_count = (await reviewer_engine.run_cycle()).succeeded
     print(f"✓ Reviewed {reviewed_count} entries")
     print()
     
@@ -84,7 +84,7 @@ async def test_complete_flow():
         use_llm_fallback=False,  # Test rule-based only
     )
     
-    decided_count = await partner_engine.run_cycle()
+    decided_count = (await partner_engine.run_cycle()).succeeded
     print(f"✓ Made {decided_count} decisions")
     print()
     

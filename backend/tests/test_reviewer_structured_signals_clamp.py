@@ -5,8 +5,23 @@ import pytest
 from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
 
 
-def test_clamp_noop_when_disabled(monkeypatch):
+def test_ungrounded_label_is_cleared_by_default(monkeypatch):
     monkeypatch.delenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", raising=False)
+    monkeypatch.delenv("REVIEWER_SIGNALS_STRICT_CLEAR", raising=False)
+    signals = {"defensibility": {"network_effects": {
+        "label": "strong", "confidence": 0.9, "evidence": "speculation"
+    }}}
+    clamped = clamp_structured_signals_evidence(
+        {"references": ["https://example.com/company"]}, signals
+    )
+    component = clamped["defensibility"]["network_effects"]
+    assert component.get("label") is None
+    assert component.get("value") is None
+    assert component["confidence"] <= 0.2
+
+
+def test_clamp_noop_when_explicitly_disabled(monkeypatch):
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "false")
     scout = {"problem": "x" * 80, "references": []}
     sig = {
         "market": {
@@ -100,3 +115,37 @@ def test_clamp_clears_label_when_strict_clear(monkeypatch):
     assert float(cell["confidence"]) <= 0.2
     assert "label" not in cell
     assert cell.get("value") is None
+
+
+def test_explicit_grounding_contract_ignores_environment_mutation(monkeypatch):
+    scout = {"problem": "x" * 80, "references": []}
+    signals = {
+        "market": {
+            "urgency": {
+                "label": "high",
+                "confidence": 0.9,
+                "evidence": "ungrounded claim",
+                "reasoning": "guess",
+            }
+        }
+    }
+    contract = {
+        "enabled": True,
+        "clear_ungrounded_labels": True,
+        "ungrounded_confidence_cap": 0.17,
+    }
+
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "false")
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "false")
+    first = clamp_structured_signals_evidence(
+        scout, signals, grounding_contract=contract
+    )
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "true")
+    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "true")
+    second = clamp_structured_signals_evidence(
+        scout, signals, grounding_contract=contract
+    )
+
+    assert first == second
+    assert first["market"]["urgency"]["confidence"] == pytest.approx(0.17)
+    assert "label" not in first["market"]["urgency"]

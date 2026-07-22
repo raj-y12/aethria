@@ -5,7 +5,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from services.scoring.policy_compiler import compile_policy_from_fund_config
+from services.scoring.policy_compiler import (
+    PolicyValidationError,
+    compile_policy_from_fund_config,
+    validate_compiled_policy_bundle,
+)
 from supabase_doc_store import list_append, list_get_all
 from utils.settings_loader import load_settings, save_settings
 
@@ -32,9 +36,11 @@ def load_active_policy(user_id: str) -> Dict[str, Any]:
     return compile_policy_from_fund_config(fund_config)
 
 
-def load_published_policy(user_id: str) -> Dict[str, Any]:
+def load_published_policy(
+    user_id: str, *, settings: Dict[str, Any] | None = None
+) -> Dict[str, Any]:
     """Load the exact active published policy, failing closed on draft fallback."""
-    settings = load_settings(user_id)
+    settings = settings if isinstance(settings, dict) else load_settings(user_id)
     fund_config = (
         settings.get("fund_config")
         if isinstance(settings.get("fund_config"), dict)
@@ -52,7 +58,15 @@ def load_published_policy(user_id: str) -> Dict[str, Any]:
         ).strip()
         candidate_hash = str(version.get("policy_hash") or "").strip()
         if candidate_id == active_id and candidate_hash == published_hash:
-            return dict(version)
+            try:
+                validated = validate_compiled_policy_bundle(dict(version))
+            except PolicyValidationError as exc:
+                detail = str(exc).lower()
+                reason = "hash" if "hash" in detail else "complete decision bundle"
+                raise PolicyNotPublishedError(
+                    f"The active published policy has an invalid {reason}"
+                ) from exc
+            return validated
     raise PolicyNotPublishedError(
         "The active published scoring policy could not be resolved"
     )
@@ -65,7 +79,10 @@ def publish_policy(user_id: str, fund_config: Dict[str, Any] | None = None) -> D
     existing_versions = list_get_all(POLICY_TABLE, user_id=user_id)
     for version in existing_versions:
         if version.get("policy_hash") == compiled["policy_hash"]:
-            active = dict(version)
+            try:
+                active = validate_compiled_policy_bundle(dict(version))
+            except PolicyValidationError:
+                continue
             _set_active_policy(settings, active, user_id, fund_config=fc)
             return active
 

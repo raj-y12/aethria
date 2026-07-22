@@ -6,6 +6,9 @@ Default mode: NO LLM calls. LLM only for edge cases (contradictory scores, MEDIU
 """
 import os
 import json
+import inspect
+import copy
+from contextvars import ContextVar
 import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,6 +19,20 @@ from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
+from evaluation_v2.prerequisites import EvaluationPrerequisites
+from evaluation_v2.governed_scoring import (
+    configured_scoring_dimensions,
+    validate_governed_scoring_trace,
+)
+from evaluation_v2.partner_rules import (
+    LLMFallbackTriggers,
+    NextActions,
+    PartnerRules,
+    PartnerRulesV3,
+    boundary_comparisons,
+    parse_partner_rules,
+    partner_rules_document,
+)
 
 from partner.rationale import (
     compose_decision_rationale,
@@ -51,20 +68,21 @@ def _log_safe_single_line(blob: str, max_len: int = 6000) -> str:
     return s
 
 
-def _partner_rules_json_for_prompt(rules: Dict[str, Any]) -> str:
+def _partner_rules_json_for_prompt(rules: PartnerRules) -> str:
     """Serialize partner rules; shrink if too large for the prompt token budget."""
-    raw = json.dumps(rules, ensure_ascii=False, indent=2)
+    document = partner_rules_document(rules)
+    raw = json.dumps(document, ensure_ascii=False, indent=2)
     if len(raw) <= _MAX_RULES_JSON_CHARS:
         return raw
     slim = {
-        "version": rules.get("version"),
-        "description": rules.get("description"),
-        "score_thresholds": rules.get("score_thresholds"),
-        "verdict_rules": rules.get("verdict_rules"),
-        "llm_fallback_triggers": rules.get("llm_fallback_triggers"),
-        "contradictory_scores": rules.get("contradictory_scores"),
-        "next_actions": rules.get("next_actions"),
-        "quality_labels": rules.get("quality_labels"),
+        "version": document["version"],
+        "description": document["description"],
+        "score_thresholds": document["score_thresholds"],
+        "verdict_rules": document["verdict_rules"],
+        "llm_fallback_triggers": document["llm_fallback_triggers"],
+        "contradictory_scores": document["contradictory_scores"],
+        "next_actions": document["next_actions"],
+        "quality_labels": document["quality_labels"],
     }
     raw2 = json.dumps(slim, ensure_ascii=False, indent=2)
     if len(raw2) <= _MAX_RULES_JSON_CHARS:
@@ -190,13 +208,13 @@ def _extract_chat_message_content(message: Any) -> str:
     return ""
 
 
-def _load_partner_rules() -> Dict[str, Any]:
+def _load_partner_rules() -> PartnerRules:
     """
     Load partner rules via policy_resolver (resources/config/active.json + versioned JSON).
     """
     from core.policy_resolver import get_partner_rules
 
-    return get_partner_rules()
+    return parse_partner_rules(get_partner_rules())
 
 
 class PartnerDecisionEngine:
@@ -215,6 +233,8 @@ class PartnerDecisionEngine:
         portfolio_store=None,
         tenant_user_id: str = "",
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+        include_deal_context_digest: Optional[bool] = None,
     ):
         """
         Initialize the decision engine.
@@ -229,11 +249,25 @@ class PartnerDecisionEngine:
         self.use_llm_fallback = use_llm_fallback
         self.logger = logging.getLogger("partner.decision")
         self.tenant_user_id = (tenant_user_id or "").strip()
+        self.evaluation_prerequisites = evaluation_prerequisites
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="PartnerDecisionEngine"
+            )
+            use_resource_fund_thesis_fallback = False
         self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.llm_call_count = 0
-        self._rules: Dict[str, Any] = _load_partner_rules()
-        self._fund_config: Dict[str, Any] = {}
-        if self.tenant_user_id:
+        if evaluation_prerequisites is not None:
+            self._rules = evaluation_prerequisites.partner_rules
+            self._fund_config = copy.deepcopy(evaluation_prerequisites.fund_config)
+            self.evaluation_policy = evaluation_prerequisites.policy.model_copy(
+                deep=True
+            )
+        else:
+            self._rules = _load_partner_rules()
+            self._fund_config = {}
+            self.evaluation_policy = None
+        if self.tenant_user_id and evaluation_prerequisites is None:
             try:
                 settings = load_settings(self.tenant_user_id)
                 fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
@@ -249,11 +283,29 @@ class PartnerDecisionEngine:
                 self.logger.warning("Partner settings unavailable, using resource rules: %s", e)
         self.api_key = (api_key or os.getenv("OPENAI_API_KEY", "")).strip()
         self.model = model or os.getenv("PARTNER_MODEL", "gpt-5-nano")
+        self.provider_id = "openai"
+        self._include_deal_context_digest = (
+            bool(include_deal_context_digest)
+            if include_deal_context_digest is not None
+            else os.getenv(
+                "PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", ""
+            ).strip().lower()
+            in ("1", "true", "yes")
+        )
+        # This hashes the exact source that constructs both system and user
+        # prompts. It is captured once, alongside the digest toggle, before any
+        # evaluation can run.
+        self.prompt_template_version = hash_prompt(
+            inspect.getsource(type(self)._decide_with_llm)
+        )
         if self.api_key:
             self.client = build_openai_client(self.api_key)
         else:
             self.client = None
         self._last_token_usage: Optional[Dict[str, int]] = None
+        self._execution_prompt_version: ContextVar[Optional[str]] = ContextVar(
+            f"partner_execution_prompt_version_{id(self)}", default=None
+        )
         self.portfolio_store = portfolio_store
         self._llm_debug_logs = os.getenv("PARTNER_LLM_DEBUG_LOGS", "").strip().lower() in (
             "1",
@@ -280,10 +332,9 @@ class PartnerDecisionEngine:
 
     def _verdict_label(self, verdict: str) -> str:
         """Human-readable quality label for verdict. Uses quality_labels from rules."""
-        labels = self._rules.get("quality_labels", {})
-        return labels.get(verdict, verdict)
+        return self._rules.quality_labels.for_verdict(verdict)
 
-    def _get_rules(self) -> Dict[str, Any]:
+    def _get_rules(self) -> PartnerRules:
         """Return loaded partner rules (cached after init)."""
         return self._rules
 
@@ -314,32 +365,77 @@ class PartnerDecisionEngine:
             self.logger.warning(f"Could not load portfolio context: {e}")
             return {}
 
-    @staticmethod
-    def _avg_score_and_dims(review_output: Dict[str, Any]) -> Tuple[float, int]:
-        """Canonical mean of four core scores only (defensibility is separate)."""
-        canonical = compute_overall_score(review_output)
-        if canonical is None:
-            return 0.0, 4
-        return float(canonical), 4
+    def _avg_score_and_dims(self, review_output: Dict[str, Any]) -> Tuple[float, int]:
+        """Mean only genuinely scored core dimensions; retain coverage count."""
+        values: List[float] = []
+        structured = review_output.get("structured_scoring")
+        structured = structured if isinstance(structured, dict) else None
+        prerequisites = self.evaluation_prerequisites
+        dimensions = (
+            configured_scoring_dimensions(prerequisites)
+            if prerequisites is not None
+            else ("market", "product", "technical", "execution")
+        )
+        for dimension in dimensions:
+            if structured is not None:
+                detail = structured.get(dimension)
+                if not isinstance(detail, dict) or bool(detail.get("unscored")):
+                    continue
+            raw = (
+                structured[dimension].get("score")
+                if structured is not None
+                else review_output.get(f"{dimension}_score")
+            )
+            try:
+                if raw is not None:
+                    values.append(float(raw))
+            except (TypeError, ValueError):
+                continue
+        if not values:
+            return 0.0, 0
+        if prerequisites is not None and len(values) == len(dimensions):
+            overall = structured.get("overall_score") if structured is not None else None
+            if isinstance(overall, (int, float)) and not isinstance(overall, bool):
+                return float(overall), len(values)
+        return sum(values) / len(values), len(values)
 
     def _canonical_recommendation(self, avg_score: float) -> str:
-        if self._fund_config:
+        if self.evaluation_policy is not None:
+            advance_threshold = self.evaluation_policy.advance_threshold
+            pass_threshold = self.evaluation_policy.pass_threshold
+        elif self._fund_config.get("scoreBands"):
             return recommendation_for_score_from_fund_config(avg_score, self._fund_config)
-        if avg_score >= 8.0:
+        else:
+            thresholds = self._rules.score_thresholds
+            advance_comparison, pass_comparison = boundary_comparisons(self._rules)
+            if (
+                advance_comparison != "greater_than_or_equal"
+                or pass_comparison != "less_than"
+            ):
+                raise ValueError("partner_rules has unsupported boundary semantics")
+            advance_threshold = float(thresholds.min_avg_strong_yes)
+            pass_threshold = float(thresholds.min_avg_pass)
+        if avg_score >= advance_threshold:
             return "INVEST"
-        if avg_score >= 6.0:
-            return "MONITOR"
-        return "PASS"
+        if avg_score < pass_threshold:
+            return "PASS"
+        return "MONITOR"
 
     def _apply_final_recommendation_fields(
         self,
         result: Dict[str, Any],
         final_recommendation: str,
         assumption_risks: Optional[List[str]] = None,
+        *,
+        next_action: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Attach canonical headline + legacy decision + policy next_action (normalized)."""
-        na = self._get_rules().get("next_actions", {})
-        raw_next = self._next_action_for_llm_decision(final_recommendation, na)
+        na = self._get_rules().next_actions
+        raw_next = (
+            next_action
+            if next_action is not None
+            else self._next_action_for_llm_decision(final_recommendation, na)
+        )
         result["recommendation"] = final_recommendation
         result["decision"] = legacy_from_recommendation(final_recommendation)
         result["assumption_risks"] = list(assumption_risks or [])
@@ -428,47 +524,36 @@ class PartnerDecisionEngine:
         tas = self._optional_thesis_alignment_score(review_output)
         if tas is None:
             return False
-        return tas >= 0.75
+        return tas >= float(self._get_rules().mandate_fit.strong_fit_min)
 
     @staticmethod
     def _is_medium_borderline_edge_case(
         avg_score: float,
         min_avg_borderline_low: float,
         max_avg_borderline_high: float,
-        llm_triggers: Dict[str, Any],
+        llm_triggers: LLMFallbackTriggers,
     ) -> bool:
         """
-        Trigger MEDIUM borderline LLM fallback only for genuine edge cases near the cutoff.
-        Defaults to the upper 0.6-point band below max_avg_borderline_high (e.g., 6.4-7.0).
+        Trigger MEDIUM borderline LLM fallback only near the configured cutoff.
         """
         if not (min_avg_borderline_low <= avg_score < max_avg_borderline_high):
             return False
-        edge_window = llm_triggers.get("medium_borderline_edge_window", 0.6)
-        try:
-            edge_window = float(edge_window)
-        except (TypeError, ValueError):
-            edge_window = 0.6
-        edge_window = max(0.05, min(1.0, edge_window))
+        edge_window = float(llm_triggers.medium_borderline_edge_window)
         return avg_score >= (max_avg_borderline_high - edge_window)
 
     @staticmethod
     def _is_low_score_near_threshold_edge_case(
         avg_score: float,
         min_avg_pass: float,
-        llm_triggers: Dict[str, Any],
+        llm_triggers: LLMFallbackTriggers,
     ) -> bool:
         """
         Allow LLM fallback for MEDIUM decisions that are just below pass threshold.
-        Default window is 0.25 below min_avg_pass (e.g., 5.75-6.0 when pass=6.0).
+        The policy window is measured below min_avg_pass.
         """
         if avg_score >= min_avg_pass:
             return False
-        near_window = llm_triggers.get("low_score_near_threshold_window", 0.25)
-        try:
-            near_window = float(near_window)
-        except (TypeError, ValueError):
-            near_window = 0.25
-        near_window = max(0.05, min(0.6, near_window))
+        near_window = float(llm_triggers.low_score_near_threshold_window)
         return avg_score >= (min_avg_pass - near_window)
 
     def _build_narrative_from_inputs(
@@ -530,8 +615,7 @@ class PartnerDecisionEngine:
         (mandate_override_required) for an explicit IC exception. Thresholds live in the
         versioned `mandate_fit` block of partner_rules, never hardcoded here.
         """
-        mf = self._get_rules().get("mandate_fit")
-        mf = mf if isinstance(mf, dict) else {}
+        mf = self._get_rules().mandate_fit
         tas = self._optional_thesis_alignment_score(review_output)  # 0-1 or None
 
         result["company_quality"] = round(float(avg_score), 2)
@@ -546,12 +630,12 @@ class PartnerDecisionEngine:
             self._log_finalize(scout_output, avg_score, avg_dims, "no_mandate", result)
             return result
 
-        strong_min = float(mf.get("strong_fit_min", 0.7))
-        partial_min = float(mf.get("partial_fit_min", 0.5))
-        weak_min = float(mf.get("weak_fit_min", 0.3))
-        gate_below = float(mf.get("gate_invest_below", 0.3))
-        low_conf_max = float(mf.get("low_confidence_max", 0.4))
-        enabled = bool(mf.get("enabled", True))
+        strong_min = float(mf.strong_fit_min)
+        partial_min = float(mf.partial_fit_min)
+        weak_min = float(mf.weak_fit_min)
+        gate_below = float(mf.gate_invest_below)
+        low_conf_max = float(mf.low_confidence_max)
+        enabled = mf.enabled
 
         conf_raw = review_output.get("thesis_alignment_confidence")
         try:
@@ -590,12 +674,12 @@ class PartnerDecisionEngine:
                 result["rationale"] = merged
 
         if enabled and result.get("recommendation") == "INVEST" and tas < gate_below and not override:
-            held = mf.get("held_recommendation", "MONITOR")
+            held = mf.held_recommendation
             result = self._apply_final_recommendation_fields(
                 result, held, result.get("assumption_risks")
             )
             result["next_action"] = self._normalize_next_action(
-                mf.get("held_next_action", "Mandate exception review required.")
+                mf.held_next_action
             )
             result["human_review_required"] = True
             override_required = True
@@ -637,6 +721,32 @@ class PartnerDecisionEngine:
     def _record_llm_stat(self, key: str) -> None:
         self._llm_stats[key] = int(self._llm_stats.get(key, 0)) + 1
 
+    def _bind_execution_prompt(self, prompt: str) -> str:
+        """Capture the exact prompt supplied to the model in this call context."""
+        version = hash_prompt(prompt)
+        self._execution_prompt_version.set(version)
+        return version
+
+    def decide_with_execution_identity(
+        self,
+        scout_output: Dict[str, Any],
+        review_output: Dict[str, Any],
+        context_memo: str = "",
+        fund_thesis: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        """Return output plus independently captured model-prompt evidence."""
+        token = self._execution_prompt_version.set(None)
+        try:
+            result = self.decide(
+                scout_output,
+                review_output,
+                context_memo=context_memo,
+                fund_thesis=fund_thesis,
+            )
+            return result, self._execution_prompt_version.get()
+        finally:
+            self._execution_prompt_version.reset(token)
+
     def decide(
         self,
         scout_output: Dict[str, Any],
@@ -656,10 +766,17 @@ class PartnerDecisionEngine:
             Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
         """
+        self._execution_prompt_version.set(None)
+        if self.evaluation_prerequisites is not None:
+            validate_governed_scoring_trace(
+                review_output.get("structured_scoring"),
+                self.evaluation_prerequisites,
+                require_resolved=True,
+            )
         rules = self._get_rules()
-        verdict_rules = rules.get("verdict_rules", {})
-        score_thresholds = rules.get("score_thresholds", {})
-        next_actions = rules.get("next_actions", {})
+        verdict_rules = rules.verdict_rules
+        score_thresholds = rules.score_thresholds
+        next_actions = rules.next_actions
 
         portfolio_context = self._get_portfolio_context() if self.portfolio_store else {}
         thesis_block = ""
@@ -706,24 +823,33 @@ class PartnerDecisionEngine:
         avg_score, avg_dims = self._avg_score_and_dims(review_output)
 
         # Grey Zone: compute once here; used in MEDIUM rules below
-        llm_triggers_global = rules.get("llm_fallback_triggers", {})
+        llm_triggers_global = rules.llm_fallback_triggers
         grey_zone_score = review_output.get("confidence_adjusted_score")
         if grey_zone_score is None:
             grey_zone_score = avg_score
-        grey_zone_min = score_thresholds.get("grey_zone_min", 6.5)
-        grey_zone_max = score_thresholds.get("grey_zone_max", 7.5)
+        grey_zone_min = float(score_thresholds.grey_zone_min)
+        grey_zone_max = float(score_thresholds.grey_zone_max)
         grey_zone_active = (
-            llm_triggers_global.get("grey_zone_deep_dive", False)
+            llm_triggers_global.grey_zone_deep_dive
             and grey_zone_min <= grey_zone_score <= grey_zone_max
         )
 
-        min_avg_pass = score_thresholds.get("min_avg_pass", 6.0)
-        min_avg_strong_yes = score_thresholds.get("min_avg_strong_yes", 8.0)
-        min_avg_medium_maybe = score_thresholds.get("min_avg_medium_maybe", 7.0)
-        min_avg_borderline_low = score_thresholds.get("min_avg_borderline_low", 6.0)
-        max_avg_borderline_high = score_thresholds.get("max_avg_borderline_high", 7.0)
+        if self.evaluation_policy is not None:
+            # Governed execution has one immutable threshold authority: the
+            # EvaluationPolicy compiled from the exact, hash-bound active
+            # Partner rules. Published tenant decision_inputs remain available
+            # as workflow/display configuration, but cannot create a second
+            # decision ladder after the governed policy has been certified.
+            min_avg_pass = float(self.evaluation_policy.pass_threshold)
+            min_avg_strong_yes = float(self.evaluation_policy.advance_threshold)
+        else:
+            min_avg_pass = float(score_thresholds.min_avg_pass)
+            min_avg_strong_yes = float(score_thresholds.min_avg_strong_yes)
+        min_avg_medium_maybe = float(score_thresholds.min_avg_medium_maybe)
+        min_avg_borderline_low = float(score_thresholds.min_avg_borderline_low)
+        max_avg_borderline_high = float(score_thresholds.max_avg_borderline_high)
         fc_thresholds = self._fund_config.get("thresholds") if isinstance(self._fund_config.get("thresholds"), dict) else {}
-        if fc_thresholds:
+        if self.evaluation_policy is None and fc_thresholds:
             try:
                 min_avg_pass = float(fc_thresholds.get("partnerReview", min_avg_pass * 10)) / 10.0
                 min_avg_strong_yes = float(fc_thresholds.get("escalation", min_avg_strong_yes * 10)) / 10.0
@@ -751,6 +877,93 @@ class PartnerDecisionEngine:
         )
         # Merged risks: key_risks + assumption_risks, deduplicated, max 5
         merged_risks: List[str] = _merge_risks(key_risks, assumption_risks)
+        has_critical_risk = self._has_critical_risk(key_risks, rules)
+
+        required_dimensions = (
+            configured_scoring_dimensions(self.evaluation_prerequisites)
+            if self.evaluation_prerequisites is not None
+            else ("market", "product", "technical", "execution")
+        )
+        if avg_dims < len(required_dimensions):
+            missing_dimensions = [
+                dimension
+                for dimension in required_dimensions
+                if (
+                    not isinstance(review_output.get("structured_scoring"), dict)
+                    or not isinstance(
+                        review_output["structured_scoring"].get(dimension), dict
+                    )
+                    or review_output["structured_scoring"][dimension].get("unscored")
+                    or review_output["structured_scoring"][dimension].get("score")
+                    is None
+                )
+            ]
+            evidence_risk = (
+                "Insufficient evidence coverage for required dimensions: "
+                + ", ".join(missing_dimensions)
+            )
+            if has_critical_risk:
+                result = self._create_decision(
+                    recommendation="PASS",
+                    conviction=8,
+                    decision_rationale=(
+                        "Critical diligence risk: the identified blocker requires "
+                        "a pass even though evaluation coverage is incomplete."
+                    ),
+                    next_action=next_actions.critical_risks,
+                    human_review_required=True,
+                    thesis=n_thesis,
+                    why_this_matters=n_why,
+                    snapshot=n_snapshot,
+                    market_insight=n_market,
+                    product_edge=n_product,
+                    traction_signals=n_traction,
+                    risks=_merge_risks(merged_risks, [evidence_risk]),
+                )
+                result["decision_drivers"] = [
+                    "critical_risk",
+                    "insufficient_evidence_coverage",
+                ]
+                result = self._apply_final_recommendation_fields(
+                    result,
+                    "PASS",
+                    assumption_risks,
+                    next_action=next_actions.critical_risks,
+                )
+                result["human_review_required"] = True
+                return self._finalize_thesis_and_mandate_gate(
+                    result, review_output, scout_output, avg_score, avg_dims
+                )
+            result = self._create_decision(
+                recommendation="MONITOR",
+                conviction=3,
+                decision_rationale=(
+                    "Insufficient evidence: required evaluation dimensions are "
+                    "unscored, so the available evidence cannot support an "
+                    "investment or pass recommendation."
+                ),
+                next_action=next_actions.human_review_monitor,
+                human_review_required=True,
+                thesis=n_thesis,
+                why_this_matters=n_why,
+                snapshot=n_snapshot,
+                market_insight=n_market,
+                product_edge=n_product,
+                traction_signals=n_traction,
+                risks=_merge_risks(merged_risks, [evidence_risk]),
+            )
+            result["decision_drivers"] = ["insufficient_evidence_coverage"]
+            result = self._apply_final_recommendation_fields(
+                result,
+                "MONITOR",
+                assumption_risks,
+                next_action=next_actions.human_review_monitor,
+            )
+            result["risks"] = _merge_risks(merged_risks, [evidence_risk])
+            result["human_review_required"] = True
+            return self._finalize_thesis_and_mandate_gate(
+                result, review_output, scout_output, avg_score, avg_dims
+            )
 
         scout_confidence = scout_output.get("confidence", 0.5)
         if scout_confidence < 0.5:
@@ -764,12 +977,15 @@ class PartnerDecisionEngine:
         if has_missing_business_model:
             conviction_adjust -= 1
         # Strong team/business model (present and not [MISSING]-only) can boost conviction
-        if not has_missing_team and self._has_strong_qualitative(review_output.get("team_analysis") or []):
+        if not has_missing_team and self._has_strong_qualitative(
+            review_output.get("team_analysis") or [], rules
+        ):
             conviction_adjust += 1
-        if not has_missing_business_model and self._has_strong_qualitative(review_output.get("business_model_analysis") or []):
+        if not has_missing_business_model and self._has_strong_qualitative(
+            review_output.get("business_model_analysis") or [], rules
+        ):
             conviction_adjust += 1
 
-        has_critical_risk = self._has_critical_risk(key_risks, rules)
         has_red_flags = self._has_red_flags(key_risks, rules)
         has_contradiction = self._has_contradictory_scores(
             market_score, product_score, technical_score, execution_score, rules
@@ -789,7 +1005,9 @@ class PartnerDecisionEngine:
             if total > 20 and startup_funding_stage == "Pre-Seed":
                 conviction_adjust -= 1
 
-        final_recommendation = self._canonical_recommendation(avg_score)
+        score_recommendation = self._canonical_recommendation(avg_score)
+        if has_critical_risk:
+            score_recommendation = "PASS"
         reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
         handoff_quality = self._handoff_quality_from_review(review_output)
 
@@ -813,13 +1031,23 @@ class PartnerDecisionEngine:
             portfolio_context and portfolio_context.get("sector_counts", {}).get(startup_sector, 0) >= 3
         )
 
-        weak_rule = verdict_rules.get("WEAK", {})
-        strong_rule = verdict_rules.get("STRONG", {})
-        medium_rule = verdict_rules.get("MEDIUM", {})
+        weak_rule = verdict_rules.weak
+        strong_rule = verdict_rules.strong
+        medium_rule = verdict_rules.medium
+        historical_v3 = isinstance(rules, PartnerRulesV3)
 
-        def _aligned_rationale() -> Tuple[str, List[str]]:
+        def _branch_recommendation(configured: str) -> str:
+            # v3 was score-authoritative: verdict branches controlled
+            # conviction/review routing but never replaced the score-band
+            # recommendation. v4 intentionally made verdict decisions
+            # authoritative, so dispatch explicitly by the parsed rules type.
+            return score_recommendation if historical_v3 else configured
+
+        def _aligned_rationale(
+            recommendation: str,
+        ) -> Tuple[str, List[str]]:
             return compose_decision_rationale(
-                final_recommendation=final_recommendation,
+                final_recommendation=recommendation,
                 tags=tags,
                 primary=primary,
                 label=label,
@@ -838,14 +1066,57 @@ class PartnerDecisionEngine:
                 sector_concentration_note=sector_conc,
             )
 
-        def _emit_deterministic(conviction: int, human_rev: bool) -> Dict[str, Any]:
-            rationale, drivers = _aligned_rationale()
+        def _default_deterministic_action(
+            recommendation: str,
+            human_review_required: bool,
+        ) -> str:
+            if recommendation == "INVEST":
+                return (
+                    next_actions.request_cap_table_and_review
+                    if human_review_required
+                    else next_actions.request_cap_table
+                )
+            if recommendation == "PASS":
+                return next_actions.default_no
+            return (
+                next_actions.human_review_monitor
+                if human_review_required
+                else next_actions.monitor
+            )
+
+        def _emit_deterministic(
+            recommendation: str,
+            conviction: int,
+            human_rev: bool,
+            *,
+            next_action: Optional[str] = None,
+        ) -> Dict[str, Any]:
+            effective_human_review = bool(human_rev or has_red_flags)
+            if historical_v3:
+                # Preserve v3's recommendation-derived action mapping. The one
+                # historical exception was the critical-risk action.
+                effective_next_action = (
+                    next_actions.critical_risks
+                    if next_action == next_actions.critical_risks
+                    else self._next_action_for_llm_decision(
+                        recommendation, next_actions
+                    )
+                )
+            else:
+                effective_next_action = (
+                    next_action
+                    if next_action is not None
+                    else _default_deterministic_action(
+                        recommendation, effective_human_review
+                    )
+                )
+            rationale, drivers = _aligned_rationale(recommendation)
             result = self._create_decision(
-                recommendation=final_recommendation,
+                recommendation=recommendation,
                 conviction=conviction,
                 decision_rationale=rationale,
-                next_action=next_actions.get("default_no", "Pass - Does not meet criteria"),
-                human_review_required=human_rev,
+                next_action=effective_next_action,
+                human_review_required=effective_human_review,
                 thesis=n_thesis,
                 why_this_matters=n_why,
                 snapshot=n_snapshot,
@@ -856,30 +1127,42 @@ class PartnerDecisionEngine:
             )
             result["decision_drivers"] = drivers
             result = self._apply_final_recommendation_fields(
-                result, final_recommendation, assumption_risks
+                result,
+                recommendation,
+                assumption_risks,
+                next_action=effective_next_action,
             )
             result = self._apply_handoff_quality_fields(result, handoff_quality)
             return self._finalize_thesis_and_mandate_gate(
                 result, review_output, scout_output, avg_score, avg_dims
             )
 
-        # Rule 1: WEAK verdict (portfolio-aware conviction like other branches)
-        if effective_verdict == "WEAK":
+        # Rule 1: Critical diligence risks
+        if has_critical_risk:
             return _emit_deterministic(
-                weak_rule.get("conviction_level", 9) + conviction_adjust,
-                weak_rule.get("human_review_required", False),
+                "PASS",
+                8 + conviction_adjust,
+                True,
+                next_action=next_actions.critical_risks,
             )
 
-        # Rule 2: Critical diligence risks
-        if has_critical_risk:
-            return _emit_deterministic(8 + conviction_adjust, False)
+        # Rule 2: WEAK verdict (portfolio-aware conviction like other branches)
+        if effective_verdict == "WEAK":
+            return _emit_deterministic(
+                _branch_recommendation(
+                    recommendation_from_legacy(weak_rule.decision)
+                ),
+                weak_rule.conviction_level + conviction_adjust,
+                weak_rule.human_review_required,
+                next_action=weak_rule.next_action,
+            )
 
         # Rule 3: Low average score → optional LLM edge case
         if avg_score < min_avg_pass:
-            llm_triggers = rules.get("llm_fallback_triggers", {})
+            llm_triggers = rules.llm_fallback_triggers
             low_score_edge_case = (
                 effective_verdict == "MEDIUM"
-                and llm_triggers.get("low_score_near_threshold", True)
+                and llm_triggers.low_score_near_threshold
                 and self._is_low_score_near_threshold_edge_case(
                     avg_score=avg_score,
                     min_avg_pass=min_avg_pass,
@@ -898,12 +1181,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=score_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=score_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
@@ -924,41 +1207,59 @@ class PartnerDecisionEngine:
                     review_output=review_output,
                     scout_output=scout_output,
                     avg_dims=avg_dims,
+                    force_human_review=has_red_flags,
                 )
 
-            return _emit_deterministic(7 + conviction_adjust, False)
+            return _emit_deterministic(
+                score_recommendation,
+                7 + conviction_adjust,
+                False,
+                next_action=next_actions.low_scores,
+            )
 
         # Rule 4: STRONG verdict, pass bar met but below YES bar
         if effective_verdict == "STRONG" and min_avg_pass <= avg_score < min_avg_strong_yes:
             return _emit_deterministic(
-                strong_rule.get("conviction_level_below_strong_yes_bar", 6) + conviction_adjust,
-                strong_rule.get("human_review_required_below_strong_yes_bar", False),
+                _branch_recommendation(
+                    recommendation_from_legacy(
+                        strong_rule.decision_below_strong_yes_bar
+                    )
+                ),
+                strong_rule.conviction_level_below_strong_yes_bar + conviction_adjust,
+                strong_rule.human_review_required_below_strong_yes_bar,
+                next_action=strong_rule.next_action_below_strong_yes_bar,
             )
 
         # Rule 5: STRONG verdict + high score
         if effective_verdict == "STRONG" and avg_score >= min_avg_strong_yes:
-            human_review = strong_rule.get("human_review_required_yes", True) or has_missing_critical_qualitative
+            human_review = strong_rule.human_review_required_yes or has_missing_critical_qualitative
             return _emit_deterministic(
-                strong_rule.get("conviction_level_yes", 8) + conviction_adjust,
+                _branch_recommendation(
+                    recommendation_from_legacy(strong_rule.decision_yes)
+                ),
+                strong_rule.conviction_level_yes + conviction_adjust,
                 human_review,
             )
 
         # Rule 6: MEDIUM verdict + strong average → optional LLM escalation
         if effective_verdict == "MEDIUM" and avg_score >= min_avg_medium_maybe:
-            llm_triggers = rules.get("llm_fallback_triggers", {})
+            branch_recommendation = _branch_recommendation(
+                recommendation_from_legacy(medium_rule.decision_maybe)
+            )
+            llm_triggers = rules.llm_fallback_triggers
             trigger_reason = ""
             if grey_zone_active:
                 trigger_reason = (
                     f"Grey zone deep dive: S_adj={grey_zone_score:.2f} in "
                     f"[{grey_zone_min}, {grey_zone_max}]"
                 )
-            elif has_contradiction and llm_triggers.get("contradictory_scores", True):
+            elif has_contradiction and llm_triggers.contradictory_scores:
                 trigger_reason = "Contradictory scores detected (gap >= threshold)"
-            elif has_missing_assumptions and llm_triggers.get("missing_assumptions_affecting_decision", True):
+            elif has_missing_assumptions and llm_triggers.missing_assumptions_affecting_decision:
                 trigger_reason = "Missing assumptions affecting decision"
-            elif has_missing_critical_qualitative and llm_triggers.get("missing_critical_qualitative", True):
+            elif has_missing_critical_qualitative and llm_triggers.missing_critical_qualitative:
                 trigger_reason = "Missing critical qualitative data (team/business model)"
-            elif reviewer_disagreement and llm_triggers.get("reviewer_disagreement", False):
+            elif reviewer_disagreement and llm_triggers.reviewer_disagreement:
                 trigger_reason = "Reviewer disagreement detected"
             elif self._high_thesis_triggers_llm(
                 review_output, avg_score, min_avg_medium_maybe
@@ -976,12 +1277,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=branch_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=branch_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
@@ -1002,16 +1303,23 @@ class PartnerDecisionEngine:
                     review_output=review_output,
                     scout_output=scout_output,
                     avg_dims=avg_dims,
+                    force_human_review=has_red_flags,
                 )
 
             return _emit_deterministic(
-                medium_rule.get("conviction_level_maybe", 6) + conviction_adjust,
+                branch_recommendation,
+                medium_rule.conviction_level_maybe + conviction_adjust,
                 False,
             )
 
         # Rule 7: MEDIUM borderline band
         if effective_verdict == "MEDIUM" and min_avg_borderline_low <= avg_score < max_avg_borderline_high:
-            llm_triggers = rules.get("llm_fallback_triggers", {})
+            branch_recommendation = _branch_recommendation(
+                recommendation_from_legacy(
+                    medium_rule.decision_borderline_no_llm
+                )
+            )
+            llm_triggers = rules.llm_fallback_triggers
             is_edge_case = self._is_medium_borderline_edge_case(
                 avg_score=avg_score,
                 min_avg_borderline_low=min_avg_borderline_low,
@@ -1020,7 +1328,7 @@ class PartnerDecisionEngine:
             )
             use_llm = (
                 self.use_llm_fallback
-                and (llm_triggers.get("medium_borderline_avg", True) and is_edge_case or grey_zone_active)
+                and (llm_triggers.medium_borderline_avg and is_edge_case or grey_zone_active)
             )
             if use_llm:
                 trigger_reason = (
@@ -1038,12 +1346,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=branch_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=final_recommendation,
+                    final_recommendation=branch_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
@@ -1064,15 +1372,22 @@ class PartnerDecisionEngine:
                     review_output=review_output,
                     scout_output=scout_output,
                     avg_dims=avg_dims,
+                    force_human_review=has_red_flags,
                 )
 
             return _emit_deterministic(
-                medium_rule.get("conviction_level_borderline", 5) + conviction_adjust,
+                branch_recommendation,
+                medium_rule.conviction_level_borderline + conviction_adjust,
                 False,
+                next_action=medium_rule.next_action_borderline,
             )
 
         # Default path
-        return _emit_deterministic(6 + conviction_adjust, False)
+        return _emit_deterministic(
+            score_recommendation,
+            6 + conviction_adjust,
+            False,
+        )
 
     def _compute_assumption_risks(
         self,
@@ -1087,29 +1402,19 @@ class PartnerDecisionEngine:
         """
         risks: List[str] = []
         rules = self._get_rules()
-        keywords = rules.get("assumption_risk_keywords", [
-            "critical unknown", "unvalidated assumption", "weak assumption",
-            "could invalidate", "unresolved", "missing validation",
-        ])
+        keywords = rules.assumption_risk_keywords
         feedback_lower = [f.lower() for f in assumption_feedback]
         for i, fb in enumerate(assumption_feedback):
             if any(kw in feedback_lower[i] for kw in keywords):
                 risks.append(fb)
-        if not risks and assumption_feedback:
-            for fb in assumption_feedback:
-                if any(w in fb.lower() for w in ("unknown", "unclear", "unvalidated", "risk")):
-                    risks.append(fb)
         biggest_unknown = scout_output.get("biggest_unknown") or ""
         if biggest_unknown.strip() and not any(biggest_unknown.strip() in r for r in risks):
             risks.append(f"Biggest unknown: {biggest_unknown.strip()}")
         return risks[:10]
 
-    def _has_critical_risk(self, key_risks: List[str], rules: Dict[str, Any]) -> bool:
+    def _has_critical_risk(self, key_risks: List[str], rules: PartnerRules) -> bool:
         """Check if any risk indicates regulatory or execution impossibility (from rules)."""
-        keywords = rules.get("critical_risk_keywords", [
-            "regulatory", "regulation", "legal impossibility", "execution impossibility",
-            "cannot be executed", "regulatory ban", "prohibited by law",
-        ])
+        keywords = [keyword.lower() for keyword in rules.critical_risk_keywords]
         risks_lower = [r.lower() for r in key_risks]
         for risk in risks_lower:
             for keyword in keywords:
@@ -1117,9 +1422,9 @@ class PartnerDecisionEngine:
                     return True
         return False
 
-    def _has_red_flags(self, key_risks: List[str], rules: Dict[str, Any]) -> bool:
+    def _has_red_flags(self, key_risks: List[str], rules: PartnerRules) -> bool:
         """Check for missing-data or red-flag phrasing (from rules)."""
-        keywords = rules.get("red_flag_keywords", ["missing", "red flag"])
+        keywords = [keyword.lower() for keyword in rules.red_flag_keywords]
         return any(
             any(kw in risk.lower() for kw in keywords)
             for risk in key_risks
@@ -1131,13 +1436,13 @@ class PartnerDecisionEngine:
         product: int,
         technical: int,
         execution: int,
-        rules: Dict[str, Any],
+        rules: PartnerRules,
     ) -> bool:
         """Detect contradictory scores using thresholds from rules."""
-        cfg = rules.get("contradictory_scores", {})
-        min_gap = cfg.get("min_gap", 4)
-        high_threshold = cfg.get("high_threshold", 8)
-        low_threshold = cfg.get("low_threshold", 4)
+        cfg = rules.contradictory_scores
+        min_gap = cfg.min_gap
+        high_threshold = cfg.high_threshold
+        low_threshold = cfg.low_threshold
         scores = [market, product, technical, execution]
         max_s, min_s = max(scores), min(scores)
         if max_s - min_s >= min_gap:
@@ -1150,7 +1455,7 @@ class PartnerDecisionEngine:
         self,
         assumption_feedback: List[str],
         assumption_risks: List[str],
-        rules: Dict[str, Any],
+        rules: PartnerRules,
     ) -> bool:
         """
         True when Reviewer feedback (or non-scout risk lines) flag assumptions that
@@ -1169,50 +1474,48 @@ class PartnerDecisionEngine:
         if not assumption_feedback:
             return False
 
-        keywords = rules.get(
-            "assumption_risk_keywords",
-            [
-                "critical unknown",
-                "unvalidated assumption",
-                "weak assumption",
-                "could invalidate",
-                "unresolved",
-                "missing validation",
-            ],
-        )
+        keywords = rules.assumption_risk_keywords
         feedback_lower = [f.lower() for f in assumption_feedback]
         for i, fb in enumerate(assumption_feedback):
             if any(kw in feedback_lower[i] for kw in keywords):
                 return True
-        for fb in assumption_feedback:
-            if any(w in fb.lower() for w in ("unknown", "unclear", "unvalidated", "risk")):
-                return True
         return False
 
-    def _has_missing_team(self, review_output: Dict[str, Any], rules: Dict[str, Any]) -> bool:
+    def _has_missing_team(self, review_output: Dict[str, Any], rules: PartnerRules) -> bool:
         """True if team_analysis is absent or only [MISSING] placeholders."""
         team = review_output.get("team_analysis") or []
         if not team:
             return True
-        missing_keywords = rules.get("missing_qualitative_keywords", ["[MISSING]", "missing", "absent", "n/a"])
+        missing_keywords = [keyword.lower() for keyword in rules.missing_qualitative_keywords]
         combined = " ".join(t.lower() for t in team)
         return any(kw in combined for kw in missing_keywords) and len(team) <= 2
 
-    def _has_missing_business_model(self, review_output: Dict[str, Any], rules: Dict[str, Any]) -> bool:
+    def _has_missing_business_model(self, review_output: Dict[str, Any], rules: PartnerRules) -> bool:
         """True if business_model_analysis is absent or only [MISSING] placeholders."""
         bm = review_output.get("business_model_analysis") or []
         if not bm:
             return True
-        missing_keywords = rules.get("missing_qualitative_keywords", ["[MISSING]", "missing", "absent", "n/a"])
+        missing_keywords = [keyword.lower() for keyword in rules.missing_qualitative_keywords]
         combined = " ".join(t.lower() for t in bm)
         return any(kw in combined for kw in missing_keywords) and len(bm) <= 2
 
-    def _has_strong_qualitative(self, items: List[str]) -> bool:
-        """True if list has substantive content (not just [MISSING] or short placeholders)."""
+    def _has_strong_qualitative(
+        self,
+        items: List[str],
+        rules: PartnerRules,
+    ) -> bool:
+        """True for substantive content not marked by configured missing keywords."""
         if not items or len(items) < 2:
             return False
-        missing = "[missing]"
-        substantive = [s for s in items if missing not in s.lower() and len(s.strip()) > 20]
+        missing_keywords = [
+            keyword.lower() for keyword in rules.missing_qualitative_keywords
+        ]
+        substantive = [
+            item
+            for item in items
+            if not any(keyword in item.lower() for keyword in missing_keywords)
+            and len(item.strip()) > 20
+        ]
         return len(substantive) >= 1
 
     def _extract_step_items(self, text: str) -> List[str]:
@@ -1329,12 +1632,14 @@ class PartnerDecisionEngine:
             "human_review_required": human_review_required,
         }
 
-    def _next_action_for_llm_decision(self, recommendation: str, next_actions: Dict[str, Any]) -> str:
+    def _next_action_for_llm_decision(
+        self, recommendation: str, next_actions: NextActions
+    ) -> str:
         if recommendation == "INVEST":
-            return next_actions.get("request_cap_table", "Request Cap Table")
+            return next_actions.request_cap_table
         if recommendation == "PASS":
-            return next_actions.get("default_no", "Pass - Does not meet criteria")
-        return next_actions.get("human_review_monitor", "Human review required - monitor closely")
+            return next_actions.default_no
+        return next_actions.human_review_monitor
 
     def _compact_llm_rescue_call(
         self,
@@ -1361,10 +1666,14 @@ class PartnerDecisionEngine:
             f"defensibility:{review_output.get('defensibility_score', 'N/A')}}}\n"
             f"trigger={trigger_reason}\n"
         )
+        compact_system_prompt = "You are a strict JSON generator."
+        self._bind_execution_prompt(
+            compact_system_prompt + "\n\n" + compact_prompt
+        )
         rescue_response = self.client.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": "You are a strict JSON generator."},
+                {"role": "system", "content": compact_system_prompt},
                 {"role": "user", "content": compact_prompt},
             ],
             max_completion_tokens=2048,
@@ -1420,6 +1729,7 @@ class PartnerDecisionEngine:
         review_output: Dict[str, Any],
         scout_output: Dict[str, Any],
         avg_dims: int,
+        force_human_review: bool = False,
     ) -> Dict[str, Any]:
         """Force rationale + headline to match canonical recommendation (LLM narrative only)."""
         rationale, drivers = compose_decision_rationale(
@@ -1451,6 +1761,8 @@ class PartnerDecisionEngine:
             result,
             self._handoff_quality_from_review(review_output),
         )
+        if force_human_review:
+            result["human_review_required"] = True
         return self._finalize_thesis_and_mandate_gate(
             result, review_output, scout_output, avg_score, avg_dims
         )
@@ -1491,11 +1803,11 @@ class PartnerDecisionEngine:
         )
 
         rules = self._get_rules()
-        next_actions = rules.get("next_actions", {})
+        next_actions = rules.next_actions
         verdict = review_output.get("verdict", "MEDIUM")
         score_reasoning = review_output.get("score_reasoning") or {}
 
-        def _failure_outcome(prompt_snapshot: str, rationale: str) -> Dict[str, Any]:
+        def _failure_outcome(_prompt_snapshot: str, rationale: str) -> Dict[str, Any]:
             n_t, n_w, n_s, n_m, n_p, n_tr = self._build_narrative_from_inputs(
                 scout_output, review_output
             )
@@ -1504,10 +1816,7 @@ class PartnerDecisionEngine:
                 recommendation=final_recommendation,
                 conviction=1,
                 decision_rationale=rationale,
-                next_action=next_actions.get(
-                    "human_review_contradictions",
-                    "Human review required - analyze contradictions",
-                ),
+                next_action=next_actions.human_review_contradictions,
                 human_review_required=True,
                 thesis=n_t,
                 why_this_matters=n_w,
@@ -1518,7 +1827,7 @@ class PartnerDecisionEngine:
                 risks=f_risks,
             )
             result["llm_fallback_reason"] = trigger_reason
-            result["prompt_version"] = hash_prompt(prompt_snapshot) if prompt_snapshot else None
+            result["prompt_version"] = self._execution_prompt_version.get()
             self.logger.warning(
                 "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",
                 uid_log,
@@ -1560,28 +1869,14 @@ class PartnerDecisionEngine:
                 _synthesize_rationale(),
             )
 
-        try:
-            from core.policy_resolver import get_partner_rules
-
-            partner_rules_payload = get_partner_rules()
-        except Exception as e:
-            self.logger.warning("[PARTNER] partner_llm_fallback user_id=%s could not load partner_rules: %s", uid_log, e)
-            partner_rules_payload = rules
-
-        rules_json = _partner_rules_json_for_prompt(
-            partner_rules_payload if isinstance(partner_rules_payload, dict) else {}
-        )
+        rules_json = _partner_rules_json_for_prompt(rules)
         tb = (thesis_block or "").strip()
         if len(tb) > _MAX_THESIS_MANDATE_CHARS:
             tb = tb[: _MAX_THESIS_MANDATE_CHARS - 30] + "\n...(truncated)\n"
         thesis_section = f"FUND THESIS MANDATE (and resource lens if present):\n{tb}\n\n" if tb else ""
 
         digest_prefix = ""
-        if os.getenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "").strip().lower() in (
-            "1",
-            "true",
-            "yes",
-        ):
+        if self._include_deal_context_digest:
             from utils.deal_context import build_deal_context_v1, format_deal_context_digest_prompt_line
 
             dc = build_deal_context_v1(scout_output, review_output, fund_thesis)
@@ -1681,6 +1976,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
                     uid_log,
                     _log_safe_single_line(prompt_for_hash),
                 )
+            self._bind_execution_prompt(prompt_for_hash)
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -1867,7 +2163,7 @@ No markdown. No extra fields. Strictly under 350 words total information density
             "next_action": next_act,
             "human_review_required": human_rev,
             "llm_fallback_reason": trigger_reason,
-            "prompt_version": hash_prompt(prompt_for_hash),
+            "prompt_version": self._execution_prompt_version.get(),
         }
         self.logger.warning(
             "[PARTNER] partner_llm_fallback_metrics user_id=%s stats=%s",

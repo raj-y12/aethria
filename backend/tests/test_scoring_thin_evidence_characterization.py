@@ -49,23 +49,14 @@ THIN_EVIDENCE_REVIEW = {
 }
 
 
-def test_issue1_strong_label_low_confidence_yields_max_subscore_BUG():
-    """BUG: confidence 0.2 does not discount the score; 'strong' -> full 10.0 sub-score.
-
-    Post-fix expectation (1A confidence-discount): a strong/0.2 signal should resolve to
-    roughly the unproven baseline (~5.0-6.0), and the defensibility dimension should be
-    flagged evidence_capped (1B). Flip these asserts when the fix lands.
-    """
-    engine = DeterministicScoringEngine()
+def test_strong_label_without_grounding_cannot_publish_max_score():
+    engine = DeterministicScoringEngine(evidence_calibration=True)
     result = engine.score(THIN_EVIDENCE_SCOUT, THIN_EVIDENCE_REVIEW)
+    network = result["defensibility"]["components"]["network_effects"]
 
-    ne = result["defensibility"]["components"]["network_effects"]
-    assert ne["label"] == "strong"
-    assert ne["confidence"] == 0.2
-    # BUG: full-credit score despite near-zero evidence confidence.
-    assert ne["score"] == 10.0
-    # BUG: no evidence-sufficiency flag exists on the dimension yet.
-    assert "evidence_capped" not in result["defensibility"]
+    assert network["score"] < 10.0
+    assert result["defensibility"]["unscored"] is True
+    assert result["defensibility"]["confidence"] == 0.0
 
 
 # ── Issue 2: when both companies have thin evidence, stage/quality ordering collapses ──

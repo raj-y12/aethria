@@ -1,5 +1,8 @@
 """Data structures for Meta-Agent cycle outputs."""
-from typing import TypedDict, List, Dict, Optional
+from enum import Enum
+from typing import Any, TypedDict, List, Dict, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class PromptMutation(TypedDict, total=False):
@@ -16,6 +19,70 @@ class PromptMutation(TypedDict, total=False):
     cycle_number: int
     promoted: bool
     activation_status: str
+
+
+class PromptMutationTargetState(str, Enum):
+    """Terminal state for one mutation target."""
+
+    PROPOSED = "proposed"
+    REJECTED = "rejected"
+    FAILED = "failed"
+
+
+class PromptMutationTargetOutcome(BaseModel):
+    """Lossless result of attempting one requested prompt mutation."""
+
+    model_config = ConfigDict(frozen=True)
+
+    agent_target: str = Field(min_length=1)
+    state: PromptMutationTargetState
+    code: str = Field(min_length=1, pattern=r"^[a-z][a-z0-9_]*$")
+    detail: str = Field(min_length=1)
+    proposal: Optional[Dict[str, Any]] = None
+
+    @model_validator(mode="after")
+    def validate_proposal_payload(self) -> "PromptMutationTargetOutcome":
+        if self.state is PromptMutationTargetState.PROPOSED:
+            if not isinstance(self.proposal, dict):
+                raise ValueError("proposed target outcomes require a proposal")
+        elif self.proposal is not None:
+            raise ValueError("non-proposed target outcomes cannot publish a proposal")
+        return self
+
+
+class PromptMutationBatchResult(BaseModel):
+    """Typed accounting for every target passed to ``PromptMutator.apply``."""
+
+    model_config = ConfigDict(frozen=True)
+
+    outcomes: List[PromptMutationTargetOutcome] = Field(default_factory=list)
+
+    @property
+    def attempted(self) -> int:
+        return len(self.outcomes)
+
+    @property
+    def succeeded(self) -> int:
+        return sum(
+            outcome.state is not PromptMutationTargetState.FAILED
+            for outcome in self.outcomes
+        )
+
+    @property
+    def failed(self) -> int:
+        return sum(
+            outcome.state is PromptMutationTargetState.FAILED
+            for outcome in self.outcomes
+        )
+
+    @property
+    def proposals(self) -> List[Dict[str, Any]]:
+        return [
+            dict(outcome.proposal)
+            for outcome in self.outcomes
+            if outcome.state is PromptMutationTargetState.PROPOSED
+            and isinstance(outcome.proposal, dict)
+        ]
 
 
 class ScoutWeightUpdate(TypedDict):
@@ -45,6 +112,7 @@ class MetaCycleReport(TypedDict, total=False):
     analysis_only: bool
     production_mutations_applied: int
     prompt_proposals: List[PromptMutation]
+    prompt_target_outcomes: List[dict]
     mutations_applied: List[PromptMutation]
     weight_proposals: List[ScoutWeightUpdate]
     calibration_proposals: List[CalibrationMutation]

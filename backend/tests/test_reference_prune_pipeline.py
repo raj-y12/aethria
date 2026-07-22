@@ -4,6 +4,7 @@ import pytest
 
 import pipeline_runner
 from models import ScoutInfo
+from pipeline_execution import MetaCycleResult, ScoutCycleResult, StageExecutionResult
 from utils.storage import Storage
 
 
@@ -27,7 +28,13 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
 
         async def run_cycle(self, **kwargs):
             order.append("scout")
-            return []
+            return ScoutCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="scout",
+                    code="scout_no_eligible_work",
+                    detail="No Scout work.",
+                )
+            )
 
     class Reviewer:
         last_cycle_stats = {}
@@ -35,7 +42,11 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
         async def run_cycle(self, **kwargs):
             assert kwargs["eligible_startup_ids"] == set()
             order.append("reviewer")
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_no_eligible_work",
+                detail="No Reviewer work.",
+            )
 
     class Partner:
         last_cycle_escalations = 0
@@ -44,6 +55,7 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
             return 0
 
     class Thesis:
+        version_id = "thesis-live"
         embedding = [0.1]
 
         def as_engine_context(self):
@@ -55,6 +67,11 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
 
         async def run_cycle(self):
             order.append("portfolio")
+            return StageExecutionResult.skipped_result(
+                stage="portfolio",
+                code="portfolio_no_due_work",
+                detail="No Portfolio work.",
+            )
 
     class Meta:
         def __init__(self, **kwargs):
@@ -62,6 +79,13 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
 
         async def run_cycle(self):
             order.append("meta")
+            return MetaCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="meta",
+                    code="meta_not_due",
+                    detail="No Meta work.",
+                )
+            )
 
     storage = StorageStub()
     engines = pipeline_runner._PipelineEngines(
@@ -95,8 +119,17 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
         async def list_linked_legacy_startup_ids(self, *, user_id):
             return []
 
+    class Prerequisites:
+        thesis_version_id = "thesis-live"
+
+        def require_tenant(self, user_id, *, context):
+            assert user_id == "user-prune-order"
+            return user_id
+
     await pipeline_runner._run_one_pipeline_cycle_inner(
-        "user-prune-order", identity_repository=IdentityRepository()
+        "user-prune-order",
+        identity_repository=IdentityRepository(),
+        evaluation_prerequisites=Prerequisites(),
     )
 
     assert order[:3] == ["scout", "prune", "reviewer"]

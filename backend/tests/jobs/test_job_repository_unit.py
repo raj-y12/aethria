@@ -4,7 +4,14 @@ from collections import deque
 
 import pytest
 
-from jobs.models import AgentJob, JobStatus, JobType, PipelineCyclePayload
+from jobs.lookup_outcomes import LookupAttemptOutcome
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobStatus,
+    JobType,
+    PipelineCyclePayload,
+)
 
 
 class _Transaction:
@@ -67,6 +74,25 @@ def _job():
     )
 
 
+def _lookup_job(*, status=JobStatus.QUEUED, attempts=0, max_attempts=3):
+    return AgentJob(
+        job_id="74d53f3f-1795-4636-bda7-c55fbf420dc4",
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup:user-a:lookup-contract-1",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-contract-1",
+        ),
+        status=status,
+        attempts=attempts,
+        max_attempts=max_attempts,
+        pipeline_run_id="pipeline-contract-1",
+        lease_owner="worker-a" if status is JobStatus.RUNNING else None,
+    )
+
+
 def _row(job=None, **overrides):
     data = (job or _job()).model_dump(mode="json")
     data["payload"] = json.dumps(data["payload"])
@@ -87,6 +113,24 @@ async def test_enqueue_commits_job_outbox_and_notify_in_one_transaction():
     assert "insert into public.agent_jobs" in sql
     assert "insert into public.domain_outbox" in sql
     assert "pg_notify" in sql
+
+
+@pytest.mark.asyncio
+async def test_enqueue_lookup_commits_initial_accepted_attempt_with_job():
+    repository_module = importlib.import_module("jobs.repository")
+    lookup = _lookup_job()
+    connection = _Connection(fetchrows=[_row(lookup)])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    accepted = await repository.enqueue(lookup)
+
+    assert accepted.job_id == lookup.job_id
+    outcome_call = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    payload = json.loads(outcome_call[2][2])
+    assert payload["attempt"] == 1
+    assert payload["disposition"] == "accepted"
 
 
 @pytest.mark.asyncio
@@ -127,6 +171,59 @@ async def test_claim_uses_skip_locked_and_recovers_expired_leases():
 
 
 @pytest.mark.asyncio
+async def test_claim_lookup_persists_accepted_attempt_in_same_transaction():
+    repository_module = importlib.import_module("jobs.repository")
+    claimed_row = _row(
+        _lookup_job(status=JobStatus.RUNNING, attempts=1),
+        status="running",
+        attempts=1,
+        lease_owner="worker-a",
+    )
+    connection = _Connection(fetchrows=[claimed_row])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    claimed = await repository.claim_next(worker_id="worker-a", lease_seconds=60)
+
+    assert claimed.attempts == 1
+    outcome_call = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    payload = json.loads(outcome_call[2][2])
+    assert payload["attempt"] == 1
+    assert payload["disposition"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_reclaimed_lookup_terminalizes_expired_attempt_before_new_acceptance():
+    repository_module = importlib.import_module("jobs.repository")
+    reclaimed = _row(
+        _lookup_job(status=JobStatus.RUNNING, attempts=2),
+        status="running",
+        attempts=2,
+        lease_owner="worker-b",
+        previous_status="running",
+        previous_attempts=1,
+        previous_lease_owner="worker-a",
+    )
+    connection = _Connection(fetchrows=[reclaimed])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    claimed = await repository.claim_next(worker_id="worker-b", lease_seconds=60)
+
+    assert claimed.attempts == 2
+    payloads = [
+        json.loads(call[2][2])
+        for call in connection.calls
+        if "lookup_job_outcomes" in call[1].lower()
+    ]
+    assert [(item["attempt"], item["disposition"]) for item in payloads] == [
+        (1, "retryable_failure"),
+        (2, "accepted"),
+    ]
+    assert payloads[0]["code"] == "lookup_attempt_lease_expired"
+
+
+@pytest.mark.asyncio
 async def test_exhausted_expired_lease_is_dead_lettered_instead_of_sticking_running():
     repository_module = importlib.import_module("jobs.repository")
     connection = _Connection(
@@ -154,6 +251,30 @@ async def test_exhausted_expired_lease_is_dead_lettered_instead_of_sticking_runn
 
 
 @pytest.mark.asyncio
+async def test_exhausted_lookup_lease_dead_letters_its_attempt_atomically():
+    repository_module = importlib.import_module("jobs.repository")
+    exhausted = _row(
+        _lookup_job(status=JobStatus.DEAD_LETTER, attempts=3, max_attempts=3),
+        status="dead_letter",
+        attempts=3,
+        max_attempts=3,
+        last_error="Worker lease expired after the final attempt",
+    )
+    connection = _Connection(fetches=[[exhausted]])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    assert await repository.dead_letter_exhausted_leases() == 1
+
+    outcome_call = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    payload = json.loads(outcome_call[2][2])
+    assert payload["attempt"] == 3
+    assert payload["disposition"] == "terminal_failure"
+    assert payload["code"] == "lookup_attempt_lease_expired"
+
+
+@pytest.mark.asyncio
 async def test_heartbeat_and_stale_completion_require_current_lease_owner():
     repository_module = importlib.import_module("jobs.repository")
     connection = _Connection(fetchrows=[{"job_id": _job().job_id}, None])
@@ -168,6 +289,105 @@ async def test_heartbeat_and_stale_completion_require_current_lease_owner():
     success_sql = connection.calls[1][1].lower()
     assert "lease_owner = $3" in success_sql
     assert "status = 'running'" in success_sql
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "operation",
+    ["heartbeat", "succeed", "retry", "fail", "block", "cancel_owned"],
+)
+async def test_owned_job_mutations_reject_an_expired_lease(operation):
+    repository_module = importlib.import_module("jobs.repository")
+    running = _lookup_job(status=JobStatus.RUNNING, attempts=1)
+    repository = repository_module.DurableJobRepository(
+        _Pool(_Connection(fetchrows=[None]))
+    )
+    common = {
+        "user_id": running.user_id,
+        "job_id": running.job_id,
+        "worker_id": "worker-a",
+    }
+
+    if operation == "heartbeat":
+        await repository.heartbeat(**common, lease_seconds=60)
+    elif operation == "succeed":
+        await repository.succeed(**common)
+    elif operation == "retry":
+        await repository.retry(**common, error="retry")
+    elif operation == "fail":
+        await repository.fail(**common, error="failed")
+    elif operation == "block":
+        await repository.block(
+            **common,
+            code="identity_review_required",
+            detail="Identity review is required.",
+            recovery_action="Resolve the identity case.",
+        )
+    else:
+        await repository.cancel_owned(
+            **common,
+            lookup_outcome=LookupAttemptOutcome.cancelled_for_job(
+                running,
+                detail="The lookup was cancelled.",
+            ),
+        )
+
+    sql = repository.pool.connection.calls[0][1].lower()
+    assert "lease_expires_at > now()" in sql
+
+
+@pytest.mark.asyncio
+async def test_stale_lookup_finalizer_cannot_publish_terminal_outcome():
+    repository_module = importlib.import_module("jobs.repository")
+    job = _lookup_job(status=JobStatus.RUNNING, attempts=1)
+    outcome = LookupAttemptOutcome.cancelled_for_job(
+        job, detail="A competing owner cancelled this attempt."
+    )
+    connection = _Connection(fetchrows=[None])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    transitioned = await repository.succeed(
+        user_id=job.user_id,
+        job_id=job.job_id,
+        worker_id="stale-worker",
+        lookup_outcome=outcome,
+    )
+
+    assert transitioned is False
+    assert not any("lookup_job_outcomes" in call[1].lower() for call in connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_owned_lookup_cancellation_and_outcome_finalize_atomically():
+    repository_module = importlib.import_module("jobs.repository")
+    running = _lookup_job(status=JobStatus.RUNNING, attempts=1)
+    cancelled = _row(
+        running.model_copy(update={"status": JobStatus.CANCELLED}),
+        status="cancelled",
+        attempts=1,
+        lease_owner=None,
+    )
+    outcome = LookupAttemptOutcome.cancelled_for_job(
+        running, detail="Lookup was cancelled at a safe boundary."
+    )
+    connection = _Connection(fetchrows=[cancelled])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.cancel_owned(
+        user_id=running.user_id,
+        job_id=running.job_id,
+        worker_id="worker-a",
+        lookup_outcome=outcome,
+    )
+
+    assert result.status is JobStatus.CANCELLED
+    mutation_sql = connection.calls[0][1].lower()
+    assert "lease_owner = $3" in mutation_sql
+    assert "status = 'running'" in mutation_sql
+    persisted = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    assert json.loads(persisted[2][2])["disposition"] == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -233,10 +453,41 @@ async def test_cancel_is_tenant_scoped_and_idempotent():
 
     result = await repository.cancel(user_id="user-a", job_id=_job().job_id)
 
-    assert result.status is JobStatus.CANCELLED
+    assert result.disposition.value == "transitioned"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
     sql = connection.calls[0][1].lower()
     assert "user_id = $2" in sql
     assert "status not in ('succeeded', 'cancelled')" in sql
+    assert "coalesce(jobs.completed_at, now())" in sql
+
+
+@pytest.mark.asyncio
+async def test_cancel_queued_lookup_uses_pre_transition_planned_attempt_atomically():
+    repository_module = importlib.import_module("jobs.repository")
+    cancelled = _row(
+        _lookup_job(status=JobStatus.CANCELLED, attempts=2),
+        status="cancelled",
+        attempts=2,
+        previous_status="queued",
+        previous_attempts=2,
+    )
+    connection = _Connection(fetchrows=[cancelled])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.cancel(
+        user_id="user-a", job_id=_lookup_job().job_id
+    )
+
+    assert result.disposition.value == "transitioned"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
+    outcome_call = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    payload = json.loads(outcome_call[2][2])
+    assert payload["attempt"] == 3
+    assert payload["disposition"] == "cancelled"
 
 
 @pytest.mark.asyncio
@@ -247,9 +498,40 @@ async def test_repeated_cancel_does_not_publish_a_second_outbox_event():
 
     result = await repository.cancel(user_id="user-a", job_id=_job().job_id)
 
-    assert result.status is JobStatus.CANCELLED
+    assert result.disposition.value == "already_cancelled"
+    assert result.job is not None
+    assert result.job.status is JobStatus.CANCELLED
     assert not any(
         call[0] == "execute" and "domain_outbox" in call[1].lower()
+        for call in connection.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_cancel_reports_when_running_to_succeeded_race_loses_transition():
+    repository_module = importlib.import_module("jobs.repository")
+    succeeded = _row(
+        _lookup_job(status=JobStatus.SUCCEEDED, attempts=1),
+        status="succeeded",
+        attempts=1,
+    )
+    connection = _Connection(fetchrows=[None, succeeded])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.cancel(
+        user_id="user-a",
+        job_id=_lookup_job().job_id,
+    )
+
+    assert result.disposition.value == "rejected"
+    assert result.job is not None
+    assert result.job.status is JobStatus.SUCCEEDED
+    assert not any(
+        call[0] == "execute"
+        and (
+            "lookup_job_outcomes" in call[1].lower()
+            or "domain_outbox" in call[1].lower()
+        )
         for call in connection.calls
     )
 
@@ -281,13 +563,62 @@ async def test_manual_requeue_adds_one_attempt_without_changing_job_identity():
 
 
 @pytest.mark.asyncio
-async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
+async def test_lookup_requeue_and_new_accepted_attempt_share_one_transaction():
+    repository_module = importlib.import_module("jobs.repository")
+    queued = _row(
+        _lookup_job(status=JobStatus.QUEUED, attempts=3, max_attempts=4),
+        status="queued",
+        attempts=3,
+        max_attempts=4,
+    )
+    connection = _Connection(fetchrows=[queued])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    result = await repository.requeue(
+        user_id="user-a", job_id=_lookup_job().job_id
+    )
+
+    assert result.status is JobStatus.QUEUED
+    outcome_call = next(
+        call for call in connection.calls if "lookup_job_outcomes" in call[1].lower()
+    )
+    payload = json.loads(outcome_call[2][2])
+    assert payload["attempt"] == 4
+    assert payload["disposition"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_lookup_outcome_write_failure_aborts_requeue_transaction():
+    repository_module = importlib.import_module("jobs.repository")
+
+    class FailingConnection(_Connection):
+        async def execute(self, sql, *args):
+            self.calls.append(("execute", sql, args))
+            if "lookup_job_outcomes" in sql.lower():
+                raise ConnectionError("lookup outcome insert failed")
+            return "OK"
+
+    queued = _row(
+        _lookup_job(status=JobStatus.QUEUED, attempts=3, max_attempts=4),
+        status="queued",
+        attempts=3,
+        max_attempts=4,
+    )
+    connection = FailingConnection(fetchrows=[queued])
+    repository = repository_module.DurableJobRepository(_Pool(connection))
+
+    with pytest.raises(Exception, match="lookup outcome"):
+        await repository.requeue(user_id="user-a", job_id=_lookup_job().job_id)
+
+
+@pytest.mark.asyncio
+async def test_block_is_structured_tenant_scoped_and_preserves_monotonic_attempt():
     repository_module = importlib.import_module("jobs.repository")
     connection = _Connection(
         fetchrows=[
             _row(
                 status="blocked",
-                attempts=0,
+                attempts=1,
                 block_code="identity_review_required",
                 block_detail="Ambiguous company identity.",
                 recovery_action="Resolve identity case and retry.",
@@ -308,7 +639,7 @@ async def test_block_is_structured_tenant_scoped_and_preserves_retry_budget():
     assert result.status is JobStatus.BLOCKED
     assert result.block_code == "identity_review_required"
     sql = connection.calls[0][1].lower()
-    assert "attempts = greatest(attempts - 1, 0)" in sql
+    assert "attempts = greatest(attempts - 1, 0)" not in sql
     assert "user_id = $2" in sql
     assert any("agent_job.blocked" in str(call) for call in connection.calls)
 

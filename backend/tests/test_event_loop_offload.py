@@ -8,16 +8,32 @@ the asyncio.to_thread offloads in pipeline_runner regress.
 import asyncio
 import time
 import threading
+from types import SimpleNamespace
 
 import pytest
 
 import pipeline_runner
+from pipeline_execution import PipelineExecutionState
 
 # Runnable standalone (python -m pytest tests/test_event_loop_offload.py) —
 # does not depend on CI's `-o asyncio_mode=auto`.
 pytestmark = pytest.mark.asyncio
 
 BLOCK_S = 0.5
+
+class _Prerequisites:
+    thesis_version_id = "thesis-live"
+
+    def require_tenant(self, user_id, *, context):
+        assert user_id == "user_loop_lag_test"
+        return user_id
+
+
+class _IdentityRepository:
+    pass
+
+
+_PREREQUISITES = _Prerequisites()
 
 
 async def _max_heartbeat_gap(stop: asyncio.Event) -> float:
@@ -32,7 +48,9 @@ async def _max_heartbeat_gap(stop: asyncio.Event) -> float:
     return worst
 
 
-async def _run_cycle_with_heartbeat(expect_error: type[Exception] | None = None) -> float:
+async def _run_cycle_with_heartbeat(
+    expect_failure_code: str | None = None,
+) -> float:
     """Run one pipeline cycle with a live heartbeat; return the worst loop gap."""
     stop = asyncio.Event()
     heartbeat = asyncio.create_task(_max_heartbeat_gap(stop))
@@ -42,11 +60,14 @@ async def _run_cycle_with_heartbeat(expect_error: type[Exception] | None = None)
     await asyncio.sleep(0.05)
 
     try:
-        if expect_error is not None:
-            with pytest.raises(expect_error):
-                await pipeline_runner._run_one_pipeline_cycle_inner("user_loop_lag_test")
-        else:
-            await pipeline_runner._run_one_pipeline_cycle_inner("user_loop_lag_test")
+        result = await pipeline_runner._run_one_pipeline_cycle_inner(
+            "user_loop_lag_test",
+            identity_repository=_IdentityRepository(),
+            evaluation_prerequisites=_PREREQUISITES,
+        )
+        if expect_failure_code is not None:
+            assert result.state is PipelineExecutionState.FAILED_STAGE
+            assert result.code == expect_failure_code
     finally:
         stop.set()
     return await heartbeat
@@ -78,6 +99,7 @@ class _EngineBuildReached(RuntimeError):
 
 
 class _FakeThesis:
+    version_id = "thesis-live"
     embedding = [0.1]  # non-empty -> skips the embedding backfill
 
     def as_engine_context(self):
@@ -106,7 +128,9 @@ async def test_slow_engine_construction_does_not_block_event_loop(monkeypatch):
 
     monkeypatch.setattr(pipeline_runner, "_build_pipeline_engines", slow_build_engines)
 
-    worst_gap = await _run_cycle_with_heartbeat(expect_error=_EngineBuildReached)
+    worst_gap = await _run_cycle_with_heartbeat(
+        expect_failure_code="pipeline_engine_initialization_failed"
+    )
     _assert_loop_stayed_free(worst_gap, "engine construction")
 
 

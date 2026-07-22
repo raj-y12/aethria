@@ -3,6 +3,7 @@ Reviewer execution engine.
 Runs continuously, processing unreviewed Scout discoveries.
 """
 import asyncio
+import copy
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -23,6 +24,14 @@ from services.scoring.policy_store import load_active_policy
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
+from evaluation_v2.prerequisites import EvaluationPrerequisites
+from evaluation_v2.governed_scoring import (
+    GovernedScoringError,
+    configured_scoring_dimensions,
+    resolve_governed_scoring_traces,
+    validate_governed_scoring_trace,
+)
+from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +61,7 @@ class ReviewerEngine:
         tenant_user_id: str = "",
         active_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     ):
         """
         Initialize the Reviewer engine.
@@ -63,6 +73,20 @@ class ReviewerEngine:
         if not inferred:
             inferred = (getattr(storage, "_user_id", None) or "").strip()
         self.tenant_user_id = require_user_id(inferred, context="ReviewerEngine")
+        self.evaluation_prerequisites = evaluation_prerequisites
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="ReviewerEngine"
+            )
+            if (
+                active_thesis is not None
+                and active_thesis != evaluation_prerequisites.thesis_context
+            ):
+                raise RuntimeError(
+                    "ReviewerEngine: active thesis does not match governed prerequisites"
+                )
+            active_thesis = copy.deepcopy(evaluation_prerequisites.thesis_context)
+            use_resource_fund_thesis_fallback = False
         self.api_key = api_key
         self.storage = storage
         self.interval_seconds = interval_seconds
@@ -72,7 +96,7 @@ class ReviewerEngine:
         self.logger = logging.getLogger("reviewer.engine")
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
-        self.active_thesis: Optional[Dict[str, Any]] = active_thesis
+        self.active_thesis: Optional[Dict[str, Any]] = copy.deepcopy(active_thesis)
         self.use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self.backpressure_threshold = int(
             os.getenv("REVIEWER_BACKPRESSURE_THRESHOLD", "10")
@@ -80,12 +104,16 @@ class ReviewerEngine:
         # Ramp-up: when unreviewed backlog is high, process more per cycle
         self.ramp_threshold = int(os.getenv("REVIEWER_RAMP_THRESHOLD", "5"))
         self.ramp_batch_max = int(os.getenv("REVIEWER_RAMP_BATCH_MAX", "5"))
-        self.use_structured_scoring = os.getenv("USE_STRUCTURED_SCORING", "true").lower() in (
-            "1",
-            "true",
-            "yes",
+        self.use_structured_scoring = evaluation_prerequisites is not None or (
+            os.getenv("USE_STRUCTURED_SCORING", "true").lower()
+            in ("1", "true", "yes")
         )
         self.structured_scoring_engine = self._build_scoring_engine() if self.use_structured_scoring else None
+        structured_signal_grounding = None
+        if evaluation_prerequisites is not None:
+            structured_signal_grounding = evaluation_prerequisites.compiled_scoring_policy[
+                "scoring_runtime"
+            ]["evidence_grounding"]
         
         # Initialize Reviewers (default + persona reviewers)
         tid = self.tenant_user_id
@@ -95,6 +123,7 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         self.skeptical_reviewer = SkepticalReviewer(
             api_key,
@@ -102,6 +131,7 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         self.opportunist_reviewer = OpportunistReviewer(
             api_key,
@@ -109,12 +139,39 @@ class ReviewerEngine:
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
             structured_scoring_enabled=self.use_structured_scoring,
+            structured_signal_grounding=structured_signal_grounding,
         )
         
         self.running = False
         self.last_cycle_stats: Dict[str, Any] = {}
 
     def _build_scoring_engine(self) -> Optional[DeterministicScoringEngine]:
+        if self.evaluation_prerequisites is not None:
+            policy = copy.deepcopy(
+                self.evaluation_prerequisites.compiled_scoring_policy
+            )
+            dimensions = (
+                policy.get("dimensions")
+                if isinstance(policy.get("dimensions"), dict)
+                else {}
+            )
+            dim_weights = {
+                str(dimension): float(config["weight"])
+                for dimension, config in dimensions.items()
+                if isinstance(config, dict)
+                and not isinstance(config.get("weight"), bool)
+                and isinstance(config.get("weight"), (int, float))
+            }
+            if dim_weights:
+                self.logger.info(
+                    "reviewer_governed_policy user_id=%s policy_version_id=%s policy_hash=%s scoring_weights=%s",
+                    self.tenant_user_id[:24],
+                    policy.get("policy_version_id"),
+                    policy.get("policy_hash"),
+                    dim_weights,
+                )
+                return DeterministicScoringEngine(policy=policy)
+            return DeterministicScoringEngine(policy=policy)
         try:
             settings = load_settings(self.tenant_user_id)
             fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
@@ -126,13 +183,19 @@ class ReviewerEngine:
                     self.tenant_user_id[:24],
                     dim_weights,
                 )
-                return DeterministicScoringEngine(dimension_weights=dim_weights, policy=policy)
+                return DeterministicScoringEngine(policy=policy)
             return DeterministicScoringEngine(policy=policy)
         except Exception as e:
             self.logger.warning("Reviewer scoring settings unavailable, using default weights: %s", e)
         return DeterministicScoringEngine()
 
     def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
+        if self.evaluation_prerequisites is not None:
+            if thesis != self.evaluation_prerequisites.thesis_context:
+                raise RuntimeError(
+                    "ReviewerEngine: governed thesis context cannot be replaced"
+                )
+            thesis = self.evaluation_prerequisites.thesis_context
         self.active_thesis = thesis
         self._sync_thesis_to_reviewers()
         if self.use_structured_scoring:
@@ -165,7 +228,12 @@ class ReviewerEngine:
         score_fields = ["market_score", "product_score", "technical_score", "execution_score"]
         score_variance = {}
         for field in score_fields:
-            values = [r.get(field, 0) for r in results]
+            values = [
+                float(value)
+                for r in results
+                if not isinstance((value := r.get(field)), bool)
+                and isinstance(value, (int, float))
+            ]
             if len(values) > 1:
                 mean = sum(values) / len(values)
                 variance = sum((v - mean) ** 2 for v in values) / len(values)
@@ -246,26 +314,45 @@ class ReviewerEngine:
             out["reviewer_type"] = persona
             if self.use_structured_scoring:
                 out = self._apply_structured_scoring(scout_output, out)
+                if self.evaluation_prerequisites is not None:
+                    self._blend_numeric_scores_into_primary(out, [out])
             self._derive_verdict_from_scores(out)
             return out
         finally:
             rev.set_prompt(prev_prompt)
 
     @staticmethod
-    def _mean_round_score(values: list) -> int:
-        nums = [int(v) for v in values if isinstance(v, (int, float))]
+    def _mean_round_score(values: list) -> Optional[float]:
+        nums = [
+            float(v)
+            for v in values
+            if not isinstance(v, bool) and isinstance(v, (int, float))
+        ]
         if not nums:
-            return 5
-        return int(round(sum(nums) / len(nums)))
+            return None
+        # Structured scores are emitted with bounded decimal precision. Keep a
+        # stable lossless compatibility projection instead of introducing
+        # binary averaging noise such as 5.99 -> 5.989999999999999.
+        return round(sum(nums) / len(nums), 6)
 
     def _blend_numeric_scores_into_primary(self, primary: dict, all_results: list) -> None:
-        """Deterministic dimension scores: integer mean across reviewers.
+        """Deterministic dimension scores across reviewers.
+
+        Governed runs first create one authoritative resolved trace and project all
+        compatibility fields from it. Legacy runs retain their historical mean.
+
         Defensibility uses the same plain mean as the other dimensions — it is a
         risk/moat modifier, not part of the overall (see the decision log in
         docs/scoring-remediation-checklist.md). The former 1.5x-skeptical weighting and
         the orphaned weighted_defensibility_score field were removed.
         Also computes confidence_adjusted_score = S_bar × (1 − reviewer_delta/10).
         """
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        if prerequisites is not None:
+            trace = resolve_governed_scoring_traces(all_results, prerequisites)
+            self._project_governed_trace(primary, trace)
+            return
+
         for d in ["market_score", "product_score", "technical_score", "execution_score", "defensibility_score"]:
             primary[d] = self._mean_round_score([r.get(d) for r in all_results])
 
@@ -276,22 +363,41 @@ class ReviewerEngine:
     ) -> None:
         """Confidence-adjusted score + enrich_scores from current primary dimension scores."""
         core_dims = ["market_score", "product_score", "technical_score", "execution_score"]
-        all_dims = list(core_dims)
-        if primary.get("defensibility_score") is not None:
-            all_dims.append("defensibility_score")
-        s_bar = sum(float(primary.get(d, 5)) for d in all_dims) / len(all_dims)
+        core_scores = [
+            float(primary[d])
+            for d in core_dims
+            if not isinstance(primary.get(d), bool)
+            and isinstance(primary.get(d), (int, float))
+        ]
+
+        # A confidence-adjusted aggregate is meaningful only when all required
+        # dimensions are genuinely scored. Publishing a partial mean would turn
+        # missing evidence into an apparently decision-ready headline score.
+        if len(core_scores) != len(core_dims):
+            primary["confidence_adjusted_score"] = None
+            primary["score_source"] = DEFAULT_SCORE_SOURCE
+            primary.update(enrich_scores(primary))
+            return
+
+        all_scores = list(core_scores)
+        defensibility = primary.get("defensibility_score")
+        if not isinstance(defensibility, bool) and isinstance(
+            defensibility, (int, float)
+        ):
+            all_scores.append(float(defensibility))
+        s_bar = sum(all_scores) / len(all_scores)
         reviewer_avgs: List[float] = []
         for r in all_results:
             r_scores = [
-                float(r[d]) for d in core_dims if isinstance(r.get(d), (int, float))
+                float(r[d])
+                for d in core_dims
+                if not isinstance(r.get(d), bool)
+                and isinstance(r.get(d), (int, float))
             ]
             ds = r.get("defensibility_score")
-            if ds is not None:
-                try:
-                    r_scores.append(float(ds))
-                except (TypeError, ValueError):
-                    pass
-            if r_scores:
+            if not isinstance(ds, bool) and isinstance(ds, (int, float)):
+                r_scores.append(float(ds))
+            if len(r_scores) >= len(core_dims):
                 reviewer_avgs.append(sum(r_scores) / len(r_scores))
         if len(reviewer_avgs) >= 2:
             delta = max(reviewer_avgs) - min(reviewer_avgs)
@@ -305,7 +411,54 @@ class ReviewerEngine:
         self, primary: Dict[str, Any], all_results: List[Dict[str, Any]]
     ) -> None:
         """Re-run confidence_adjusted_score and enrich_scores after resolution tweaks."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        trace = primary.get("structured_scoring")
+        if prerequisites is not None:
+            validate_governed_scoring_trace(
+                trace, prerequisites, require_resolved=True
+            )
+            self._project_governed_trace(primary, trace)
+            return
         self._recompute_derived_from_primary(primary, all_results)
+
+    @staticmethod
+    def _project_governed_trace(
+        primary: Dict[str, Any], trace: Dict[str, Any]
+    ) -> None:
+        """Project compatibility fields from, and only from, the resolved trace."""
+
+        for dimension in (
+            "market",
+            "product",
+            "technical",
+            "execution",
+            "defensibility",
+        ):
+            detail = trace.get(dimension)
+            if not isinstance(detail, dict):
+                primary[f"{dimension}_score"] = None
+            else:
+                primary[f"{dimension}_score"] = (
+                    None if detail.get("unscored") else float(detail["score"])
+                )
+        primary["structured_scoring"] = trace
+        primary["overall_score"] = trace.get("overall_score")
+        primary["confidence_adjusted_score"] = trace.get("overall_score")
+        primary["score_source"] = "Governed resolved reviewer consensus"
+
+        enriched = enrich_scores(primary)
+        # enrich_scores intentionally preserves historical four-driver display
+        # labels. Its recomputed overall is not authoritative for governed runs.
+        for key, value in enriched.items():
+            if key == "overall_score":
+                continue
+            primary[key] = value
+        primary["overall_score"] = trace.get("overall_score")
+        primary["overall_label"] = (
+            None
+            if trace.get("overall_score") is None
+            else enriched.get("overall_label")
+        )
 
     @staticmethod
     def _pick_primary_structured_signals(
@@ -328,11 +481,8 @@ class ReviewerEngine:
         """Build per-persona SingleReview snapshots for storage.
 
         Only the primary persona's snapshot retains the heavy structured_signals /
-        structured_scoring blobs (~4KB each). Those are the only copies anything reads:
-        the deterministic scorer, partner engine, and memo all consume the primary
-        signals, which are also mirrored onto ReviewInfo's top-level fields. The
-        non-primary copies were persisted but never read — dropping them roughly
-        halves review_info size with no loss of information used downstream.
+        raw structured_scoring blob. The authoritative top-level resolved trace embeds
+        every persona input with provenance; the snapshots do not need duplicate blobs.
 
         Primary = DefaultReviewer when present, else the first successful result
         (mirrors _pick_primary_structured_signals and the primary review_output).
@@ -357,10 +507,10 @@ class ReviewerEngine:
                 primary_kept = True
             single_reviews.append(SingleReview(
                 reviewer_type=reviewer_label,
-                market_score=r.get("market_score", 5),
-                product_score=r.get("product_score", 5),
-                technical_score=r.get("technical_score", 5),
-                execution_score=r.get("execution_score", 5),
+                market_score=r.get("market_score"),
+                product_score=r.get("product_score"),
+                technical_score=r.get("technical_score"),
+                execution_score=r.get("execution_score"),
                 defensibility_score=r.get("defensibility_score"),
                 overall_summary=r.get("overall_summary", ""),
                 key_risks=r.get("key_risks", []),
@@ -416,33 +566,45 @@ class ReviewerEngine:
 
     def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
         if not self.structured_scoring_engine:
+            if prerequisites is not None:
+                raise GovernedScoringError(
+                    "governed structured scoring engine is unavailable"
+                )
             return reviewer_output
-        from config.scoring_config import DEFAULT_SCORE
-
-        trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
-        # The engine's overall already EXCLUDES no-evidence ("unscored") dimensions.
-        # But the per-dimension integer fields below are read by the partner's plain
-        # 4-dim mean and by its contradiction check (max-min gap). If we stamp the
-        # neutral DEFAULT_SCORE placeholder onto an unscored dimension, it both drags
-        # that mean (demoting e.g. INVEST→MONITOR) and can fabricate a contradiction
-        # gap. Instead, an unscored dimension inherits the overall score, so it stays
-        # consistent with the headline and never invents disagreement.
-        overall = trace.get("overall_score")
-        inherit = int(round(float(overall))) if overall is not None else int(round(DEFAULT_SCORE))
-
-        def _dim_int(dim: str) -> int:
+        try:
+            trace = self.structured_scoring_engine.score(scout_output, reviewer_output)
+        except Exception as exc:
+            if prerequisites is not None:
+                raise GovernedScoringError(
+                    "governed structured scoring could not be applied"
+                ) from exc
+            raise
+        if prerequisites is not None:
+            if not isinstance(trace, dict):
+                raise GovernedScoringError(
+                    "governed structured scoring trace is absent or malformed"
+                )
+            trace = dict(trace)
+            trace.setdefault("user_id", prerequisites.user_id)
+            trace.setdefault("rubric_version", prerequisites.policy.rubric_version)
+            validate_governed_scoring_trace(trace, prerequisites)
+        # An unscored dimension is missing evidence, not a neutral score and not an
+        # invitation to copy another dimension's score. Preserve that missingness in
+        # the persisted compatibility projection so Partner cannot fabricate coverage.
+        def _dim_score(dim: str) -> Optional[float]:
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
-            if details.get("unscored") and overall is not None:
-                return inherit
-            return int(round(float(details.get("score", DEFAULT_SCORE))))
+            if details.get("unscored"):
+                return None
+            return float(details["score"])
 
         updated = dict(reviewer_output)
-        updated["market_score"] = _dim_int("market")
-        updated["product_score"] = _dim_int("product")
-        updated["technical_score"] = _dim_int("technical")
-        updated["execution_score"] = _dim_int("execution")
-        updated["defensibility_score"] = _dim_int("defensibility")
+        updated["market_score"] = _dim_score("market")
+        updated["product_score"] = _dim_score("product")
+        updated["technical_score"] = _dim_score("technical")
+        updated["execution_score"] = _dim_score("execution")
+        updated["defensibility_score"] = _dim_score("defensibility")
         updated["structured_scoring"] = trace
         updated["score_source"] = "Structured assessment framework"
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
@@ -455,7 +617,18 @@ class ReviewerEngine:
         out: Dict[str, str] = {}
         for dim in ("market", "product", "technical", "execution", "defensibility"):
             details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
-            score = float(details.get("score", 5.0))
+            if details.get("unscored"):
+                reasons = [
+                    str(reason)
+                    for reason in (details.get("missing_reasons") or [])
+                    if str(reason).strip()
+                ]
+                suffix = f" Reasons: {', '.join(reasons)}." if reasons else ""
+                out[f"{dim}_score"] = (
+                    f"Not scored because grounded {dim} evidence is missing.{suffix}"
+                )
+                continue
+            score = float(details["score"])
             confidence = float(details.get("confidence", 0.0))
             components = details.get("components") if isinstance(details.get("components"), dict) else {}
 
@@ -497,16 +670,41 @@ class ReviewerEngine:
             out[f"{dim}_score"] = " ".join(parts) if parts else band_desc or f"Assessment based on available {dim} evidence."
         return out
 
-    @staticmethod
-    def _derive_verdict_from_scores(primary: dict) -> None:
-        """Set primary['derived_verdict'] from blended core scores (mean of present numerics only)."""
+    def _derive_verdict_from_scores(self, primary: dict) -> None:
+        """Set a verdict only when every required blended dimension is scored."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        if prerequisites is not None:
+            trace = validate_governed_scoring_trace(
+                primary.get("structured_scoring"),
+                prerequisites,
+                require_resolved=True,
+            )
+            dimensions = configured_scoring_dimensions(prerequisites)
+            if any(trace[dimension]["unscored"] for dimension in dimensions):
+                primary.pop("derived_verdict", None)
+                return
+            overall = trace.get("overall_score")
+            if not isinstance(overall, (int, float)) or isinstance(overall, bool):
+                primary.pop("derived_verdict", None)
+                return
+            mean = float(overall)
+            policy = prerequisites.policy
+            if mean >= policy.advance_threshold:
+                primary["derived_verdict"] = "STRONG"
+            elif mean >= policy.pass_threshold:
+                primary["derived_verdict"] = "MEDIUM"
+            else:
+                primary["derived_verdict"] = "WEAK"
+            return
+
         dims = ["market_score", "product_score", "technical_score", "execution_score"]
         nums: List[float] = []
         for d in dims:
             v = primary.get(d)
-            if isinstance(v, (int, float)):
+            if not isinstance(v, bool) and isinstance(v, (int, float)):
                 nums.append(float(v))
-        if not nums:
+        if len(nums) != len(dims):
+            primary.pop("derived_verdict", None)
             return
         mean = sum(nums) / len(nums)
         if mean >= 8.0:
@@ -563,14 +761,13 @@ class ReviewerEngine:
         pipeline_run_id: Optional[str] = None,
         *,
         eligible_startup_ids: Optional[set[str]] = None,
-    ) -> int:
+    ) -> StageExecutionResult:
         """
         Run one review cycle.
         Processes up to batch_size unreviewed entries.
         Runs all 3 reviewer personas in parallel for each startup.
         
-        Returns:
-            Number of entries reviewed in this cycle
+        Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting review cycle at {utcnow().isoformat()}")
         if not is_reviewers_enabled(self.tenant_user_id):
@@ -582,22 +779,12 @@ class ReviewerEngine:
                 "confidence_threshold": None,
                 "reason": "agents_disabled",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_disabled",
+                detail="The Reviewer stage is disabled for this tenant.",
+            )
         self._sync_thesis_to_reviewers()
-
-        # Check budget before reviewing
-        if self.cost_controller:
-            allowed, reason = self.cost_controller.check_budget("reviewer", "reviewer_engine")
-            if not allowed:
-                self.logger.warning(f"Reviewer budget denied: {reason}")
-                self.last_cycle_stats = {
-                    "reviewed_count": 0,
-                    "skipped_low_confidence": 0,
-                    "candidates_seen": 0,
-                    "confidence_threshold": None,
-                    "reason": "budget_denied",
-                }
-                return 0
         
         # Ramp-up: process more per cycle when unreviewed backlog is high.
         # Sync Supabase I/O off the serving event loop: a blocked loop stalls
@@ -620,7 +807,11 @@ class ReviewerEngine:
                 "confidence_threshold": None,
                 "reason": "no_unreviewed",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_no_eligible_work",
+                detail="No unreviewed startup is eligible for the Reviewer stage.",
+            )
         try:
             cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", effective_batch))
             effective_batch = min(effective_batch, max(1, cycle_limit))
@@ -673,7 +864,11 @@ class ReviewerEngine:
                 "confidence_threshold": confidence_threshold,
                 "reason": "no_candidates",
             }
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="reviewer",
+                code="reviewer_no_eligible_work",
+                detail="No unreviewed startup is eligible for the Reviewer stage.",
+            )
 
         # Sort by confidence_score descending (highest confidence first)
         unreviewed_startups.sort(
@@ -690,13 +885,50 @@ class ReviewerEngine:
             unreviewed_startups[-1].scout_info.confidence_score if unreviewed_startups else 0,
         )
 
+        eligible_count = sum(
+            1
+            for startup in unreviewed_startups
+            if startup.scout_info.confidence_score >= confidence_threshold
+        )
+        if self.cost_controller and eligible_count:
+            allowed, reason = self.cost_controller.check_budget(
+                "reviewer", "reviewer_engine"
+            )
+            if not allowed:
+                blocked_count = min(effective_batch, eligible_count)
+                self.logger.warning("Reviewer budget denied: %s", reason)
+                self.last_cycle_stats = {
+                    "attempted": blocked_count,
+                    "reviewed_count": 0,
+                    "failed": 0,
+                    "blocked": blocked_count,
+                    "skipped_low_confidence": 0,
+                    "candidates_seen": len(unreviewed_startups),
+                    "confidence_threshold": confidence_threshold,
+                    "reason": "budget_denied",
+                }
+                return StageExecutionResult.blocked_result(
+                    stage="reviewer",
+                    code="reviewer_budget_blocked",
+                    detail="Reviewer budget denied all eligible work in this cycle.",
+                    recovery_action=(
+                        "Increase the Reviewer budget or wait for the budget window "
+                        "to reset, then retry."
+                    ),
+                    attempted=blocked_count,
+                    blocked=blocked_count,
+                )
+
         reviewed_count = 0
+        failed_count = 0
         skipped_low_confidence = 0
+        attempted_count = 0
         
         # Process each startup
         for startup in unreviewed_startups:
             if reviewed_count >= effective_batch:
                 break
+            attempted_count += 1
             confidence_score = startup.scout_info.confidence_score
             if confidence_score < confidence_threshold:
                 skipped_low_confidence += 1
@@ -749,6 +981,7 @@ class ReviewerEngine:
                             status="failed",
                             error="all reviewers failed",
                         )
+                    failed_count += 1
                     continue
                 
                 # Primary narrative/summary: DefaultReviewer (types are set to class names above)
@@ -870,12 +1103,14 @@ class ReviewerEngine:
                             )
                 else:
                     self.logger.error(f"Failed to save review for entry {entry_id}")
+                    failed_count += 1
                     
             except Exception as e:
                 self.logger.error(
                     f"Error reviewing entry {entry_id}: {e}",
                     exc_info=True
                 )
+                failed_count += 1
                 continue
         
         self.logger.info(
@@ -885,14 +1120,49 @@ class ReviewerEngine:
             len(unreviewed_startups),
         )
         self.last_cycle_stats = {
+            "attempted": attempted_count,
             "reviewed_count": reviewed_count,
+            "failed": failed_count,
+            "blocked": 0,
             "skipped_low_confidence": skipped_low_confidence,
             "candidates_seen": len(unreviewed_startups),
             "confidence_threshold": confidence_threshold,
             "reason": "ok",
         }
-        
-        return reviewed_count
+
+        if failed_count:
+            return StageExecutionResult.failed_result(
+                stage="reviewer",
+                code="reviewer_candidate_failures",
+                detail=(
+                    f"Reviewer completed {reviewed_count} of {attempted_count} "
+                    "attempted candidates; one or more candidates failed."
+                ),
+                recovery_action=(
+                    "Inspect Reviewer and persistence logs, correct the failures, "
+                    "and retry the affected candidates."
+                ),
+                attempted=attempted_count,
+                succeeded=reviewed_count,
+                failed=failed_count,
+                skipped=skipped_low_confidence,
+            )
+        if reviewed_count:
+            return StageExecutionResult.completed(
+                stage="reviewer",
+                code="reviewer_completed",
+                detail=f"Reviewer completed {reviewed_count} eligible candidate(s).",
+                attempted=attempted_count,
+                succeeded=reviewed_count,
+                skipped=skipped_low_confidence,
+            )
+        return StageExecutionResult.skipped_result(
+            stage="reviewer",
+            code="reviewer_no_eligible_work",
+            detail="No candidate met the Reviewer eligibility threshold.",
+            attempted=attempted_count,
+            skipped=skipped_low_confidence,
+        )
 
     async def run_startup(
         self,
@@ -1074,31 +1344,34 @@ class ReviewerEngine:
         
         while self.running:
             try:
-                if not is_reviewers_enabled(self.tenant_user_id):
-                    self.logger.info("Reviewers disabled in settings, skipping cycle")
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
-
-                # Backpressure: skip cycle if too many undecided startups
-                undecided_count = self.storage.count_undecided()
-                if undecided_count > self.backpressure_threshold:
-                    self.logger.warning(
-                        f"Backpressure: {undecided_count} undecided startups "
-                        f"exceeds threshold ({self.backpressure_threshold}), skipping review cycle"
-                    )
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
-
                 cycle_count += 1
                 self.logger.info(f"=== Review Cycle #{cycle_count} ===")
                 from uuid import uuid4
 
-                reviewed = await self.run_cycle(pipeline_run_id=str(uuid4()))
-                
-                if reviewed > 0:
-                    self.logger.info(f"Reviewed {reviewed} entries in this cycle")
+                undecided_count = await asyncio.to_thread(
+                    self.storage.count_undecided
+                )
+                if undecided_count > self.backpressure_threshold:
+                    result = StageExecutionResult.skipped_result(
+                        stage="reviewer",
+                        code="reviewer_backpressure",
+                        detail=(
+                            "The Reviewer stage deferred work while the Partner "
+                            "backlog is above its configured threshold."
+                        ),
+                    )
+                else:
+                    result = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                self.logger.info(
+                    "Reviewer cycle state=%s code=%s attempted=%s succeeded=%s failed=%s blocked=%s skipped=%s",
+                    result.state.value,
+                    result.code,
+                    result.attempted,
+                    result.succeeded,
+                    result.failed,
+                    result.blocked,
+                    result.skipped,
+                )
                 
                 # Wait for next cycle
                 if self.running:

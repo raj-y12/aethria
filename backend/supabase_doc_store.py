@@ -100,6 +100,31 @@ def list_get_all(table: str, *, user_id: str) -> List[Dict[str, Any]]:
         return []
 
 
+def list_get_all_strict(table: str, *, user_id: str) -> List[Dict[str, Any]]:
+    """Return tenant rows while preserving transport/storage failures.
+
+    Most legacy document consumers intentionally treat an unavailable optional
+    store like an empty collection. Durable execution state cannot do that: an
+    empty result means "no outcome exists", while an exception means the state
+    is unknowable and must be surfaced to the caller.
+    """
+    uid = require_user_id(user_id, context=f"list_get_all_strict({table})")
+
+    def _fetch():
+        return (
+            _client()
+            .table(table)
+            .select("data,created_at")
+            .eq("user_id", uid)
+            .order("created_at")
+            .execute()
+        )
+
+    response = _retry_on_transient(_fetch)
+    rows = (response.data or []) if hasattr(response, "data") else []
+    return [row["data"] for row in rows if isinstance(row.get("data"), dict)]
+
+
 def list_get_by_id(table: str, row_id: str, *, user_id: str) -> Dict[str, Any] | None:
     """Return data JSON for one list row (user_id, id), or None if missing."""
     uid = require_user_id(user_id, context=f"list_get_by_id({table})")
@@ -224,6 +249,28 @@ def doc_get(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> Any | None:
     except Exception as e:
         logger.warning("supabase_doc_store doc_get %s %s: %s", table, key, e)
         return None
+
+
+def doc_get_strict(table: str, key: str = _DEFAULT_KEY, *, user_id: str) -> Any | None:
+    """Return a tenant document without converting store failure to absence."""
+    uid = require_user_id(user_id, context=f"doc_get_strict({table})")
+
+    def _fetch():
+        return (
+            _client()
+            .table(table)
+            .select("data")
+            .eq("user_id", uid)
+            .eq("key", key)
+            .limit(1)
+            .execute()
+        )
+
+    response = _retry_on_transient(_fetch)
+    rows = (response.data or []) if hasattr(response, "data") else []
+    if not rows:
+        return None
+    return rows[0].get("data")
 
 
 def doc_set(table: str, data: Any, key: str = _DEFAULT_KEY, *, user_id: str) -> None:

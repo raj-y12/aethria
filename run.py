@@ -272,6 +272,19 @@ def _wait_for_tcp(host: str, port: int, timeout_seconds: float = 20.0) -> bool:
     return False
 
 
+def _critical_services_running(
+    backend_proc: subprocess.Popen,
+    app_proc: subprocess.Popen,
+    web_proc: subprocess.Popen,
+) -> bool:
+    """Only user-facing services determine the root supervisor lifetime."""
+
+    return all(
+        process.poll() is None
+        for process in (backend_proc, app_proc, web_proc)
+    )
+
+
 def main() -> int:
     if load_dotenv and ENV_FILE.exists():
         load_dotenv(ENV_FILE, override=True)
@@ -381,12 +394,19 @@ def main() -> int:
         t_app.start()
         t_web.start()
 
-        while (
-            backend_proc.poll() is None
-            and app_proc.poll() is None
-            and web_proc.poll() is None
-            and (agents_proc is None or agents_proc.poll() is None)
-        ):
+        agent_exit_reported = False
+        while _critical_services_running(backend_proc, app_proc, web_proc):
+            if (
+                agents_proc is not None
+                and agents_proc.poll() is not None
+                and not agent_exit_reported
+            ):
+                print(
+                    "Agents process exited; Backend and frontends remain available.",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                agent_exit_reported = True
             time.sleep(0.25)
     except KeyboardInterrupt:
         pass

@@ -1047,9 +1047,15 @@ export default function SettingsPage() {
                           tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
+                          label="Execution policy"
+                          value={agentsStatus.execution_prerequisites_ready ? 'Ready' : 'Blocked'}
+                          detail={agentsStatus.execution_prerequisites_ready ? undefined : (agentsStatus.execution_prerequisite_detail ?? 'An active thesis and published policy are required.')}
+                          tone={agentsStatus.execution_prerequisites_ready ? 'ready' : 'warning'}
+                        />
+                        <EditorialStatus
                           label="Pipeline"
                           value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
-                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.thesis_error ?? 'A required gate is not ready.')}
+                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.execution_prerequisite_detail ?? agentsStatus.thesis_error ?? 'A required gate is not ready.')}
                           tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
                         />
                       </div>

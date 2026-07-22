@@ -3,6 +3,7 @@ Partner execution engine.
 Runs continuously, processing reviewed entries and making investment decisions.
 """
 import asyncio
+import copy
 import json
 import logging
 import os
@@ -18,6 +19,9 @@ from utils.settings_loader import get_runtime_limits, is_partners_enabled
 from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
+from evaluation_v2.prerequisites import EvaluationPrerequisites
+from models import EvaluationManifestIdentity
+from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +51,9 @@ class PartnerEngine:
         tenant_user_id: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
+        evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+        model: Optional[str] = None,
+        include_deal_context_digest: Optional[bool] = None,
     ):
         """
         Initialize the Partner engine.
@@ -70,14 +77,64 @@ class PartnerEngine:
             portfolio_store=portfolio_store,
             tenant_user_id=self.tenant_user_id,
             use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+            evaluation_prerequisites=evaluation_prerequisites,
+            model=model,
+            include_deal_context_digest=include_deal_context_digest,
         )
-        self.fund_thesis: Optional[Dict[str, Any]] = fund_thesis
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                self.tenant_user_id, context="PartnerEngine"
+            )
+            if (
+                fund_thesis is not None
+                and fund_thesis != evaluation_prerequisites.thesis_context
+            ):
+                raise RuntimeError(
+                    "PartnerEngine: fund thesis does not match governed prerequisites"
+                )
+            fund_thesis = copy.deepcopy(evaluation_prerequisites.thesis_context)
+        self.evaluation_prerequisites = evaluation_prerequisites
+        self.evaluation_manifest_identity: Optional[
+            EvaluationManifestIdentity
+        ] = None
+        self.fund_thesis: Optional[Dict[str, Any]] = copy.deepcopy(fund_thesis)
         # Max undecided to process per cycle (ramp: process a solid batch when backlog is high)
         self.batch_max = int(os.getenv("PARTNER_BATCH_MAX", "20"))
 
         self.logger = logging.getLogger("partner.engine")
         self.running = False
         self.last_cycle_escalations: int = 0
+
+    def set_evaluation_manifest_identity(
+        self,
+        identity: EvaluationManifestIdentity | Dict[str, Any],
+    ) -> None:
+        """Bind the exact pipeline construction identity once, before execution."""
+        validated = EvaluationManifestIdentity.model_validate(
+            identity.model_dump(mode="python")
+            if isinstance(identity, EvaluationManifestIdentity)
+            else dict(identity)
+        )
+        if validated.dependency_identity.user_id != self.tenant_user_id:
+            raise RuntimeError("PartnerEngine manifest identity tenant mismatch")
+        if self.evaluation_prerequisites is None:
+            raise RuntimeError(
+                "PartnerEngine manifest identity requires governed prerequisites"
+            )
+        if (
+            validated.dependency_identity.model_dump(mode="python")
+            != self.evaluation_prerequisites.dependency_identity
+        ):
+            raise RuntimeError(
+                "PartnerEngine manifest dependency identity mismatch"
+            )
+        if self.evaluation_manifest_identity is not None:
+            if self.evaluation_manifest_identity != validated:
+                raise RuntimeError(
+                    "PartnerEngine manifest identity cannot be replaced"
+                )
+            return
+        self.evaluation_manifest_identity = validated
     
     def close(self) -> None:
         """Release the decision engine's OpenAI client (called at cycle end)."""
@@ -221,6 +278,11 @@ class PartnerEngine:
             from partner.decision import _parse_llm_json_object
             fixed = _parse_llm_json_object(content)
             if fixed:
+                # Provenance metadata is engine-owned, never model-repaired.
+                fixed["prompt_version"] = decision.get("prompt_version")
+                fixed["llm_fallback_reason"] = decision.get(
+                    "llm_fallback_reason"
+                )
                 return fixed
         except Exception as e:
             self.logger.warning("JSON fix retry failed: %s", e)
@@ -244,12 +306,32 @@ class PartnerEngine:
         # makes a blocking OpenAI call. Run it off the event loop so a partner LLM
         # round-trip never freezes SSE streams or the queue workers — the Scout and
         # Reviewer engines already offload their .create() calls the same way.
-        decision = await asyncio.to_thread(
-            self.decision_engine.decide,
+        decision, partner_execution_prompt_version = await asyncio.to_thread(
+            self.decision_engine.decide_with_execution_identity,
             scout_output,
             review_output,
             fund_thesis=self.fund_thesis,
         )
+        persisted_prompt_version = str(decision.get("prompt_version") or "").strip()
+        captured_prompt_version = str(
+            partner_execution_prompt_version or ""
+        ).strip()
+        if persisted_prompt_version != captured_prompt_version:
+            self.logger.error(
+                "Partner prompt provenance mismatch for %s: output did not match "
+                "the independently captured engine invocation",
+                entry_id,
+            )
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="partner execution prompt provenance mismatch",
+                )
+            return False, decision
 
         if os.getenv("DEAL_CONTEXT_LOG_PIPELINE", "").strip().lower() in ("1", "true", "yes"):
             try:
@@ -283,6 +365,25 @@ class PartnerEngine:
                     )
                 return False, decision
 
+        if (
+            str(decision.get("prompt_version") or "").strip()
+            != captured_prompt_version
+        ):
+            self.logger.error(
+                "Partner prompt provenance changed before persistence for %s",
+                entry_id,
+            )
+            if pr and client and uid:
+                upsert_pipeline_state(
+                    client,
+                    user_id=uid,
+                    startup_id=entry_id,
+                    pipeline_run_id=pr,
+                    status="failed",
+                    error="partner execution prompt provenance changed before persistence",
+                )
+            return False, decision
+
         if self.cost_controller:
             tokens_used = 0
             if decision.get("llm_fallback_reason"):
@@ -306,11 +407,19 @@ class PartnerEngine:
         partner_info.partner_agent_id = self.agent_id
 
         try:
+            persist_kwargs: Dict[str, Any] = {"pipeline_run_id": pr}
+            if self.evaluation_manifest_identity is not None:
+                persist_kwargs["evaluation_manifest_identity"] = (
+                    self.evaluation_manifest_identity
+                )
+                persist_kwargs["partner_execution_prompt_version"] = (
+                    partner_execution_prompt_version
+                )
             success = await asyncio.to_thread(
                 self.storage.add_partner_decision,
                 entry_id,
                 partner_info,
-                pipeline_run_id=pr,
+                **persist_kwargs,
             )
         except Exception as e:
             self.logger.error("Partner persist failed for %s: %s", entry_id, e, exc_info=True)
@@ -337,18 +446,21 @@ class PartnerEngine:
         pipeline_run_id: Optional[str] = None,
         *,
         eligible_startup_ids: Optional[set[str]] = None,
-    ) -> int:
+    ) -> StageExecutionResult:
         """
         Run one decision cycle.
         Processes all undecided entries.
         
-        Returns:
-            Number of decisions made in this cycle
+        Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting decision cycle at {utcnow().isoformat()}")
         if not is_partners_enabled(self.tenant_user_id):
             self.logger.info("Decision cycle skipped (partners disabled in settings)")
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_disabled",
+                detail="The Partner stage is disabled for this tenant.",
+            )
 
         # Ramp: process up to batch_max per cycle so we make progress without one huge cycle
         # Sync Supabase I/O off the serving event loop: a blocked loop stalls
@@ -375,11 +487,17 @@ class PartnerEngine:
         
         if not undecided:
             self.logger.info("No undecided entries found")
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_no_eligible_work",
+                detail="No reviewed startup is eligible for the Partner stage.",
+            )
         
         self.logger.info(f"Found {len(undecided)} entries awaiting partner decision")
         
         decided_count = 0
+        failed_count = 0
+        blocked_count = 0
         self.last_cycle_escalations = 0
 
         # Process each entry
@@ -403,6 +521,7 @@ class PartnerEngine:
                         self.logger.warning(
                             f"Partner budget denied for entry {entry_id}: {reason}"
                         )
+                        blocked_count += 1
                         continue
 
                 success, decision = await self._decide_and_save(
@@ -432,21 +551,79 @@ class PartnerEngine:
                             self.logger.error(
                                 f"Failed to record successful thesis: {e}"
                             )
-                elif not success:
-                    self.logger.error(f"Failed to save decision for entry {entry_id}")
+                else:
+                    self.logger.error(
+                        "Partner decision did not persist a complete outcome for %s",
+                        entry_id,
+                    )
+                    failed_count += 1
                     
             except Exception as e:
                 self.logger.error(
                     f"Error making decision for entry {entry_id}: {e}",
                     exc_info=True
                 )
+                failed_count += 1
                 continue
         
         self.logger.info(
             f"Decision cycle complete: {decided_count}/{len(undecided)} decisions successful"
         )
         
-        return decided_count
+        attempted_count = len(undecided)
+        if failed_count:
+            return StageExecutionResult.failed_result(
+                stage="partner",
+                code="partner_candidate_failures",
+                detail=(
+                    f"Partner completed {decided_count} of {attempted_count} "
+                    "attempted candidates; one or more candidates failed."
+                ),
+                recovery_action=(
+                    "Inspect Partner decision and persistence logs, correct the "
+                    "failures, and retry the affected candidates."
+                ),
+                attempted=attempted_count,
+                succeeded=decided_count,
+                failed=failed_count,
+                blocked=blocked_count,
+            )
+        if blocked_count:
+            if decided_count:
+                return StageExecutionResult.failed_result(
+                    stage="partner",
+                    code="partner_partial_budget_block",
+                    detail=(
+                        f"Partner completed {decided_count} of {attempted_count} "
+                        "attempted candidates before the budget blocked remaining work."
+                    ),
+                    recovery_action=(
+                        "Increase the Partner budget or wait for the budget window "
+                        "to reset, then retry the blocked candidates."
+                    ),
+                    attempted=attempted_count,
+                    succeeded=decided_count,
+                    failed=0,
+                    blocked=blocked_count,
+                )
+            return StageExecutionResult.blocked_result(
+                stage="partner",
+                code="partner_budget_blocked",
+                detail="Partner budget denied all eligible work in this cycle.",
+                recovery_action=(
+                    "Increase the Partner budget or wait for the budget window "
+                    "to reset, then retry."
+                ),
+                attempted=attempted_count,
+                blocked=blocked_count,
+            )
+        return StageExecutionResult.completed(
+            stage="partner",
+            code="partner_completed",
+            detail=f"Partner completed {decided_count} eligible candidate(s).",
+            attempted=attempted_count,
+            succeeded=decided_count,
+        )
 
     async def run_startup(
         self,
@@ -511,22 +688,25 @@ class PartnerEngine:
         
         while self.running:
             try:
-                if not is_partners_enabled(self.tenant_user_id):
-                    self.logger.info("Partners disabled in settings, skipping cycle")
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
                 cycle_count += 1
                 self.logger.info(f"=== Decision Cycle #{cycle_count} ===")
                 from uuid import uuid4
 
-                decided = await self.run_cycle(pipeline_run_id=str(uuid4()))
-                
-                if decided > 0:
-                    self.logger.info(f"Made {decided} decisions in this cycle")
+                result = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                self.logger.info(
+                    "Partner cycle state=%s code=%s attempted=%s succeeded=%s failed=%s blocked=%s skipped=%s",
+                    result.state.value,
+                    result.code,
+                    result.attempted,
+                    result.succeeded,
+                    result.failed,
+                    result.blocked,
+                    result.skipped,
+                )
                 
                 # Wait for next cycle
-                await asyncio.sleep(self.interval_seconds)
+                if self.running:
+                    await asyncio.sleep(self.interval_seconds)
                 
             except KeyboardInterrupt:
                 self.logger.info("Received interrupt signal, shutting down...")

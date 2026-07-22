@@ -7,6 +7,13 @@ import json
 from typing import Any, Dict, Iterable
 
 from evaluation_v2.models import CriterionRule, EvaluationPolicy
+from evaluation_v2.partner_rules import (
+    PartnerRules,
+    boundary_comparisons,
+    decision_safety_policy,
+    parse_partner_rules,
+    partner_rules_document,
+)
 
 
 def _document_hash(document: Any) -> str:
@@ -20,8 +27,24 @@ def _strings(values: Iterable[Any]) -> list[str]:
     return sorted({str(value).strip() for value in values if str(value).strip()})
 
 
+def _partner_rules_error(detail: str) -> ValueError:
+    return ValueError(f"partner_rules is incomplete or invalid: {detail}")
+
+
+def validate_partner_rules_document(
+    partner_rules: PartnerRules | Dict[str, Any],
+) -> PartnerRules:
+    """Validate every active field and reject unknown policy keys."""
+    try:
+        return parse_partner_rules(partner_rules)
+    except ValueError as exc:
+        raise _partner_rules_error(str(exc)) from exc
+
+
 def evaluation_policy_from_compiled(
-    compiled_policy: Dict[str, Any], *, partner_rules: Dict[str, Any]
+    compiled_policy: Dict[str, Any],
+    *,
+    partner_rules: PartnerRules | Dict[str, Any],
 ) -> EvaluationPolicy:
     """Create a deterministic evidence policy from the exact published version."""
     version_id = str(compiled_policy.get("policy_version_id") or "").strip()
@@ -62,21 +85,25 @@ def evaluation_policy_from_compiled(
             )
         )
 
-    thresholds = (
-        partner_rules.get("score_thresholds")
-        if isinstance(partner_rules.get("score_thresholds"), dict)
-        else {}
-    )
-    advance_threshold = float(thresholds.get("min_avg_strong_yes", 7.5))
-    pass_threshold = float(thresholds.get("min_avg_pass", 4.0))
-    rules_version = str(partner_rules.get("version") or "unknown").strip() or "unknown"
+    typed_rules = validate_partner_rules_document(partner_rules)
+    thresholds = typed_rules.score_thresholds
+    decision_safety = decision_safety_policy(typed_rules)
+    advance_threshold = float(thresholds.min_avg_strong_yes)
+    pass_threshold = float(thresholds.min_avg_pass)
+    advance_comparison, pass_comparison = boundary_comparisons(typed_rules)
+
     return EvaluationPolicy(
         policy_version_id=version_id,
         policy_hash=policy_hash,
         rubric_version=f"tenant-rubric:{version_id}",
-        partner_rules_version=rules_version,
-        partner_rules_hash=_document_hash(partner_rules),
+        partner_rules_version=typed_rules.version,
+        partner_rules_hash=_document_hash(partner_rules_document(typed_rules)),
         criteria=criteria,
         advance_threshold=advance_threshold,
         pass_threshold=pass_threshold,
+        advance_comparison=advance_comparison,
+        pass_comparison=pass_comparison,
+        minimum_scored_weight=float(thresholds.minimum_scored_weight),
+        decision_safety=decision_safety,
+        hard_exclusion_claim_types=decision_safety.hard_exclusion_claim_types,
     )

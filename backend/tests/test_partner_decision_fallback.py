@@ -1,5 +1,9 @@
 from types import SimpleNamespace
 
+import pytest
+
+from evaluation_v2.partner_rules import parse_partner_rules, partner_rules_document
+
 from partner.decision import PartnerDecisionEngine
 
 
@@ -28,6 +32,26 @@ def _base_review():
         "business_model_analysis": ["Clear B2B SaaS pricing with gross-margin potential."],
         "thesis_alignment_score": 0.7,
     }
+
+
+def test_partner_model_prompt_and_digest_configuration_are_captured_once(monkeypatch):
+    monkeypatch.setenv("PARTNER_MODEL", "mutable-env-model")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "true")
+    engine = PartnerDecisionEngine(
+        use_llm_fallback=False,
+        api_key=None,
+        model="captured-partner-model",
+        include_deal_context_digest=False,
+    )
+    captured_template = engine.prompt_template_version
+
+    monkeypatch.setenv("PARTNER_MODEL", "post-construction-model")
+    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "true")
+
+    assert engine.model == "captured-partner-model"
+    assert engine.provider_id == "openai"
+    assert engine._include_deal_context_digest is False
+    assert engine.prompt_template_version == captured_template
 
 
 def test_medium_6_4_borderline_routes_to_llm():
@@ -189,27 +213,48 @@ def test_weak_verdict_uses_constructive_pass_rationale():
     assert "not suitable for investment consideration" not in rationale.lower()
 
 
-def test_critical_risk_pass_uses_actionable_language():
+def test_critical_risk_forces_pass_even_with_invest_scores():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review()
-    review.update(
-        {
-            "verdict": "MEDIUM",
-            "market_score": 7,
-            "product_score": 7,
-            "technical_score": 6,
-            "execution_score": 6,
-            "key_risks": ["Regulatory ban risk in primary market"],
-        }
-    )
+    review.update({
+        "verdict": "STRONG",
+        "market_score": 9,
+        "product_score": 9,
+        "technical_score": 9,
+        "execution_score": 9,
+        "defensibility_score": 9,
+        "key_risks": ["Regulatory ban risk in primary market"],
+    })
 
     out = engine.decide(_base_scout(), review)
-    rationale = (out.get("rationale") or "").lower()
+    assert out["recommendation"] == "PASS"
+    assert out["decision"] == "NO"
+    assert out["human_review_required"] is True
+    assert "critical" in out["next_action"].lower()
 
-    assert out.get("decision") == "MAYBE"
-    assert "we monitor at this stage" in rationale
-    assert "material diligence risks" in rationale
-    assert "risk too high for investment" not in rationale
+
+@pytest.mark.parametrize(
+    ("policy_present", "policy_value"),
+    [
+        (False, None),
+        (True, []),
+        (True, "regulatory"),
+        (True, [123]),
+        (True, ["  "]),
+    ],
+)
+def test_invalid_critical_risk_policy_fails_closed_before_score_decision(
+    policy_present, policy_value
+):
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    rules = partner_rules_document(engine._rules)
+    if policy_present:
+        rules["critical_risk_keywords"] = policy_value
+    else:
+        rules.pop("critical_risk_keywords", None)
+
+    with pytest.raises(ValueError, match="critical_risk_keywords"):
+        parse_partner_rules(rules)
 
 
 def test_monitor_and_invest_paths_use_consistent_professional_tone():
@@ -429,8 +474,7 @@ def test_missing_critical_qualitative_triggers_llm():
 
 def test_reviewer_disagreement_trigger_llm():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
-    # Ensure policy enables this trigger for the test.
-    engine._rules.setdefault("llm_fallback_triggers", {})["reviewer_disagreement"] = True
+    assert engine._rules.llm_fallback_triggers.reviewer_disagreement is True
     review = _base_review()
     review["reviewer_disagreement"] = True
 
@@ -509,6 +553,31 @@ def test_openai_exception_returns_safe_maybe_with_contextual_rationale():
     )
     assert out.get("decision") == "MAYBE"
     assert "average score" in (out.get("rationale") or "").lower()
+
+
+def test_partner_execution_prompt_is_captured_independently_from_output():
+    engine = PartnerDecisionEngine(use_llm_fallback=True, api_key="fake-key")
+
+    class _BoomCompletions:
+        def create(self, *args, **kwargs):
+            raise RuntimeError("boom")
+
+    class _BoomChat:
+        completions = _BoomCompletions()
+
+    class _BoomClient:
+        chat = _BoomChat()
+
+    engine.client = _BoomClient()  # type: ignore[assignment]
+    output, captured = engine.decide_with_execution_identity(
+        _base_scout(),
+        _base_review(),
+    )
+
+    assert captured
+    assert output["prompt_version"] == captured
+    output["prompt_version"] = "forged-after-engine-return"
+    assert captured != output["prompt_version"]
 
 
 def test_malformed_json_returns_safe_maybe():
@@ -593,7 +662,9 @@ def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     # Disable grey-zone deep dive so the test only validates the biggest_unknown behaviour,
     # not the new grey-zone trigger (avg_score=7.0 would otherwise sit inside [6.5, 7.5]).
-    engine._rules.setdefault("llm_fallback_triggers", {})["grey_zone_deep_dive"] = False
+    rules = partner_rules_document(engine._rules)
+    rules["llm_fallback_triggers"]["grey_zone_deep_dive"] = False
+    engine._rules = parse_partner_rules(rules)
     scout = {**_base_scout(), "biggest_unknown": "Enterprise sales cycle length unproven"}
     review = _base_review()
     review.update(
@@ -605,6 +676,9 @@ def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():
             "assumption_feedback": [],
         }
     )
+    # Keep this fixture thesis-blind so configured mandate-fit fallback routing
+    # cannot become a second, unrelated LLM trigger.
+    review.pop("thesis_alignment_score", None)
 
     def _should_not_call_llm(*args, **kwargs):
         raise AssertionError("LLM fallback should not run when only scout biggest_unknown is present")

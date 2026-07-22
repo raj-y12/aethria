@@ -19,20 +19,23 @@ from jobs.models import (
     JobType,
     PipelineCyclePayload,
 )
+from jobs.lookup_outcomes import LookupAttemptDisposition, LookupAttemptOutcome
+from jobs.fencing import assert_job_ownership
 from evidence.repository import EvidenceRepository
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    load_evaluation_prerequisites,
+)
+from fund_intelligence.repository import FundIntelligenceRepository
 from monitoring.models import RefreshReason
 from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
+from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from resolver.company_resolver import CompanyResolution, resolve_company
 
 
 async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
-    getter = getattr(repository, "get_job", None)
-    if getter is None:
-        return
-    current = await getter(user_id=job.user_id, job_id=job.job_id)
-    if current is not None and current.status is JobStatus.CANCELLED:
-        raise JobExecutionCancelled(f"Job {job.job_id} was cancelled")
+    await assert_job_ownership(repository, job)
 
 
 async def _checkpoint(repository, job, stage, status, metadata):
@@ -52,16 +55,49 @@ async def _checkpoint(repository, job, stage, status, metadata):
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
     payload = PipelineCyclePayload.model_validate(job.payload)
     await _checkpoint(repository, job, "pipeline_cycle", "started", {})
-    await run_one_pipeline_cycle(
-        job.user_id,
-        manual_one_shot=payload.manual_one_shot,
-        pipeline_run_id=job.pipeline_run_id,
-        identity_repository=IdentityRepository(repository.pool),
-    )
-    await _checkpoint(repository, job, "pipeline_cycle", "succeeded", {})
+    try:
+        evaluation_prerequisites = await load_evaluation_prerequisites(
+            user_id=job.user_id,
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+    try:
+        result = await run_one_pipeline_cycle(
+            job.user_id,
+            manual_one_shot=payload.manual_one_shot,
+            pipeline_run_id=job.pipeline_run_id,
+            identity_repository=IdentityRepository(repository.pool),
+            evaluation_prerequisites=evaluation_prerequisites,
+            ownership_check=lambda: _raise_if_cancelled(repository, job),
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+    if not isinstance(result, PipelineExecutionResult):
+        raise RuntimeError("Pipeline cycle runner returned an invalid execution result")
+    metadata = result.model_dump(mode="json", exclude_none=True)
+    if result.state is PipelineExecutionState.BLOCKED:
+        await _checkpoint(repository, job, "pipeline_cycle", "failed", metadata)
+        raise JobExecutionBlocked(
+            code=result.code,
+            detail=result.detail,
+            recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
+        )
+    if result.state is PipelineExecutionState.FAILED_STAGE:
+        await _checkpoint(repository, job, "pipeline_cycle", "failed", metadata)
+        raise RuntimeError(f"{result.code}: {result.detail}")
+    await _checkpoint(repository, job, "pipeline_cycle", "succeeded", metadata)
 
 
-async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
+async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExecutionResult:
     payload = CompanyLookupPayload.model_validate(job.payload)
     await _raise_if_cancelled(repository, job)
     resolution = (
@@ -134,7 +170,9 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
             },
             resolution_payload=resolution_payload,
         )
+        await _raise_if_cancelled(repository, job)
         admission = await IdentityService(identity_repository).admit(observation)
+        await _raise_if_cancelled(repository, job)
 
     identity_metadata = {
         "observation_id": admission.observation_id,
@@ -157,33 +195,63 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
             ),
         )
 
+    try:
+        evaluation_prerequisites = await load_evaluation_prerequisites(
+            user_id=job.user_id,
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+
     async def checkpoint(stage: str, status: str, metadata: Dict[str, Any]) -> None:
         await _checkpoint(repository, job, stage, status, metadata)
 
-    startup_id = await run_on_demand_lookup(
-        job.user_id,
-        payload.company_name,
-        website=payload.website,
-        lookup_query=payload.lookup_query,
-        lookup_input_type=payload.lookup_input_type,
-        lookup_id=payload.lookup_id,
-        additional_context=payload.additional_context,
-        replace_startup_id=payload.replace_startup_id,
-        resolution=resolution,
-        pipeline_run_id=job.pipeline_run_id,
-        checkpoint=checkpoint,
-        institutional_context={
-            "observation_id": admission.observation_id,
-            "company_id": admission.company_id,
-            "opportunity_id": admission.opportunity_id,
-        },
-    )
-    if startup_id is not None:
+    try:
+        result = await run_on_demand_lookup(
+            job.user_id,
+            payload.company_name,
+            website=payload.website,
+            lookup_query=payload.lookup_query,
+            lookup_input_type=payload.lookup_input_type,
+            lookup_id=payload.lookup_id,
+            additional_context=payload.additional_context,
+            replace_startup_id=payload.replace_startup_id,
+            resolution=resolution,
+            pipeline_run_id=job.pipeline_run_id,
+            checkpoint=checkpoint,
+            ownership_check=lambda: _raise_if_cancelled(repository, job),
+            evaluation_prerequisites=evaluation_prerequisites,
+            institutional_context={
+                "observation_id": admission.observation_id,
+                "company_id": admission.company_id,
+                "opportunity_id": admission.opportunity_id,
+                "thesis_version_id": evaluation_prerequisites.thesis_version_id,
+                "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
+                "policy_hash": evaluation_prerequisites.policy.policy_hash,
+            },
+        )
+    except EvaluationPrerequisiteError as exc:
+        raise JobExecutionBlocked(
+            code=exc.code,
+            detail=exc.detail,
+            recovery_action=exc.recovery_action,
+        ) from exc
+    if not isinstance(result, PipelineExecutionResult):
+        raise RuntimeError("Company lookup runner returned an invalid execution result")
+    result_metadata = result.model_dump(mode="json", exclude_none=True)
+    startup_id = result.startup_id
+    if startup_id:
+        await _raise_if_cancelled(repository, job)
         await identity_repository.link_legacy_projection(
             user_id=job.user_id,
             opportunity_id=admission.opportunity_id,
             legacy_startup_id=startup_id,
         )
+        await _raise_if_cancelled(repository, job)
         await _checkpoint(
             repository,
             job,
@@ -194,15 +262,63 @@ async def company_lookup_handler(repository: Any, job: AgentJob) -> None:
                 "startup_id": startup_id,
             },
         )
-    await _checkpoint(
-        repository,
-        job,
-        "lookup_result",
-        "succeeded" if startup_id else "failed",
-        {"startup_id": startup_id} if startup_id else {},
-    )
-    if startup_id is None:
-        raise RuntimeError("Company lookup completed without a startup record")
+    if result.state is PipelineExecutionState.BLOCKED:
+        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+    elif result.state is PipelineExecutionState.FAILED_STAGE:
+        await _checkpoint(repository, job, "lookup_result", "failed", result_metadata)
+    elif result.state is PipelineExecutionState.COMPLETED:
+        if not startup_id:
+            raise RuntimeError("Completed company lookup did not produce a startup record")
+        await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
+    else:
+        await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
+    return result
+
+
+async def company_lookup_handler(
+    repository: Any, job: AgentJob
+) -> LookupAttemptOutcome:
+    """Execute one lookup attempt with a lossless, central lifecycle record."""
+    try:
+        result = await _execute_company_lookup(repository, job)
+    except JobExecutionCancelled as exc:
+        exc.lookup_outcome = LookupAttemptOutcome.cancelled_for_job(
+            job, detail="The lookup job was cancelled before completion."
+        )
+        raise
+    except JobExecutionBlocked as exc:
+        exc.lookup_outcome = LookupAttemptOutcome.blocked_for_job(
+            job,
+            code=exc.code,
+            detail=exc.detail or "Lookup execution is blocked.",
+            recovery_action=exc.recovery_action,
+        )
+        raise
+    except Exception as exc:
+        exc.lookup_outcome = LookupAttemptOutcome.failed_for_job(
+            job,
+            detail=str(exc).strip() or "Lookup attempt failed unexpectedly.",
+            recovery_action="Retry the lookup after checking worker and provider availability.",
+        )
+        raise
+
+    lookup_outcome = LookupAttemptOutcome.from_pipeline_result(job, result)
+    if result.state is PipelineExecutionState.BLOCKED:
+        raise JobExecutionBlocked(
+            code=result.code,
+            detail=result.detail,
+            recovery_action=result.recovery_action or "Correct the prerequisite and retry.",
+            lookup_outcome=lookup_outcome,
+        )
+    if result.state is PipelineExecutionState.FAILED_STAGE:
+        exc = RuntimeError(f"{result.code}: {result.detail}")
+        exc.lookup_outcome = lookup_outcome
+        raise exc
+    if lookup_outcome.disposition is LookupAttemptDisposition.CANCELLED:
+        exc = JobExecutionCancelled(result.detail)
+        exc.lookup_outcome = lookup_outcome
+        raise exc
+    return lookup_outcome
 
 
 async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:
@@ -223,8 +339,14 @@ async def evidence_refresh_handler(repository: Any, job: AgentJob) -> None:
         "succeeded",
         {
             "material_change": check["material_change"],
-            "previous_snapshot_hash": check.get("previous_snapshot_hash"),
-            "current_snapshot_hash": check.get("current_snapshot_hash"),
+            "previous_materiality_digest": check.get(
+                "previous_materiality_digest",
+                check.get("previous_snapshot_hash"),
+            ),
+            "current_materiality_digest": check.get(
+                "current_materiality_digest",
+                check.get("current_snapshot_hash"),
+            ),
         },
     )
     reasons_requiring_plan = {

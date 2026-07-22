@@ -4,20 +4,47 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Sequence, Tuple
 
 from evaluation_v2.models import (
     CriterionResult,
+    EvidenceEligibilityPolicy,
     EvaluationPolicy,
     EvaluationResult,
     RecommendationResult,
     RecommendationState,
+    ScoreEligibility,
 )
 
 
+def _canonical_digest(value: Any) -> str:
+    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def materiality_digest(snapshot: Sequence[Dict[str, Any]]) -> str:
+    """Hash enriched immutable content while excluding only the evaluation clock."""
+    material_projection = [
+        {
+            key: value
+            for key, value in claim.items()
+            if key != "evaluation_at_snapshot"
+        }
+        for claim in snapshot
+    ]
+    material_projection.sort(key=lambda item: str(item.get("claim_id") or ""))
+    return _canonical_digest(material_projection)
+
+
 def snapshot_claims(
-    claims: Sequence[Dict[str, Any]], links: Sequence[Dict[str, Any]]
+    claims: Sequence[Dict[str, Any]],
+    links: Sequence[Dict[str, Any]],
+    *,
+    evaluation_at: datetime | None = None,
 ) -> Tuple[List[Dict[str, Any]], str]:
+    evaluation_clock = _utc(evaluation_at or datetime.now(timezone.utc))
+    evaluation_clock_iso = evaluation_clock.isoformat()
     by_claim: Dict[str, List[Dict[str, Any]]] = {}
     for link in links:
         by_claim.setdefault(str(link.get("claim_id")), []).append(link)
@@ -29,13 +56,19 @@ def snapshot_claims(
             {
                 "claim_id": claim_id,
                 "claim_type": str(claim.get("claim_type") or ""),
-                "normalized_value": claim.get("normalized_value") or {},
+                "normalized_value": (
+                    {}
+                    if claim.get("normalized_value") is None
+                    else claim.get("normalized_value")
+                ),
                 "unit": claim.get("unit"),
                 "period": claim.get("period"),
                 "display_text": str(claim.get("display_text") or ""),
                 "status_at_snapshot": str(claim.get("status") or ""),
                 "assertion_class_at_snapshot": str(claim.get("assertion_class") or ""),
+                "operator_attribution_at_snapshot": claim.get("operator_attribution"),
                 "confidence_at_snapshot": float(claim.get("confidence") or 0),
+                "evaluation_at_snapshot": evaluation_clock_iso,
                 "supporting_evidence_ids": sorted(
                     str(link.get("evidence_item_id"))
                     for link in claim_links
@@ -52,6 +85,23 @@ def snapshot_claims(
                             "evidence_item_id": str(link.get("evidence_item_id")),
                             "relationship": str(link.get("relationship")),
                             "support_strength": float(link.get("support_strength") or 0),
+                            "verification_state": str(link.get("verification_state") or ""),
+                            "source_quality": float(link.get("source_quality") or 0),
+                            "trust_class": str(link.get("trust_class") or ""),
+                            "untrusted_input": bool(link.get("untrusted_input")),
+                            "prompt_injection_detected": bool(
+                                link.get("prompt_injection_detected")
+                            ),
+                            "evidence_effective_at": _iso_or_none(
+                                link.get("evidence_effective_at")
+                            ),
+                            "evidence_expires_at": _iso_or_none(
+                                link.get("evidence_expires_at")
+                            ),
+                            "artifact_effective_at": _iso_or_none(
+                                link.get("artifact_effective_at")
+                            ),
+                            "retrieved_at": _iso_or_none(link.get("retrieved_at")),
                         }
                         for link in claim_links
                     ],
@@ -60,8 +110,175 @@ def snapshot_claims(
             }
         )
     snapshot.sort(key=lambda item: item["claim_id"])
-    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
-    return snapshot, hashlib.sha256(canonical.encode()).hexdigest()
+    return snapshot, _canonical_digest(snapshot)
+
+
+def _utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        raise ValueError("evaluation timestamp must be timezone-aware")
+    return value.astimezone(timezone.utc)
+
+
+def _parse_timestamp(value: Any) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return _utc(value)
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return _utc(parsed)
+    except (TypeError, ValueError):
+        return None
+
+
+def _iso_or_none(value: Any) -> str | None:
+    parsed = _parse_timestamp(value)
+    return parsed.isoformat() if parsed else None
+
+
+def _snapshot_clock(
+    snapshot: Sequence[Dict[str, Any]], evaluation_at: datetime | None
+) -> datetime:
+    embedded = {
+        str(claim.get("evaluation_at_snapshot") or "").strip()
+        for claim in snapshot
+        if claim.get("evaluation_at_snapshot")
+    }
+    if len(embedded) > 1:
+        raise ValueError("immutable snapshot contains multiple evaluation timestamps")
+    embedded_clock = _parse_timestamp(next(iter(embedded))) if embedded else None
+    requested_clock = _utc(evaluation_at) if evaluation_at is not None else None
+    if embedded_clock and requested_clock and embedded_clock != requested_clock:
+        raise ValueError("evaluation timestamp does not match immutable snapshot")
+    return embedded_clock or requested_clock or _utc(datetime.now(timezone.utc))
+
+
+def evaluate_claim_score_eligibility(
+    claim: Dict[str, Any],
+    *,
+    policy: EvaluationPolicy,
+    evaluation_at: datetime,
+) -> ScoreEligibility:
+    blocking_reasons: List[str] = []
+    quality_flags: List[str] = []
+    evidence_policy = policy.decision_safety.evidence_eligibility
+    confidence_policy = policy.decision_safety.claim_confidence
+    freshness_policy = policy.decision_safety.freshness
+    quality_policy = policy.decision_safety.source_quality
+    claim_confidence = float(claim.get("confidence_at_snapshot") or 0)
+    score_cap = 10.0
+    confidence_cap = 1.0
+    if claim_confidence == 0 and confidence_policy.zero_confidence_ineligible:
+        blocking_reasons.append("claim_confidence_zero")
+    elif claim_confidence < confidence_policy.minimum_eligible:
+        blocking_reasons.append("claim_confidence_below_minimum")
+    elif claim_confidence < confidence_policy.full_confidence_at:
+        quality_flags.append("claim_confidence_below_full")
+        score_cap = min(score_cap, confidence_policy.score_cap_below_full_confidence)
+        confidence_cap = min(
+            confidence_cap,
+            confidence_policy.recommendation_confidence_cap_below_full_confidence,
+        )
+
+    assertion_class = claim.get("assertion_class_at_snapshot")
+    if assertion_class not in evidence_policy.allowed_assertion_classes:
+        blocking_reasons.append("assertion_class_not_allowed")
+
+    candidate_links = list(claim.get("evidence_relationships", []))
+    if (
+        assertion_class == "operator_asserted"
+        and "operator_asserted" in evidence_policy.allowed_assertion_classes
+        and str(claim.get("operator_attribution_at_snapshot") or "").strip()
+    ):
+        candidate_links.append(
+            {
+                "relationship": evidence_policy.allowed_relationships[0],
+                "support_strength": 1.0,
+                "source_quality": 1.0,
+                "trust_class": "operator",
+                "prompt_injection_detected": False,
+                "verification_state": "verified",
+                "operator_grounded": True,
+            }
+        )
+
+    allowed_links = []
+    rejected_link_reasons: List[str] = []
+    link_caps: list[tuple[float, float, list[str]]] = []
+    for link in candidate_links:
+        if link.get("relationship") not in evidence_policy.allowed_relationships:
+            continue
+        if float(link.get("support_strength") or 0) < evidence_policy.min_support_strength:
+            continue
+        source_quality = float(link.get("source_quality") or 0)
+        if source_quality < evidence_policy.min_source_quality:
+            continue
+        if link.get("trust_class") in evidence_policy.blocked_trust_classes:
+            continue
+        if bool(link.get("prompt_injection_detected")):
+            continue
+        if (
+            evidence_policy.require_verified_evidence
+            and link.get("verification_state") != "verified"
+        ):
+            continue
+
+        current_score_cap = 10.0
+        current_confidence_cap = 1.0
+        current_flags: list[str] = []
+        if not link.get("operator_grounded"):
+            expires_at = _parse_timestamp(link.get("evidence_expires_at"))
+            effective_at = (
+                _parse_timestamp(link.get("evidence_effective_at"))
+                or _parse_timestamp(link.get("artifact_effective_at"))
+                or _parse_timestamp(link.get("retrieved_at"))
+            )
+            if expires_at is not None and expires_at <= evaluation_at:
+                rejected_link_reasons.append("evidence_expired")
+                continue
+            if effective_at is None:
+                rejected_link_reasons.append("evidence_undated")
+                continue
+            if effective_at > evaluation_at:
+                rejected_link_reasons.append("evidence_future_dated")
+                continue
+            if evaluation_at - effective_at > timedelta(days=freshness_policy.max_age_days):
+                current_flags.append("evidence_stale")
+                current_score_cap = min(
+                    current_score_cap, freshness_policy.stale_score_cap
+                )
+                current_confidence_cap = min(
+                    current_confidence_cap, freshness_policy.stale_confidence_cap
+                )
+        if source_quality < quality_policy.full_confidence_at:
+            current_flags.append("source_quality_below_full")
+            current_score_cap = min(
+                current_score_cap, quality_policy.score_cap_below_full_quality
+            )
+            current_confidence_cap = min(
+                current_confidence_cap,
+                quality_policy.recommendation_confidence_cap_below_full_quality,
+            )
+        allowed_links.append(link)
+        link_caps.append((current_score_cap, current_confidence_cap, current_flags))
+
+    if not allowed_links:
+        blocking_reasons.extend(rejected_link_reasons)
+        blocking_reasons.append("no_eligible_supporting_evidence")
+    else:
+        # Any independently eligible full-quality link can establish the claim.
+        best_score_cap, best_confidence_cap, best_flags = max(
+            link_caps, key=lambda item: (item[0], item[1])
+        )
+        score_cap = min(score_cap, best_score_cap)
+        confidence_cap = min(confidence_cap, best_confidence_cap)
+        quality_flags.extend(best_flags)
+    return ScoreEligibility(
+        eligible=not blocking_reasons,
+        reason_codes=sorted(set(blocking_reasons + quality_flags)),
+        score_cap=score_cap,
+        confidence_cap=confidence_cap,
+    )
 
 
 def _score(claim: Dict[str, Any]) -> float | None:
@@ -72,9 +289,52 @@ def _score(claim: Dict[str, Any]) -> float | None:
         return None
 
 
+def decisive_policy_outcome(
+    snapshot: Sequence[Dict[str, Any]],
+    policy: EvaluationPolicy,
+    *,
+    evaluation_at: datetime,
+) -> tuple[RecommendationState | None, list[str], list[str], list[str]]:
+    risks: list[str] = []
+    conflicts: list[str] = []
+    uncertainties: list[str] = []
+    for claim in snapshot:
+        if claim.get("status_at_snapshot") != "current":
+            continue
+        eligibility = evaluate_claim_score_eligibility(
+            claim, policy=policy, evaluation_at=evaluation_at
+        )
+        raw_value = (claim.get("normalized_value") or {}).get("value")
+        claim_type = claim.get("claim_type")
+        if claim_type not in (
+            set(policy.decision_safety.hard_exclusion_claim_types)
+            | set(policy.decision_safety.critical_risk_claim_types)
+        ):
+            continue
+        if type(raw_value) is not bool:
+            uncertainties.append(str(claim.get("display_text") or claim_type))
+            continue
+        if raw_value is False:
+            continue
+        if not eligibility.eligible:
+            uncertainties.append(str(claim.get("display_text") or claim_type))
+            continue
+        if claim_type in policy.decision_safety.hard_exclusion_claim_types:
+            conflicts.append(str(claim_type))
+        if claim_type in policy.decision_safety.critical_risk_claim_types:
+            risks.append(str(claim.get("display_text") or claim_type))
+    if conflicts or risks:
+        return RecommendationState.PASS, risks, conflicts, uncertainties
+    return None, risks, conflicts, uncertainties
+
+
 def evaluate_snapshot(
-    snapshot: Sequence[Dict[str, Any]], policy: EvaluationPolicy
+    snapshot: Sequence[Dict[str, Any]],
+    policy: EvaluationPolicy,
+    *,
+    evaluation_at: datetime | None = None,
 ) -> EvaluationResult:
+    evaluation_clock = _snapshot_clock(snapshot, evaluation_at)
     canonical = json.dumps(list(snapshot), sort_keys=True, separators=(",", ":"))
     digest = hashlib.sha256(canonical.encode()).hexdigest()
     criteria: List[CriterionResult] = []
@@ -82,24 +342,54 @@ def evaluate_snapshot(
     weighted_total = 0.0
     total_weight = sum(rule.weight for rule in policy.criteria)
     missing = []
+    required_missing = []
     conflicts = []
     for rule in policy.criteria:
-        eligible = [
+        criterion_claims = [
             claim
             for claim in snapshot
             if claim["claim_type"] in rule.claim_types
             and claim["status_at_snapshot"] in {"current", "contradicted"}
         ]
-        scored = [(claim, _score(claim)) for claim in eligible]
-        scored = [(claim, score) for claim, score in scored if score is not None]
+        eligibility_results = [
+            (
+                claim,
+                evaluate_claim_score_eligibility(
+                    claim, policy=policy, evaluation_at=evaluation_clock
+                ),
+            )
+            for claim in criterion_claims
+        ]
+        eligible = [
+            claim for claim, eligibility in eligibility_results if eligibility.eligible
+        ]
+        eligibility_flags = sorted(
+            {
+                reason
+                for _, eligibility in eligibility_results
+                for reason in eligibility.reason_codes
+            }
+        )
+        scored = [
+            (claim, _score(claim), eligibility)
+            for claim, eligibility in eligibility_results
+            if eligibility.eligible
+        ]
+        scored = [
+            (claim, min(score, eligibility.score_cap), eligibility)
+            for claim, score, eligibility in scored
+            if score is not None
+        ]
         contradicted = [
             claim["claim_id"]
-            for claim in eligible
+            for claim in criterion_claims
             if claim["status_at_snapshot"] == "contradicted"
             or claim["contradicting_evidence_ids"]
         ]
         if not scored:
             missing.append(rule.criterion)
+            if rule.required:
+                required_missing.append(rule.criterion)
             criteria.append(
                 CriterionResult(
                     criterion=rule.criterion,
@@ -108,17 +398,20 @@ def evaluate_snapshot(
                     reasoning="No eligible scored claim was present in the immutable snapshot.",
                     missing_evidence=[rule.criterion],
                     contradicting_claim_ids=contradicted,
+                    quality_flags=eligibility_flags,
                 )
             )
             continue
-        weight_sum = sum(max(0.01, claim["confidence_at_snapshot"]) for claim, _ in scored)
+        weight_sum = sum(claim["confidence_at_snapshot"] for claim, _, _ in scored)
         score = sum(
-            value * max(0.01, claim["confidence_at_snapshot"])
-            for claim, value in scored
+            value * claim["confidence_at_snapshot"]
+            for claim, value, _ in scored
         ) / weight_sum
         confidence = min(
             1.0,
-            sum(claim["confidence_at_snapshot"] for claim, _ in scored) / len(scored),
+            sum(claim["confidence_at_snapshot"] for claim, _, _ in scored)
+            / len(scored),
+            min(eligibility.confidence_cap for _, _, eligibility in scored),
         )
         if contradicted:
             confidence *= 0.6
@@ -132,28 +425,28 @@ def evaluate_snapshot(
                 confidence=round(confidence, 4),
                 evidence_sufficiency="partial" if contradicted else "sufficient",
                 reasoning="Deterministic confidence-weighted claim score.",
-                supporting_claim_ids=[claim["claim_id"] for claim, _ in scored],
+                supporting_claim_ids=[claim["claim_id"] for claim, _, _ in scored],
                 contradicting_claim_ids=contradicted,
-                quality_flags=["contradiction_present"] if contradicted else [],
+                quality_flags=sorted(
+                    set(eligibility_flags)
+                    | ({"contradiction_present"} if contradicted else set())
+                ),
             )
         )
 
-    exclusion_claims = [
-        claim
-        for claim in snapshot
-        if claim["claim_type"] in policy.hard_exclusion_claim_types
-        and claim["status_at_snapshot"] == "current"
-        and bool((claim.get("normalized_value") or {}).get("value"))
-    ]
+    decisive_state, decisive_risks, mandate_conflicts, decisive_uncertainties = decisive_policy_outcome(
+        snapshot, policy, evaluation_at=evaluation_clock
+    )
+    missing = list(dict.fromkeys(missing + decisive_uncertainties))
     coverage = scored_weight / total_weight if total_weight else 0
     average = weighted_total / scored_weight if scored_weight else 0
-    if exclusion_claims:
-        state = RecommendationState.PASS
-    elif coverage < policy.minimum_scored_weight:
+    if decisive_state is not None:
+        state = decisive_state
+    elif required_missing or coverage < policy.minimum_scored_weight:
         state = RecommendationState.INSUFFICIENT_EVIDENCE
     elif average >= policy.advance_threshold:
         state = RecommendationState.ADVANCE
-    elif average <= policy.pass_threshold:
+    elif average < policy.pass_threshold:
         state = RecommendationState.PASS
     else:
         state = RecommendationState.MONITOR
@@ -171,11 +464,16 @@ def evaluate_snapshot(
                 reverse=True,
             )[:3]
         ],
-        principal_risks=conflicts,
-        mandate_conflicts=sorted({claim["claim_type"] for claim in exclusion_claims}),
+        principal_risks=list(dict.fromkeys(conflicts + decisive_risks)),
+        mandate_conflicts=sorted(set(mandate_conflicts)),
         missing_information=missing,
         change_conditions=[f"Resolve missing evidence: {name}" for name in missing],
-        human_review_required=bool(exclusion_claims or conflicts or missing or state is RecommendationState.INSUFFICIENT_EVIDENCE),
+        human_review_required=bool(
+            decisive_state
+            or conflicts
+            or missing
+            or state is RecommendationState.INSUFFICIENT_EVIDENCE
+        ),
     )
     return EvaluationResult(snapshot_hash=digest, criteria=criteria, recommendation=recommendation)
 

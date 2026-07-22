@@ -128,10 +128,10 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         reviewed = utcnow()
     enriched = enrich_scores(reviewer_output)
     return ReviewInfo(
-        market_score=enriched.get("market_score", 5),
-        product_score=enriched.get("product_score", 5),
-        technical_score=enriched.get("technical_score", 5),
-        execution_score=enriched.get("execution_score", 5),
+        market_score=enriched.get("market_score"),
+        product_score=enriched.get("product_score"),
+        technical_score=enriched.get("technical_score"),
+        execution_score=enriched.get("execution_score"),
         defensibility_score=enriched.get("defensibility_score"),
         overall_summary=enriched.get("overall_summary", ""),
         key_risks=enriched.get("key_risks", []),

@@ -229,6 +229,8 @@ class Storage:
         *,
         investment_memo_markdown: Optional[str] = None,
         pipeline_run_id: Optional[str] = None,
+        evaluation_manifest_identity: Optional[Any] = None,
+        partner_execution_prompt_version: Optional[str] = None,
     ) -> bool:
         """Add partner decision (YES/NO/MAYBE, human_review_required, next_action, etc.). Updates updated_at."""
         found_ref: List[bool] = [False]

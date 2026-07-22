@@ -82,11 +82,11 @@ def normalize_tam(value: Any, thresholds: Optional[dict] = None) -> float:
     return 4.0
 
 
-def normalize_growth(value: Any) -> float:
+def normalize_growth(value: Any, thresholds: Optional[dict] = None) -> float:
     pct = _parse_float(value)
     if pct is None:
         return DEFAULT_SCORE
-    t = THRESHOLDS["growth_pct"]
+    t = thresholds or THRESHOLDS["growth_pct"]
     if pct >= t["hyper"]:
         return 10.0
     if pct >= t["strong"]:

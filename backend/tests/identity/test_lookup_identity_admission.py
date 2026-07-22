@@ -1,10 +1,56 @@
 import importlib
+import json
+from pathlib import Path
 
 import pytest
 
+from evaluation_v2.policy import evaluation_policy_from_compiled
+from evaluation_v2.prerequisites import EvaluationPrerequisites
 from identity.models import IdentityAdmission, IdentityStatus, OpportunityRecord
 from jobs.models import AgentJob, CompanyLookupPayload, JobExecutionBlocked, JobType
 from utils.timeutil import utcnow
+from pipeline_execution import PipelineExecutionResult
+
+
+def _prerequisites():
+    compiled = {
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
+        "dimensions": {
+            "market": {"weight": 100, "criteria": [{"id": "market"}]}
+        },
+    }
+    partner_rules = json.loads(
+        (
+            Path(__file__).resolve().parents[3]
+            / "resources/config/partner_rules/v3.json"
+        ).read_text()
+    )
+    partner_rules["version"] = "rules-v3"
+    policy = evaluation_policy_from_compiled(
+        compiled,
+        partner_rules=partner_rules,
+    )
+    return EvaluationPrerequisites(
+        user_id="user-a",
+        thesis_context={"version_id": "thesis-live"},
+        thesis_version_id="thesis-live",
+        compiled_scoring_policy=compiled,
+        partner_rules=partner_rules,
+        fund_config={},
+        policy=policy,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _admit_evaluation_prerequisites(monkeypatch):
+    handlers = importlib.import_module("jobs.handlers")
+
+    async def load(**kwargs):
+        assert kwargs["user_id"] == "user-a"
+        return _prerequisites()
+
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
 
 
 class _JobRepository:
@@ -87,7 +133,12 @@ async def test_identity_is_admitted_before_legacy_scout_and_projection_is_linked
     async def run(*args, **kwargs):
         order.append("legacy")
         captured["lookup_kwargs"] = kwargs
-        return "11111111-1111-4111-8111-111111111111"
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="11111111-1111-4111-8111-111111111111",
+            projection_id="opportunity-1",
+        )
 
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: identity_repository)
     monkeypatch.setattr(handlers, "IdentityService", _Service)
@@ -104,7 +155,11 @@ async def test_identity_is_admitted_before_legacy_scout_and_projection_is_linked
         "observation_id": "observation-1",
         "company_id": "company-1",
         "opportunity_id": "opportunity-1",
+        "thesis_version_id": "thesis-live",
+        "policy_version_id": "policy-live",
+        "policy_hash": "hash-live",
     }
+    assert captured["lookup_kwargs"]["evaluation_prerequisites"] == _prerequisites()
     assert identity_repository.linked[0]["opportunity_id"] == "opportunity-1"
     assert [item["stage"] for item in job_repository.checkpoints][-2:] == [
         "projection",
@@ -216,7 +271,12 @@ async def test_rerun_reuses_opportunity_already_linked_to_legacy_startup(monkeyp
             admitted = True
 
     async def run(*args, **kwargs):
-        return "11111111-1111-4111-8111-111111111111"
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="11111111-1111-4111-8111-111111111111",
+            projection_id="opportunity-1",
+        )
 
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: identity_repository)
     monkeypatch.setattr(handlers, "IdentityService", _Service)

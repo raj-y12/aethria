@@ -1,7 +1,6 @@
-from collections import deque
-
 import pytest
 
+from evaluation_v2.evidence_projection import enriched_claim_evidence_sql
 from monitoring.repository import MonitoringRepository
 
 
@@ -15,16 +14,6 @@ class _Transaction:
 
 class _Connection:
     def __init__(self):
-        self.fetchrows = deque(
-            [
-                {"current_evaluation_id": "evaluation-1"},
-                {
-                    "material_change_check_id": "check-1",
-                    "detail": {"claim_count": 0},
-                    "material_change": False,
-                },
-            ]
-        )
         self.calls = []
 
     def transaction(self):
@@ -32,7 +21,20 @@ class _Connection:
 
     async def fetchrow(self, sql, *args):
         self.calls.append(("fetchrow", sql, args))
-        return self.fetchrows.popleft()
+        if "from public.opportunities" in sql:
+            return {"current_evaluation_id": "evaluation-1"}
+        if "from public.evaluation_runs" in sql:
+            return {
+                "evidence_materiality_digest": "materiality-1",
+                "claim_snapshot": [],
+            }
+        if "insert into public.material_change_checks" in sql:
+            return {
+                "material_change_check_id": "check-1",
+                "detail": {"claim_count": 0},
+                "material_change": False,
+            }
+        raise AssertionError(f"unexpected fetchrow: {sql}")
 
     async def fetchval(self, sql, *args):
         self.calls.append(("fetchval", sql, args))
@@ -77,9 +79,31 @@ async def test_material_change_reads_the_immutable_evaluation_schema_columns():
     evaluation_sql = next(
         sql.lower()
         for operation, sql, _ in connection.calls
-        if operation == "fetchval" and "evaluation_runs" in sql
+        if "evaluation_runs" in sql
     )
-    assert "evidence_snapshot_hash" in evaluation_sql
+    assert "evidence_materiality_digest" in evaluation_sql
+    assert "claim_snapshot" in evaluation_sql
     assert "evaluation_id=$2" in evaluation_sql
-    assert "claim_snapshot_hash" not in evaluation_sql
     assert "evaluation_run_id" not in evaluation_sql
+
+    link_sql = next(
+        sql.lower()
+        for operation, sql, _ in connection.calls
+        if operation == "fetch" and "claim_evidence_links" in sql
+    )
+    normalized = " ".join(link_sql.split())
+    assert " ".join(enriched_claim_evidence_sql().lower().split()) == normalized
+    assert "join public.evidence_items ei" in normalized
+    assert "join public.evidence_artifacts ea" in normalized
+    assert "ei.verification_state" in normalized
+    assert "ei.source_quality" in normalized
+    assert "ea.trust_class" in normalized
+    assert "ea.prompt_injection_detected" in normalized
+
+    insert_sql = next(
+        sql.lower()
+        for operation, sql, _ in connection.calls
+        if operation == "fetchrow" and "material_change_checks" in sql
+    )
+    assert "previous_materiality_digest" in insert_sql
+    assert "current_materiality_digest" in insert_sql

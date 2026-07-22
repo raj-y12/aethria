@@ -24,16 +24,28 @@ class JobExecutionCancelled(RuntimeError):
     """Cooperative stop observed between durable execution checkpoints."""
 
 
+class JobLeaseLost(RuntimeError):
+    """The executing worker no longer owns the durable job lease."""
+
+
 class JobExecutionBlocked(RuntimeError):
     """Execution cannot continue until an explicit operator action is complete."""
 
-    def __init__(self, *, code: str, detail: str, recovery_action: str):
+    def __init__(
+        self,
+        *,
+        code: str,
+        detail: str,
+        recovery_action: str,
+        lookup_outcome: Any = None,
+    ):
         normalized_code = str(code or "").strip().lower()
         if not normalized_code or not normalized_code.replace("_", "a").isalnum():
             raise ValueError("blocked job code must be lowercase snake_case")
         self.code = normalized_code[:80]
         self.detail = str(detail or "").strip()[:1000]
         self.recovery_action = str(recovery_action or "").strip()[:1000]
+        self.lookup_outcome = lookup_outcome
         if not self.recovery_action:
             raise ValueError("blocked job recovery_action is required")
         super().__init__(f"{self.code}: {self.detail or self.recovery_action}")
@@ -54,6 +66,13 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     DEAD_LETTER = "dead_letter"
     CANCELLED = "cancelled"
+
+
+class JobCancellationDisposition(str, Enum):
+    TRANSITIONED = "transitioned"
+    ALREADY_CANCELLED = "already_cancelled"
+    REJECTED = "rejected"
+    NOT_FOUND = "not_found"
 
 
 class CheckpointStatus(str, Enum):
@@ -182,6 +201,36 @@ class AgentJob(BaseModel):
         if self.attempts > self.max_attempts:
             raise ValueError("attempts cannot exceed max_attempts")
         return self
+
+
+class JobCancellationResult(BaseModel):
+    """Unambiguous outcome of an operator cancellation request."""
+
+    disposition: JobCancellationDisposition
+    job: Optional[AgentJob] = None
+
+    @model_validator(mode="after")
+    def _result_matches_job_state(self):
+        if self.disposition is JobCancellationDisposition.NOT_FOUND:
+            if self.job is not None:
+                raise ValueError("not_found cancellation cannot include a job")
+            return self
+        if self.job is None:
+            raise ValueError("cancellation result requires the current job")
+        cancellation_won = self.disposition in {
+            JobCancellationDisposition.TRANSITIONED,
+            JobCancellationDisposition.ALREADY_CANCELLED,
+        }
+        if cancellation_won != (self.job.status is JobStatus.CANCELLED):
+            raise ValueError("cancellation disposition does not match job status")
+        return self
+
+    @property
+    def cancellation_won(self) -> bool:
+        return self.disposition in {
+            JobCancellationDisposition.TRANSITIONED,
+            JobCancellationDisposition.ALREADY_CANCELLED,
+        }
 
 
 class JobCheckpoint(BaseModel):

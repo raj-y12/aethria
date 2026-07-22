@@ -26,6 +26,7 @@ from analytics.clustering import ClusterAnalyzer
 from utils.storage import Storage
 from utils.partner_codes import legacy_from_recommendation
 from utils.job_schedule import claim_due_jobs
+from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -119,8 +120,8 @@ class PortfolioEngine:
         self.last_feedback = utcnow()
         self.last_health = utcnow()
     
-    async def run_cycle(self):
-        """Run one cycle of all portfolio components."""
+    async def run_cycle(self) -> StageExecutionResult:
+        """Run due portfolio jobs and account for every claimed subjob."""
         now = utcnow()
         if self.tenant_user_id:
             try:
@@ -135,10 +136,17 @@ class PortfolioEngine:
                     },
                 )
             except Exception as exc:
-                # Without an authoritative claim we must not run expensive work,
-                # but a schedule outage must not abort activity persistence or meta.
                 self.logger.error("Portfolio schedule claim failed: %s", exc, exc_info=True)
-                return
+                return StageExecutionResult.failed_result(
+                    stage="portfolio",
+                    code="portfolio_schedule_unavailable",
+                    detail="The Portfolio schedule could not be claimed.",
+                    recovery_action=(
+                        "Restore the durable schedule store and retry the Portfolio cycle."
+                    ),
+                    attempted=1,
+                    failed=1,
+                )
         else:
             due = set()
             if (now - self.last_execution).total_seconds() >= self.execution_interval:
@@ -150,26 +158,69 @@ class PortfolioEngine:
             if (now - self.last_health).total_seconds() >= self.health_interval:
                 due.add("health")
 
-        # Execution Agent: Process new Partner decisions
-        if "execution" in due:
-            await self._run_execution()
-            self.last_execution = now
-        
-        # Signal Tracker: Check watchlist
-        if "signals" in due:
-            await self._run_signals()
-            await self._run_watchlist_review()
-            self.last_signal = now
-        
-        # Feedback Loop: Calculate metrics
-        if "feedback" in due:
-            await self._run_feedback()
-            self.last_feedback = now
-        
-        # Health Monitor: Check system health
-        if "health" in due:
-            await self._run_health()
-            self.last_health = now
+        ordered_due = [
+            name
+            for name in ("execution", "signals", "feedback", "health")
+            if name in due
+        ]
+        if not ordered_due:
+            return StageExecutionResult.skipped_result(
+                stage="portfolio",
+                code="portfolio_no_due_work",
+                detail="No Portfolio subjob is due in this cycle.",
+            )
+
+        succeeded = 0
+        failed = 0
+        for job_name in ordered_due:
+            try:
+                if job_name == "execution":
+                    await self._run_execution()
+                    self.last_execution = now
+                elif job_name == "signals":
+                    await self._run_signals()
+                    await self._run_watchlist_review()
+                    self.last_signal = now
+                elif job_name == "feedback":
+                    await self._run_feedback()
+                    self.last_feedback = now
+                else:
+                    await self._run_health()
+                    self.last_health = now
+                succeeded += 1
+            except Exception as exc:
+                failed += 1
+                self.logger.error(
+                    "Portfolio subjob %s failed: %s",
+                    job_name,
+                    exc,
+                    exc_info=True,
+                )
+
+        attempted = len(ordered_due)
+        if failed:
+            return StageExecutionResult.failed_result(
+                stage="portfolio",
+                code="portfolio_subjob_failures",
+                detail=(
+                    f"Portfolio completed {succeeded} of {attempted} due subjobs; "
+                    "one or more subjobs failed."
+                ),
+                recovery_action=(
+                    "Inspect Portfolio persistence and subjob logs, restore the "
+                    "failed dependency, and retry."
+                ),
+                attempted=attempted,
+                succeeded=succeeded,
+                failed=failed,
+            )
+        return StageExecutionResult.completed(
+            stage="portfolio",
+            code="portfolio_completed",
+            detail=f"Portfolio completed {succeeded} due subjob(s).",
+            attempted=attempted,
+            succeeded=succeeded,
+        )
     
     async def _run_execution(self):
         """Run Execution Agent to process new decisions."""
@@ -275,9 +326,11 @@ class PortfolioEngine:
                 self.logger.info(f"Processed {processed_count} new decisions")
             del all_entries
             del existing_decision_startup_ids
+            return processed_count
         
         except Exception as e:
             self.logger.error(f"Error in execution cycle: {e}", exc_info=True)
+            raise
 
     def _get_execution_entries(self):
         """Bounded partner-decision scan for portfolio execution."""
@@ -298,6 +351,7 @@ class PortfolioEngine:
                 self.logger.info(f"Detected {len(signal_ids)} signals")
         except Exception as e:
             self.logger.error(f"Error in signal cycle: {e}", exc_info=True)
+            raise
     
     async def _run_watchlist_review(self):
         """Review watchlist entries for staleness and decay."""
@@ -355,6 +409,7 @@ class PortfolioEngine:
                     )
         except Exception as e:
             self.logger.error(f"Error in watchlist review: {e}", exc_info=True)
+            raise
 
     async def _run_feedback(self):
         """Run Feedback Loop to calculate metrics."""
@@ -368,6 +423,7 @@ class PortfolioEngine:
                 self.logger.info(f"Calculated {len(metric_ids)} metrics")
         except Exception as e:
             self.logger.error(f"Error in feedback cycle: {e}", exc_info=True)
+            raise
     
     async def _run_health(self):
         """Run Health Monitor and cluster analysis."""
@@ -381,6 +437,7 @@ class PortfolioEngine:
                 self.logger.info(f"Detected {len(health_ids)} health issues")
         except Exception as e:
             self.logger.error(f"Error in health cycle: {e}", exc_info=True)
+            raise
 
         # HealthMonitor runs the same clustering pass with bounded reads.
     
@@ -391,7 +448,16 @@ class PortfolioEngine:
         
         while self.running:
             try:
-                await self.run_cycle()
+                result = await self.run_cycle()
+                self.logger.info(
+                    "Portfolio cycle state=%s code=%s attempted=%s succeeded=%s failed=%s skipped=%s",
+                    result.state.value,
+                    result.code,
+                    result.attempted,
+                    result.succeeded,
+                    result.failed,
+                    result.skipped,
+                )
                 await asyncio.sleep(5)  # Small sleep to prevent tight loop
             except KeyboardInterrupt:
                 self.logger.info("Received interrupt signal, shutting down...")

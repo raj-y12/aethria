@@ -24,6 +24,30 @@ def test_override_classification_is_explicit_not_assumed_model_failure():
     ) is None
 
 
+def test_no_recommendation_cannot_be_overridden():
+    assert classify_override(
+        recommendation=None,
+        ruling=HumanRulingDecision.INVEST,
+        requested=None,
+    ) is None
+
+
+def test_blank_recommendation_cannot_be_overridden():
+    assert classify_override(
+        recommendation="   ",
+        ruling=HumanRulingDecision.PASS,
+        requested=OverrideType.TIMING,
+    ) is None
+
+
+def test_advance_to_invest_is_lifecycle_progression_not_override():
+    assert classify_override(
+        recommendation="advance",
+        ruling=HumanRulingDecision.INVEST,
+        requested=None,
+    ) is None
+
+
 def test_diligence_questions_and_information_request_derive_from_gaps():
     questions = build_workflow_draft(
         WorkflowActionType.PREPARE_DILIGENCE_QUESTIONS,

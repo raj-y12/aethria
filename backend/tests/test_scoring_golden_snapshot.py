@@ -122,37 +122,43 @@ FIXTURES = {
 #     * structured_signals → evidenced dimensions rise off the 5.0 floor (market 6.30→7.60,
 #       execution 5.60→6.33); overall 5.95→6.96. Unscored dims unchanged.
 #     * strong_saas / all_missing → unchanged.
+# - Thin-evidence safety: calibration is now enabled by default and evidence eligibility
+#   requires component `evidence` or `rule` metadata. This deliberately changes only
+#   the fixtures that rely on inference without that metadata:
+#     * strong_saas has grounded extraction evidence, so it remains scored, but its
+#       display values are confidence-discounted (overall 7.26→6.63).
+#     * weak_thin retains only its rule-supported Technical signal; its other
+#       dimensions are unscored rather than inferred from sparse narrative.
+#     * structured_signals carries no evidence/rule metadata, so every dimension is
+#       unscored instead of publishing the supplied labels and values as fact.
 GOLDEN = {
     "strong_saas": {
-        "overall_score": 7.26,
-        "dims": {"market": 7.88, "product": 8.25, "technical": 6.15, "execution": 6.75, "defensibility": 2.35},
+        "overall_score": 6.63,
+        "dims": {"market": 6.83, "product": 7.79, "technical": 6.11, "execution": 5.80, "defensibility": 3.68},
     },
     "weak_thin": {
-        "overall_score": 4.35,
-        "dims": {"market": 5.20, "product": 6.29, "technical": 2.56, "execution": 3.36, "defensibility": 2.00},
+        "overall_score": 4.00,
+        "dims": {"market": None, "product": None, "technical": 4.00, "execution": None, "defensibility": None},
     },
     "all_missing": {
-        # Every dimension is a placeholder 5.0 but unscored=True; overall is None.
+        # Every dimension is explicitly unscored with score=None; overall is None.
         "overall_score": None,
-        "dims": {"market": 5.00, "product": 5.00, "technical": 5.00, "execution": 5.00, "defensibility": 5.00},
+        "dims": {"market": None, "product": None, "technical": None, "execution": None, "defensibility": None},
     },
     "structured_signals": {
-        # Issue-1 root-cause fix: _sanitize_component no longer destroys LLM value-only /
-        # label-only signals (previously it preserved neither the value nor the provided
-        # confidence). The fixture's LLM-supplied market values now count, lifting market
-        # 7.60→7.75 and overall 6.96→7.04. Calibration is OFF here, so this is purely the
-        # confidence/value-preservation fix, not the discount/gate.
-        "overall_score": 7.04,
-        "dims": {"market": 7.75, "product": 5.00, "technical": 5.00, "execution": 6.33, "defensibility": 5.00},
+        # Value-only / label-only reviewer signals without evidence or a rule are no
+        # longer eligible to manufacture a display score.
+        "overall_score": None,
+        "dims": {"market": None, "product": None, "technical": None, "execution": None, "defensibility": None},
     },
 }
 
 # Dimensions expected to be flagged `unscored` (no evidence) per fixture.
 UNSCORED_DIMS = {
     "strong_saas": set(),
-    "weak_thin": set(),
+    "weak_thin": {"market", "product", "execution", "defensibility"},
     "all_missing": {"market", "product", "technical", "execution", "defensibility"},
-    "structured_signals": {"product", "technical", "defensibility"},
+    "structured_signals": {"market", "product", "technical", "execution", "defensibility"},
 }
 
 
@@ -175,9 +181,13 @@ def test_engine_dimension_scores_golden(name):
     scout, review = FIXTURES[name]
     result = DeterministicScoringEngine().score(scout, review)
     for dim, expected in GOLDEN[name]["dims"].items():
-        assert result[dim]["score"] == pytest.approx(expected, abs=ABS), (
-            f"{name}.{dim}: dimension score drifted from golden snapshot."
-        )
+        if expected is None:
+            assert result[dim]["score"] is None
+            assert result[dim]["missing_reasons"] == ["no_grounded_components"]
+        else:
+            assert result[dim]["score"] == pytest.approx(expected, abs=ABS), (
+                f"{name}.{dim}: dimension score drifted from golden snapshot."
+            )
 
 
 @pytest.mark.parametrize("name", list(FIXTURES))
@@ -405,12 +415,11 @@ def test_FIXED_unknown_market_is_unscored_not_outscoring_known_small_C2():
     """Audit C2 (the headline of the comparability problem), now FIXED by P3.2.
 
     A company with NO market data used to score 5.78 on Market — HIGHER than a company
-    with a verified-but-small market (5.48). Now the no-data Market is flagged
-    `unscored` and excluded from the overall, so it cannot outrank a real, evidenced
-    market. The known-small company remains scored.
+    with a verified-but-small market (5.48). A small-market value without evidence or
+    a rule is also unscored now: neither case may publish an inferred Market score.
     """
     engine = DeterministicScoringEngine()
     unknown = engine.score(*FIXTURES["all_missing"])["market"]
     known_small = engine.score(*FIXTURES["weak_thin"])["market"]
     assert unknown.get("unscored") is True, "no-evidence Market must be unscored"
-    assert known_small.get("unscored") is False, "known-small Market stays scored"
+    assert known_small.get("unscored") is True, "ungrounded small-market value is unscored"

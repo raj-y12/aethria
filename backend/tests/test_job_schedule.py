@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from meta.agent import MetaAgent
+from pipeline_execution import MetaCycleResult, StageExecutionState
 from portfolio.engine import PortfolioEngine
 from utils import job_schedule
 
@@ -75,9 +76,12 @@ def test_meta_agent_skips_automatic_cycle_until_due(monkeypatch):
     monkeypatch.setattr("meta.agent.claim_due_jobs", lambda *a, **k: set())
     monkeypatch.setattr(agent, "_run_cycle_sync", lambda: ran.append(True) or {"cycle_number": 1})
 
-    report = asyncio.run(agent.run_cycle())
+    result = asyncio.run(agent.run_cycle())
 
-    assert report is None
+    assert isinstance(result, MetaCycleResult)
+    assert result.outcome.state is StageExecutionState.SKIPPED
+    assert result.outcome.code == "meta_not_due"
+    assert result.report is None
     assert ran == []
 
 
@@ -90,7 +94,10 @@ def test_meta_agent_manual_cycle_bypasses_schedule(monkeypatch):
     )
     monkeypatch.setattr(agent, "_run_cycle_sync", lambda: {"cycle_number": 7})
 
-    assert asyncio.run(agent.run_cycle(force=True)) == {"cycle_number": 7}
+    result = asyncio.run(agent.run_cycle(force=True))
+
+    assert result.outcome.state is StageExecutionState.COMPLETED
+    assert result.report == {"cycle_number": 7}
     assert claims == [("user-schedule", {"meta": 0})]
 
 
@@ -116,9 +123,12 @@ def test_portfolio_engine_runs_only_persistently_due_stages(monkeypatch):
         lambda user_id, intervals: {"execution", "health"},
     )
 
-    asyncio.run(engine.run_cycle())
+    result = asyncio.run(engine.run_cycle())
 
     assert calls == ["execution", "health"]
+    assert result.state is StageExecutionState.COMPLETED
+    assert result.attempted == 2
+    assert result.succeeded == 2
 
 
 def test_portfolio_schedule_failure_is_fail_closed_and_isolated(monkeypatch):
@@ -140,6 +150,84 @@ def test_portfolio_schedule_failure_is_fail_closed_and_isolated(monkeypatch):
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("schedule unavailable")),
     )
 
-    asyncio.run(engine.run_cycle())
+    result = asyncio.run(engine.run_cycle())
 
     assert calls == []
+    assert result.state is StageExecutionState.FAILED
+    assert result.code == "portfolio_schedule_unavailable"
+    assert result.failed == 1
+    assert result.recovery_action
+
+
+def test_portfolio_engine_reports_no_due_work_as_skipped(monkeypatch):
+    engine = object.__new__(PortfolioEngine)
+    engine.tenant_user_id = "user-schedule"
+    engine.execution_interval = 10
+    engine.signal_interval = 3600
+    engine.feedback_interval = 86400
+    engine.health_interval = 3600
+    engine.logger = __import__("logging").getLogger("test.portfolio.schedule")
+    monkeypatch.setattr("portfolio.engine.claim_due_jobs", lambda *_a, **_k: set())
+
+    result = asyncio.run(engine.run_cycle())
+
+    assert result.state is StageExecutionState.SKIPPED
+    assert result.code == "portfolio_no_due_work"
+
+
+def test_portfolio_engine_aggregates_due_subjob_failure(monkeypatch):
+    engine = object.__new__(PortfolioEngine)
+    engine.tenant_user_id = "user-schedule"
+    engine.execution_interval = 10
+    engine.signal_interval = 3600
+    engine.feedback_interval = 86400
+    engine.health_interval = 3600
+    engine.logger = __import__("logging").getLogger("test.portfolio.schedule")
+    engine.last_execution = datetime.now(timezone.utc)
+    engine.last_health = datetime.now(timezone.utc)
+
+    async def succeed():
+        return None
+
+    async def fail():
+        raise RuntimeError("health store unavailable")
+
+    engine._run_execution = succeed
+    engine._run_health = fail
+    monkeypatch.setattr(
+        "portfolio.engine.claim_due_jobs",
+        lambda *_a, **_k: {"execution", "health"},
+    )
+
+    result = asyncio.run(engine.run_cycle())
+
+    assert result.state is StageExecutionState.FAILED
+    assert result.attempted == 2
+    assert result.succeeded == 1
+    assert result.failed == 1
+    assert result.recovery_action
+
+
+def test_meta_agent_returns_typed_disabled_and_failure_outcomes(monkeypatch):
+    disabled = MetaAgent(user_id="user-schedule")
+    disabled.enabled = False
+    disabled_result = asyncio.run(disabled.run_cycle())
+
+    assert disabled_result.outcome.state is StageExecutionState.SKIPPED
+    assert disabled_result.outcome.code == "meta_disabled"
+    assert disabled_result.report is None
+
+    failed = MetaAgent(user_id="user-schedule")
+    monkeypatch.setattr(
+        "meta.agent.claim_due_jobs", lambda *_a, **_k: {"meta"}
+    )
+    monkeypatch.setattr(
+        failed,
+        "_run_cycle_sync",
+        lambda: (_ for _ in ()).throw(RuntimeError("analysis store unavailable")),
+    )
+    failed_result = asyncio.run(failed.run_cycle())
+
+    assert failed_result.outcome.state is StageExecutionState.FAILED
+    assert failed_result.outcome.code == "meta_cycle_failed"
+    assert failed_result.report is None

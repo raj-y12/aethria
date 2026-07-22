@@ -3,16 +3,21 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
 from evaluation_v2.models import EvaluationPolicy
+from evaluation_v2.evidence_projection import enriched_claim_evidence_sql
 from evaluation_v2.service import (
     evaluate_snapshot,
     explain_recommendation_change,
+    materiality_digest,
     snapshot_claims,
 )
 from tenant_context import require_user_id
+from utils.timeutil import utcnow
 
 
 def _json(value: Any, default: Any) -> Any:
@@ -31,8 +36,9 @@ class EvaluationLifecycleError(RuntimeError):
 
 
 class EvaluationRepository:
-    def __init__(self, pool: Any):
+    def __init__(self, pool: Any, *, clock: Callable[[], datetime] = utcnow):
         self.pool = pool
+        self._clock = clock
 
     @staticmethod
     async def _outbox(conn: Any, *, user_id: str, aggregate_id: str, event_type: str, payload: Dict[str, Any]):
@@ -105,30 +111,32 @@ class EvaluationRepository:
                 links = [
                     dict(row)
                     for row in await conn.fetch(
-                        """
-                        select l.* from public.claim_evidence_links l
-                        join public.claims c on c.user_id = l.user_id and c.claim_id = l.claim_id
-                        where l.user_id = $1 and c.opportunity_id = $2
-                        order by l.claim_id, l.evidence_item_id
-                        """,
+                        enriched_claim_evidence_sql(),
                         uid, opportunity_id,
                     )
                 ]
-                snapshot, digest = snapshot_claims(claims, links)
-                result = evaluate_snapshot(snapshot, policy)
+                evaluation_at = self._clock()
+                snapshot, digest = snapshot_claims(
+                    claims, links, evaluation_at=evaluation_at
+                )
+                content_digest = materiality_digest(snapshot)
+                result = evaluate_snapshot(
+                    snapshot, policy, evaluation_at=evaluation_at
+                )
                 evaluation_id = str(uuid4())
                 await conn.execute(
                     """
                     insert into public.evaluation_runs (
                       evaluation_id,user_id,opportunity_id,trigger_type,actor_id,
-                      evidence_snapshot_hash,claim_snapshot,thesis_version_id,
+                      evidence_snapshot_hash,evidence_materiality_digest,
+                      claim_snapshot,thesis_version_id,
                       policy_version_id,policy_hash,rubric_version,
                       partner_rules_version,partner_rules_hash,model_manifest,
                       prompt_manifest,status,supersedes_evaluation_id,started_at,created_at
-                    ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11,$12,$13,$14::jsonb,$15::jsonb,'running',$16,now(),now())
+                    ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,'running',$17,now(),now())
                     """,
                     evaluation_id, uid, opportunity_id, trigger_type, actor_id,
-                    digest, json.dumps(snapshot), thesis_version_id,
+                    digest, content_digest, json.dumps(snapshot), thesis_version_id,
                     policy.policy_version_id, policy.policy_hash, policy.rubric_version,
                     policy.partner_rules_version, policy.partner_rules_hash,
                     json.dumps(model_manifest or {}), json.dumps(prompt_manifest or {}),
@@ -209,6 +217,7 @@ class EvaluationRepository:
                     "recommendation_id": recommendation_id,
                     "opportunity_id": opportunity_id,
                     "evidence_snapshot_hash": digest,
+                    "evidence_materiality_digest": content_digest,
                     "criteria": [item.model_dump(mode="json") for item in result.criteria],
                     "recommendation": recommendation.model_dump(mode="json"),
                     "policy": policy.model_dump(mode="json"),
@@ -305,11 +314,12 @@ class EvaluationRepository:
                     """
                     insert into public.evaluation_runs (
                       evaluation_id,user_id,opportunity_id,trigger_type,actor_id,
-                      evidence_snapshot_hash,claim_snapshot,policy_version_id,
+                      evidence_snapshot_hash,evidence_materiality_digest,
+                      claim_snapshot,policy_version_id,
                       policy_hash,rubric_version,partner_rules_version,
                       partner_rules_hash,status,failure_code,supersedes_evaluation_id,
                       started_at,completed_at,created_at
-                    ) values ($1,$2,$3,$4,$5,'unavailable','[]'::jsonb,$6,$7,$8,$9,$10,'failed',$11,$12,now(),now(),now())
+                    ) values ($1,$2,$3,$4,$5,'unavailable','unavailable','[]'::jsonb,$6,$7,$8,$9,$10,'failed',$11,$12,now(),now(),now())
                     """,
                     evaluation_id, uid, opportunity_id, trigger_type, actor_id,
                     policy.policy_version_id, policy.policy_hash, policy.rubric_version,

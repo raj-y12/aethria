@@ -1,6 +1,15 @@
 from fastapi.testclient import TestClient
 
-from jobs.models import AgentJob, JobStatus, JobType, PipelineCyclePayload
+from jobs.lookup_outcomes import LookupOutcomeStoreUnavailable
+from jobs.models import (
+    AgentJob,
+    CompanyLookupPayload,
+    JobCancellationDisposition,
+    JobCancellationResult,
+    JobStatus,
+    JobType,
+    PipelineCyclePayload,
+)
 from security.rate_limiter import InMemorySecurityStore
 
 
@@ -18,9 +27,29 @@ def _job(*, user_id="user-a", status=JobStatus.DEAD_LETTER):
     )
 
 
+def _lookup_job(*, user_id="user-a", status=JobStatus.DEAD_LETTER):
+    return AgentJob(
+        job_id="74d53f3f-1795-4636-bda7-c55fbf420dc4",
+        user_id=user_id,
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key=f"lookup:{user_id}:lookup-contract-1",
+        payload=CompanyLookupPayload(
+            user_id=user_id,
+            company_name="Acme",
+            lookup_id="lookup-contract-1",
+        ),
+        status=status,
+        attempts=3,
+        max_attempts=3,
+        pipeline_run_id="pipeline-contract-1",
+        last_error="provider unavailable",
+    )
+
+
 class _Repository:
     def __init__(self, jobs):
         self.jobs = {job.job_id: job for job in jobs}
+        self.atomic_outcomes = []
 
     async def get_job(self, *, user_id, job_id):
         job = self.jobs.get(job_id)
@@ -51,17 +80,44 @@ class _Repository:
             }
         )
         self.jobs[job_id] = updated
+        if updated.job_type is JobType.COMPANY_LOOKUP:
+            from jobs.lookup_outcomes import LookupAttemptOutcome
+
+            self.atomic_outcomes.append(
+                LookupAttemptOutcome.accepted_for_job(updated)
+            )
         return updated
 
     async def cancel(self, *, user_id, job_id):
         job = await self.get_job(user_id=user_id, job_id=job_id)
         if job is None:
-            return None
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.NOT_FOUND,
+            )
         if job.status is JobStatus.SUCCEEDED:
-            return job
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.REJECTED,
+                job=job,
+            )
+        if job.status is JobStatus.CANCELLED:
+            return JobCancellationResult(
+                disposition=JobCancellationDisposition.ALREADY_CANCELLED,
+                job=job,
+            )
         updated = job.model_copy(update={"status": JobStatus.CANCELLED})
         self.jobs[job_id] = updated
-        return updated
+        if updated.job_type is JobType.COMPANY_LOOKUP:
+            from jobs.lookup_outcomes import LookupAttemptOutcome
+
+            self.atomic_outcomes.append(
+                LookupAttemptOutcome.cancelled_for_job(
+                    job, detail="The lookup job was cancelled by the operator."
+                )
+            )
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.TRANSITIONED,
+            job=updated,
+        )
 
 
 def _client(monkeypatch, repository, *, user_id="user-a"):
@@ -146,6 +202,62 @@ def test_retry_reuses_same_job_and_adds_one_safe_attempt(monkeypatch):
     assert response.json()["max_attempts"] == 4
 
 
+def test_lookup_retry_uses_repository_atomic_outcome_before_returning_accepted(monkeypatch):
+    import routers.jobs as jobs_router
+
+    async def persist(_outcome):
+        raise AssertionError("router must not publish outside the job transaction")
+
+    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
+    repository = _Repository([_lookup_job()])
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/retry",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 202
+    assert repository.atomic_outcomes[0].lookup_id == "lookup-contract-1"
+    assert repository.atomic_outcomes[0].attempt == 4
+    assert repository.atomic_outcomes[0].disposition.value == "accepted"
+
+
+def test_lookup_retry_explicitly_fails_if_attempt_status_cannot_be_persisted(monkeypatch):
+    repository = _Repository([_lookup_job()])
+
+    async def fail_atomic_requeue(**_kwargs):
+        raise LookupOutcomeStoreUnavailable("atomic lookup outcome write failed")
+
+    repository.requeue = fail_atomic_requeue
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/retry",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 503
+    assert response.json()["detail"]["reason"] == "lookup_outcome_store_unavailable"
+
+
+def test_lookup_cancel_uses_repository_atomic_outcome_without_router_write(monkeypatch):
+    import routers.jobs as jobs_router
+
+    async def persist(_outcome):
+        raise AssertionError("router must not publish outside the job transaction")
+
+    monkeypatch.setattr(jobs_router, "_persist_lookup_attempt", persist, raising=False)
+    repository = _Repository([_lookup_job(status=JobStatus.RUNNING)])
+
+    response = _client(monkeypatch, repository).post(
+        "/api/jobs/74d53f3f-1795-4636-bda7-c55fbf420dc4/cancel",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 202
+    assert repository.atomic_outcomes[0].disposition.value == "cancelled"
+    assert repository.atomic_outcomes[0].attempt == 3
+
+
 def test_succeeded_job_cannot_be_retried_or_cancelled(monkeypatch):
     succeeded = _job(status=JobStatus.SUCCEEDED)
     repository = _Repository([succeeded])
@@ -177,3 +289,27 @@ def test_cancel_is_idempotent(monkeypatch):
 
     assert first.status_code == second.status_code == 202
     assert first.json()["status"] == second.json()["status"] == "cancelled"
+
+
+def test_cancel_returns_conflict_when_running_job_succeeds_during_transition(
+    monkeypatch,
+):
+    running = _job(status=JobStatus.RUNNING)
+    repository = _Repository([running])
+
+    async def finish_before_cancel(*, user_id, job_id):
+        succeeded = running.model_copy(update={"status": JobStatus.SUCCEEDED})
+        repository.jobs[job_id] = succeeded
+        return JobCancellationResult(
+            disposition=JobCancellationDisposition.REJECTED,
+            job=succeeded,
+        )
+
+    repository.cancel = finish_before_cancel
+    response = _client(monkeypatch, repository).post(
+        f"/api/jobs/{running.job_id}/cancel",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Job state changed; refresh before cancelling"

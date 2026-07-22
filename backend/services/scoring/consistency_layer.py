@@ -523,6 +523,10 @@ def run_consistency_audit(
         pres = pres_by_id.get(dim_key)
         if not pres:
             continue
+        # Missing evidence is not a numeric 5.0. An unscored dimension has no
+        # score whose narrative consistency can be audited.
+        if pres.get("score") is None:
+            continue
         raw_dim = raw_scoring.get(dim_key) if isinstance(raw_scoring.get(dim_key), dict) else None
         corpus = build_narrative_corpus(
             raw_dim=raw_dim,

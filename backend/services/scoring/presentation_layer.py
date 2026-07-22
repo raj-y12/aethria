@@ -501,7 +501,10 @@ def serialize_scoring_presentation(
         startup_context: Optional startup metadata (name, sector, product type)
                         for generating startup-specific diligence actions.
     """
-    overall_score = float(raw_scoring.get("overall_score", 5.0))
+    raw_overall_score = raw_scoring.get("overall_score")
+    overall_score = (
+        float(raw_overall_score) if raw_overall_score is not None else None
+    )
     overall_confidence = raw_scoring.get("overall_confidence")
     if overall_confidence is not None:
         overall_confidence = float(overall_confidence)
@@ -514,7 +517,8 @@ def serialize_scoring_presentation(
         if not isinstance(dim_data, dict):
             continue
 
-        dim_score = float(dim_data.get("score", 5.0))
+        raw_dim_score = dim_data.get("score")
+        dim_score = float(raw_dim_score) if raw_dim_score is not None else None
         dim_confidence = dim_data.get("confidence")
         if dim_confidence is not None:
             dim_confidence = float(dim_confidence)
@@ -542,15 +546,34 @@ def serialize_scoring_presentation(
                         concern_part = reasoning.split("Concerns:")[-1].strip()
                         raw_weaknesses.append(concern_part)
 
-        headline_draft = _build_headline(dim_key, dim_score, [], missing_evidence, components_presentation)
-        supports = _build_supports(components_presentation, headline_draft)
-        headline = _build_headline(dim_key, dim_score, supports, missing_evidence, components_presentation)
+        if dim_score is None or dim_data.get("unscored"):
+            supports = []
+            dim_label = CANONICAL_DIMENSIONS.get(dim_key, {}).get(
+                "label", dim_key.title()
+            )
+            headline = f"{dim_label} is not scored: grounded evidence is insufficient."
+        else:
+            headline_draft = _build_headline(
+                dim_key, dim_score, [], missing_evidence, components_presentation
+            )
+            supports = _build_supports(components_presentation, headline_draft)
+            headline = _build_headline(
+                dim_key,
+                dim_score,
+                supports,
+                missing_evidence,
+                components_presentation,
+            )
 
         weakens = _build_weakens(components_presentation, missing_evidence, raw_weaknesses)
         diligence_actions = _build_diligence_actions(
             missing_evidence, weakens, dim_key, components_presentation,
         )
-        score_interpretation = _build_score_interpretation(dim_key, dim_score)
+        score_interpretation = (
+            "Not scored until grounded evidence is available."
+            if dim_score is None
+            else _build_score_interpretation(dim_key, dim_score)
+        )
         analyst_summary = _build_analyst_summary(dim_key, components_presentation, weakens, missing_evidence)
         conf_info = _evidence_confidence(dim_confidence)
 
@@ -559,8 +582,8 @@ def serialize_scoring_presentation(
         dimensions_output.append({
             "id": dim_key,
             "label": dim_label,
-            "score": round(dim_score, 1),
-            "band": _score_band(dim_score),
+            "score": None if dim_score is None else round(dim_score, 1),
+            "band": "Not scored" if dim_score is None else _score_band(dim_score),
             "headline": headline,
             "score_interpretation": score_interpretation,
             "analyst_summary": analyst_summary,
@@ -576,8 +599,10 @@ def serialize_scoring_presentation(
     overall_conf_info = _evidence_confidence(overall_confidence)
 
     presentation = {
-        "overall_score": round(overall_score, 1),
-        "overall_band": _score_band(overall_score),
+        "overall_score": None if overall_score is None else round(overall_score, 1),
+        "overall_band": (
+            "Not scored" if overall_score is None else _score_band(overall_score)
+        ),
         "confidence_label": overall_conf_info["label"],
         "confidence_tooltip": overall_conf_info["tooltip"],
         "dimensions": dimensions_output,

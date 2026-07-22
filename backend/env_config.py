@@ -254,6 +254,8 @@ REGISTRY: List[EnvVar] = [
 
     # --- Scoring / retrieval / misc -----------------------------------------
     EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
+    EnvVar("SCORING_EVIDENCE_CALIBRATION_ENABLED", "bool", "true", "Scoring / misc",
+           "Publish confidence-discounted, evidence-capped legacy display scores."),
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
     EnvVar("DEBUG_SCORING", "bool", "false", "Scoring / misc", "Verbose scoring debug logs."),
     EnvVar("RETRIEVAL_SNIPPET_MAX_CHARS", "int", "2800", "Scoring / misc", "Max chars per retrieval snippet."),

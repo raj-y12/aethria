@@ -26,6 +26,7 @@ from utils.storage import Storage
 from tenant_context import require_user_id
 from utils.settings_loader import get_runtime_limits, is_scouts_enabled
 from utils.prompt_version import hash_prompt
+from pipeline_execution import ScoutCycleResult, StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
@@ -156,17 +157,23 @@ class ScoutEngine:
         pipeline_run_id: Optional[str] = None,
         *,
         persist_discoveries: bool = True,
-    ) -> List[ScoutOutput]:
+    ) -> ScoutCycleResult:
         """
         Run one discovery cycle with all Scouts in parallel.
         
-        Returns:
-            List of valid ScoutOutputs (may be empty if all Scouts fail)
+        Returns one immutable payload containing both valid discoveries and a
+        lossless terminal account of every selected Scout persona.
         """
         self.logger.info(f"Starting discovery cycle at {utcnow().isoformat()}")
         if not is_scouts_enabled(self.tenant_user_id):
             self.logger.info("Discovery cycle skipped (scouts disabled in settings)")
-            return []
+            return ScoutCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="scout",
+                    code="scout_disabled",
+                    detail="The Scout stage is disabled for this tenant.",
+                )
+            )
         try:
             max_discoveries = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", 10))
         except Exception:
@@ -189,7 +196,16 @@ class ScoutEngine:
                 f"Backpressure: {unreviewed} unreviewed exceeds threshold "
                 f"({self.backpressure_threshold}), skipping scout cycle"
             )
-            return []
+            return ScoutCycleResult(
+                outcome=StageExecutionResult.skipped_result(
+                    stage="scout",
+                    code="scout_backpressure",
+                    detail=(
+                        "The Scout stage deferred discovery while the Reviewer "
+                        "backlog is above its configured threshold."
+                    ),
+                )
+            )
 
         waves = 1
         if (
@@ -206,20 +222,29 @@ class ScoutEngine:
             )
 
         discoveries: List[ScoutOutput] = []
+        attempted_count = 0
+        failed_count = 0
+        blocked_count = 0
+        skipped_count = 0
         for wave_idx in range(waves):
             remaining_slots = max_discoveries - len(discoveries)
             if remaining_slots <= 0:
                 break
+            selected_scouts = self._select_scouts_for_wave()
+            selected_scouts = selected_scouts[:remaining_slots]
+            if not selected_scouts:
+                continue
             if self.cost_controller:
                 allowed, reason = self.cost_controller.check_budget("scout", "scout_engine")
                 if not allowed:
+                    blocked_count += len(selected_scouts)
+                    attempted_count += len(selected_scouts)
                     self.logger.warning(
                         "Scout budget denied (wave %s/%s): %s", wave_idx + 1, waves, reason
                     )
                     break
 
-            selected_scouts = self._select_scouts_for_wave()
-            selected_scouts = selected_scouts[:remaining_slots]
+            attempted_count += len(selected_scouts)
 
             if self.deal_memory:
                 memory_context = self.deal_memory.get_memory_context_for_scout()
@@ -233,10 +258,12 @@ class ScoutEngine:
                 scout = selected_scouts[i]
 
                 if isinstance(result, Exception):
+                    failed_count += 1
                     self.logger.error(
                         f"[{scout.scout_type}] Discovery failed with exception: {result}"
                     )
                 elif result is None:
+                    failed_count += 1
                     self.logger.warning(f"[{scout.scout_type}] Discovery returned None")
                 else:
                     if self.deal_memory:
@@ -246,6 +273,7 @@ class ScoutEngine:
                                 f"[{scout.scout_type}] Skipping duplicate thesis: "
                                 f"{result['name']}"
                             )
+                            skipped_count += 1
                             continue
 
                     try:
@@ -254,7 +282,6 @@ class ScoutEngine:
                     except Exception:
                         result = dict(result)
 
-                    discoveries.append(result)
                     result["pipeline_run_id"] = pipeline_run_id
                     self.logger.info(
                         f"[{scout.scout_type}] Discovered: {result['name']} "
@@ -274,6 +301,10 @@ class ScoutEngine:
                             persisted_id = await asyncio.to_thread(
                                 self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
                             )
+                            if not str(persisted_id or "").strip():
+                                raise RuntimeError(
+                                    "discovery persistence returned no startup id"
+                                )
                             result["persisted_startup_id"] = str(
                                 persisted_id or result.get("id") or ""
                             )
@@ -281,6 +312,10 @@ class ScoutEngine:
                             self.logger.error(
                                 f"Failed to persist discovery {result.get('id')}: {e}"
                             )
+                            failed_count += 1
+                            continue
+
+                    discoveries.append(result)
 
                     if self.deal_memory:
                         try:
@@ -298,7 +333,61 @@ class ScoutEngine:
             len(self.scouts),
         )
 
-        return discoveries
+        succeeded_count = len(discoveries)
+        if failed_count or (blocked_count and succeeded_count):
+            outcome = StageExecutionResult.failed_result(
+                stage="scout",
+                code=(
+                    "scout_partial_budget_block"
+                    if blocked_count and not failed_count
+                    else "scout_persona_failures"
+                ),
+                detail=(
+                    f"Scout completed {succeeded_count} of {attempted_count} "
+                    "selected persona attempts; one or more attempts failed or "
+                    "were blocked."
+                ),
+                recovery_action=(
+                    "Inspect Scout, budget, and persistence logs; correct the "
+                    "failure and retry the affected personas."
+                ),
+                attempted=attempted_count,
+                succeeded=succeeded_count,
+                failed=failed_count,
+                blocked=blocked_count,
+                skipped=skipped_count,
+            )
+        elif blocked_count:
+            outcome = StageExecutionResult.blocked_result(
+                stage="scout",
+                code="scout_budget_blocked",
+                detail="Scout budget denied all selected personas in this cycle.",
+                recovery_action=(
+                    "Increase the Scout budget or wait for the budget window to "
+                    "reset, then retry."
+                ),
+                attempted=attempted_count,
+                blocked=blocked_count,
+                skipped=skipped_count,
+            )
+        elif succeeded_count:
+            outcome = StageExecutionResult.completed(
+                stage="scout",
+                code="scout_completed",
+                detail=f"Scout completed {succeeded_count} discovery attempt(s).",
+                attempted=attempted_count,
+                succeeded=succeeded_count,
+                skipped=skipped_count,
+            )
+        else:
+            outcome = StageExecutionResult.skipped_result(
+                stage="scout",
+                code="scout_no_eligible_work",
+                detail="No Scout persona produced a distinct eligible discovery.",
+                attempted=attempted_count,
+                skipped=skipped_count,
+            )
+        return ScoutCycleResult(outcome=outcome, discoveries=discoveries)
 
     async def run_named_lookup(
         self,
@@ -491,21 +580,27 @@ class ScoutEngine:
         
         while self.running:
             try:
-                if not is_scouts_enabled(self.tenant_user_id):
-                    self.logger.info("Scouts disabled in settings, skipping cycle")
-                    if self.running:
-                        await asyncio.sleep(self.interval_seconds)
-                    continue
                 cycle_count += 1
                 self.logger.info(f"=== Discovery Cycle #{cycle_count} ===")
                 from uuid import uuid4
 
-                discoveries = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                cycle_result = await self.run_cycle(pipeline_run_id=str(uuid4()))
+                outcome = cycle_result.outcome
+                self.logger.info(
+                    "Scout cycle state=%s code=%s attempted=%s succeeded=%s failed=%s blocked=%s skipped=%s",
+                    outcome.state.value,
+                    outcome.code,
+                    outcome.attempted,
+                    outcome.succeeded,
+                    outcome.failed,
+                    outcome.blocked,
+                    outcome.skipped,
+                )
                 
                 # Log discoveries in a structured way
-                if discoveries:
+                if cycle_result.discoveries:
                     self.logger.info("Discoveries:")
-                    for disc in discoveries:
+                    for disc in cycle_result.discoveries:
                         self.logger.info(
                             f"  - [{disc['scout_type']}] {disc['name']}: "
                             f"{disc['one_line']}"

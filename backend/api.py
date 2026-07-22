@@ -93,7 +93,6 @@ from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admi
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
 from supabase_client import get_service_client
-from supabase_doc_store import list_get_all, list_get_by_id
 from supabase_storage import SupabaseStartupsStorage
 from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
@@ -120,9 +119,17 @@ from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
 from jobs.handlers import build_handlers
+from jobs.lookup_outcomes import (
+    LookupAttemptOutcome,
+    LookupOutcomeCorrupt,
+    LookupOutcomeStoreUnavailable,
+    latest_lookup_attempt,
+    record_lookup_attempt,
+)
 from jobs.models import (
     AgentJob,
     CompanyLookupPayload,
+    JobCancellationDisposition,
     JobType,
     PipelineCyclePayload,
 )
@@ -133,17 +140,21 @@ from jobs.worker import DurableJobWorker
 from identity.repository import IdentityRepository
 from evidence.repository import EvidenceRepository
 from evaluation_v2.repository import EvaluationRepository
+from evaluation_v2.prerequisites import (
+    EvaluationPrerequisiteError,
+    load_evaluation_prerequisites,
+)
 from decisions.repository import DecisionRepository
 from monitoring.repository import MonitoringRepository
 from fund_intelligence.repository import FundIntelligenceRepository
 from outcomes.repository import ChannelOutcomeRepository
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
-    _record_lookup_failure,
     reprocess_startups_missing_fund_thesis,
     run_one_pipeline_cycle,
     run_on_demand_lookup,
 )
+from pipeline_execution import LookupExecutionStatus, PipelineExecutionResult, PipelineExecutionState
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
@@ -410,6 +421,17 @@ def _consume_lookup_resolution(user_id: str, token: Optional[str]) -> Any:
     return cached[2]
 
 
+def _agent_status_for_execution(result: PipelineExecutionResult) -> str:
+    if result.state in {
+        PipelineExecutionState.BLOCKED,
+        PipelineExecutionState.FAILED_STAGE,
+    }:
+        return "error"
+    if result.state is PipelineExecutionState.SKIPPED:
+        return "stopped"
+    return "running"
+
+
 async def _agent_worker() -> None:
     """Background worker: full scout/reviewer/partner cycles only (not on-demand lookup)."""
     if _agent_queue is None:
@@ -419,12 +441,26 @@ async def _agent_worker() -> None:
             job = await _agent_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             try:
-                await run_one_pipeline_cycle(
+                result = await run_one_pipeline_cycle(
                     user_id,
                     manual_one_shot=bool(job.get("manual_one_shot")),
+                    identity_repository=getattr(
+                        app.state, "identity_repository", None
+                    ),
+                    fund_intelligence_repository=getattr(
+                        app.state, "fund_intelligence_repository", None
+                    ),
+                )
+                if not isinstance(result, PipelineExecutionResult):
+                    raise RuntimeError("Pipeline runner returned an invalid execution result")
+                await _update_agent_run_status(
+                    user_id,
+                    _agent_status_for_execution(result),
+                    execution_result=result,
                 )
             except Exception as e:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
+                await _update_agent_run_status(user_id, "error")
             finally:
                 _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _agent_queue.task_done()
@@ -441,15 +477,51 @@ async def _lookup_worker() -> None:
             job = await _lookup_queue.get()
             user_id = str(job.get("user_id") or "").strip()
             lookup_id = str(job.get("lookup_id") or "").strip() or None
+            legacy_job: Optional[AgentJob] = None
             try:
+                resolution = job.get("resolution")
+                if resolution is not None and hasattr(resolution, "model_dump"):
+                    resolution = resolution.model_dump(mode="json")
+                legacy_job_id = str(job.get("job_id") or uuid4())
+                legacy_job = AgentJob(
+                    job_id=legacy_job_id,
+                    user_id=user_id,
+                    job_type=JobType.COMPANY_LOOKUP,
+                    idempotency_key=_lookup_idempotency_key(
+                        user_id, lookup_id or legacy_job_id
+                    ),
+                    payload=CompanyLookupPayload(
+                        user_id=user_id,
+                        company_name=str(job.get("company_name") or "").strip(),
+                        website=str(job.get("website") or "").strip() or None,
+                        lookup_query=str(job.get("lookup_query") or "").strip() or None,
+                        lookup_input_type=str(job.get("lookup_input_type") or "").strip() or None,
+                        lookup_id=lookup_id,
+                        additional_context=str(job.get("additional_context") or "").strip() or None,
+                        replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
+                        resolution=resolution,
+                    ),
+                    status="running",
+                    attempts=max(1, int(job.get("attempt") or 1)),
+                    pipeline_run_id=str(job.get("pipeline_run_id") or uuid4()),
+                )
+                await _persist_legacy_lookup_attempt(
+                    LookupAttemptOutcome.accepted_for_job(legacy_job)
+                )
                 if _is_lookup_cancelled(user_id, lookup_id):
+                    await _persist_legacy_lookup_attempt(
+                        LookupAttemptOutcome.cancelled_for_job(
+                            legacy_job,
+                            detail="The lookup was cancelled before execution started.",
+                        )
+                    )
                     _logger_agents.info(
                         "On-demand lookup skipped after cancellation for user %s lookup_id=%s",
                         user_id[:12] if user_id else "?",
                         lookup_id,
                     )
                     continue
-                await run_on_demand_lookup(
+                result = await run_on_demand_lookup(
                     user_id,
                     str(job.get("company_name") or ""),
                     website=str(job.get("website") or "").strip() or None,
@@ -460,23 +532,57 @@ async def _lookup_worker() -> None:
                     additional_context=str(job.get("additional_context") or "").strip() or None,
                     replace_startup_id=str(job.get("replace_startup_id") or "").strip() or None,
                     resolution=job.get("resolution"),
+                    pipeline_run_id=legacy_job.pipeline_run_id,
+                    fund_intelligence_repository=getattr(
+                        app.state, "fund_intelligence_repository", None
+                    ),
                 )
+                if not isinstance(result, PipelineExecutionResult):
+                    raise RuntimeError("Lookup runner returned an invalid execution result")
+                await _persist_legacy_lookup_attempt(
+                    LookupAttemptOutcome.from_pipeline_result(legacy_job, result)
+                )
+                if result.state is not PipelineExecutionState.COMPLETED:
+                    _logger_agents.warning(
+                        "On-demand lookup finished state=%s code=%s user=%s lookup_id=%s",
+                        result.state.value,
+                        result.code,
+                        user_id[:12] if user_id else "?",
+                        lookup_id,
+                    )
             except Exception as e:
                 _logger_agents.exception(
                     "On-demand lookup error for user %s: %s",
                     user_id[:12] if user_id else "?",
                     e,
                 )
-                await _record_lookup_failure(
-                    user_id,
-                    lookup_id,
-                    "Lookup worker failed unexpectedly. Please retry the lookup.",
-                )
+                if legacy_job is not None and not isinstance(e, LookupOutcomeStoreUnavailable):
+                    try:
+                        await _persist_legacy_lookup_attempt(
+                            LookupAttemptOutcome.failed_for_job(
+                                legacy_job,
+                                detail="Lookup worker failed unexpectedly.",
+                                recovery_action="Check worker availability and retry the lookup.",
+                            )
+                        )
+                    except LookupOutcomeStoreUnavailable:
+                        _logger_agents.exception(
+                            "Lookup outcome store unavailable for user %s lookup_id=%s",
+                            user_id[:12] if user_id else "?",
+                            lookup_id,
+                        )
             finally:
                 _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _lookup_queue.task_done()
         except asyncio.CancelledError:
             break
+
+
+async def _persist_legacy_lookup_attempt(
+    outcome: LookupAttemptOutcome,
+) -> LookupAttemptOutcome:
+    """Central outcome service adapter for the compatibility queue worker."""
+    return await asyncio.to_thread(record_lookup_attempt, outcome)
 
 
 def _lookup_worker_count() -> int:
@@ -514,12 +620,21 @@ def _is_user_loop_alive(user_id: str) -> bool:
     return task is not None and not task.done()
 
 
-async def _update_agent_run_status(user_id: str, status: str) -> None:
+async def _update_agent_run_status(
+    user_id: str,
+    status: str,
+    *,
+    execution_result: Optional[PipelineExecutionResult] = None,
+) -> None:
     """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
     try:
         s = load_settings(user_id)
         ac = s.setdefault("agent_config", {})
         ac["agents_status"] = status
+        if execution_result is not None:
+            ac["agents_last_execution"] = execution_result.model_dump(
+                mode="json", exclude_none=True
+            )
         if status == "running":
             ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
         save_settings(s, user_id)
@@ -563,14 +678,42 @@ async def _user_agent_loop(user_id: str) -> None:
                 else:
                     # Local-only development seam. Production/Supabase execution
                     # is always committed to the durable repository first.
-                    await run_one_pipeline_cycle(user_id)
+                    result = await run_one_pipeline_cycle(
+                        user_id,
+                        identity_repository=getattr(
+                            app.state, "identity_repository", None
+                        ),
+                        fund_intelligence_repository=getattr(
+                            app.state, "fund_intelligence_repository", None
+                        ),
+                    )
+                    if not isinstance(result, PipelineExecutionResult):
+                        raise RuntimeError(
+                            "Pipeline runner returned an invalid execution result"
+                        )
+                    status = _agent_status_for_execution(result)
+                    if status == "error":
+                        await _update_agent_run_status(
+                            user_id, "error", execution_result=result
+                        )
+                        _logger_agents.warning(
+                            "[AGENT LOOP] Cycle state=%s code=%s user=%s",
+                            result.state.value,
+                            result.code,
+                            user_id[:12],
+                        )
+                    else:
+                        await _update_agent_run_status(
+                            user_id, status, execution_result=result
+                        )
                 _logger_agents.info(
                     "[AGENT LOOP] Cycle dispatched user=%s duration_s=%.2f rss_mb_after=%.1f",
                     user_id[:12],
                     time.perf_counter() - cycle_started_at,
                     _pipeline_rss_mb(),
                 )
-                await _update_agent_run_status(user_id, "running")
+                if _durable_jobs_required():
+                    await _update_agent_run_status(user_id, "running")
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -1811,7 +1954,7 @@ async def event_stream(request: Request):
 @app.get("/api/startups/lookup-status")
 def lookup_job_status(request: Request, lookup_id: str = ""):
     """
-    Poll after POST /api/startups/lookup: if the worker recorded a failure, returns failed=true and message.
+    Return the lossless lookup execution state and actionable terminal metadata.
     """
     uid = request.state.user_id
     raw = (lookup_id or "").strip()
@@ -1820,25 +1963,54 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
             status_code=422,
             detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
         )
-    if not env_config.use_supabase_storage():
-        return {"lookup_id": raw, "failed": False}
-    row = list_get_by_id("lookup_job_outcomes", raw, user_id=uid)
-    if not row:
-        return {"lookup_id": raw, "failed": False, "status": "pending"}
-    if row.get("status") != "failed":
+    try:
+        outcome = latest_lookup_attempt(uid, raw)
+    except LookupOutcomeStoreUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "unavailable",
+                "reason": "lookup_outcome_store_unavailable",
+            },
+        ) from exc
+    except LookupOutcomeCorrupt as exc:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "failed",
+                "reason": "lookup_outcome_contract_invalid",
+            },
+        ) from exc
+    if outcome is None:
         return {
             "lookup_id": raw,
             "failed": False,
-            "status": str(row.get("status") or "pending"),
-            "startup_id": row.get("startup_id"),
-            "message": row.get("message"),
+            "terminal": False,
+            "status": LookupExecutionStatus.PENDING.value,
         }
-    return {
+    payload = {
         "lookup_id": raw,
-        "failed": True,
-        "status": "failed",
-        "message": str(row.get("message") or "Lookup failed."),
+        "job_id": outcome.job_id,
+        "pipeline_run_id": outcome.pipeline_run_id,
+        "attempt": outcome.attempt,
+        "disposition": outcome.disposition.value,
+        "recorded_at": outcome.recorded_at.isoformat(),
+        "failed": outcome.failed,
+        "terminal": outcome.terminal,
+        "status": outcome.status.value,
     }
+    if outcome.startup_id:
+        payload["startup_id"] = outcome.startup_id
+    if outcome.code:
+        payload["code"] = outcome.code
+    if outcome.failed_stage:
+        payload["failed_stage"] = outcome.failed_stage
+    if outcome.detail:
+        payload["detail"] = outcome.detail
+        payload["message"] = outcome.detail
+    if outcome.recovery_action:
+        payload["recovery_action"] = outcome.recovery_action
+    return payload
 
 
 @app.get("/api/startups/{startup_id}")
@@ -2421,9 +2593,58 @@ async def agents_status(request: Request):
         if _durable_jobs_required()
         else _lookup_queue is not None
     )
+    agents_infrastructure_ready = bool(
+        supabase_configured and openai_configured and worker_ready
+    )
+    lookup_infrastructure_ready = bool(
+        supabase_configured and openai_configured and lookup_worker_ready
+    )
+    execution_prerequisites_ready = False
+    published_policy_ready = False
+    active_policy_version_id: Optional[str] = None
+    execution_prerequisite_code: Optional[str] = None
+    execution_prerequisite_detail: Optional[str] = None
+    execution_prerequisite_recovery_action: Optional[str] = None
+    if supabase_configured:
+        try:
+            prerequisites = await load_evaluation_prerequisites(
+                user_id=user_id,
+                fund_intelligence_repository=getattr(
+                    app.state, "fund_intelligence_repository", None
+                ),
+            )
+        except EvaluationPrerequisiteError as exc:
+            execution_prerequisite_code = exc.code
+            execution_prerequisite_detail = exc.detail
+            execution_prerequisite_recovery_action = exc.recovery_action
+        except Exception:
+            execution_prerequisite_code = "prerequisite_unavailable"
+            execution_prerequisite_detail = (
+                "The execution prerequisites could not be loaded."
+            )
+            execution_prerequisite_recovery_action = (
+                "Retry after the thesis and published-policy stores are available."
+            )
+        else:
+            execution_prerequisites_ready = True
+            published_policy_ready = True
+            thesis_ready = True
+            active_thesis_version_id = prerequisites.thesis_version_id
+            active_policy_version_id = prerequisites.policy.policy_version_id
+            thesis_error = None
+    else:
+        execution_prerequisite_code = "infrastructure_unavailable"
+        execution_prerequisite_detail = (
+            "Supabase is required to load the active thesis and published policy."
+        )
+        execution_prerequisite_recovery_action = (
+            "Configure Supabase before dispatching evaluation work."
+        )
     return {
         "worker_ready": worker_ready,
         "lookup_worker_ready": lookup_worker_ready,
+        "agents_infrastructure_ready": agents_infrastructure_ready,
+        "lookup_infrastructure_ready": lookup_infrastructure_ready,
         "agent_queue_size": (
             sum(v for k, v in durable_counts.items() if k.startswith("pipeline_cycle:"))
             if _durable_jobs_required()
@@ -2442,21 +2663,26 @@ async def agents_status(request: Request):
         "openai_configured": openai_configured,
         "user_agents_enabled": user_agents_enabled,
         "agents_will_run": (
-            supabase_configured
-            and openai_configured
-            and worker_ready
+            agents_infrastructure_ready
             and user_agents_enabled
-            and thesis_ready
+            and execution_prerequisites_ready
         ),
         "lookup_will_run": (
-            supabase_configured
-            and openai_configured
-            and lookup_worker_ready
+            lookup_infrastructure_ready
+            and execution_prerequisites_ready
+        ),
+        "execution_prerequisites_ready": execution_prerequisites_ready,
+        "execution_prerequisite_code": execution_prerequisite_code,
+        "execution_prerequisite_detail": execution_prerequisite_detail,
+        "execution_prerequisite_recovery_action": (
+            execution_prerequisite_recovery_action
         ),
         "thesis_ready": thesis_ready,
         "mandate_published": mandate_published,
         "active_thesis_version_id": active_thesis_version_id,
         "thesis_error": thesis_error,
+        "published_policy_ready": published_policy_ready,
+        "active_policy_version_id": active_policy_version_id,
     }
 
 
@@ -3076,6 +3302,7 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
 
     cancelled: List[str] = []
     cancelled_job_ids: List[str] = []
+    conflicts: List[Dict[str, str]] = []
     restored_startup_ids: List[str] = []
     storage = None
     if env_config.use_supabase_storage():
@@ -3085,33 +3312,70 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
             _logger_agents.warning("lookup cancel: storage restore unavailable: %s", e)
     for raw in raw_ids[:16]:
         lookup_id = _coerce_lookup_id(raw)
-        _mark_lookup_cancelled(user_id, lookup_id)
-        cancelled.append(lookup_id)
         if _durable_job_repository is not None:
             job = await _durable_job_repository.get_by_idempotency_key(
                 user_id=user_id,
                 idempotency_key=_lookup_idempotency_key(user_id, lookup_id),
             )
             if job is not None:
-                cancelled_job = await _durable_job_repository.cancel(
-                    user_id=user_id,
-                    job_id=job.job_id,
+                try:
+                    cancellation = await _durable_job_repository.cancel(
+                        user_id=user_id,
+                        job_id=job.job_id,
+                    )
+                except LookupOutcomeStoreUnavailable as exc:
+                    raise HTTPException(
+                        status_code=503,
+                        detail={
+                            "status": "unavailable",
+                            "reason": "lookup_outcome_store_unavailable",
+                        },
+                    ) from exc
+                if not cancellation.cancellation_won:
+                    current_status = (
+                        cancellation.job.status.value
+                        if cancellation.job is not None
+                        else JobCancellationDisposition.NOT_FOUND.value
+                    )
+                    conflicts.append(
+                        {
+                            "lookup_id": lookup_id,
+                            "job_id": job.job_id,
+                            "status": current_status,
+                        }
+                    )
+                    continue
+                cancelled_job_ids.append(job.job_id)
+            else:
+                conflicts.append(
+                    {
+                        "lookup_id": lookup_id,
+                        "job_id": "",
+                        "status": JobCancellationDisposition.NOT_FOUND.value,
+                    }
                 )
-                if cancelled_job is not None:
-                    cancelled_job_ids.append(job.job_id)
+                continue
+        _mark_lookup_cancelled(user_id, lookup_id)
+        cancelled.append(lookup_id)
         if isinstance(storage, SupabaseStartupsStorage):
             restored = await asyncio.to_thread(storage.mark_existing_rerun_cancelled, lookup_id)
             if restored:
                 restored_startup_ids.append(restored)
                 _notify_startups_changed(user_id, "lookup_cancelled")
 
+    response_status = (
+        "cancelled"
+        if not conflicts
+        else ("partially_cancelled" if cancelled else "conflict")
+    )
     return JSONResponse(
-        status_code=202,
+        status_code=202 if cancelled else 409,
         content={
-            "status": "cancelled",
+            "status": response_status,
             "cancelled": cancelled,
             "job_ids": cancelled_job_ids,
             "restored_startup_ids": restored_startup_ids,
+            "conflicts": conflicts,
         },
     )
 
