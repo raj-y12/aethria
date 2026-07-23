@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { ScrollReveal } from './ScrollReveal';
 import { SCROLL_EASE } from '../motionTokens';
+import SectionRule from './SectionRule';
 
 /**
  * Reviewer-disagreement proof block. Three reviewer personas (Default / Skeptical /
@@ -55,12 +56,16 @@ export default function ReviewDisagreement() {
   return (
     <section
       id="disagreement"
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="disagreement-heading"
     >
+      <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
-        <p className="np-head np-label">A7 — The Review</p>
+        <div className="np-head flex items-baseline gap-x-4">
+          <span className="np-folio">A7</span>
+          <span className="np-label">The Review</span>
+        </div>
 
         {/* Split statement — headline and gloss run side by side, not stacked, so this
             doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
@@ -73,8 +78,7 @@ export default function ReviewDisagreement() {
             id="disagreement-heading"
             className="editorial-display font-normal text-[clamp(2.2rem,5.6vw,4.4rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
           >
-            Three reviewers, one record. The disagreement is the{' '}
-            <span className="italic text-[var(--color-accent)]">point</span>.
+            Three reviewers, one record. The disagreement is the point.
           </h2>
           <p className="np-serif text-[16.5px] leading-[1.75] text-[var(--text-secondary)] md:pb-1">
             Every company is scored independently by three reviewer modes. Aethria does not average them into a
@@ -120,10 +124,11 @@ export default function ReviewDisagreement() {
           ))}
         </div>
 
-        {/* Partner resolution */}
-        <ScrollReveal y={12} amount={0.4} className="mt-10">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-            The split resolves to <span className="text-[var(--color-accent)]">Monitor</span>
+        {/* Partner resolution — set as an oversized ruled pull-quote, the section's payoff. */}
+        <ScrollReveal y={16} amount={0.4} className="mt-14">
+          <p className="np-pullquote max-w-[26ch]">
+            Three takes, one call. The split resolves to{' '}
+            <span className="accent-underline">Monitor</span>.
           </p>
         </ScrollReveal>
       </div>

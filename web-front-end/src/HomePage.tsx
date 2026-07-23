@@ -11,6 +11,7 @@ import ReviewDisagreement from './components/ReviewDisagreement';
 import PortfolioSection from './components/PortfolioSection';
 import AccessForm from './components/AccessForm';
 import { ScrollReveal } from './components/ScrollReveal';
+import SectionRule from './components/SectionRule';
 import { SCROLL_EASE } from './motionTokens';
 
 /** Matches the real reviewer scoring dimensions (see backend/models.py SingleReview). */
@@ -65,6 +66,11 @@ function scrollToAnchor(e: MouseEvent<HTMLAnchorElement>, href: string) {
 
 export default function HomePage() {
   const reduce = useReducedMotion();
+  // Edition number — days into the year, so the masthead reads like a real
+  // daily that advances on its own rather than a frozen mockup number.
+  const editionNo = Math.floor(
+    (Date.now() - Date.UTC(new Date().getUTCFullYear(), 0, 0)) / 86_400_000,
+  );
   const sidebarRef = useRef<HTMLDivElement | null>(null);
   const sidebarInView = useInView(sidebarRef, { once: true, amount: 0.5 });
   const [introDone, setIntroDone] = useState(false);
@@ -95,69 +101,82 @@ export default function HomePage() {
           className="home-hero-section relative w-full overflow-hidden"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
-          <div className="page-margin-x pt-7 text-center font-mono text-[9.5px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-          </div>
+          {/* ── The masthead — one commanding dark block. Edition furniture, a
+              dominant nameplate under a double rule, then the section index.
+              The dark-to-paper handoff is the page's first breath of contrast. ── */}
+          <header className="masthead-dark">
+            <div className="page-margin-x folio-strip">
+              <span>Vol. I · No. {editionNo}</span>
+              <span>
+                {new Date().toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
+              </span>
+              <span>London · San Francisco</span>
+            </div>
 
-          <div className="mt-3 text-center">
-            <p className="font-wordmark text-[clamp(2.1rem,5vw,3.1rem)] font-medium leading-none tracking-[-0.01em] text-[var(--color-oxford)]">
-              Aethria<span className="wordmark-dot">.</span>
-            </p>
-          </div>
+            <div className="page-margin-x masthead-plate">
+              <h1 className="masthead-nameplate">
+                Aethria<span className="wordmark-dot--inverse">.</span>
+              </h1>
+            </div>
 
-          {/* Section-nav strip — the paper's real navigation, ruled under the nameplate
-              (the sticky compact bar only overlays once this scrolls away). */}
-          <nav aria-label="Section navigation" className="page-margin-x mt-5">
-            <div className="np-masthead-nav flex flex-wrap items-center justify-center gap-x-8 gap-y-1 py-2.5">
+            <div className="page-margin-x masthead-rules" aria-hidden>
+              <div className="bar" />
+              <div className="hair" />
+            </div>
+
+            <nav aria-label="Section navigation" className="page-margin-x masthead-nav-strip">
               {[
                 { label: 'The market', href: '#market' },
                 { label: 'Method', href: '#method' },
-                { label: 'Product', href: '#product' },
+                { label: 'The record', href: '#product' },
+                { label: 'On-demand lookup', href: '#lookup' },
                 { label: 'Request access', href: '#access' },
               ].map((item) => (
-                <a
-                  key={item.href}
-                  href={item.href}
-                  onClick={(e) => scrollToAnchor(e, item.href)}
-                  className="inline-flex min-h-[36px] items-center font-mono text-[10px] uppercase tracking-[0.16em] text-[var(--color-oxford)] transition-colors duration-200 hover:text-[var(--color-accent)]"
-                >
+                <a key={item.href} href={item.href} onClick={(e) => scrollToAnchor(e, item.href)}>
                   {item.label}
                 </a>
               ))}
-            </div>
-          </nav>
+            </nav>
+          </header>
 
-          <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 py-[clamp(2.25rem,5vh,3.5rem)] lg:grid-cols-[1.85fr_1fr]">
+          <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 pb-[clamp(2.25rem,5vh,3.5rem)] pt-[clamp(2rem,4.5vh,3.25rem)] lg:grid-cols-[1.85fr_1fr]">
             {/* Lede */}
             <div>
-              <p className="np-head np-label">Lede — The Thesis Engine</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A1</span>
+                <span className="np-label">The Lede</span>
+              </div>
 
-              <h1 className="editorial-display mt-3 max-w-[17ch] font-normal text-[clamp(2.5rem,6vw,5.2rem)] leading-[1.0] tracking-[-0.02em] text-[var(--color-oxford)]">
-                Private market judgment, made{' '}
-                <span className="italic text-[var(--color-accent)]">inspectable</span>.
-              </h1>
+              <h2 className="editorial-display mt-3 max-w-[15ch] font-normal text-[clamp(2.7rem,6.4vw,5.6rem)] leading-[0.96] tracking-[-0.025em] text-[var(--color-oxford)]">
+                Private-market judgment, on the record.
+              </h2>
 
-              <p className="mt-6 max-w-[54ch] font-display text-[clamp(1.05rem,1.6vw,1.25rem)] italic leading-[1.55] text-[var(--text-secondary)]">
-                Continuously discovers companies, reviews them against your fund thesis, records disagreement, and
-                produces investment-ready records — every decision traceable to its evidence.
+              <p className="np-serif mt-7 max-w-[52ch] text-[clamp(1.05rem,1.5vw,1.28rem)] leading-[1.6] text-[var(--text-secondary)]">
+                Aethria reads the open web for companies, scores each one against your fund's thesis, keeps the
+                record where its reviewers disagree, and files an investment-ready brief for every name it surfaces.
               </p>
 
-              <div className="np-serif np-cols mt-6 max-w-[640px] text-[15px] leading-[1.68] text-[var(--text-secondary)] sm:columns-2 sm:gap-9">
+              <div className="np-serif np-cols mt-8 max-w-[640px] text-[15px] leading-[1.68] text-[var(--text-secondary)] sm:columns-2 sm:gap-9">
                 <p className="mb-3">
                   <span className="editorial-display float-left mr-1 text-[3rem] font-medium leading-[0.76] text-[var(--color-oxford)]">
                     F
                   </span>
-                  our independent scouts search the live web for real companies — market-driven, technical,
-                  pain-point, and contrarian — never a static list. Each candidate is scored by three reviewer modes
-                  built to disagree.
+                  our scouts work the live web for real companies — market-driven, technical, pain-point,
+                  contrarian. Never a static list. Three reviewer modes, built to disagree, score every candidate
+                  they turn up.
                 </p>
                 <p>
-                  Where a rule-based partner engine finds consensus, it rules automatically. Where reviewers split,
-                  the disagreement is preserved on the record rather than averaged away.
+                  Where the partner engine finds consensus it rules on its own. Where the reviewers split, the
+                  split stays on the record. Nothing gets averaged into a number that hides the argument.
                 </p>
               </div>
 
-              <a href="#market" onClick={(e) => scrollToAnchor(e, '#market')} className={`${CTA_TEXT_LINK_CLASS} mt-7`}>
+              <a href="#market" onClick={(e) => scrollToAnchor(e, '#market')} className={`${CTA_TEXT_LINK_CLASS} mt-8`}>
                 <span>See today's full record</span>
                 <span aria-hidden>→</span>
               </a>
@@ -233,10 +252,11 @@ export default function HomePage() {
         {/* 1 — Mandate: the constraint that drives everything */}
         <section
           id="mandate"
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="mandate-heading"
         >
+          <SectionRule />
           {/* Reversed hierarchy — the panel is the artifact this section is about, so it
               gets the larger column; the statement runs small and plain beside it, not as
               a display headline. Breaks from the kicker→title→paragraph shape used elsewhere. */}
@@ -246,7 +266,10 @@ export default function HomePage() {
             amount={0.18}
           >
             <div className="max-w-md md:sticky md:top-32">
-              <p className="np-head np-label">A2 — Mandate</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A2</span>
+                <span className="np-label">Mandate</span>
+              </div>
               <p
                 id="mandate-heading"
                 className="np-serif mt-6 text-[clamp(1.15rem,2.1vw,1.45rem)] leading-[1.5] text-[var(--color-oxford)]"
@@ -306,19 +329,20 @@ export default function HomePage() {
         {/* A9 — On-demand lookup: drive it yourself */}
         <section
           id="lookup"
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="lookup-heading"
         >
+          <SectionRule />
           {/* The command line and record are the artifact; the explanation runs as a caption. */}
-          <ScrollReveal className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]" y={20} amount={0.16}>
-            <p className="np-head np-label">A9 — On demand</p>
+          <ScrollReveal className="page-margin-x py-[clamp(2.5rem,5.5vh,4rem)]" y={20} amount={0.16}>
+            <div className="np-head flex items-baseline gap-x-4">
+              <span className="np-folio">A9</span>
+              <span className="np-label">On Demand</span>
+            </div>
 
-            <h2
-              id="lookup-heading"
-              className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
-            >
-              Look up any company, get the <span className="italic text-[var(--color-accent)]">record</span>.
+            <h2 id="lookup-heading" className="np-hed mt-5 max-w-[18ch] text-[var(--color-oxford)]">
+              Look up any company, get the record.
             </h2>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
@@ -342,15 +366,19 @@ export default function HomePage() {
 
         {/* Closing — the last word, set large with air */}
         <section
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
+          <SectionRule heavy />
           <div className="page-margin-x py-[clamp(3rem,6vh,4.5rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <p className="np-head np-label">A10 — Access</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A10</span>
+                <span className="np-label">Access</span>
+              </div>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
-                <span className="italic text-[var(--color-accent)]">memory</span>.
+                <span className="accent-underline">memory</span>.
               </h2>
               <p className="np-serif mt-10 max-w-[46ch] text-[16.5px] leading-[1.75] text-[var(--text-secondary)]">
                 Aethria turns sourcing, review, and partner decisions into one investment record — with the evidence
