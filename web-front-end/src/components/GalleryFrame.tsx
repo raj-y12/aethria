@@ -10,10 +10,11 @@ import { bureauTimes, editionNo } from '../lib/clocks';
  */
 export default function GalleryFrame() {
   const reduce = useReducedMotion();
-  const [times, setTimes] = useState(bureauTimes());
+  const [times, setTimes] = useState<{ label: string; time: string }[] | null>(null);
   const [edition] = useState(editionNo());
 
   useEffect(() => {
+    setTimes(bureauTimes());
     if (reduce) return;
     const id = window.setInterval(() => setTimes(bureauTimes()), 1000);
     return () => window.clearInterval(id);
@@ -35,11 +36,13 @@ export default function GalleryFrame() {
       </div>
 
       <div className="frame bl">
-        {times.map(({ label, time }) => (
-          <div key={label}>
-            {time} &nbsp; {label}
-          </div>
-        ))}
+        {(times ?? [{ label: 'London', time: '— : —' }, { label: 'San Francisco', time: '— : —' }]).map(
+          ({ label, time }) => (
+            <div key={label}>
+              {time} &nbsp; {label}
+            </div>
+          )
+        )}
       </div>
 
       <div className="frame br">Specimen Edition &middot; No. {edition}</div>
