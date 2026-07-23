@@ -12,10 +12,11 @@ export default function QueryPlate() {
   const reduce = useReducedMotion();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const started = useRef(false);
+  const timeoutRef = useRef<number | null>(null);
 
   // Initial state is the settled, fully-rendered look (query typed, memo visible, no caret) —
   // matches SSR output and the reduced-motion experience. Only the effect below (client-only,
-  // motion allowed) resets to empty and types it back out once the plate scrolls into view.
+  // motion allowed) resets to empty on mount and types it back out once the plate scrolls into view.
   const [typed, setTyped] = useState(DEMO_LOOKUP_QUERY);
   const [memoIn, setMemoIn] = useState(true);
   const [caretOn, setCaretOn] = useState(false);
@@ -23,30 +24,41 @@ export default function QueryPlate() {
   useEffect(() => {
     if (reduce) return;
 
+    // Reset to empty immediately on mount (plate is off-screen — 06 of 08), not when the
+    // observer fires, so the visible transition is "scrolls in already empty → types", never
+    // a flash of the settled memo blinking out.
+    setTyped('');
+    setMemoIn(false);
+    setCaretOn(true);
+
     const runSequence = () => {
       if (started.current) return;
       started.current = true;
-      setTyped('');
-      setMemoIn(false);
-      setCaretOn(true);
 
       let i = 0;
       const typeChar = () => {
         i += 1;
         setTyped(DEMO_LOOKUP_QUERY.slice(0, i));
         if (i < DEMO_LOOKUP_QUERY.length) {
-          window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
+          timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
         } else {
-          window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);
+          timeoutRef.current = window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);
         }
       };
-      window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
+      timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
+    };
+
+    const clearPendingTimeout = () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
 
     const root = rootRef.current;
     if (!root || typeof IntersectionObserver === 'undefined') {
       runSequence();
-      return;
+      return clearPendingTimeout;
     }
     const obs = new IntersectionObserver(
       (entries) => {
@@ -57,7 +69,10 @@ export default function QueryPlate() {
       { threshold: 0.3 },
     );
     obs.observe(root);
-    return () => obs.disconnect();
+    return () => {
+      obs.disconnect();
+      clearPendingTimeout();
+    };
   }, [reduce]);
 
   return (
