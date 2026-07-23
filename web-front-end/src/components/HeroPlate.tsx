@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react';
-import { useReducedMotion } from 'framer-motion';
 import DottedMarketMap from './DottedMarketMap';
 
 /**
@@ -11,19 +9,12 @@ import DottedMarketMap from './DottedMarketMap';
  * The <h1> here is the single page-level heading.
  *
  * Ink-settle load-in: resting state (no .hero-in) is fully visible — required for
- * prerendered/no-JS output. `.hero-in`, added on mount, layers in the entrance animation.
+ * prerendered/no-JS output. `.hero-in`, layered in via the `enter` prop, adds the
+ * entrance animation; CSS (not JS) is what skips it under reduced motion.
  */
-export default function HeroPlate() {
-  const reduce = useReducedMotion();
-  const [entered, setEntered] = useState(false);
-
-  useEffect(() => {
-    // Reduced motion still flips this — CSS (not JS) is what skips the animation.
-    setEntered(true);
-  }, [reduce]);
-
+export default function HeroPlate({ enter = true }: { enter?: boolean }) {
   return (
-    <section className={entered ? 'hero hero-in' : 'hero'}>
+    <section className={enter ? 'hero hero-in' : 'hero'}>
       <div className="hero-echo">
         <DottedMarketMap echo className="h-full w-full" />
       </div>

@@ -8,21 +8,19 @@ import { bureauTimes, editionNo } from '../lib/clocks';
  * Visual source of truth: _design-explore/J-gallery-instruments.html (.frame.tl/.tr/.bl/.br, .wordmark, .grain).
  * Classes are already defined in index.css (Task 1) — this just supplies markup + live clock/edition state.
  */
-export default function GalleryFrame() {
+export default function GalleryFrame({ enter = true }: { enter?: boolean }) {
   const reduce = useReducedMotion();
   const [times, setTimes] = useState<{ label: string; time: string }[] | null>(null);
   const [edition] = useState(editionNo());
-  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
     setTimes(bureauTimes());
-    setEntered(true);
     if (reduce) return;
     const id = window.setInterval(() => setTimes(bureauTimes()), 1000);
     return () => window.clearInterval(id);
   }, [reduce]);
 
-  const frameCx = (side: string) => (entered ? `frame ${side} frame-in` : `frame ${side}`);
+  const frameCx = (side: string) => (enter ? `frame ${side} frame-in` : `frame ${side}`);
 
   return (
     <>
