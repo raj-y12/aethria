@@ -620,6 +620,32 @@
   color: var(--accent);
 }
 
+/* Plate 08 — access, colophon furniture at the foot of the gallery */
+.colophon {
+  border-top: 1px solid var(--line);
+  padding: clamp(3rem, 8vh, 6rem) var(--mx) 7rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.colophon .wm {
+  font-family: var(--font-display);
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-transform: none;
+}
+.colophon p {
+  margin-top: 0.9rem;
+  line-height: 1.9;
+}
+
 .page-margin-x {
   /* Explicit width (not just max-width) — .page-margin-x is often a direct child of a
      display:flex; flex-direction:column ancestor (page shells), where auto margins on
