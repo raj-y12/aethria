@@ -1,5 +1,5 @@
 /*
- * Aethria Website — deep blue and paper. Editorial display (Playfair Display) + Figtree + Space Mono.
+ * Aethria Website — deep blue and paper. Editorial display (Playfair Display) + Instrument Sans + Space Mono.
  */
 
 @tailwind base;
@@ -37,12 +37,12 @@
   --color-brass-line: rgba(168, 138, 94, 0.55);
 
   /* Roles: wordmark = logo only · display = editorial headings (h1–h6 base) · sans = body & UI · mono = labels, caps, data */
-  --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, monospace;
   --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Playfair Display', 'Georgia', serif;
-  /* Newsprint body — a text serif for running copy (Playfair stays display-only). */
-  --font-serif-text: 'Source Serif 4', 'Georgia', 'Times New Roman', serif;
+  /* Newsprint body — a text serif for running copy (Playfair stays display-only, running copy is minimal). */
+  --font-serif-text: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 
   --page-margin-x: 84px;
   --page-margin-x-mobile: 24px;
