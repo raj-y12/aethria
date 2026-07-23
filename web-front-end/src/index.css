@@ -212,6 +212,10 @@
 }
 
 /* ── GALLERY SPINE ── */
+.gallery {
+  position: relative;
+  padding: clamp(3rem, 10vh, 9rem) 0;
+}
 .plate {
   position: relative;
   min-height: 92vh;
