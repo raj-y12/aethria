@@ -1,10 +1,8 @@
-import { lazy, Suspense, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { useReducedMotion } from 'framer-motion';
-import type { MapHit } from '../DottedMarketMap';
+import DottedMarketMap, { type MapHit } from '../DottedMarketMap';
 import Plate from '../Plate';
-
-const DottedMarketMap = lazy(() => import('../DottedMarketMap'));
 
 /** In-thesis companies plotted on the field (lon, lat). Copied verbatim from MarketSection. */
 const HITS: MapHit[] = [
@@ -65,9 +63,7 @@ export default function MarketPlate() {
     >
       <div ref={rootRef}>
         <div className="market-stage reveal d2">
-          <Suspense fallback={<div className="h-full w-full" aria-hidden />}>
-            <DottedMarketMap hits={HITS} className="h-full w-full" />
-          </Suspense>
+          <DottedMarketMap hits={HITS} className="h-full w-full" />
         </div>
 
         <p className="caption reveal d3">
