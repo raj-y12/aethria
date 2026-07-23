@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import GalleryFrame from './components/GalleryFrame';
 import HeroPlate from './components/HeroPlate';
-import Plate from './components/Plate';
+import MarketPlate from './components/plates/MarketPlate';
+import RecordPlate from './components/plates/RecordPlate';
 
 export default function HomePage() {
   // The application form lives further down the gallery spine (Task 11); honour
@@ -23,17 +24,9 @@ export default function HomePage() {
       <HeroPlate />
 
       <div className="gallery">
-        {/* Placeholder — Phase 2 (Tasks 8–11) replaces this with the real plate spine
-            (Market, Record, Review, Lookup, Access, Colophon). */}
-        <Plate
-          id="market"
-          index="01 — 08"
-          title="The Market"
-          capLeft="The Market — Plate 01"
-          capRight="Placeholder — plates land in Phase 2"
-        >
-          <div style={{ minHeight: '200px' }} />
-        </Plate>
+        <MarketPlate />
+        <RecordPlate />
+        {/* Remaining plates (Review, Newsroom, Corrections, Query, Holdings, Access) land in Tasks 9–11. */}
       </div>
     </div>
   );
