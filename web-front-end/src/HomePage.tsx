@@ -11,6 +11,7 @@ import ReviewDisagreement from './components/ReviewDisagreement';
 import PortfolioSection from './components/PortfolioSection';
 import AccessForm from './components/AccessForm';
 import { ScrollReveal } from './components/ScrollReveal';
+import SectionRule from './components/SectionRule';
 import { SCROLL_EASE } from './motionTokens';
 
 /** Matches the real reviewer scoring dimensions (see backend/models.py SingleReview). */
@@ -248,10 +249,11 @@ export default function HomePage() {
         {/* 1 — Mandate: the constraint that drives everything */}
         <section
           id="mandate"
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="mandate-heading"
         >
+          <SectionRule />
           {/* Reversed hierarchy — the panel is the artifact this section is about, so it
               gets the larger column; the statement runs small and plain beside it, not as
               a display headline. Breaks from the kicker→title→paragraph shape used elsewhere. */}
@@ -321,10 +323,11 @@ export default function HomePage() {
         {/* A9 — On-demand lookup: drive it yourself */}
         <section
           id="lookup"
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
           aria-labelledby="lookup-heading"
         >
+          <SectionRule />
           {/* The command line and record are the artifact; the explanation runs as a caption. */}
           <ScrollReveal className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]" y={20} amount={0.16}>
             <p className="np-head np-label">A9 — On demand</p>
@@ -333,7 +336,7 @@ export default function HomePage() {
               id="lookup-heading"
               className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
             >
-              Look up any company, get the <span className="italic text-[var(--color-accent)]">record</span>.
+              Look up any company, get the record.
             </h2>
 
             <div className="mx-auto mt-8 w-full max-w-[760px]" aria-hidden>
@@ -357,15 +360,16 @@ export default function HomePage() {
 
         {/* Closing — the last word, set large with air */}
         <section
-          className="w-full border-t border-solid border-[var(--section-divider)]"
+          className="w-full"
           style={{ backgroundColor: 'var(--color-paper)' }}
         >
+          <SectionRule heavy />
           <div className="page-margin-x py-[clamp(3rem,6vh,4.5rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
               <p className="np-head np-label">A10 — Access</p>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
-                <span className="italic text-[var(--color-accent)]">memory</span>.
+                <span className="accent-underline">memory</span>.
               </h2>
               <p className="np-serif mt-10 max-w-[46ch] text-[16.5px] leading-[1.75] text-[var(--text-secondary)]">
                 Aethria turns sourcing, review, and partner decisions into one investment record — with the evidence

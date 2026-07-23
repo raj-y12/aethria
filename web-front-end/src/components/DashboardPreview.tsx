@@ -1,6 +1,7 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { DEMO_LOOKUP_MEMO_SAMPLE, LookupResultSnapshot } from '@aethria/product-chrome';
 import { SCROLL_EASE } from '../motionTokens';
+import SectionRule from './SectionRule';
 
 const FEATURES = [
   {
@@ -46,10 +47,11 @@ export default function DashboardPreview() {
   return (
     <section
       id="product"
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="record-heading"
     >
+      <SectionRule />
       <motion.div
         className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]"
         variants={rowVariants}
@@ -63,7 +65,7 @@ export default function DashboardPreview() {
           id="record-heading"
           className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
         >
-          The system shows its <span className="italic text-[var(--color-accent)]">work</span>.
+          The system shows its work.
         </h2>
 
         <div className="mt-8 grid gap-10 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-16">

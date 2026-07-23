@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { SCROLL_EASE } from '../motionTokens';
+import SectionRule from './SectionRule';
 
 /**
  * The portfolio layer — what happens after INVEST, set as a newspaper briefs column.
@@ -35,10 +36,11 @@ export default function PortfolioSection() {
   return (
     <section
       id="portfolio"
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="portfolio-heading"
     >
+      <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
         <p className="np-head np-label">A8 — The Portfolio</p>
 
@@ -52,7 +54,7 @@ export default function PortfolioSection() {
             id="portfolio-heading"
             className="editorial-display mt-6 max-w-[22ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
           >
-            The record doesn't end at <span className="italic text-[var(--color-accent)]">invest</span>.
+            The record doesn't end at invest.
           </h2>
         </motion.div>
 

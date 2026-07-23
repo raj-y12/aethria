@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { SCROLL_EASE } from '../motionTokens';
+import SectionRule from './SectionRule';
 
 const ACCENT = '#3d6b5e';
 const INK = 'rgba(0,20,51,0.25)';
@@ -118,10 +119,11 @@ export default function MethodSection() {
   return (
     <section
       id="method"
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="method-heading"
     >
+      <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
         <p className="np-head np-label">A4 — Method</p>
 
@@ -129,7 +131,7 @@ export default function MethodSection() {
           id="method-heading"
           className="editorial-display mt-6 max-w-[22ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
         >
-          How the judgment is <span className="italic text-[var(--color-accent)]">formed</span>.
+          How the judgment is formed.
         </h2>
 
         <div className="mt-8 grid grid-cols-1 md:grid-cols-4">

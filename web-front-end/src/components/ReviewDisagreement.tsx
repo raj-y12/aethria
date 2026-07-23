@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { ScrollReveal } from './ScrollReveal';
 import { SCROLL_EASE } from '../motionTokens';
+import SectionRule from './SectionRule';
 
 /**
  * Reviewer-disagreement proof block. Three reviewer personas (Default / Skeptical /
@@ -55,10 +56,11 @@ export default function ReviewDisagreement() {
   return (
     <section
       id="disagreement"
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="disagreement-heading"
     >
+      <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
         <p className="np-head np-label">A7 — The Review</p>
 
@@ -73,8 +75,7 @@ export default function ReviewDisagreement() {
             id="disagreement-heading"
             className="editorial-display font-normal text-[clamp(2.2rem,5.6vw,4.4rem)] leading-[0.98] tracking-[-0.02em] text-[var(--color-oxford)]"
           >
-            Three reviewers, one record. The disagreement is the{' '}
-            <span className="italic text-[var(--color-accent)]">point</span>.
+            Three reviewers, one record. The disagreement is the point.
           </h2>
           <p className="np-serif text-[16.5px] leading-[1.75] text-[var(--text-secondary)] md:pb-1">
             Every company is scored independently by three reviewer modes. Aethria does not average them into a

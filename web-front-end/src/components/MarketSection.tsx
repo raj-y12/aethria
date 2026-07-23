@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { MapHit } from './DottedMarketMap';
+import SectionRule from './SectionRule';
 
 const DottedMarketMap = lazy(() => import('./DottedMarketMap'));
 
@@ -76,10 +77,11 @@ export default function MarketSection() {
     <section
       id="market"
       ref={rootRef}
-      className="w-full border-t border-solid border-[var(--section-divider)]"
+      className="w-full"
       style={{ backgroundColor: 'var(--color-paper)' }}
       aria-labelledby="market-heading"
     >
+      <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
         {/* Raw field header — a terminal readout, not a title block. Typography stays
             small so the map (the actual graphic) carries the section, not a headline. */}
@@ -98,7 +100,7 @@ export default function MarketSection() {
           id="market-heading"
           className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
         >
-          It watches the whole market. You only see what <span className="italic text-[var(--color-accent)]">fits</span>.
+          It watches the whole market. You only see what fits.
         </h2>
 
         <p className="mt-8 h-[1em] font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--label-muted)]">
