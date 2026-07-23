@@ -5,7 +5,7 @@ import DottedMarketMap from './DottedMarketMap';
  * .hero-kicker/.hero-statement) live in index.css; the faint dot-map "echo" behind the
  * veil is the real DottedMarketMap in echo mode, not the mockup's standalone canvas.
  * Visual source of truth: _design-explore/J-gallery-instruments.html (.hero) — minus
- * the mockup's .scrollcue, which the redesign explicitly drops.
+ * the mockup's bouncing down-arrow hint, which the redesign explicitly drops.
  * The <h1> here is the single page-level heading.
  */
 export default function HeroPlate() {
