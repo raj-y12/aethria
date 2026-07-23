@@ -7,6 +7,9 @@ const CHAR_MIN_MS = 60;
 const CHAR_MAX_MS = 90;
 const MEMO_DELAY_MS = 500;
 
+// Command phrasing, like the mockup ("look up  anthropic") — double space after "up" is intentional.
+const TYPED_QUERY = `look up  ${DEMO_LOOKUP_QUERY.toLowerCase()}`;
+
 /** Plate 06 — place a query: the real on-demand lookup, reused from product-chrome. */
 export default function QueryPlate() {
   const reduce = useReducedMotion();
@@ -17,7 +20,7 @@ export default function QueryPlate() {
   // Initial state is the settled, fully-rendered look (query typed, memo visible, no caret) —
   // matches SSR output and the reduced-motion experience. Only the effect below (client-only,
   // motion allowed) resets to empty on mount and types it back out once the plate scrolls into view.
-  const [typed, setTyped] = useState(DEMO_LOOKUP_QUERY);
+  const [typed, setTyped] = useState(TYPED_QUERY);
   const [memoIn, setMemoIn] = useState(true);
   const [caretOn, setCaretOn] = useState(false);
 
@@ -38,8 +41,8 @@ export default function QueryPlate() {
       let i = 0;
       const typeChar = () => {
         i += 1;
-        setTyped(DEMO_LOOKUP_QUERY.slice(0, i));
-        if (i < DEMO_LOOKUP_QUERY.length) {
+        setTyped(TYPED_QUERY.slice(0, i));
+        if (i < TYPED_QUERY.length) {
           timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
         } else {
           timeoutRef.current = window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);

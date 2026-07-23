@@ -12,30 +12,34 @@ export default function GalleryFrame() {
   const reduce = useReducedMotion();
   const [times, setTimes] = useState<{ label: string; time: string }[] | null>(null);
   const [edition] = useState(editionNo());
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
     setTimes(bureauTimes());
+    setEntered(true);
     if (reduce) return;
     const id = window.setInterval(() => setTimes(bureauTimes()), 1000);
     return () => window.clearInterval(id);
   }, [reduce]);
 
+  const frameCx = (side: string) => (entered ? `frame ${side} frame-in` : `frame ${side}`);
+
   return (
     <>
       <div className="grain" />
 
-      <div className="frame tl">
+      <div className={frameCx('tl')}>
         <Link to="/home" className="wordmark">
           Aethria<span className="dot">.</span>
         </Link>
       </div>
 
-      <div className="frame tr">
+      <div className={frameCx('tr')}>
         <a href="#market">Index</a>
         <a href="#access">Access</a>
       </div>
 
-      <div className="frame bl">
+      <div className={frameCx('bl')}>
         {(times ?? [{ label: 'London', time: '— : —' }, { label: 'San Francisco', time: '— : —' }]).map(
           ({ label, time }) => (
             <div key={label}>
@@ -45,7 +49,7 @@ export default function GalleryFrame() {
         )}
       </div>
 
-      <div className="frame br">Specimen Edition &middot; No. {edition}</div>
+      <div className={frameCx('br')}>Specimen Edition &middot; No. {edition}</div>
     </>
   );
 }

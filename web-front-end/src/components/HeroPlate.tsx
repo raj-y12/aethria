@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import DottedMarketMap from './DottedMarketMap';
 
 /**
@@ -7,10 +9,21 @@ import DottedMarketMap from './DottedMarketMap';
  * Visual source of truth: _design-explore/J-gallery-instruments.html (.hero) — minus
  * the mockup's bouncing down-arrow hint, which the redesign explicitly drops.
  * The <h1> here is the single page-level heading.
+ *
+ * Ink-settle load-in: resting state (no .hero-in) is fully visible — required for
+ * prerendered/no-JS output. `.hero-in`, added on mount, layers in the entrance animation.
  */
 export default function HeroPlate() {
+  const reduce = useReducedMotion();
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    // Reduced motion still flips this — CSS (not JS) is what skips the animation.
+    setEntered(true);
+  }, [reduce]);
+
   return (
-    <section className="hero">
+    <section className={entered ? 'hero hero-in' : 'hero'}>
       <div className="hero-echo">
         <DottedMarketMap echo className="h-full w-full" />
       </div>

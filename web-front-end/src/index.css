@@ -166,6 +166,14 @@
     display: none;
   }
 }
+.frame-in {
+  animation: hero-fade 0.9s ease 0.5s backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .frame-in {
+    animation: none;
+  }
+}
 
 /* ── HERO (Izanami calm) ── */
 .hero {
@@ -209,6 +217,44 @@
   color: var(--ink);
   max-width: 16ch;
   margin: 0 auto;
+}
+
+/* Ink-settle load-in. Resting state (no .hero-in) stays fully visible for prerender/no-JS. */
+.hero-in .hero-kicker {
+  animation: hero-settle 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.15s backwards;
+}
+.hero-in .hero-statement {
+  animation: hero-settle 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+}
+.hero-in .hero-echo,
+.hero-in .hero-veil {
+  animation: hero-fade 1.4s ease 0s backwards;
+}
+@keyframes hero-settle {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-in .hero-kicker,
+  .hero-in .hero-statement,
+  .hero-in .hero-echo,
+  .hero-in .hero-veil {
+    animation: none;
+  }
 }
 
 /* ── GALLERY SPINE ── */
