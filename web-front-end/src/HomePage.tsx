@@ -147,7 +147,10 @@ export default function HomePage() {
           <div className="page-margin-x grid grid-cols-1 gap-x-14 gap-y-14 pb-[clamp(2.25rem,5vh,3.5rem)] pt-[clamp(2rem,4.5vh,3.25rem)] lg:grid-cols-[1.85fr_1fr]">
             {/* Lede */}
             <div>
-              <p className="np-head np-label">A1 · The Lede</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A1</span>
+                <span className="np-label">The Lede</span>
+              </div>
 
               <h2 className="editorial-display mt-3 max-w-[15ch] font-normal text-[clamp(2.7rem,6.4vw,5.6rem)] leading-[0.96] tracking-[-0.025em] text-[var(--color-oxford)]">
                 Private-market judgment, on the record.
@@ -263,7 +266,10 @@ export default function HomePage() {
             amount={0.18}
           >
             <div className="max-w-md md:sticky md:top-32">
-              <p className="np-head np-label">A2 — Mandate</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A2</span>
+                <span className="np-label">Mandate</span>
+              </div>
               <p
                 id="mandate-heading"
                 className="np-serif mt-6 text-[clamp(1.15rem,2.1vw,1.45rem)] leading-[1.5] text-[var(--color-oxford)]"
@@ -329,13 +335,13 @@ export default function HomePage() {
         >
           <SectionRule />
           {/* The command line and record are the artifact; the explanation runs as a caption. */}
-          <ScrollReveal className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]" y={20} amount={0.16}>
-            <p className="np-head np-label">A9 — On demand</p>
+          <ScrollReveal className="page-margin-x py-[clamp(2.5rem,5.5vh,4rem)]" y={20} amount={0.16}>
+            <div className="np-head flex items-baseline gap-x-4">
+              <span className="np-folio">A9</span>
+              <span className="np-label">On Demand</span>
+            </div>
 
-            <h2
-              id="lookup-heading"
-              className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
-            >
+            <h2 id="lookup-heading" className="np-hed mt-5 max-w-[18ch] text-[var(--color-oxford)]">
               Look up any company, get the record.
             </h2>
 
@@ -366,7 +372,10 @@ export default function HomePage() {
           <SectionRule heavy />
           <div className="page-margin-x py-[clamp(3rem,6vh,4.5rem)]">
             <ScrollReveal y={22} amount={0.25} className="max-w-[1100px]">
-              <p className="np-head np-label">A10 — Access</p>
+              <div className="np-head flex items-baseline gap-x-4">
+                <span className="np-folio">A10</span>
+                <span className="np-label">Access</span>
+              </div>
               <h2 className="editorial-display mt-3 max-w-[16ch] font-normal text-[clamp(2.85rem,8vw,7rem)] leading-[0.95] tracking-[-0.025em] text-[var(--color-oxford)]">
                 For funds that need judgment with{' '}
                 <span className="accent-underline">memory</span>.

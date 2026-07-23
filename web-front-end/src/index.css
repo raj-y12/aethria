@@ -498,6 +498,58 @@ hr.doc-section-separator::before {
   color: var(--color-oxford);
 }
 
+/* Oversized editorial section folio — a magazine section marker, not a tiny slug.
+   Pairs with a small mono label on the baseline. */
+.np-folio {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 3vw, 2.9rem);
+  line-height: 0.85;
+  letter-spacing: -0.02em;
+  color: rgba(0, 20, 51, 0.26);
+}
+.np-folio--inverse {
+  color: rgba(244, 241, 234, 0.42);
+}
+
+/* Big display figure for numbered ledger items (steps, briefs, features).
+   Replaces the tiny mono "01" — scale contrast is what reads as editorial. */
+.np-figure {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(2.6rem, 3.8vw, 3.6rem);
+  line-height: 0.82;
+  letter-spacing: -0.03em;
+  color: rgba(0, 20, 51, 0.19);
+  font-feature-settings: 'onum' 1;
+}
+.np-figure--inverse {
+  color: rgba(244, 241, 234, 0.34);
+}
+
+/* Section hed — the body's display headline, set larger and tighter than before
+   so each section opens with real weight instead of a mid-size serif line. */
+.np-hed {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(2.6rem, 5.6vw, 4.7rem);
+  line-height: 0.94;
+  letter-spacing: -0.03em;
+}
+
+/* Broadsheet pull-quote — an oversized ruled statement that breaks the column grid. */
+.np-pullquote {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.9rem, 4.2vw, 3.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--color-oxford);
+  border-top: 2px solid var(--color-oxford);
+  padding-top: clamp(1.25rem, 2.5vw, 2rem);
+}
+
 /* Newspaper column setting — justified with a hairline column rule */
 .np-cols {
   column-rule: 1px solid var(--section-divider);

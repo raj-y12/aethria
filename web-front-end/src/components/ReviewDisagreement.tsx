@@ -62,7 +62,10 @@ export default function ReviewDisagreement() {
     >
       <SectionRule />
       <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
-        <p className="np-head np-label">A7 — The Review</p>
+        <div className="np-head flex items-baseline gap-x-4">
+          <span className="np-folio">A7</span>
+          <span className="np-label">The Review</span>
+        </div>
 
         {/* Split statement — headline and gloss run side by side, not stacked, so this
             doesn't repeat the kicker→title→paragraph cadence used elsewhere on the page. */}
@@ -121,10 +124,11 @@ export default function ReviewDisagreement() {
           ))}
         </div>
 
-        {/* Partner resolution */}
-        <ScrollReveal y={12} amount={0.4} className="mt-10">
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[var(--text-subtle)]">
-            The split resolves to <span className="text-[var(--color-accent)]">Monitor</span>
+        {/* Partner resolution — set as an oversized ruled pull-quote, the section's payoff. */}
+        <ScrollReveal y={16} amount={0.4} className="mt-14">
+          <p className="np-pullquote max-w-[26ch]">
+            Three takes, one call. The split resolves to{' '}
+            <span className="accent-underline">Monitor</span>.
           </p>
         </ScrollReveal>
       </div>

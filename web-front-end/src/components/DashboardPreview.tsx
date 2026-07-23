@@ -59,26 +59,26 @@ export default function DashboardPreview() {
         whileInView="visible"
         viewport={{ once: true, amount: 0.12, margin: '0px 0px -10% 0px' }}
       >
-        <p className="np-head np-label">A6 — The record</p>
+        <div className="np-head flex items-baseline gap-x-4">
+          <span className="np-folio">A6</span>
+          <span className="np-label">The Record</span>
+        </div>
 
-        <h2
-          id="record-heading"
-          className="editorial-display mt-6 max-w-[24ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
-        >
+        <h2 id="record-heading" className="np-hed mt-5 max-w-[18ch] text-[var(--color-oxford)]">
           The system shows its work.
         </h2>
 
-        <div className="mt-8 grid gap-10 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-16">
+        <div className="mt-12 grid gap-10 md:grid-cols-[0.72fr_1.28fr] md:items-start md:gap-16">
           <div className="flex flex-col">
             {FEATURES.map((item) => (
               <motion.div
                 key={item.label}
                 variants={itemVariants}
-                className="grid grid-cols-[2.4rem_1fr] gap-3 border-t border-solid border-[var(--section-divider)] py-7 first:border-t-0 first:pt-0"
+                className="grid grid-cols-[3.4rem_1fr] items-start gap-4 border-t border-solid border-[var(--section-divider)] py-7 first:border-t-0 first:pt-0"
               >
-                <p className="font-mono text-[11px] text-[var(--color-accent)]">{item.n}</p>
+                <p className="np-figure">{item.n}</p>
                 <div>
-                  <h3 className="editorial-display text-[1.15rem] font-normal leading-[1.15] tracking-[-0.01em] text-[var(--color-oxford)]">
+                  <h3 className="editorial-display text-[1.3rem] font-normal leading-[1.15] tracking-[-0.015em] text-[var(--color-oxford)]">
                     {item.label}
                   </h3>
                   <p className="np-serif mt-2 max-w-[38ch] text-[14.5px] leading-[1.65] text-[var(--text-secondary)]">

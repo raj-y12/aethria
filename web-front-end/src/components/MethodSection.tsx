@@ -124,29 +124,29 @@ export default function MethodSection() {
       aria-labelledby="method-heading"
     >
       <SectionRule />
-      <div className="page-margin-x py-[clamp(2rem,4.5vh,3rem)]">
-        <p className="np-head np-label">A4 — Method</p>
+      <div className="page-margin-x py-[clamp(2.5rem,5.5vh,4rem)]">
+        <div className="np-head flex items-baseline gap-x-4">
+          <span className="np-folio">A4</span>
+          <span className="np-label">Method</span>
+        </div>
 
-        <h2
-          id="method-heading"
-          className="editorial-display mt-6 max-w-[22ch] font-normal text-[clamp(2rem,4.6vw,3.4rem)] leading-[1.02] tracking-[-0.02em] text-[var(--color-oxford)]"
-        >
+        <h2 id="method-heading" className="np-hed mt-5 max-w-[16ch] text-[var(--color-oxford)]">
           How the judgment is formed.
         </h2>
 
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-4">
+        <div className="mt-12 grid grid-cols-1 md:grid-cols-4">
           {STEPS.map((step, i) => (
             <motion.div
               key={step.n}
-              className={`py-6 md:py-2 md:pr-7 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-7' : ''}`}
+              className={`py-7 md:py-2 md:pr-8 ${i > 0 ? 'border-t border-solid border-[var(--section-divider)] md:border-l md:border-t-0 md:pl-8' : ''}`}
               initial={reduce ? false : { opacity: 0, y: 16 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.3 }}
               transition={{ duration: reduce ? 0 : 0.6, ease: SCROLL_EASE, delay: reduce ? 0 : i * 0.07 }}
             >
-              <p className="font-mono text-[11px] text-[var(--color-accent)]">{step.n}</p>
-              <div className="mt-3 w-full max-w-[220px] text-[var(--color-oxford)]">{step.viz}</div>
-              <h3 className="editorial-display mt-4 text-[1.25rem] font-normal leading-[1.15] tracking-[-0.01em] text-[var(--color-oxford)]">
+              <p className="np-figure">{step.n}</p>
+              <div className="mt-5 w-full max-w-[220px] text-[var(--color-oxford)]">{step.viz}</div>
+              <h3 className="editorial-display mt-5 text-[1.4rem] font-normal leading-[1.12] tracking-[-0.015em] text-[var(--color-oxford)]">
                 {step.title}
               </h3>
               <p className="np-serif mt-3 text-[14.5px] leading-[1.65] text-[var(--text-secondary)]">{step.desc}</p>
