@@ -52,10 +52,8 @@ export default function HomePage() {
     >
       {showLoader && (
         <GalleryLoader
-          onDone={() => {
-            setEntered(true);
-            setShowLoader(false);
-          }}
+          onLift={() => setEntered(true)}
+          onDone={() => setShowLoader(false)}
         />
       )}
       <GalleryFrame enter={entered} />

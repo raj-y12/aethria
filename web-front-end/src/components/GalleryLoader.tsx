@@ -6,10 +6,10 @@ import { editionNo } from '../lib/clocks';
  * prerendered; HomePage mounts it conditionally post-hydration). Wordmark +
  * brackets + edition label settle in, hold, then the whole plate lifts and
  * dissolves. Sequence timing lives in CSS (index.css, "GALLERY LOADER"); this
- * component only owns the single dismissal timeout and session/scroll-lock
+ * component only owns the two dismissal timeouts and session/scroll-lock
  * bookkeeping.
  */
-export default function GalleryLoader({ onDone }: { onDone: () => void }) {
+export default function GalleryLoader({ onLift, onDone }: { onLift: () => void; onDone: () => void }) {
   useEffect(() => {
     try {
       sessionStorage.setItem('aethria-intro-seen', '1');
@@ -20,13 +20,18 @@ export default function GalleryLoader({ onDone }: { onDone: () => void }) {
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // ponytail: fixed 1550ms matches the CSS sequence's total duration exactly
-    // (see loader-lift's 1100ms delay + 450ms duration in index.css) rather than
-    // wiring up animationend listeners for a one-shot, non-interactive overlay.
-    const timer = window.setTimeout(onDone, 1550);
+    // ponytail: fixed timers matching the CSS sequence exactly (loader-lift's
+    // 1600ms delay + 800ms duration in index.css) rather than wiring up
+    // animationend listeners for a one-shot, non-interactive overlay.
+    // onLift fires the instant the dissolve begins, so the hero starts
+    // settling in BEHIND the still-fading overlay (single continuous entrance,
+    // not visible → hidden → animate-in).
+    const liftTimer = window.setTimeout(onLift, 1600);
+    const doneTimer = window.setTimeout(onDone, 2450);
 
     return () => {
-      window.clearTimeout(timer);
+      window.clearTimeout(liftTimer);
+      window.clearTimeout(doneTimer);
       document.body.style.overflow = prevOverflow;
     };
   }, []);
