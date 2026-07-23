@@ -543,6 +543,85 @@
   }
 }
 
+/* Plate 05 — corrections & revisions, a ruled specimen box */
+.corrections {
+  border: 1px solid var(--line);
+  padding: 1.6rem 1.75rem;
+  max-width: 560px;
+}
+.corrections h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.7rem;
+  margin-bottom: 1rem;
+}
+.corrections p {
+  font-family: var(--font-serif-text);
+  font-style: italic;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  margin-bottom: 0.7rem;
+}
+.corrections p:last-of-type {
+  margin-bottom: 0;
+}
+.corrections b {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Plate 06 — place a query, framing the real product-chrome lookup */
+.query {
+  width: 100%;
+}
+.query > * + * {
+  margin-top: 1.5rem;
+}
+
+/* Plate 07 — holdings, the portfolio table */
+.holdings {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+}
+.holdings th {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  text-align: left;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--line-2);
+}
+.holdings td {
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.holdings td.name {
+  font-family: var(--font-display);
+  font-size: 17px;
+  color: var(--ink);
+}
+.holdings .sig {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .page-margin-x {
   /* Explicit width (not just max-width) — .page-margin-x is often a direct child of a
      display:flex; flex-direction:column ancestor (page shells), where auto margins on

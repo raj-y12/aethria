@@ -5,6 +5,9 @@ import MarketPlate from './components/plates/MarketPlate';
 import RecordPlate from './components/plates/RecordPlate';
 import ReviewPlate from './components/plates/ReviewPlate';
 import NewsroomPlate from './components/plates/NewsroomPlate';
+import CorrectionsPlate from './components/plates/CorrectionsPlate';
+import QueryPlate from './components/plates/QueryPlate';
+import HoldingsPlate from './components/plates/HoldingsPlate';
 
 export default function HomePage() {
   // The application form lives further down the gallery spine (Task 11); honour
@@ -30,7 +33,10 @@ export default function HomePage() {
         <RecordPlate />
         <ReviewPlate />
         <NewsroomPlate />
-        {/* Remaining plates (Corrections, Query, Holdings, Access) land in Tasks 10–11. */}
+        <CorrectionsPlate />
+        <QueryPlate />
+        <HoldingsPlate />
+        {/* Access plate lands in Task 11. */}
       </div>
     </div>
   );
