@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aethria — Living Broadsheet (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<!-- Mockup only: CDN fonts. Shipped site self-hosts via @fontsource.
+     Display = Fraunces (characterful old-style, anti-Playfair), Text = Newsreader (true news serif),
+     Furniture = Instrument Sans, Wire/data = Space Mono. -->
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Instrument+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --oxford:#001433; --paper:#f4f1ea; --paper-2:#efeadf;
+    --accent:#3d6b5e; --accent-lt:#7aab9a; --brass:#a88a5e;
+    --divider:rgba(0,20,51,.12); --divider-2:rgba(0,20,51,.20);
+    --ink:rgba(0,20,51,.90); --ink-2:rgba(0,20,51,.72); --ink-3:rgba(0,20,51,.55); --ink-4:rgba(0,20,51,.40);
+    --inv:rgba(244,241,234,.94); --inv-2:rgba(244,241,234,.72); --inv-3:rgba(244,241,234,.5);
+    --disp:'Fraunces',Georgia,serif; --text:'Newsreader',Georgia,serif;
+    --sans:'Instrument Sans',system-ui,sans-serif; --mono:'Space Mono',monospace;
+    --mx:clamp(20px,5vw,84px); --w:1360px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{background:var(--paper);color:var(--ink);font-family:var(--text);line-height:1.5}
+  ::selection{background:var(--oxford);color:var(--paper)}
+  .wrap{width:100%;max-width:var(--w);margin:0 auto;padding-inline:var(--mx)}
+  .mono{font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em}
+  .kicker{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--ink-4);display:inline-flex;align-items:center;gap:.5rem}
+  .kicker::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  h1,h2,h3{font-family:var(--disp);font-weight:500;letter-spacing:-.02em;line-height:.98;color:var(--oxford)}
+  .rule{height:1px;background:var(--divider);transform-origin:left;transition:transform .9s cubic-bezier(.16,1,.3,1)}
+  .rule.heavy{height:2px;background:var(--oxford)}
+  .draw{transform:scaleX(0)} .draw.in{transform:scaleX(1)}
+
+  /* ── Masthead ── */
+  .masthead{background:var(--oxford);color:var(--inv)}
+  .folio{display:flex;justify-content:space-between;gap:1.5rem;padding:13px 0 11px;font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;color:var(--inv-2);border-bottom:1px solid rgba(244,241,234,.16)}
+  .folio .c{text-align:center}.folio .r{text-align:right}
+  .plate{display:flex;justify-content:center;padding-top:clamp(1.5rem,4vw,2.75rem)}
+  .nameplate{font-family:var(--disp);font-weight:500;font-size:clamp(3.4rem,12vw,9rem);line-height:.84;letter-spacing:-.035em;color:var(--inv);text-align:center}
+  .nameplate .dot{color:var(--accent-lt)}
+  .tag{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.28em;text-transform:uppercase;color:var(--inv-3);padding-top:14px}
+  .m-rules{margin-top:clamp(1.1rem,3vw,1.7rem)}
+  .m-rules .bar{height:2px;background:rgba(244,241,234,.9)}
+  .m-rules .hair{height:1px;margin-top:3px;background:rgba(244,241,234,.28)}
+  .nav{display:flex;flex-wrap:wrap;justify-content:center;gap:.4rem 2.25rem;padding:14px 0 clamp(1.25rem,3vw,1.9rem)}
+  .nav a{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--inv-2);text-decoration:none;transition:color .2s}
+  .nav a:hover{color:var(--accent-lt)}
+
+  /* ── The Lead + Today's Record ── */
+  .lead-grid{display:grid;grid-template-columns:1.85fr 1fr;gap:3.5rem;padding:clamp(2rem,4.5vh,3.25rem) 0}
+  .slug{display:flex;align-items:baseline;gap:1rem}
+  .folionum{font-family:var(--disp);font-weight:500;font-size:clamp(1.9rem,3vw,2.9rem);line-height:.85;letter-spacing:-.02em;color:rgba(0,20,51,.24)}
+  .slug .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--oxford)}
+  .hed{font-family:var(--disp);font-weight:500;font-size:clamp(2.7rem,6.2vw,5.4rem);line-height:.95;letter-spacing:-.025em;color:var(--oxford);margin-top:.7rem;max-width:15ch}
+  .standfirst{font-family:var(--text);font-size:clamp(1.05rem,1.5vw,1.28rem);line-height:1.6;color:var(--ink-2);margin-top:1.5rem;max-width:54ch}
+  .byline{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4);margin-top:1.4rem}
+  .body-cols{margin-top:1.8rem;max-width:640px;columns:2;column-gap:2.25rem;column-rule:1px solid var(--divider);font-family:var(--text);font-size:15px;line-height:1.7;color:var(--ink-2);text-align:justify;hyphens:auto}
+  .body-cols p{margin-bottom:.7rem}
+  .dropcap::first-letter{font-family:var(--disp);font-weight:500;font-size:3.1rem;line-height:.72;float:left;margin:.05em .08em -.02em 0;color:var(--oxford)}
+
+  .rail{border-left:1px solid var(--divider);padding-left:2.25rem}
+  .rail .live{display:flex;align-items:center;gap:.5rem;font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .blip{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 2s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  .rec-name{font-family:var(--disp);font-weight:500;font-size:1.5rem;line-height:1.1;color:var(--oxford);margin-top:1.1rem}
+  .rec-meta{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);margin-top:.4rem}
+  .chip{display:inline-block;margin-top:1rem;background:#bfe3cc;color:#17442d;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;padding:.28rem .7rem}
+  .dims{display:flex;gap:1.4rem;margin-top:1.3rem}
+  .dim .n{font-family:var(--mono);font-size:15px;color:var(--oxford)}
+  .dim .k{font-family:var(--mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-4);margin-top:.2rem}
+  .inside{margin-top:2.2rem}
+  .inside .t{font-family:var(--mono);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-4)}
+  .inside li{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.5rem 0;border-top:1px solid var(--divider)}
+  .inside li:first-of-type{margin-top:.5rem}
+  .inside a{font-family:var(--disp);font-size:14px;color:var(--oxford);text-decoration:none}
+  .inside a:hover{color:var(--accent)}
+  .inside .f{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+
+  /* ── The Wire ── */
+  .wire{background:var(--oxford);color:var(--inv)}
+  .wire-inner{display:flex;align-items:center;gap:1.5rem;padding:.9rem 0;font-family:var(--mono);font-size:11px;letter-spacing:.04em}
+  .wire .lbl{color:var(--accent-lt);text-transform:uppercase;letter-spacing:.18em;font-size:9.5px;white-space:nowrap}
+  .wire .feed{overflow:hidden;white-space:nowrap;color:var(--inv-2);min-width:0}
+  .wire .feed b{color:var(--inv);font-weight:400}
+  .caret{display:inline-block;width:7px;height:13px;background:var(--accent-lt);vertical-align:-2px;margin-left:2px;animation:blink 1s step-end infinite}
+
+  /* ── section scaffold ── */
+  .sec{padding:clamp(2.5rem,5.5vh,4rem) 0}
+  .sec-slug{display:flex;align-items:baseline;gap:1rem;margin-bottom:1.6rem}
+  .sec-hed{font-family:var(--disp);font-weight:500;font-size:clamp(2.2rem,4.6vw,3.8rem);line-height:.98;letter-spacing:-.025em;color:var(--oxford);max-width:20ch}
+  .cutline{font-family:var(--text);font-style:italic;font-size:13.5px;line-height:1.6;color:var(--ink-3);margin-top:1rem;max-width:64ch}
+
+  /* ── Market centerpiece ── */
+  .market{position:relative}
+  .market-stage{position:relative;height:clamp(320px,46vw,560px);margin-top:1.5rem;border-top:1px solid var(--divider);border-bottom:1px solid var(--divider)}
+  #mkt{position:absolute;inset:0;width:100%;height:100%}
+  .market-legend{position:absolute;left:0;bottom:14px;display:flex;gap:1.5rem;font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4)}
+  .market-legend .k{display:inline-flex;align-items:center;gap:.45rem}
+  .swatch{width:7px;height:7px;border-radius:50%}
+
+  /* ── Newsroom staff box ── */
+  .staff{display:grid;grid-template-columns:repeat(2,1fr);gap:0;border:1px solid var(--divider)}
+  .staff .col{padding:1.6rem 1.75rem}
+  .staff .col+.col{border-left:1px solid var(--divider)}
+  .staff h4{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--oxford);margin-bottom:.9rem}
+  .staff .row{display:flex;justify-content:space-between;gap:1rem;padding:.55rem 0;border-top:1px solid var(--divider);font-family:var(--text);font-size:15px;color:var(--ink-2)}
+  .staff .row:first-of-type{border-top:0}
+  .staff .role{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-4);align-self:center}
+
+  /* ── Opinion spread ── */
+  .opinion{display:grid;grid-template-columns:1fr auto 1fr;gap:2.5rem;align-items:start}
+  .opinion .divider-v{width:1px;background:var(--divider);align-self:stretch}
+  .op-head{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:.9rem}
+  .op-for{color:var(--accent)} .op-against{color:var(--brass)}
+  .op-body{font-family:var(--text);font-size:16px;line-height:1.62;color:var(--ink-2)}
+  .op-body .lede{font-family:var(--disp);font-size:1.3rem;line-height:1.2;color:var(--oxford);margin-bottom:.7rem;display:block}
+  .split-note{font-family:var(--text);font-style:italic;font-size:13.5px;color:var(--ink-3);text-align:center;margin-top:1.8rem;padding-top:1.2rem;border-top:1px solid var(--divider)}
+
+  /* ── Corrections box ── */
+  .corrections{border:1px solid var(--divider);padding:1.6rem 1.75rem;max-width:560px}
+  .corrections h4{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--oxford);border-bottom:1px solid var(--divider);padding-bottom:.7rem;margin-bottom:1rem}
+  .corrections p{font-family:var(--text);font-style:italic;font-size:14.5px;line-height:1.65;color:var(--ink-2);margin-bottom:.7rem}
+  .corrections b{font-style:normal;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+
+  /* ── Query / classified ── */
+  .query-bar{display:flex;align-items:center;gap:.9rem;border:1px solid var(--divider-2);padding:1rem 1.25rem;font-family:var(--mono);font-size:14px;color:var(--oxford);max-width:760px;margin:0 auto}
+  .query-bar .p{color:var(--accent)}
+  .query-bar .run{margin-left:auto;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-4)}
+
+  /* ── Holdings table ── */
+  .holdings{width:100%;border-collapse:collapse;font-family:var(--text)}
+  .holdings th{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);text-align:left;padding:.7rem 0;border-bottom:1px solid var(--divider-2)}
+  .holdings td{padding:.85rem 0;border-bottom:1px solid var(--divider);font-size:15px;color:var(--ink-2)}
+  .holdings td.name{font-family:var(--disp);font-size:17px;color:var(--oxford)}
+  .holdings .sig{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+
+  /* ── Coupon ── */
+  .coupon{border:1px dashed var(--divider-2);padding:clamp(1.5rem,4vw,2.5rem);display:grid;grid-template-columns:1fr 1fr;gap:2.5rem;align-items:center}
+  .coupon h3{font-size:clamp(1.9rem,3.6vw,2.6rem)}
+  .coupon .sf{font-family:var(--text);font-size:14.5px;line-height:1.65;color:var(--ink-2);margin-top:.8rem;max-width:42ch}
+  .coupon .form{display:flex;flex-direction:column;gap:1rem}
+  .coupon input{border:none;border-bottom:1px solid var(--divider-2);background:transparent;font-family:var(--sans);font-size:15px;padding:.5rem 0;color:var(--oxford)}
+  .coupon input:focus{outline:none;border-bottom-color:var(--accent)}
+  .coupon button{align-self:flex-start;border:1px solid var(--oxford);background:var(--oxford);color:var(--paper);font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:.7rem 1.4rem;cursor:pointer}
+
+  /* ── Colophon ── */
+  .colophon{background:var(--oxford);color:var(--inv-2);font-family:var(--mono);font-size:10px;letter-spacing:.06em}
+  .colophon .grid{display:flex;flex-wrap:wrap;justify-content:space-between;gap:1.5rem;padding:2.5rem 0}
+  .colophon .wm{font-family:var(--disp);font-size:22px;color:var(--inv);letter-spacing:-.01em}
+  .colophon a{color:var(--inv-2);text-decoration:none}
+
+  @media(max-width:860px){
+    .lead-grid{grid-template-columns:1fr;gap:2.5rem}
+    .rail{border-left:0;border-top:1px solid var(--divider);padding-left:0;padding-top:2rem}
+    .body-cols{columns:1}
+    .opinion{grid-template-columns:1fr;gap:1.6rem}.opinion .divider-v{display:none;height:1px;width:100%}
+    .staff{grid-template-columns:1fr}.staff .col+.col{border-left:0;border-top:1px solid var(--divider)}
+    .coupon{grid-template-columns:1fr}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .rule,.draw{transition:none!important;transform:none!important}
+    .blip,.caret{animation:none!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- ══ MASTHEAD ══ -->
+<header class="masthead">
+  <div class="wrap">
+    <div class="folio">
+      <span id="volno">Vol. I · No. —</span>
+      <span class="c" id="date">—</span>
+      <span class="r">London · San Francisco</span>
+    </div>
+    <div class="plate"><div class="nameplate">Aethria<span class="dot">.</span></div></div>
+    <div class="tag">Private-market judgment, on the record · Specimen Edition</div>
+    <div class="m-rules"><div class="bar"></div><div class="hair"></div></div>
+    <nav class="nav">
+      <a href="#market">The Market</a><a href="#method">The Newsroom</a>
+      <a href="#opinion">The Review</a><a href="#query">Place a Query</a><a href="#access">Request Access</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<!-- ══ THE LEAD + TODAY'S RECORD ══ -->
+<section class="wrap">
+  <div class="lead-grid">
+    <article>
+      <div class="slug"><span class="folionum">A1</span><span class="lbl">The Lede</span></div>
+      <h1 class="hed">The machine reads the open web, and files a brief on every name.</h1>
+      <p class="standfirst">Aethria reads the live web for companies, scores each against your fund's thesis, keeps the record where its reviewers disagree, and files an investment-ready brief for every name it surfaces.</p>
+      <p class="byline">By the Partner Engine · Filed today · San Francisco Bureau</p>
+      <div class="body-cols">
+        <p class="dropcap">Four scouts work the live web for real companies — market-driven, technical, pain-point, contrarian. Never a static list. Three reviewer modes, built to disagree, score every candidate they turn up against the mandate.</p>
+        <p>Where the partner engine finds consensus it rules on its own — invest, pass, or monitor. Where the reviewers split, the split stays on the record. Nothing is averaged into a number that hides the argument.</p>
+      </div>
+    </article>
+
+    <aside class="rail">
+      <div class="live"><span class="blip"></span> Specimen record</div>
+      <div class="rec-name">Meridian Compute</div>
+      <div class="rec-meta">B2B Infrastructure · Series A · London</div>
+      <span class="chip">Invest</span>
+      <div class="dims">
+        <div class="dim"><div class="n" data-count="9">0</div><div class="k">Market</div></div>
+        <div class="dim"><div class="n" data-count="8">0</div><div class="k">Product</div></div>
+        <div class="dim"><div class="n" data-count="9">0</div><div class="k">Technical</div></div>
+        <div class="dim"><div class="n" data-count="8">0</div><div class="k">Exec</div></div>
+        <div class="dim"><div class="n" data-count="7">0</div><div class="k">Defens.</div></div>
+      </div>
+      <nav class="inside">
+        <div class="t">Inside this edition</div>
+        <ul>
+          <li><a href="#market">The Market</a><span class="f">A3</span></li>
+          <li><a href="#method">The Newsroom</a><span class="f">A4</span></li>
+          <li><a href="#opinion">The Review</a><span class="f">A6</span></li>
+          <li><a href="#corrections">Corrections</a><span class="f">A7</span></li>
+          <li><a href="#query">Place a Query</a><span class="f">A9</span></li>
+        </ul>
+      </nav>
+    </aside>
+  </div>
+</section>
+
+<!-- ══ THE WIRE ══ -->
+<section class="wire"><div class="wrap"><div class="wire-inner">
+  <span class="lbl">● The Wire</span>
+  <span class="feed" id="wire"></span>
+</div></div></section>
+
+<!-- ══ THE MARKET (centerpiece) ══ -->
+<section class="wrap sec market" id="market">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A3</span><span class="kicker">The Market</span></div>
+  <h2 class="sec-hed">The whole field, scanned. The few that fit, lit.</h2>
+  <p class="cutline">Every company reads as a faint mark. The few inside your active thesis glow in verdigris; scouts fire toward them in real time and the conviction spreads through the surrounding market. Stands in for the live <code>DottedMarketMap</code> component.</p>
+  <div class="market-stage"><canvas id="mkt"></canvas>
+    <div class="market-legend">
+      <span class="k"><span class="swatch" style="background:rgba(0,20,51,.25)"></span> Scanned</span>
+      <span class="k"><span class="swatch" style="background:var(--accent)"></span> In thesis</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══ THE NEWSROOM (staff box) ══ -->
+<section class="wrap sec" id="method">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A4</span><span class="kicker">The Newsroom</span></div>
+  <h2 class="sec-hed">Who works the story.</h2>
+  <p class="cutline" style="margin-bottom:1.8rem">A masthead of agents. Scouts source, reviewers argue, the partner rules, the portfolio watches, and the meta-agent rewrites the newsroom itself.</p>
+  <div class="staff">
+    <div class="col">
+      <h4>Scouts — source the field</h4>
+      <div class="row"><span>Market-Driven</span><span class="role">web + tavily</span></div>
+      <div class="row"><span>Builder / Technical</span><span class="role">web + tavily</span></div>
+      <div class="row"><span>Pain-Point</span><span class="role">web + tavily</span></div>
+      <div class="row"><span>Contrarian</span><span class="role">web + tavily</span></div>
+    </div>
+    <div class="col">
+      <h4>Reviewers — score the mandate</h4>
+      <div class="row"><span>Default</span><span class="role">1–10 · 5 dims</span></div>
+      <div class="row"><span>Skeptical</span><span class="role">built to dissent</span></div>
+      <div class="row"><span>Opportunist</span><span class="role">built to back</span></div>
+      <div class="row"><span>Partner Engine</span><span class="role">rules v1 · invest/pass/monitor</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ THE REVIEW (opinion spread) ══ -->
+<section class="wrap sec" id="opinion">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A6</span><span class="kicker">The Review</span></div>
+  <h2 class="sec-hed">The reviewers disagree. It stays on the record.</h2>
+  <div class="opinion" style="margin-top:2rem">
+    <div>
+      <div class="op-head op-for">Opportunist — for</div>
+      <div class="op-body"><span class="lede">The wedge is real and capital-efficient.</span>
+        A defensible technical moat in a market pulling hard toward the next compute cycle. Early traction is thin but the direction is unambiguous; this is exactly the asymmetry the thesis is built to catch.</div>
+    </div>
+    <div class="divider-v"></div>
+    <div>
+      <div class="op-head op-against">Skeptical — against</div>
+      <div class="op-body"><span class="lede">The moat is asserted, not proven.</span>
+        Defensibility scores a seven for a reason: no evidence of switching cost yet, and two funded competitors within eighteen months. Strong story, unproven execution. Monitor before conviction.</div>
+    </div>
+  </div>
+  <p class="split-note">The partner engine logs the split rather than averaging it away — a 9 and a 7 remain a 9 and a 7.</p>
+</section>
+
+<!-- ══ CORRECTIONS (meta-agent) ══ -->
+<section class="wrap sec" id="corrections">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A7</span><span class="kicker">Corrections &amp; Revisions</span></div>
+  <div class="corrections">
+    <h4>The newsroom revises itself</h4>
+    <p><b>Scout weighting —</b> after the last cycle's outcomes, market-driven sourcing was weighted up and pain-point down.</p>
+    <p><b>Reviewer thresholds —</b> recalibrated against forty resolved decisions to hold the false-positive rate.</p>
+    <p><b>Prompt versions —</b> mutated scout prompts re-hashed; every change is versioned and attributable.</p>
+  </div>
+</section>
+
+<!-- ══ PLACE A QUERY ══ -->
+<section class="wrap sec" id="query">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A9</span><span class="kicker">Place a Query</span></div>
+  <h2 class="sec-hed" style="text-align:center;margin:0 auto 2rem">Look up any company. Get the record.</h2>
+  <div class="query-bar"><span class="p">›</span> <span id="qtext"></span><span class="caret"></span><span class="run">Run</span></div>
+  <p class="cutline" style="text-align:center;margin:1.6rem auto 0">On-demand lookup turns any name into a sourced investment record in seconds — benchmarked against your active thesis the moment results arrive.</p>
+</section>
+
+<!-- ══ HOLDINGS ══ -->
+<section class="wrap sec">
+  <div class="rule draw" style="margin-bottom:2rem"></div>
+  <div class="sec-slug"><span class="folionum">A10</span><span class="kicker">Holdings</span></div>
+  <h2 class="sec-hed">After the invest, the watch continues.</h2>
+  <table class="holdings" style="margin-top:1.8rem">
+    <thead><tr><th>Company</th><th>Stage</th><th>Signal</th><th>Health</th></tr></thead>
+    <tbody>
+      <tr><td class="name">Meridian Compute</td><td>Series A</td><td class="sig">Hiring ▲</td><td>Nominal</td></tr>
+      <tr><td class="name">Halden Systems</td><td>Seed</td><td class="sig">Shipping ▲</td><td>Nominal</td></tr>
+      <tr><td class="name">Cormorant Labs</td><td>Series A</td><td class="sig">Quiet ▼</td><td>Watch</td></tr>
+    </tbody>
+  </table>
+  <p class="cutline">The portfolio engine tracks execution, signals, and health for every accepted name. Specimen holdings.</p>
+</section>
+
+<!-- ══ COUPON ══ -->
+<section class="wrap sec" id="access">
+  <div class="rule heavy draw" style="margin-bottom:2.5rem"></div>
+  <div class="coupon">
+    <div>
+      <div class="kicker" style="margin-bottom:1rem">Subscription</div>
+      <h3>For funds that need judgment with memory.</h3>
+      <p class="sf">Complete the coupon. Seats open in small batches — we'll write when yours is ready.</p>
+    </div>
+    <form class="form" onsubmit="return false">
+      <input placeholder="Fund / firm" aria-label="Fund" />
+      <input placeholder="Work email" aria-label="Email" type="email" />
+      <button>Request access →</button>
+    </form>
+  </div>
+</section>
+</main>
+
+<!-- ══ COLOPHON ══ -->
+<footer class="colophon">
+  <div class="wrap grid">
+    <div style="max-width:34ch">
+      <div class="wm">Aethria<span style="color:var(--accent-lt)">.</span></div>
+      <p style="margin-top:1rem;line-height:1.6">Private-market intelligence for funds that need the evidence trail, not another beautiful spreadsheet.</p>
+    </div>
+    <div>
+      <p>Set in Fraunces, Newsreader &amp; Space Mono.</p>
+      <p style="margin-top:.5rem">Bureaus — London · San Francisco.</p>
+      <p style="margin-top:.5rem">Specimen Edition · © <span id="yr"></span> Aethria.</p>
+    </div>
+    <div><a href="#access">Request access</a> &nbsp;·&nbsp; <a href="#">LinkedIn</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+  var now = new Date();
+  // Edition furniture — advances on its own
+  var doy = Math.floor((Date.now()-Date.UTC(now.getUTCFullYear(),0,0))/864e5);
+  document.getElementById('volno').textContent = 'Vol. I · No. '+doy;
+  document.getElementById('date').textContent = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  document.getElementById('yr').textContent = now.getFullYear();
+
+  // Rules draw in on scroll
+  var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.6});
+  document.querySelectorAll('.rule.draw').forEach(function(r){reduce?r.classList.add('in'):io.observe(r);});
+
+  // Count-up dims
+  document.querySelectorAll('[data-count]').forEach(function(el){
+    var to=+el.dataset.count; if(reduce){el.textContent=to;return;}
+    var t0=performance.now();
+    (function tick(t){var p=Math.min(1,(t-t0)/850);el.textContent=Math.round(to*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(tick);})(t0);
+  });
+
+  // The Wire — typeset events
+  var events=[
+    'SCOUT · market-driven surfaced <b>3 names</b> in climate-hardware',
+    'REVIEWER · skeptical & opportunist <b>split</b> on defensibility',
+    'PARTNER · ruled <b>MONITOR</b> — thesis fit strong, traction thin',
+    'SCOUT · contrarian flagged an <b>out-of-consensus</b> infra bet',
+    'PARTNER · ruled <b>INVEST</b> — consensus across three reviewers',
+    'META · <b>recalibrated</b> reviewer thresholds after 40 outcomes'
+  ];
+  var wire=document.getElementById('wire'), wi=0;
+  if(reduce){wire.innerHTML=events[0];}
+  else{
+    (function cycle(){
+      var raw=events[wi%events.length], i=0, plain=raw.replace(/<[^>]+>/g,'');
+      wire.innerHTML='';
+      var typer=setInterval(function(){
+        i++; wire.innerHTML=raw.length? typeSlice(raw,i):plain.slice(0,i);
+        if(i>=plain.length){clearInterval(typer);setTimeout(function(){wi++;cycle();},2600);}
+      },26);
+    })();
+  }
+  // slice a string that contains <b> tags to N visible chars, keeping tags intact
+  function typeSlice(html,n){var out='',vis=0,i=0;while(i<html.length&&vis<n){if(html[i]==='<'){var j=html.indexOf('>',i);out+=html.slice(i,j+1);i=j+1;}else{out+=html[i];i++;vis++;}}return out;}
+
+  // Query typing loop
+  var qt=document.getElementById('qtext'), q='look up  anthropic', qi=0;
+  if(reduce){qt.textContent=q;}
+  else{(function qtype(){qi++;qt.textContent=q.slice(0,qi);if(qi<q.length)setTimeout(qtype,80);else setTimeout(function(){qi=0;qt.textContent='';setTimeout(qtype,1200);},3000);})();}
+
+  // Market field — evocative stand-in for DottedMarketMap (dots + verdigris hits + scout arcs)
+  var cv=document.getElementById('mkt'), ctx=cv.getContext('2d'), dpr=Math.min(devicePixelRatio||1,2);
+  var pts=[], hits=[], arcs=[], W,H;
+  function size(){W=cv.clientWidth;H=cv.clientHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    pts=[];var gap=22;for(var y=gap;y<H-6;y+=gap)for(var x=gap;x<W-6;x+=gap){if(Math.random()<.82)pts.push([x+ (Math.random()-.5)*4,y+(Math.random()-.5)*4]);}
+    hits=[[W*.22,H*.4],[W*.5,H*.62],[W*.72,H*.34],[W*.84,H*.7]].map(function(h){return {x:h[0],y:h[1]};});
+  }
+  size(); addEventListener('resize',size);
+  function spawn(){if(!pts.length)return;var h=hits[(Math.random()*hits.length)|0];var s=pts[(Math.random()*pts.length)|0];arcs.push({s:s,t:[h.x,h.y],c:[(s[0]+h.x)/2,(s[1]+h.y)/2-Math.hypot(h.x-s[0],h.y-s[1])*.3],p:0,sp:.012+Math.random()*.01});}
+  var last=0;
+  function frame(ts){
+    ctx.clearRect(0,0,W,H);
+    // scanned dots
+    for(var i=0;i<pts.length;i++){var p=pts[i];var near=1e9;for(var k=0;k<hits.length;k++){var d=Math.hypot(p[0]-hits[k].x,p[1]-hits[k].y);if(d<near)near=d;}
+      var glow=near<90?.35*(1-near/90):0; ctx.beginPath();ctx.arc(p[0],p[1],1.1,0,6.283);
+      ctx.fillStyle=glow>0?'rgba(61,107,94,'+(0.18+glow)+')':'rgba(0,20,51,.22)';ctx.fill();}
+    // arcs
+    if(ts-last>460){last=ts;spawn();if(Math.random()<.5)spawn();}
+    arcs=arcs.filter(function(a){return a.p<1.02;});
+    arcs.forEach(function(a){a.p+=a.sp;var bez=function(t){return[(1-t)*(1-t)*a.s[0]+2*(1-t)*t*a.c[0]+t*t*a.t[0],(1-t)*(1-t)*a.s[1]+2*(1-t)*t*a.c[1]+t*t*a.t[1]];};
+      ctx.beginPath();var tail=Math.max(0,a.p-.2);for(var t=tail;t<=Math.min(a.p,1);t+=.03){var qp=bez(t);t===tail?ctx.moveTo(qp[0],qp[1]):ctx.lineTo(qp[0],qp[1]);}
+      ctx.strokeStyle='rgba(61,107,94,.5)';ctx.lineWidth=1.1;ctx.stroke();
+      var hd=bez(Math.min(a.p,1));ctx.beginPath();ctx.arc(hd[0],hd[1],1.8,0,6.283);ctx.fillStyle='#3d6b5e';ctx.fill();});
+    // hits pulse
+    hits.forEach(function(h){var r=6+5*Math.abs(Math.sin(ts/700));
+      ctx.beginPath();ctx.arc(h.x,h.y,r,0,6.283);ctx.strokeStyle='rgba(61,107,94,'+(0.45-(r-6)/22)+')';ctx.lineWidth=1;ctx.stroke();
+      ctx.beginPath();ctx.arc(h.x,h.y,3.2,0,6.283);ctx.fillStyle='#3d6b5e';ctx.fill();});
+    raf=requestAnimationFrame(frame);
+  }
+  var raf;
+  if(reduce){ // static paint
+    for(var i=0;i<pts.length;i++){var p=pts[i];ctx.beginPath();ctx.arc(p[0],p[1],1.1,0,6.283);ctx.fillStyle='rgba(0,20,51,.22)';ctx.fill();}
+    hits.forEach(function(h){ctx.beginPath();ctx.arc(h.x,h.y,3.2,0,6.283);ctx.fillStyle='#3d6b5e';ctx.fill();});
+  } else raf=requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
