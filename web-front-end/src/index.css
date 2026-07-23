@@ -8,9 +8,21 @@
 
 /* Design tokens (match app-front-end behaviour; note single-colon :root) */
 :root {
-  --color-oxford: #001433;
-  --color-paper: #f4f1ea;
-  --color-ivory: #f4f1ea;
+  /* Gallery of Instruments — cool architectural grey stock (replaces warm cream). */
+  --stock: #d9d7d4;
+  --stock-2: #d1cfcb;
+  --ink: #111820;
+  --ink-2: rgba(17, 24, 32, 0.66);
+  --ink-3: rgba(17, 24, 32, 0.44);
+  --ink-4: rgba(17, 24, 32, 0.3);
+  --line: rgba(17, 24, 32, 0.16);
+  --line-2: rgba(17, 24, 32, 0.26);
+  --accent: #3d6b5e;
+  --mx: clamp(20px, 6vw, 120px);
+
+  --color-oxford: #111820;
+  --color-paper: #d9d7d4;
+  --color-ivory: #d9d7d4;
   --color-charcoal: #26313f;
   /* Brand accent — verdigris (patina green). Marketing punctuation only.
      NOTE: distinct from app escalation (#7d2b3a). */
@@ -40,8 +52,8 @@
   --section-padding-y: 96px;
   --section-padding-y-mobile: 56px;
   /* All marketing section top/bottom borders + matching 1px hairlines use this (1px solid). */
-  --section-divider: rgba(0, 20, 51, 0.1);
-  --section-diamond: rgba(0, 20, 51, 0.2);
+  --section-divider: var(--line);
+  --section-diamond: rgba(17, 24, 32, 0.2);
 
   /* Frame borders (match app-front-end) */
   --frame-opacity: 0.06;
@@ -53,25 +65,236 @@
   --safe-right: env(safe-area-inset-right, 0px);
 
   /* Semantic roles for consistent contrast and token usage */
-  --surface-base: var(--color-paper);
+  --surface-base: var(--stock);
   --surface-strong: var(--color-oxford);
-  --surface-strong-hover: rgba(0, 20, 51, 0.88);
-  --text-primary: rgba(0, 20, 51, 0.9);
-  --text-secondary: rgba(0, 20, 51, 0.74);
-  --text-tertiary: rgba(0, 20, 51, 0.62);
-  --text-muted: rgba(0, 20, 51, 0.5);
-  --text-subtle: rgba(0, 20, 51, 0.42);
-  --text-inverse: rgba(244, 241, 234, 0.94);
-  --text-inverse-secondary: rgba(244, 241, 234, 0.78);
-  --text-inverse-muted: rgba(244, 241, 234, 0.66);
-  --label-strong: rgba(0, 20, 51, 0.74);
-  --label-muted: rgba(0, 20, 51, 0.56);
+  --surface-strong-hover: rgba(17, 24, 32, 0.88);
+  --text-primary: var(--ink);
+  --text-secondary: rgba(17, 24, 32, 0.74);
+  --text-tertiary: rgba(17, 24, 32, 0.62);
+  --text-muted: rgba(17, 24, 32, 0.5);
+  --text-subtle: rgba(17, 24, 32, 0.42);
+  --text-inverse: rgba(217, 215, 212, 0.94);
+  --text-inverse-secondary: rgba(217, 215, 212, 0.78);
+  --text-inverse-muted: rgba(217, 215, 212, 0.66);
+  --label-strong: rgba(17, 24, 32, 0.74);
+  --label-muted: rgba(17, 24, 32, 0.56);
 }
 
 @media (max-width: 768px) {
   :root {
     --page-margin-x: var(--page-margin-x-mobile);
     --section-padding-y: var(--section-padding-y-mobile);
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────
+   Gallery of Instruments — CSS primitives ported verbatim from
+   _design-explore/J-gallery-instruments.html (mockup var(--disp/--sans/--mono)
+   translated to the project's var(--font-display/--font-sans/--font-mono)).
+   ─────────────────────────────────────────────────────────────── */
+
+.lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* film grain — the anti-flat texture (Izanami) */
+.grain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 120;
+  opacity: 0.5;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/></svg>");
+}
+
+/* ── fixed marginal furniture ── */
+.frame {
+  position: fixed;
+  z-index: 100;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  mix-blend-mode: normal;
+}
+.frame.tl {
+  top: 26px;
+  left: var(--mx);
+}
+.frame.tr {
+  top: 26px;
+  right: var(--mx);
+  text-align: right;
+  display: flex;
+  gap: 1.5rem;
+}
+.frame.tr a:hover {
+  color: var(--ink);
+}
+.frame.bl {
+  bottom: 22px;
+  left: var(--mx);
+  line-height: 1.9;
+}
+.frame.br {
+  bottom: 22px;
+  right: var(--mx);
+  text-align: right;
+}
+.wordmark {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-transform: none;
+}
+.wordmark .dot {
+  color: var(--accent);
+}
+@media (max-width: 760px) {
+  .frame.tr {
+    gap: 1rem;
+  }
+  .frame.bl,
+  .frame.br {
+    display: none;
+  }
+}
+
+/* ── GALLERY SPINE ── */
+.plate {
+  position: relative;
+  min-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(4rem, 12vh, 11rem) var(--mx);
+}
+.plate-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: var(--ink-4);
+}
+.plate-cap-l {
+  position: absolute;
+  left: var(--mx);
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.plate-cap-r {
+  position: absolute;
+  right: var(--mx);
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+@media (max-width: 900px) {
+  .plate-cap-l,
+  .plate-cap-r {
+    display: none;
+  }
+}
+
+/* framed plate body with [ ] brackets */
+.framed {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+}
+.framed::before,
+.framed::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  width: 14px;
+  border: 1px solid var(--line-2);
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+.framed::before {
+  left: -26px;
+  border-right: 0;
+}
+.framed::after {
+  right: -26px;
+  border-left: 0;
+}
+.plate.in .framed::before,
+.plate.in .framed::after {
+  opacity: 1;
+}
+@media (max-width: 640px) {
+  .framed::before,
+  .framed::after {
+    display: none;
+  }
+}
+
+.plate-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.9rem;
+  margin-bottom: 2rem;
+}
+.plate-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 3vw, 2.3rem);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition: opacity 0.9s ease, transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.plate.in .reveal {
+  opacity: 1;
+  transform: none;
+}
+.reveal.d1 {
+  transition-delay: 0.08s;
+}
+.reveal.d2 {
+  transition-delay: 0.16s;
+}
+.reveal.d3 {
+  transition-delay: 0.24s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .framed::before,
+  .framed::after {
+    opacity: 1 !important;
   }
 }
 
@@ -101,7 +324,7 @@ section[id] {
   }
 }
 
-/* Marketing — paper dot grid (#F4F1EA texture, 28px, Oxford @ 3.5%) */
+/* Marketing — paper dot grid (grey stock texture, 28px, Oxford @ 3.5%) */
 .paper-dot-grid {
   background-color: var(--color-paper);
   background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
@@ -913,7 +1136,7 @@ hr.doc-section-separator::before {
 
   ::selection {
     background-color: var(--color-oxford);
-    color: #f4f1ea;
+    color: var(--color-paper);
   }
 
   a:focus-visible,

@@ -5,7 +5,7 @@ import HomePage from '../HomePage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const PAPER = '#f4f1ea';
+const PAPER = '#D9D7D4';
 
 // Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.
 // Delete the file to remove that route at build time.
