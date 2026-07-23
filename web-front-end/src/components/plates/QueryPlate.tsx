@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
-import { DEMO_LOOKUP_QUERY, DEMO_LOOKUP_RESULT, LookupCommandBar, LookupResultSnapshot } from '@aethria/product-chrome';
+import { DEMO_LOOKUP_QUERY, DEMO_LOOKUP_RESULT, LookupResultSnapshot } from '@aethria/product-chrome';
 import Plate from '../Plate';
 
 const CHAR_MIN_MS = 60;
@@ -87,9 +87,11 @@ export default function QueryPlate() {
       capRight="Any name · a sourced record"
     >
       <div ref={rootRef} className="query reveal d2" aria-hidden>
-        <div className="query-typing">
-          <LookupCommandBar query={typed} trailing="run" />
+        <div className="query-bar">
+          <span className="p">›</span>
+          <span className="query-text">{typed}</span>
           {caretOn ? <span className="query-caret" /> : null}
+          <span className="run">Run</span>
         </div>
         <div className={`memo-reveal${memoIn ? ' in' : ''}`}>
           <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
