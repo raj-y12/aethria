@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 
-const INK = '#001433';
-const ACCENT = '#3d6b5e';
-const PAPER = '#f4f1ea';
+// Composes on the oxford field so the pull-up reveals the dark masthead with no
+// paper flash between the two — the letterforms are paper ink, the dot verdigris.
+const OXFORD = '#001433';
+const INK = '#f4f1ea';
+const ACCENT = '#7aab9a';
 /** How long the particles get to assemble before the sheet is pulled. */
 const ASSEMBLE_MS = 2400;
 
@@ -126,7 +128,7 @@ export default function EditionLoader({ onDone }: { onDone: () => void }) {
   return (
     <motion.div
       className="fixed inset-0 z-[200] cursor-pointer"
-      style={{ backgroundColor: PAPER }}
+      style={{ backgroundColor: OXFORD }}
       animate={exiting ? { y: '-100%' } : { y: 0 }}
       transition={{ duration: 0.8, ease: [0.85, 0, 0.15, 1] }}
       onAnimationComplete={() => {
@@ -137,14 +139,14 @@ export default function EditionLoader({ onDone }: { onDone: () => void }) {
     >
       <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
       <motion.p
-        className="absolute inset-x-0 bottom-10 text-center font-mono text-[9.5px] uppercase tracking-[0.24em] text-[var(--text-subtle)]"
+        className="absolute inset-x-0 bottom-10 text-center font-mono text-[9.5px] uppercase tracking-[0.24em] text-[var(--text-inverse-muted)]"
         animate={{ opacity: [0.35, 0.8, 0.35] }}
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
       >
         Composing today's edition
       </motion.p>
       {/* the sheet below peeks out as this one is pulled away */}
-      <div className="absolute inset-x-0 bottom-0 h-px bg-[rgba(0,20,51,0.15)]" />
+      <div className="absolute inset-x-0 bottom-0 h-px bg-[rgba(244,241,234,0.16)]" />
     </motion.div>
   );
 }
