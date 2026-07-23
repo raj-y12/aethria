@@ -645,13 +645,6 @@
 .query-bar .p {
   color: var(--accent);
 }
-.query-bar .run {
-  margin-left: auto;
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ink-4);
-}
 .query-text {
   white-space: pre;
   min-height: 1em;

@@ -91,7 +91,6 @@ export default function QueryPlate() {
           <span className="p">›</span>
           <span className="query-text">{typed}</span>
           {caretOn ? <span className="query-caret" /> : null}
-          <span className="run">Run</span>
         </div>
         <div className={`memo-reveal${memoIn ? ' in' : ''}`}>
           <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
