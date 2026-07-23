@@ -437,6 +437,112 @@
   }
 }
 
+/* Plate 03 — the review, two quiet columns */
+.review {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.review .side {
+  padding: 1.8rem;
+}
+.review .side + .side {
+  border-left: 1px solid var(--line);
+}
+.review .h {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.review .for {
+  color: var(--accent);
+}
+.review .against {
+  color: var(--ink-3);
+}
+.review .lede {
+  font-family: var(--font-display);
+  font-size: 1.3rem;
+  line-height: 1.2;
+  color: var(--ink);
+  margin-bottom: 0.7rem;
+}
+.review p {
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--ink-2);
+}
+.review .num {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-3);
+  float: right;
+}
+@media (max-width: 640px) {
+  .review {
+    grid-template-columns: 1fr;
+  }
+  .review .side + .side {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* Plate 04 — the newsroom staff box, two ruled index columns */
+.staff {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0;
+  border: 1px solid var(--line);
+}
+.staff .col {
+  padding: 1.6rem 1.75rem;
+}
+.staff .col + .col {
+  border-left: 1px solid var(--line);
+}
+.staff h4 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 0.9rem;
+}
+.staff .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.staff .row:first-of-type {
+  border-top: 0;
+}
+.staff .role {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  align-self: center;
+}
+@media (max-width: 640px) {
+  .staff {
+    grid-template-columns: 1fr;
+  }
+  .staff .col + .col {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+}
+
 .page-margin-x {
   /* Explicit width (not just max-width) — .page-margin-x is often a direct child of a
      display:flex; flex-direction:column ancestor (page shells), where auto margins on
