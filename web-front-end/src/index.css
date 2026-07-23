@@ -996,7 +996,7 @@ hr.doc-section-separator::before {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-inverse-muted);
-  border-bottom: 1px solid rgba(244, 241, 234, 0.16);
+  border-bottom: 1px solid rgba(217, 215, 212, 0.16);
 }
 
 .folio-strip > span:nth-child(2) {
@@ -1039,12 +1039,12 @@ hr.doc-section-separator::before {
 }
 .masthead-rules > .bar {
   height: 2px;
-  background: rgba(244, 241, 234, 0.9);
+  background: rgba(217, 215, 212, 0.9);
 }
 .masthead-rules > .hair {
   height: 1px;
   margin-top: 3px;
-  background: rgba(244, 241, 234, 0.28);
+  background: rgba(217, 215, 212, 0.28);
 }
 
 /* Section-nav on the dark masthead — paper links, quiet until hover. */
@@ -1116,7 +1116,7 @@ hr.doc-section-separator::before {
   color: rgba(0, 20, 51, 0.26);
 }
 .np-folio--inverse {
-  color: rgba(244, 241, 234, 0.42);
+  color: rgba(217, 215, 212, 0.42);
 }
 
 /* Big display figure for numbered ledger items (steps, briefs, features).
@@ -1132,7 +1132,7 @@ hr.doc-section-separator::before {
   font-feature-settings: 'onum' 1;
 }
 .np-figure--inverse {
-  color: rgba(244, 241, 234, 0.34);
+  color: rgba(217, 215, 212, 0.34);
 }
 
 /* Section hed — the body's display headline, set larger and tighter than before
@@ -1210,7 +1210,7 @@ hr.doc-section-separator::before {
 }
 
 .hero-result-snapshot {
-  background: rgba(244, 241, 234, 0.9) !important;
+  background: rgba(217, 215, 212, 0.9) !important;
 }
 
 /* CTA — expand-arrow on hover (padding/size set per instance) */
@@ -1241,7 +1241,7 @@ hr.doc-section-separator::before {
   align-items: center;
   gap: 0.8rem;
   padding: 0.85rem var(--page-margin-x);
-  background: rgba(244, 241, 234, 0.78);
+  background: rgba(217, 215, 212, 0.78);
   color: var(--text-secondary);
 }
 
@@ -1358,7 +1358,7 @@ hr.doc-section-separator::before {
 
 .home-proof-grid article {
   border-color: rgba(0, 20, 51, 0.07);
-  background: rgba(244, 241, 234, 0.72);
+  background: rgba(217, 215, 212, 0.72);
 }
 
 .home-proof-grid article:hover {
@@ -1765,7 +1765,7 @@ hr.doc-section-separator::before {
   pointer-events: none;
   background:
     radial-gradient(ellipse 85% 55% at 18% 32%, rgba(168, 138, 94, 0.14), transparent 58%),
-    radial-gradient(ellipse 65% 45% at 88% 62%, rgba(244, 241, 234, 0.09), transparent 50%),
+    radial-gradient(ellipse 65% 45% at 88% 62%, rgba(217, 215, 212, 0.09), transparent 50%),
     radial-gradient(circle at 50% 130%, rgba(0, 0, 0, 0.45), transparent 52%);
   mix-blend-mode: soft-light;
   opacity: 0.9;
@@ -1796,7 +1796,7 @@ hr.doc-section-separator::before {
 /* Metrics ledger strip (JPM / Lazard annual-report rhythm) */
 .inst-metrics-strip {
   background:
-    linear-gradient(180deg, rgba(244, 241, 234, 0.55) 0%, transparent 38%),
+    linear-gradient(180deg, rgba(217, 215, 212, 0.55) 0%, transparent 38%),
     var(--color-paper);
   border-color: rgba(0, 20, 51, 0.09);
 }
@@ -2023,7 +2023,7 @@ hr.doc-section-separator::before {
   color: rgba(0, 20, 51, 0.55);
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--section-divider);
-  background-color: rgba(244, 241, 234, 0.35);
+  background-color: rgba(217, 215, 212, 0.35);
   transition:
     border-color 0.2s ease,
     color 0.2s ease,
@@ -2033,7 +2033,7 @@ hr.doc-section-separator::before {
 .conviction-chip:hover {
   border-color: rgba(168, 138, 94, 0.45);
   color: rgba(0, 20, 51, 0.78);
-  background-color: rgba(244, 241, 234, 0.62);
+  background-color: rgba(217, 215, 212, 0.62);
 }
 
 .inst-footer {

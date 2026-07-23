@@ -10,13 +10,10 @@ export default {
       colors: {
         oxford: '#111820',
         paper: '#d9d7d4',
-        paperDeep: '#e7e0d4',
-        'paper-bright': '#f8f5ee',
         ivory: '#d9d7d4',
         canvas: '#d9d7d4',
         mist: '#f2f4f8',
         charcoal: '#26313f',
-        graphite: '#001433',
         escalation: '#8f4a32',
         accent: '#3d6b5e',
         'accent-strong': '#2f574c',

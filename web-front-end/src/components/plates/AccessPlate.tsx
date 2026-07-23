@@ -21,7 +21,7 @@ export default function AccessPlate() {
           <span className="wm">
             Aethria<span style={{ color: 'var(--accent)' }}>.</span>
           </span>
-          <p>Private-market intelligence for funds that need the evidence trail.</p>
+          <p>Private-market intelligence for funds that need the evidence trail, not another beautiful spreadsheet.</p>
         </div>
         <div>
           <p>

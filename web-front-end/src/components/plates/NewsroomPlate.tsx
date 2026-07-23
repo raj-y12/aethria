@@ -51,8 +51,8 @@ export default function NewsroomPlate() {
         </div>
       </div>
       <p className="caption reveal d3">
-        A masthead of agents. Scouts source, reviewers argue, the partner rules, the portfolio watches, and the
-        meta-agent rewrites the newsroom itself.
+        It only looks for what you tell it to. A masthead of agents. Scouts source, reviewers argue, the partner
+        rules, the portfolio watches, and the meta-agent rewrites the newsroom itself.
       </p>
     </Plate>
   );
