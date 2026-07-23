@@ -363,6 +363,117 @@ hr.doc-section-separator::before {
 }
 
 /* ───────────────────────────────────────────────────────────────
+   Dynamic range — the loud registers. A page that only whispers
+   reads as timid; a broadsheet SHOUTS at the masthead, then quiets
+   into the body. These are the heavy/dark counterweights to the
+   hairline system above.
+   ─────────────────────────────────────────────────────────────── */
+
+/* Full-bleed dark masthead — the one commanding block, ink on paper inverted. */
+.masthead-dark {
+  background: var(--color-oxford);
+  color: var(--text-inverse);
+  position: relative;
+}
+
+/* Broadsheet folio strip — edition furniture (vol/no · date · bureaus). */
+.folio-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-top: 14px;
+  padding-bottom: 12px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-inverse-muted);
+  border-bottom: 1px solid rgba(244, 241, 234, 0.16);
+}
+
+.folio-strip > span:nth-child(2) {
+  text-align: center;
+}
+.folio-strip > span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 680px) {
+  .folio-strip > span:first-child,
+  .folio-strip > span:last-child {
+    display: none;
+  }
+  .folio-strip > span:nth-child(2) {
+    width: 100%;
+  }
+}
+
+/* The nameplate — dominant, not a timid centered wordmark. */
+.masthead-plate {
+  display: flex;
+  justify-content: center;
+  padding-top: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.masthead-nameplate {
+  font-family: var(--font-wordmark);
+  font-weight: 500;
+  font-size: clamp(3.4rem, 11vw, 8.5rem);
+  line-height: 0.86;
+  letter-spacing: -0.03em;
+  color: var(--text-inverse);
+  text-align: center;
+}
+
+/* Double rule — a heavy bar over a hairline, the classic nameplate underscore. */
+.masthead-rules {
+  margin-top: clamp(1.25rem, 3vw, 2rem);
+}
+.masthead-rules > .bar {
+  height: 2px;
+  background: rgba(244, 241, 234, 0.9);
+}
+.masthead-rules > .hair {
+  height: 1px;
+  margin-top: 3px;
+  background: rgba(244, 241, 234, 0.28);
+}
+
+/* Section-nav on the dark masthead — paper links, quiet until hover. */
+.masthead-nav-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem 2.25rem;
+  padding-top: 14px;
+  padding-bottom: clamp(1.25rem, 3vw, 1.9rem);
+}
+.masthead-nav-strip a {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-inverse-secondary);
+  transition: color 0.2s ease;
+}
+.masthead-nav-strip a:hover {
+  color: var(--color-brand-mark-inverse);
+}
+
+/* Heavy rule — the weighted counterpart to .aethria-rule-t/b hairlines. */
+.rule-heavy-t {
+  border-top: 2px solid var(--color-oxford);
+}
+.rule-heavy-b {
+  border-bottom: 2px solid var(--color-oxford);
+}
+
+/* ───────────────────────────────────────────────────────────────
    Broadsheet system — the repeated print moves that make the page
    read as one newspaper rather than sections with paper colours.
    ─────────────────────────────────────────────────────────────── */
