@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite-react-ssg build",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:marketing": "node scripts/check-marketing.mjs",
     "preview": "vite preview",
@@ -43,6 +43,7 @@
     "postcss": "^8.4.32",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.2.2",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vite-react-ssg": "^0.9.2"
   }
 }
