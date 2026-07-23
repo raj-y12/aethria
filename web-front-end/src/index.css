@@ -167,6 +167,50 @@
   }
 }
 
+/* ── HERO (Izanami calm) ── */
+.hero {
+  position: relative;
+  height: 100vh;
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.hero-echo {
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+}
+.hero-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 80% at 50% 40%, transparent 40%, var(--stock) 100%);
+}
+.hero-center {
+  position: relative;
+  text-align: center;
+  padding: 0 1.5rem;
+}
+.hero-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 2rem;
+}
+.hero-statement {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  max-width: 16ch;
+  margin: 0 auto;
+}
+
 /* ── GALLERY SPINE ── */
 .plate {
   position: relative;
