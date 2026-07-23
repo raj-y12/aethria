@@ -5,7 +5,11 @@ import HomePage from '../HomePage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
-const PAPER = '#f4f1ea';
+const PAPER = '#D9D7D4';
+
+// ponytail: module-scope flag, not state — first client render must match SSG (no animation),
+// later route changes (post-mount) should still animate.
+let animateEntrances = false;
 
 // Private routes: any file in src/private/*.tsx is exposed at /<filename-lowercase>.
 // Delete the file to remove that route at build time.
@@ -59,13 +63,17 @@ export default function AnimatedRoutes() {
     document.body.style.backgroundColor = PAPER;
   }, []);
 
+  useEffect(() => {
+    animateEntrances = true;
+  }, []);
+
   if (element === null) return null;
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={pathname}
-        initial={{ opacity: 0, x: 12 }}
+        initial={animateEntrances ? { opacity: 0, x: 12 } : false}
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -12 }}
         transition={{ duration: DURATION, ease: EASE }}
