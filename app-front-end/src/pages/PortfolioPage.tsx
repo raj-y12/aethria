@@ -143,7 +143,6 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           className={workspaceLayout.headerBottom}
           eyebrow="Conviction"
           title="Portfolio"
-          plateIndex="03 — 04"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
               <Readout label="Invested" value={buckets.invested.length} />

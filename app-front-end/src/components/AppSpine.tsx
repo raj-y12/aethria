@@ -3,8 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { SpineNavButton } from './SystemBar';
 import AgentLogoutModal from './AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
-import { usePrefersReducedMotion } from '../hooks';
-import { bureauTimes, editionNo } from '../lib/clocks';
+import { editionNo } from '../lib/clocks';
 import type { ExecutionReadiness } from './institutional/ExecutionReadinessPanel';
 
 export type SpinePipelineState = 'Live' | 'Idle' | 'Off' | 'Issue' | 'Stopping';
@@ -146,22 +145,7 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
   const timeShort = time.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const dateShort = time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
 
-  // Bureau clocks — quiet foot furniture, mirrors the marketing gallery frame.
-  const reduceMotion = usePrefersReducedMotion();
-  const [bureau, setBureau] = useState<{ label: string; time: string }[] | null>(null);
   const [edition] = useState(editionNo());
-  useEffect(() => {
-    setBureau(bureauTimes());
-    if (reduceMotion) return;
-    const id = window.setInterval(() => setBureau(bureauTimes()), 1000);
-    return () => window.clearInterval(id);
-  }, [reduceMotion]);
-  // Drop :SS and stack cities on their own lines — the ~248px rail can't
-  // reliably hold "HH:MM:SS LON · HH:MM:SS SF · No. NNN" on one line without
-  // an ellipsis, which read as broken.
-  const bureauEntries = (bureau ?? []).map(
-    ({ label, time: t }) => `${t.slice(0, 5)} ${label === 'San Francisco' ? 'SF' : 'LON'}`
-  );
 
   const hasEscalations = telemetry.pendingEscalations > 0;
   const pipelineTone = PIPELINE_TONE[telemetry.pipelineState];
@@ -338,20 +322,9 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 {agentActionError}
               </p>
             ) : null}
-            {/* Bureau clocks + edition — quiet foot furniture, mirrors the
-                marketing gallery frame's bl/br corners. Stacked one city per
-                line rather than truncated onto a single line. */}
-            <div className="type-meta type-meta-inverse mt-phi-2 tabular-nums" aria-hidden>
-              {bureauEntries.length > 0 ? (
-                bureauEntries.map((entry, i) => (
-                  <p key={entry}>
-                    {i === bureauEntries.length - 1 ? `${entry} · No. ${edition}` : entry}
-                  </p>
-                ))
-              ) : (
-                <p>No. {edition}</p>
-              )}
-            </div>
+            <p className="type-meta type-meta-inverse mt-phi-2 tabular-nums" aria-hidden>
+              No. {edition}
+            </p>
           </footer>
         </div>
       </aside>
