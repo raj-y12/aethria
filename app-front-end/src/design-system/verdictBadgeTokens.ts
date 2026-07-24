@@ -23,7 +23,7 @@ export const DECISION_BADGE_CLASS: Record<DecisionBadgeVariant, string> = {
   MONITOR: 'border-oxford/40 text-oxford',
   awaiting: 'border-oxford/25 text-oxford/70',
   undecided: 'border-oxford/25 text-oxford/70',
-  escalation: 'bg-escalation !text-white border-escalation', // the one exception — stays filled
+  escalation: '!bg-escalation !text-white border-escalation', // the one exception — stays filled
 };
 
 /**
@@ -45,7 +45,7 @@ export const REVIEWER_BADGE_CLASS: Record<ReviewerQualityBand, string> = {
 export type QueueAnnotationVariant = 'burgundy' | 'gold' | 'positive';
 
 export const QUEUE_ANNOTATION_CLASS: Record<QueueAnnotationVariant, string> = {
-  burgundy: 'bg-escalation !text-white border-escalation', // genuine human-attention alert — stays filled
+  burgundy: '!bg-escalation !text-white border-escalation', // genuine human-attention alert — stays filled
   gold: 'border bg-transparent border-oxford/40 text-oxford',
   positive: 'border bg-transparent border-oxford/40 text-oxford',
 };

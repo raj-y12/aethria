@@ -37,4 +37,14 @@ describe('DecisionBadge', () => {
     expect(el).toHaveStyle({ borderColor: '#0a5' });
     expect(el.style.backgroundColor).toBe('');
   });
+
+  it('marks the escalation badge fill with !important (regression: bg-transparent cascade)', () => {
+    render(<DecisionBadge variant="escalation" />);
+    const el = screen.getByText(DECISION_BADGE_LABEL.escalation);
+    // The base VERDICT_CHIP_CLASS carries bg-transparent, and in the compiled
+    // stylesheet .bg-transparent happens to win at equal specificity — the
+    // fill must be marked !bg-escalation so !important forces it regardless
+    // of source order.
+    expect(el.className).toContain('!bg-escalation');
+  });
 });
