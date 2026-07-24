@@ -5,8 +5,8 @@ Audited against `.impeccable.md` (design brief) and the implemented design syste
 
 **Source of truth:** the *implemented* system. The brief was reconciled to it —
 Playfair Display (display/wordmark), Figtree Variable (body/UI), Space Mono
-(labels/data); oxford `#001433`, paper `#F4F1EA`, heritage gold `#a88a5e`,
-escalation burgundy `#7D2B3A`. (An earlier draft of this doc and the brief named
+(labels/data); oxford `#0a1629`, paper `#D9D7D4`,
+escalation burgundy `#6E2A3C`. (An earlier draft of this doc and the brief named
 Geist/Instrument/EB Garamond/JetBrains Mono and `#002147`/`#F2F0EA`/`#b8976a`;
 those describe a prior era and no longer reflect the code.)
 
