@@ -117,7 +117,6 @@
   color: rgba(var(--color-oxford-rgb), 0.64);
   font-family: var(--memo-font-display);
   font-size: clamp(1rem, 0.94rem + 0.3cqi, 1.2rem);
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -379,7 +378,6 @@
   color: var(--memo-ink-body);
   font-family: var(--memo-font-display);
   font-size: 0.9375rem;
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -395,7 +393,6 @@
   color: var(--memo-ink);
   font-family: var(--memo-font-display);
   font-size: clamp(1.45rem, 1.2rem + 1.15cqi, 2rem);
-  font-style: italic;
   line-height: 1.38;
   letter-spacing: -0.018em;
   text-wrap: pretty;
@@ -1333,7 +1330,6 @@
 
 .memoScoreEvidenceNote {
   margin: 0;
-  font-style: italic;
 }
 
 .memoScoreMoat,

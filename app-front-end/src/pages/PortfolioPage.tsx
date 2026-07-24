@@ -33,12 +33,11 @@ function ruledWhen(s: Startup): string {
   return Number.isNaN(t.getTime()) ? '—' : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** Instrument readout — bordered Record-plate dims cell. Counts up on arrival
- * (mirrors Fund's HeaderReadout dims-grid construction). */
+/** Instrument readout — a number with its label, no box. Counts up on arrival. */
 function Readout({ label, value, tone }: { label: string; value: number; tone?: 'escalation' }) {
   const shown = useCountUp(value);
   return (
-    <div className="flex flex-col gap-phi-1 bg-paper px-phi-4 py-phi-3">
+    <div className="flex flex-col gap-phi-1">
       <span
         className={`type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
@@ -146,10 +145,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           title="Portfolio"
           plateIndex="03 — 04"
           readouts={
-            // Record-plate dims cells — 1px section-divider grid lines via the
-            // gap+background trick (marketing `.dims` pattern), mirrors Fund's
-            // HeaderReadout construction (Task 3).
-            <div className="grid grid-cols-3 gap-px border border-[var(--section-divider)] bg-[var(--section-divider)]">
+            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
               <Readout label="Invested" value={buckets.invested.length} />
               <Readout label="Monitoring" value={buckets.monitoring.length} />
               <Readout label="Passed" value={buckets.passed.length} />
