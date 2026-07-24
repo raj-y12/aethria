@@ -1,32 +1,28 @@
 /* Fonts are self-hosted via @fontsource imports in main.tsx — no CDN. */
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
- * Palette: deep blue #001433, paper #F4F1EA, body ink #26313f, shell/memo on paper, accent #7D2B3A (escalations only), heritageGold #a88a5e (decorative only).
+ * Palette: deep blue #0a1629, paper #D9D7D4, body ink #1c2836, shell/memo on paper, accent #6E2A3C (escalations only).
  * Figtree Variable (body + UI, matches web-front-end warmth). Display: Playfair Display (editorial headings, verdicts, memos). Wordmark: Playfair Display (wordmark ONLY). Metadata: Space Mono.
  * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
 :root {
   /* Primary palette — aligned with web-front-end tokens */
-  --color-oxford: #001433;
-  --color-oxford-rgb: 0, 20, 51;
-  --color-paper: #f4f1ea;
-  --color-paper-rgb: 244, 241, 234;
+  --color-oxford: #0a1629;
+  --color-oxford-rgb: 10, 22, 41;
+  --color-paper: #D9D7D4;
+  --color-paper-rgb: 217, 215, 212;
   /** Slightly darker paper — selected rows, recessed surfaces (same hue family as paper). */
-  --color-paper-deep: #e7e0d4;
+  --color-paper-deep: #CDCBC7;
   /** Subtle lift for raised chrome (aligned with web marketing paper family). */
-  --color-paper-bright: #f8f5ee;
-  --color-ivory: #f4f1ea;
-  --color-heritage-gold: #a88a5e;
-  --color-heritage-gold-soft: rgba(168, 138, 94, 0.35);
-  --color-accent-soft: rgba(125, 43, 58, 0.24);
+  --color-paper-bright: #E1DFDC;
+  --color-ivory: #D9D7D4;
+  --color-accent-soft: rgba(110, 42, 60, 0.24);
   /** Brand mark — verdigris wordmark dot only (marketing parity). Not escalation. */
   --color-brand-mark: #3d6b5e;
   --color-brand-mark-inverse: #7aab9a;
-  --color-brass: #8a704d;
-  --color-brass-line: rgba(168, 138, 94, 0.55);
   /* Escalation-only: use only for escalation dots, pulse, counts, critical human-attention alerts. */
-  --color-accent: #7d2b3a;
+  --color-accent: #6E2A3C;
   /* Pipe column headers, WorkGrid row selected/hover, memo summary — oxford @ 3%. */
   --color-register-tint: rgba(var(--color-oxford-rgb), 0.03);
   /* Validation strip: paper only (palette whitelist). */
@@ -47,13 +43,13 @@
   --text-muted:              rgba(var(--color-oxford-rgb), 0.50);
   --text-subtle:             rgba(var(--color-oxford-rgb), 0.38);
   --text-ghost:              rgba(var(--color-oxford-rgb), 0.22);
-  --text-inverse:            rgba(244, 241, 234, 0.94);
-  --text-inverse-secondary:  rgba(244, 241, 234, 0.78);
-  --text-inverse-muted:      rgba(244, 241, 234, 0.56);
+  --text-inverse:            rgba(217, 215, 212, 0.94);
+  --text-inverse-secondary:  rgba(217, 215, 212, 0.78);
+  --text-inverse-muted:      rgba(217, 215, 212, 0.56);
   --label-strong:            rgba(var(--color-oxford-rgb), 0.74);
   --label-muted:             rgba(var(--color-oxford-rgb), 0.42);
   /* Body / long-form prose on paper, deliberately blue-tinted rather than black. */
-  --color-charcoal:          #26313f;
+  --color-charcoal:          #1c2836;
   /* Clerk — match app palette and typography */
   --clerk-color-primary: var(--color-oxford);
   --clerk-color-background: var(--color-paper);
@@ -205,7 +201,7 @@
 /* Editorial paper texture (ported from web-front-end) */
 .paper-dot-grid {
   background-color: #f2efe6;
-  background-image: radial-gradient(rgba(0, 20, 51, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(10, 22, 41, 0.08) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
 }
@@ -514,7 +510,7 @@
   }
   .section-numeral--on-dark {
     font-size: 9px;
-    color: rgba(244, 241, 234, 0.25);
+    color: rgba(217, 215, 212, 0.25);
   }
 
   /** Full-width rule (institutional plain divider) */
@@ -661,13 +657,6 @@
 
 .signal-dot-breathe {
   animation: signal-dot-breathe 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
-}
-
-/* Brass vertical accent spine — flat heritage tone */
-.brass-spine {
-  width: 1px;
-  background-color: rgba(168, 138, 94, 0.42);
-  flex-shrink: 0;
 }
 
 /* Conviction chip — quiet bordered tag */

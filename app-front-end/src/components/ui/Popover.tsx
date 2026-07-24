@@ -74,7 +74,7 @@ export default function Popover({
         hidden={!open}
         className={[
           'absolute top-full z-30 mt-2 w-[min(22rem,78vw)] cursor-default',
-          'border border-oxford/15 bg-paper px-3.5 py-3 text-left shadow-[0_10px_30px_-12px_rgba(0,20,51,0.35)]',
+          'border border-oxford/15 bg-paper px-3.5 py-3 text-left shadow-[0_10px_30px_-12px_rgba(10,22,41,0.35)]',
           align === 'end' ? 'right-0' : 'left-0',
           reduceMotion ? '' : 'transition-opacity duration-150',
           open ? 'opacity-100' : 'opacity-0',

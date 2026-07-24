@@ -42,7 +42,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const { isDecided, ageDays } = queueContext;
 
   const spineVisible = isSelected;
-  const spineColor = spineVisible ? '#001433' : 'transparent';
+  const spineColor = spineVisible ? '#0a1629' : 'transparent';
   const spineWidth = spineVisible ? 3 : 0;
 
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
@@ -99,7 +99,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
           className="type-meta tabular-nums self-start shrink-0 min-w-[2.75rem] pr-0.5 leading-none"
           initial={false}
           animate={{
-            color: isSelected ? 'rgba(0, 20, 51, 0.68)' : 'rgba(0, 20, 51, 0.24)',
+            color: isSelected ? 'rgba(10, 22, 41, 0.68)' : 'rgba(10, 22, 41, 0.24)',
           }}
           transition={selectTransition}
         >
