@@ -10,6 +10,23 @@ export default function NewsroomPlate() {
       capLeft="The Newsroom — Plate 04"
       capRight="Who works the story"
     >
+      <div className="newsroom-flow reveal d2" aria-label="Pipeline order">
+        <span>Mandate</span>
+        <span className="arrow">→</span>
+        <span>Scouts</span>
+        <span className="arrow">→</span>
+        <span>Evidence</span>
+        <span className="arrow">→</span>
+        <span>Reviewers</span>
+        <span className="arrow">→</span>
+        <span>Partner</span>
+        <span className="arrow">→</span>
+        <span>Record</span>
+        <span className="arrow">→</span>
+        <span>Memory</span>
+        <span className="arrow">→</span>
+        <span>Portfolio</span>
+      </div>
       <div className="staff reveal d2">
         <div className="col">
           <h4>Scouts — source the field</h4>
@@ -52,7 +69,7 @@ export default function NewsroomPlate() {
       </div>
       <p className="caption reveal d3">
         It only looks for what you tell it to. A masthead of agents. Scouts source, reviewers argue, the partner
-        rules, the portfolio watches, and the meta-agent rewrites the newsroom itself.
+        rules, the portfolio watches, and the meta-agent calibrates the newsroom against real outcomes.
       </p>
     </Plate>
   );

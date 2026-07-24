@@ -14,6 +14,7 @@ export default function ReviewPlate() {
       capLeft="The Review — Plate 03"
       capRight="The disagreement, preserved"
     >
+      <p className="review-statement reveal d2">Investment judgment is not consensus.</p>
       <div className="review reveal d2">
         <div className="side">
           <div className="h for">
