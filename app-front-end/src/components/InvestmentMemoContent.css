@@ -115,7 +115,7 @@
   max-width: 40rem;
   margin: 15px 0 0;
   color: rgba(var(--color-oxford-rgb), 0.64);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1rem, 0.94rem + 0.3cqi, 1.2rem);
   line-height: 1.5;
 }
@@ -336,7 +336,7 @@
   max-width: 42rem;
   margin: clamp(20px, 3cqi, 30px) 0 0;
   color: rgba(var(--color-oxford-rgb), 0.82);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.125rem, 1rem + 0.65cqi, 1.45rem);
   line-height: 1.48;
   letter-spacing: -0.012em;
@@ -347,7 +347,7 @@
 .memoDossierStat {
   margin: clamp(14px, 2cqi, 20px) 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.3rem, 1.2rem + 0.5cqi, 1.55rem);
   font-weight: 500;
   line-height: 1.25;
@@ -376,7 +376,7 @@
 .memoDossierCallout > p:last-child {
   margin: 7px 0 0;
   color: var(--memo-ink-body);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.9375rem;
   line-height: 1.5;
 }
@@ -723,7 +723,7 @@
 .memoDecisionRecommendation {
   margin: 5px 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -840,7 +840,7 @@
 .memoDecisionHistoryDecision {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -1500,7 +1500,7 @@
 .memoEvRiskTitle {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1rem;
   line-height: 1.42;
 }
@@ -1758,7 +1758,7 @@
 
 .memoDisclosureTitle {
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.98rem;
   font-weight: 500;
   letter-spacing: -0.012em;
