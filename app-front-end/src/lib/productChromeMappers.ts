@@ -4,7 +4,7 @@ import type { LookupResultSnapshotProps, MandateCardProps } from '@aethria/produ
 import { getReviewerQualityBand } from '../design-system/semantics';
 import type { Startup } from '../types/startup';
 import { normalizeStructuredScoring } from './reviewScoring';
-import { DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
+import { badgeTextColorForBackground, DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
 
 const DIMENSION_KEYS = ['market', 'execution', 'product', 'technical', 'defensibility'] as const;
 const DIMENSION_LABELS: Record<(typeof DIMENSION_KEYS)[number], string> = {
@@ -140,12 +140,13 @@ export function buildLookupSnapshotProps(
   const recommendation = startup.partner?.recommendation;
   const verdict = recommendation ? `${recommendation}.` : band ? `${band}.` : 'REVIEWING.';
 
-  // Mono outline chip, matching DecisionBadge: configured colour tints the
-  // border only, never a fill — verdict reads by label, not colour.
+  // Filled chip, matching DecisionBadge: configured colour is the fill,
+  // with a computed contrasting ink for readability.
   const badges = verdictBadges ?? DEFAULT_VERDICT_BADGES;
   const verdictColor = recommendation
     ? badges.find((b) => b.id === recommendation)?.backgroundColor ?? null
     : null;
+  const verdictTextColor = verdictColor ? badgeTextColorForBackground(verdictColor) : null;
   const sector = startup.scout.sector?.trim();
   const stage = startup.scout.funding_stage?.trim();
   const metaParts = [sector, stage].filter(Boolean);
@@ -193,6 +194,7 @@ export function buildLookupSnapshotProps(
     metaLine: metaParts.length > 0 ? metaParts.join(' · ') : undefined,
     verdict,
     verdictColor,
+    verdictTextColor,
     summary,
     dimensions,
     thesisLine: thesisBits.length > 0 ? thesisBits.join(' · ') : undefined,

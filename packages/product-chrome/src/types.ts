@@ -33,10 +33,9 @@ export type LookupResultSnapshotProps = {
   queryLabel?: string;
   metaLine?: string;
   verdict: string;
-  /** When set, the verdict renders as a mono outline chip with a border tint in this colour
-   * (matches DecisionBadge — transparent fill, ink text, verdict reads by label). */
+  /** When set, the verdict renders as a filled chip in this colour (matches DecisionBadge). */
   verdictColor?: string | null;
-  /** @deprecated No longer used — the verdict chip always renders ink text on transparent fill. */
+  /** Contrasting text color for the filled verdict chip (matches DecisionBadge). */
   verdictTextColor?: string | null;
   summary: string;
   dimensions: LookupDimensionScore[];

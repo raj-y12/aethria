@@ -18,7 +18,7 @@ describe('DecisionBadge', () => {
     expect(screen.getByText('Custom')).toBeInTheDocument();
   });
 
-  it('applies a configured badge colour as a border tint (not a fill) for verdict variants', () => {
+  it('applies a configured badge colour as a fill for verdict variants', () => {
     render(
       <DecisionBadge
         variant="INVEST"
@@ -32,19 +32,17 @@ describe('DecisionBadge', () => {
       />,
     );
     const el = screen.getByText(DECISION_BADGE_LABEL.INVEST);
-    // Configured colour becomes a border tint on an otherwise-transparent chip —
-    // marketing parity: verdict reads by label, not fill colour.
-    expect(el).toHaveStyle({ borderColor: '#0a5' });
-    expect(el.style.backgroundColor).toBe('');
+    // Configured colour is the chip's fill — verdicts render as cooled, filled chips.
+    expect(el).toHaveStyle({ backgroundColor: '#0a5' });
+    expect(el.style.borderColor).toBe('');
   });
 
-  it('marks the escalation badge fill with !important (regression: bg-transparent cascade)', () => {
+  it('renders the escalation badge with its filled, full-strength background class', () => {
     render(<DecisionBadge variant="escalation" />);
     const el = screen.getByText(DECISION_BADGE_LABEL.escalation);
-    // The base VERDICT_CHIP_CLASS carries bg-transparent, and in the compiled
-    // stylesheet .bg-transparent happens to win at equal specificity — the
-    // fill must be marked !bg-escalation so !important forces it regardless
-    // of source order.
-    expect(el.className).toContain('!bg-escalation');
+    // Escalation is the one variant that stays filled at full saturation,
+    // regardless of any configured verdict-badge colour.
+    expect(el.className).toContain('bg-escalation');
+    expect(el.className).toContain('!text-white');
   });
 });

@@ -23,8 +23,8 @@ export const DEMO_LOOKUP_RESULT: LookupResultSnapshotProps = {
   queryLabel: DEMO_LOOKUP_QUERY,
   metaLine: 'B2B Infrastructure · Series A · London',
   verdict: 'INVEST',
-  verdictColor: '#bfe3cc',
-  verdictTextColor: '#17442d',
+  verdictColor: '#c3d3c9',
+  verdictTextColor: '#0a1629',
   summary:
     'Source trail retained · Reviewer disagreement surfaced · Mandate fit recorded',
   thesisLine: 'Investment record prepared for review',

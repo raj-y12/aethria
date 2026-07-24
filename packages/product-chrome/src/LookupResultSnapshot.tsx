@@ -16,6 +16,7 @@ export default function LookupResultSnapshot({
   metaLine,
   verdict,
   verdictColor,
+  verdictTextColor,
   summary,
   dimensions,
   thesisLine,
@@ -104,14 +105,13 @@ export default function LookupResultSnapshot({
         {verdictColor ? (
           <span
             className={cx(
-              // Mono outline chip — matches the app-front-end decision chip
-              // (VERDICT_CHIP_CLASS/DecisionBadge): transparent fill, border
-              // tint in the configured colour, ink text. Verdict reads by
-              // label, not fill colour.
-              'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none border bg-transparent font-mono font-semibold uppercase leading-none min-w-[4.25rem] px-2 py-1 text-[9px] tracking-[0.1em] text-oxford',
+              // Filled chip — matches the app-front-end decision chip
+              // (VERDICT_CHIP_CLASS/DecisionBadge): configured colour is the
+              // fill, with a computed contrasting ink for readability.
+              'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono font-semibold uppercase leading-none min-w-[4.25rem] px-2 py-1 text-[9px] tracking-[0.1em]',
               showCompanyName && companyName ? 'mt-2' : '',
             )}
-            style={{ borderColor: verdictColor }}
+            style={{ backgroundColor: verdictColor, color: verdictTextColor ?? undefined }}
           >
             {verdict.replace(/\.$/, '')}
           </span>
