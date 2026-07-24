@@ -53,10 +53,6 @@ export default function LoadingAnimation({
           <div className="aethria-t-dot r5d5" />
         </div>
       </div>
-
-      <div className="mt-phi-5 text-center">
-        <p className="type-label-section text-oxford/60">Calibrating workspace</p>
-      </div>
     </div>
   );
 }
