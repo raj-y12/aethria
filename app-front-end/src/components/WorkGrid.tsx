@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import type { ReactElement } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -162,7 +163,7 @@ const WorkGrid = ({
   onViewCounts,
   entranceReady = true,
   onEntranceComplete,
-}: WorkGridProps): JSX.Element => {
+}: WorkGridProps): ReactElement => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const [searchParams, setSearchParams] = useSearchParams();
