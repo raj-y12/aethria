@@ -1272,6 +1272,21 @@
   color: var(--memo-ink-muted);
 }
 
+/* "Not scored" is a word, not a numeral — the 16px Playfair treatment above is
+   sized for single digits and overflows the fixed 46px/44px column with a real
+   word. Fall back to the mono micro-label voice used for other muted states so
+   it reads as "no data" and wraps cleanly inside the track instead of spilling
+   into .memoScoreTake. */
+.memoScoreVal--unscored {
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-variant-numeric: normal;
+}
+
 .memoScoreTake {
   color: var(--memo-ink-body);
   font-size: 0.8125rem;
