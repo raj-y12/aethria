@@ -816,6 +816,107 @@
   will-change: opacity, transform;
 }
 
+/* ── Aethria SVG path-tracing loader ────────────────────────────────────── */
+.aethria-loader-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.aethria-loader {
+  --loader-size: 48px;
+  --stroke-color: rgba(var(--color-oxford-rgb), 0.25);
+  --dot-color: rgba(var(--color-oxford-rgb), 0.90);
+  width: var(--loader-size);
+  height: var(--loader-size);
+  position: relative;
+}
+
+.aethria-loader svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--stroke-color);
+  stroke-width: 3;
+  stroke-linejoin: miter;
+  stroke-linecap: butt;
+  stroke-dasharray: 201;
+  stroke-dashoffset: 0;
+  animation: aethria-path-circle 2.8s var(--motion-ease-in-out) infinite;
+}
+
+/* Traveling dot (circle) — pseudo on the loader div */
+.aethria-loader::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  background: var(--dot-color);
+  /* Start at bottom-center of the circle */
+  top: calc(50% + 19px);
+  left: calc(50% - 2.5px);
+  animation: aethria-dot-circle 2.8s var(--motion-ease-in-out) infinite;
+}
+
+/* ── Triangle overrides ── */
+.aethria-loader--triangle svg {
+  stroke-dasharray: 221;
+  animation: aethria-path-triangle 2.8s var(--motion-ease-in-out) infinite;
+}
+
+.aethria-loader--triangle::after {
+  /* Start at bottom-left vertex */
+  top: auto;
+  bottom: 4px;
+  left: 4px;
+  animation: aethria-dot-triangle 2.8s var(--motion-ease-in-out) infinite;
+}
+
+/* ── Static / reduced-motion fallback ── */
+.aethria-loader--static svg {
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  stroke: rgba(var(--color-oxford-rgb), 0.40);
+  animation: none;
+}
+
+.aethria-loader--static::after {
+  animation: none;
+  opacity: 0.85;
+}
+
+/* ── Circle keyframes ── */
+@keyframes aethria-path-circle {
+  0%   { stroke-dashoffset: 0; }
+  25%  { stroke-dashoffset: 50; }
+  50%  { stroke-dashoffset: 100; }
+  75%  { stroke-dashoffset: 150; }
+  100% { stroke-dashoffset: 201; }
+}
+
+@keyframes aethria-dot-circle {
+  0%   { transform: translate(0, 0); }
+  25%  { transform: translate(19px, -19px); }
+  50%  { transform: translate(0, -38px); }
+  75%  { transform: translate(-19px, -19px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ── Triangle keyframes ── */
+@keyframes aethria-path-triangle {
+  0%   { stroke-dashoffset: 0; }
+  33%  { stroke-dashoffset: 74; }
+  66%  { stroke-dashoffset: 147; }
+  100% { stroke-dashoffset: 221; }
+}
+
+@keyframes aethria-dot-triangle {
+  0%   { transform: translate(0, 0); }
+  33%  { transform: translate(36px, 0); }
+  66%  { transform: translate(18px, -32px); }
+  100% { transform: translate(0, 0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .escalation-pulse,
   .escalation-dot-active,
@@ -826,7 +927,9 @@
   .rule-draw,
   .pulse-soft,
   .pulse-fast,
-  .dot-grid-pulse {
+  .dot-grid-pulse,
+  .aethria-loader svg,
+  .aethria-loader::after {
     animation: none !important;
   }
 
