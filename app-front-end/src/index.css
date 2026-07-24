@@ -200,7 +200,7 @@
 
 /* Editorial paper texture (ported from web-front-end) */
 .paper-dot-grid {
-  background-color: #f2efe6;
+  background-color: #d6d4d0; /* a breath deeper than stock, as the old cream sat under paper */
   background-image: radial-gradient(rgba(10, 22, 41, 0.08) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
