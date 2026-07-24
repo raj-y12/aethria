@@ -325,6 +325,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   return (
     <AppFrameContext.Provider value={contextValue}>
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+        <div className="grain" aria-hidden />
         <IdentityReviewCenter />
         <LookupReadyToast
           name={dispatch.lookupReady?.scout?.name ?? null}

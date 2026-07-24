@@ -215,6 +215,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
           eyebrow="Judgment"
           title="Flow"
+          plateIndex="02 — 04"
           readouts={
             <div
               className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4"

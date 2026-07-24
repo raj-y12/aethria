@@ -52,7 +52,8 @@ function Readout({ label, value, tone }: { label: string; value: number; tone?: 
 
 function SectionHead({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
+    <div className="relative flex items-baseline justify-between gap-phi-4 pt-phi-4">
+      <div className="rule-draw absolute inset-x-0 top-0 h-px bg-oxford/[0.075]" aria-hidden />
       <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
       {detail ? <span className="type-meta tabular-nums">{detail}</span> : null}
     </div>
@@ -133,6 +134,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           className={workspaceLayout.headerBottom}
           eyebrow="Conviction"
           title="Portfolio"
+          plateIndex="03 — 04"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
               <Readout label="Invested" value={buckets.invested.length} />

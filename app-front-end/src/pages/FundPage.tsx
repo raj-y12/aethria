@@ -67,6 +67,7 @@ export default function FundPage({ data }: { data: SystemData }) {
               runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
             }`}
             title={fundName}
+            plateIndex="04 — 04"
             sub={
               <Link
                 to="/v1/settings"
