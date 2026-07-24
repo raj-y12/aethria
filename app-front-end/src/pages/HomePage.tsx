@@ -313,14 +313,14 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                 aria-label="Workspaces"
               >
                 <HomeDoor
-                  numeral="III"
+                  numeral="03 — 04"
                   label="Portfolio"
                   detail={`${convictionCount} conviction · ${watchTotal} watching`}
                   index={0}
                   onClick={() => navigate('/v1/portfolio')}
                 />
                 <HomeDoor
-                  numeral="IV"
+                  numeral="04 — 04"
                   label="Fund"
                   detail={
                     mandateVersion != null

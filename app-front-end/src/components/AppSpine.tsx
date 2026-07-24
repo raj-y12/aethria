@@ -156,9 +156,12 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
     const id = window.setInterval(() => setBureau(bureauTimes()), 1000);
     return () => window.clearInterval(id);
   }, [reduceMotion]);
-  const bureauLine = (bureau ?? [])
-    .map(({ label, time: t }) => `${t} ${label === 'San Francisco' ? 'SF' : 'LON'}`)
-    .join(' · ');
+  // Drop :SS and stack cities on their own lines — the ~248px rail can't
+  // reliably hold "HH:MM:SS LON · HH:MM:SS SF · No. NNN" on one line without
+  // an ellipsis, which read as broken.
+  const bureauEntries = (bureau ?? []).map(
+    ({ label, time: t }) => `${t.slice(0, 5)} ${label === 'San Francisco' ? 'SF' : 'LON'}`
+  );
 
   const hasEscalations = telemetry.pendingEscalations > 0;
   const pipelineTone = PIPELINE_TONE[telemetry.pipelineState];
@@ -336,12 +339,19 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
               </p>
             ) : null}
             {/* Bureau clocks + edition — quiet foot furniture, mirrors the
-                marketing gallery frame's bl/br corners. Combined onto one
-                line: the rail is narrow, two lines would crowd the operator
-                block. */}
-            <p className="type-meta type-meta-inverse mt-phi-2 truncate tabular-nums" aria-hidden>
-              {bureauLine ? `${bureauLine} · ` : ''}No. {edition}
-            </p>
+                marketing gallery frame's bl/br corners. Stacked one city per
+                line rather than truncated onto a single line. */}
+            <div className="type-meta type-meta-inverse mt-phi-2 tabular-nums" aria-hidden>
+              {bureauEntries.length > 0 ? (
+                bureauEntries.map((entry, i) => (
+                  <p key={entry}>
+                    {i === bureauEntries.length - 1 ? `${entry} · No. ${edition}` : entry}
+                  </p>
+                ))
+              ) : (
+                <p>No. {edition}</p>
+              )}
+            </div>
           </footer>
         </div>
       </aside>

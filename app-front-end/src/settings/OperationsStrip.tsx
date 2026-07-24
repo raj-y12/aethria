@@ -135,7 +135,7 @@ export default function OperationsStrip({
     <section
       className={isRail
         ? 'bg-paper px-phi-4 py-phi-5'
-        : 'border-b border-oxford/[0.08] bg-paper px-phi-4 py-phi-3 lg:px-phi-6'}
+        : 'border-b border-oxford/[0.16] bg-paper px-phi-4 py-phi-3 lg:px-phi-6'}
       aria-labelledby="operations-strip-title"
     >
       <div className={isRail ? 'flex flex-col gap-phi-4' : 'flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6'}>

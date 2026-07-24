@@ -29,8 +29,7 @@
   --color-warning-bg: var(--color-paper);
   --color-warning-border: rgba(var(--color-oxford-rgb), 0.25);
   /* Section divider — matches web-front-end (1px solid borders, hairlines). */
-  --section-divider: rgba(var(--color-oxford-rgb), 0.1);
-  --section-diamond: rgba(var(--color-oxford-rgb), 0.2);
+  --section-divider: rgba(var(--color-oxford-rgb), 0.16);
   /* Typography roles — aligned with web-front-end font stack */
   --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Playfair Display', 'Georgia', serif;
@@ -200,8 +199,8 @@
 
 /* Editorial paper texture (ported from web-front-end) */
 .paper-dot-grid {
-  background-color: #d6d4d0; /* a breath deeper than stock, as the old cream sat under paper */
-  background-image: radial-gradient(rgba(10, 22, 41, 0.08) 1px, transparent 1px);
+  background-color: #D9D7D4; /* matches web-front-end's paper-dot-grid exactly */
+  background-image: radial-gradient(rgba(10, 22, 41, 0.055) 1px, transparent 1px);
   background-size: 28px 28px;
   background-repeat: repeat;
 }
@@ -511,15 +510,6 @@
   .section-numeral--on-dark {
     font-size: 9px;
     color: rgba(217, 215, 212, 0.25);
-  }
-
-  /** Full-width rule (institutional plain divider) */
-  .doc-rule-with-diamond {
-    border-top: 1px solid var(--section-divider);
-    position: relative;
-  }
-  .doc-rule-with-diamond::before {
-    content: none;
   }
 
   /** 1px Oxford-tinted horizontal rules (alternative to Tailwind border-b/t). */

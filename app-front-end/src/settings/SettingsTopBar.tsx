@@ -41,7 +41,7 @@ export default function SettingsTopBar({
 
   return (
     <motion.header
-      className="flex-none border-b border-oxford/[0.08] bg-paper"
+      className="flex-none border-b border-oxford/[0.16] bg-paper"
       initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
@@ -56,9 +56,7 @@ export default function SettingsTopBar({
             <span aria-hidden>←</span> Aethria
           </button>
           <span className="h-4 w-px bg-oxford/15" aria-hidden />
-          <p className="type-display text-[1.2rem] leading-none text-oxford">
-            Settings<span className="wordmark-dot">.</span>
-          </p>
+          <p className="type-label-section text-oxford">Settings</p>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1">

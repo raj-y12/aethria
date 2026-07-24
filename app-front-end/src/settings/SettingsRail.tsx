@@ -31,7 +31,7 @@ export default function SettingsRail({
   const reduceMotion = usePrefersReducedMotion();
   return (
     <motion.aside
-      className="hidden w-[13.5rem] flex-none flex-col overflow-y-auto border-r border-oxford/[0.08] bg-paper lg:flex"
+      className="hidden w-[13.5rem] flex-none flex-col overflow-y-auto border-r border-oxford/[0.16] bg-paper lg:flex"
       aria-label="Settings sections"
       initial={reduceMotion ? false : { opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
@@ -77,7 +77,7 @@ export default function SettingsRail({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-oxford/[0.08]">
+      <div className="mt-auto border-t border-oxford/[0.16]">
         <OperationsStrip
           variant="rail"
           settings={settings}

@@ -102,7 +102,7 @@ export default function FundThesisConfirmationModal({
             >
               <div
                 data-testid="desktop-comparison-headings"
-                className="hidden gap-x-phi-4 border-b border-oxford/[0.08] px-phi-5 py-phi-3 md:grid md:grid-cols-[minmax(9rem,22%)_minmax(0,1fr)_minmax(0,1fr)]"
+                className="hidden gap-x-phi-4 border-b border-oxford/[0.16] px-phi-5 py-phi-3 md:grid md:grid-cols-[minmax(9rem,22%)_minmax(0,1fr)_minmax(0,1fr)]"
               >
                 <span aria-hidden />
                 <p className="type-label-section text-oxford/55">Currently live</p>
