@@ -293,9 +293,12 @@ export default function FlowPage({ data }: { data: SystemData }) {
               />
             </section>
 
-            <aside className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex lg:pl-phi-4" aria-live="polite">
+            <aside className="hidden min-h-0 min-w-0 flex-col overflow-visible bg-paper lg:flex lg:pl-phi-4" aria-live="polite">
               {selectedStartup && memoStartup ? (
-                <div className="memoShellContent memoShellContent--workspace min-h-0 min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-paper px-phi-0 pt-phi-3 pb-phi-6">
+                // focus-frame: brackets read "this is the framed print" — only while a deal
+                // is open. overflow-y-auto stays for the memo scroll; overflow-x drops to
+                // visible so the bracket's ±26px flanks can bleed into the column gutter.
+                <div className="focus-frame memoShellContent memoShellContent--workspace min-h-0 min-w-0 w-full flex-1 overflow-y-auto bg-paper px-phi-0 pt-phi-3 pb-phi-6">
                   <motion.div
                     key={memoStartup.id}
                     initial={reduceMotion ? false : { opacity: 0, y: 6 }}

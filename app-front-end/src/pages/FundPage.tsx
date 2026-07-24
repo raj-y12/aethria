@@ -15,7 +15,7 @@ function HeaderReadout({ label, value, suffix, text }: { label: string; value?: 
   const shown = useCountUp(value ?? 0);
   const display = text != null ? text : value == null ? '--' : `${shown.toLocaleString()}${suffix ?? ''}`;
   return (
-    <div className="flex flex-col gap-phi-1">
+    <div className="flex flex-col gap-phi-1 bg-paper px-phi-4 py-phi-3">
       <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
         {display}
       </span>
@@ -77,7 +77,9 @@ export default function FundPage({ data }: { data: SystemData }) {
               </Link>
             }
             readouts={
-              <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+              // Record-plate dims cells — 1px section-divider grid lines via the
+              // gap+background trick (marketing `.dims` pattern), cells on bg-paper.
+              <div className="grid grid-cols-2 gap-px border border-[var(--section-divider)] bg-[var(--section-divider)] sm:grid-cols-4">
                 <HeaderReadout label="Mandate match" value={pctNum(stats?.pct_matching_thesis)} suffix="%" />
                 <HeaderReadout label="Mean alignment" value={pctNum(stats?.avg_alignment_score)} suffix="%" />
                 <HeaderReadout label="Drift" text={drift(stats?.drift_vs_previous)} />

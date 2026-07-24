@@ -43,7 +43,8 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
 
   const spineVisible = isSelected;
   const spineColor = spineVisible ? '#0a1629' : 'transparent';
-  const spineWidth = spineVisible ? 3 : 0;
+  // 2px ink left-edge — the audit's spine mark (reconciled down from 3px).
+  const spineWidth = spineVisible ? 2 : 0;
 
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
   const ambientPadding =
