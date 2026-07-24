@@ -98,7 +98,7 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.32 }}
-              className="focus-frame mt-phi-7 min-w-0 w-full max-w-3xl border border-oxford/10 bg-paper"
+              className="focus-frame mt-phi-7 min-w-0 w-full max-w-3xl bg-paper"
             >
               <div
                 data-testid="desktop-comparison-headings"

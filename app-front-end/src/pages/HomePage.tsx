@@ -254,7 +254,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
             {/* ── On the desk — the door to Flow, carrying its scent ── */}
             {attention.length > 0 && (
-              <Reveal delay={0.34} className="focus-frame mt-phi-7 w-full max-w-[46rem]">
+              <Reveal delay={0.34} className="mt-phi-7 w-full max-w-[46rem]">
                 <button
                   type="button"
                   onClick={() => navigate('/v1/flow')}
