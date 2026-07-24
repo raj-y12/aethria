@@ -816,105 +816,68 @@
   will-change: opacity, transform;
 }
 
-/* ── Aethria SVG path-tracing loader ────────────────────────────────────── */
-.aethria-loader-group {
+/* ── Aethria Triangle Dot Grid Matrix Loader ───────────────────────────── */
+.aethria-triangle-dot-grid {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-5);
+  gap: 6px;
 }
 
-.aethria-loader {
-  --loader-size: 48px;
-  --stroke-color: rgba(var(--color-oxford-rgb), 0.25);
-  --dot-color: rgba(var(--color-oxford-rgb), 0.90);
-  width: var(--loader-size);
-  height: var(--loader-size);
-  position: relative;
+.aethria-grid-row {
+  display: flex;
+  gap: 9px;
+  justify-content: center;
 }
 
-.aethria-loader svg {
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke: var(--stroke-color);
-  stroke-width: 3;
-  stroke-linejoin: miter;
-  stroke-linecap: butt;
-  stroke-dasharray: 201;
-  stroke-dashoffset: 0;
-  animation: aethria-path-circle 2.8s var(--motion-ease-in-out) infinite;
+.aethria-t-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--color-oxford);
+  opacity: 0.10;
+  transform: scale(0.5);
+  animation: aethria-tri-dot-pulse-point-one 2s ease-in-out infinite;
 }
 
-/* Traveling dot (circle) — pseudo on the loader div */
-.aethria-loader::after {
-  content: '';
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  background: var(--dot-color);
-  /* Start at bottom-center of the circle */
-  top: calc(50% + 19px);
-  left: calc(50% - 2.5px);
-  animation: aethria-dot-circle 2.8s var(--motion-ease-in-out) infinite;
+/* Staggered organic pulse delays */
+.aethria-t-dot.r1d1 { animation-delay: 0.1s; }
+
+.aethria-t-dot.r2d1 { animation-delay: 0.7s; }
+.aethria-t-dot.r2d2 { animation-delay: 0.3s; }
+
+.aethria-t-dot.r3d1 { animation-delay: 1.1s; }
+.aethria-t-dot.r3d2 { animation-delay: 0.4s; }
+.aethria-t-dot.r3d3 { animation-delay: 0.9s; }
+
+.aethria-t-dot.r4d1 { animation-delay: 0.2s; }
+.aethria-t-dot.r4d2 { animation-delay: 1.4s; }
+.aethria-t-dot.r4d3 { animation-delay: 0.6s; }
+.aethria-t-dot.r4d4 { animation-delay: 1.0s; }
+
+.aethria-t-dot.r5d1 { animation-delay: 0.8s; }
+.aethria-t-dot.r5d2 { animation-delay: 0.3s; }
+.aethria-t-dot.r5d3 { animation-delay: 1.2s; }
+.aethria-t-dot.r5d4 { animation-delay: 0.5s; }
+.aethria-t-dot.r5d5 { animation-delay: 1.5s; }
+
+/* 0.1 -> 1 -> 0.1 Pulse Keyframes */
+@keyframes aethria-tri-dot-pulse-point-one {
+  0%, 100% {
+    opacity: 0.10;
+    transform: scale(0.5);
+    background: var(--color-oxford);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+    background: var(--color-brand-mark);
+  }
 }
 
-/* ── Triangle overrides ── */
-.aethria-loader--triangle svg {
-  stroke-dasharray: 221;
-  animation: aethria-path-triangle 2.8s var(--motion-ease-in-out) infinite;
-}
-
-.aethria-loader--triangle::after {
-  /* Start at bottom-left vertex */
-  top: auto;
-  bottom: 4px;
-  left: 4px;
-  animation: aethria-dot-triangle 2.8s var(--motion-ease-in-out) infinite;
-}
-
-/* ── Static / reduced-motion fallback ── */
-.aethria-loader--static svg {
-  stroke-dasharray: none;
-  stroke-dashoffset: 0;
-  stroke: rgba(var(--color-oxford-rgb), 0.40);
-  animation: none;
-}
-
-.aethria-loader--static::after {
-  animation: none;
-  opacity: 0.85;
-}
-
-/* ── Circle keyframes ── */
-@keyframes aethria-path-circle {
-  0%   { stroke-dashoffset: 0; }
-  25%  { stroke-dashoffset: 50; }
-  50%  { stroke-dashoffset: 100; }
-  75%  { stroke-dashoffset: 150; }
-  100% { stroke-dashoffset: 201; }
-}
-
-@keyframes aethria-dot-circle {
-  0%   { transform: translate(0, 0); }
-  25%  { transform: translate(19px, -19px); }
-  50%  { transform: translate(0, -38px); }
-  75%  { transform: translate(-19px, -19px); }
-  100% { transform: translate(0, 0); }
-}
-
-/* ── Triangle keyframes ── */
-@keyframes aethria-path-triangle {
-  0%   { stroke-dashoffset: 0; }
-  33%  { stroke-dashoffset: 74; }
-  66%  { stroke-dashoffset: 147; }
-  100% { stroke-dashoffset: 221; }
-}
-
-@keyframes aethria-dot-triangle {
-  0%   { transform: translate(0, 0); }
-  33%  { transform: translate(36px, 0); }
-  66%  { transform: translate(18px, -32px); }
-  100% { transform: translate(0, 0); }
+.aethria-dot-grid--static .aethria-t-dot {
+  animation: none !important;
+  opacity: 0.5;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -928,8 +891,7 @@
   .pulse-soft,
   .pulse-fast,
   .dot-grid-pulse,
-  .aethria-loader svg,
-  .aethria-loader::after {
+  .aethria-t-dot {
     animation: none !important;
   }
 
