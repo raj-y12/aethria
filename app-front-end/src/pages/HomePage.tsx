@@ -71,7 +71,7 @@ function HomeDoor({
       />
 
       <span
-        className={`type-data relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/60 group-hover:text-oxford`}
+        className={`plate-num relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] group-hover:text-oxford`}
         aria-hidden
       >
         {numeral}
@@ -209,8 +209,8 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
         {showFirstRun ? (
           <>
-            <Reveal delay={0.16} y={10} className="mt-phi-5">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Define your mandate.
               </h1>
             </Reveal>
@@ -232,8 +232,8 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           </>
         ) : (
           <>
-            <Reveal delay={0.16} y={10} className="mt-phi-5">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 {headline}
               </h1>
             </Reveal>
@@ -254,7 +254,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
             {/* ── On the desk — the door to Flow, carrying its scent ── */}
             {attention.length > 0 && (
-              <Reveal delay={0.34} className="mt-phi-7 w-full max-w-[46rem]">
+              <Reveal delay={0.34} className="focus-frame mt-phi-7 w-full max-w-[46rem]">
                 <button
                   type="button"
                   onClick={() => navigate('/v1/flow')}

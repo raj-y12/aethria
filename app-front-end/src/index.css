@@ -774,6 +774,24 @@
   }
 }
 
+/* Dispatch idle-placeholder caret — ported from web-front-end's `.query-caret`,
+   a blinking solid block after the "› look up …" prompt voice. Decorative only. */
+@keyframes query-caret-blink {
+  50% { opacity: 0; }
+}
+.query-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  background: var(--color-oxford);
+  animation: query-caret-blink 1s step-end infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .query-caret {
+    display: none;
+  }
+}
+
 .pulse-soft {
   animation: aethria-pulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }

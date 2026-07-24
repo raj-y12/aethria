@@ -107,8 +107,13 @@ function DispatchPanelBody({
   const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed'
+    ? `min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed${!input ? ' caret-transparent' : ''}`
     : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed';
+  // Embedded idle state (Dispatch's full-screen compose view) borrows the
+  // marketing query voice — a static "› look up …" prompt with a blinking
+  // block caret — instead of the plain native placeholder. Drawer/compact
+  // variants (Flow's inline dispatch) keep the native placeholder untouched.
+  const showQueryPrompt = embedded && !input;
 
   const showStatusSlot = isBusy || !!lookupMessage;
   const statusSlotCls = embedded
@@ -151,6 +156,12 @@ function DispatchPanelBody({
         }`}
         aria-label="Pipeline dispatch"
       >
+        {showQueryPrompt ? (
+          <span className="pointer-events-none absolute left-0 inline-flex items-baseline gap-[2px] text-oxford/60" aria-hidden>
+            <span className="font-medium font-sans text-[13px] leading-[1.5]">› look up …</span>
+            <span className="query-caret" />
+          </span>
+        ) : null}
         <input
           ref={inputRef}
           type="text"
@@ -162,7 +173,8 @@ function DispatchPanelBody({
             if (e.key === 'Enter') onSubmit();
             onInputKeyDown?.(e);
           }}
-          placeholder="Company name or URL"
+          placeholder={embedded ? '' : 'Company name or URL'}
+          aria-label={embedded ? 'Look up a company' : undefined}
           autoComplete="off"
           disabled={isBusy}
           className={inputCls}
