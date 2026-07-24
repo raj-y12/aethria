@@ -11,16 +11,16 @@
   /* Gallery of Instruments — cool architectural grey stock (replaces warm cream). */
   --stock: #d9d7d4;
   --stock-2: #d1cfcb;
-  --ink: #111820;
-  --ink-2: rgba(17, 24, 32, 0.66);
-  --ink-3: rgba(17, 24, 32, 0.44);
-  --ink-4: rgba(17, 24, 32, 0.3);
-  --line: rgba(17, 24, 32, 0.16);
-  --line-2: rgba(17, 24, 32, 0.26);
+  --ink: #0a1629;
+  --ink-2: rgba(10, 22, 41, 0.66);
+  --ink-3: rgba(10, 22, 41, 0.44);
+  --ink-4: rgba(10, 22, 41, 0.3);
+  --line: rgba(10, 22, 41, 0.16);
+  --line-2: rgba(10, 22, 41, 0.26);
   --accent: #3d6b5e;
   --mx: clamp(20px, 6vw, 120px);
 
-  --color-oxford: #111820;
+  --color-oxford: #0a1629;
   --color-paper: #d9d7d4;
   --color-ivory: #d9d7d4;
   --color-charcoal: #26313f;
@@ -53,7 +53,7 @@
   --section-padding-y-mobile: 56px;
   /* All marketing section top/bottom borders + matching 1px hairlines use this (1px solid). */
   --section-divider: var(--line);
-  --section-diamond: rgba(17, 24, 32, 0.2);
+  --section-diamond: rgba(10, 22, 41, 0.2);
 
   /* Frame borders (match app-front-end) */
   --frame-opacity: 0.06;
@@ -67,17 +67,17 @@
   /* Semantic roles for consistent contrast and token usage */
   --surface-base: var(--stock);
   --surface-strong: var(--color-oxford);
-  --surface-strong-hover: rgba(17, 24, 32, 0.88);
+  --surface-strong-hover: rgba(10, 22, 41, 0.88);
   --text-primary: var(--ink);
-  --text-secondary: rgba(17, 24, 32, 0.74);
-  --text-tertiary: rgba(17, 24, 32, 0.62);
-  --text-muted: rgba(17, 24, 32, 0.5);
-  --text-subtle: rgba(17, 24, 32, 0.42);
+  --text-secondary: rgba(10, 22, 41, 0.74);
+  --text-tertiary: rgba(10, 22, 41, 0.62);
+  --text-muted: rgba(10, 22, 41, 0.5);
+  --text-subtle: rgba(10, 22, 41, 0.42);
   --text-inverse: rgba(217, 215, 212, 0.94);
   --text-inverse-secondary: rgba(217, 215, 212, 0.78);
   --text-inverse-muted: rgba(217, 215, 212, 0.66);
-  --label-strong: rgba(17, 24, 32, 0.74);
-  --label-muted: rgba(17, 24, 32, 0.56);
+  --label-strong: rgba(10, 22, 41, 0.74);
+  --label-muted: rgba(10, 22, 41, 0.56);
 }
 
 @media (max-width: 768px) {
