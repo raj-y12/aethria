@@ -14,6 +14,7 @@ import {
 } from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 import { fetchStartupsWithToken } from '../api/startups';
+import { bureauTimes, editionNo } from '../lib/clocks';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -76,6 +77,18 @@ export default function LoginPage() {
   useEffect(() => {
     pingBackendWarmup();
   }, []);
+
+  // Quiet corner furniture (lg+ only): bureau clocks bottom-left, edition
+  // number bottom-right — mirrors the marketing gallery frame. Ticks once a
+  // second; reduced motion renders a single static read.
+  const [bureau, setBureau] = useState<{ label: string; time: string }[] | null>(null);
+  const [edition] = useState(editionNo());
+  useEffect(() => {
+    setBureau(bureauTimes());
+    if (reduceMotion) return;
+    const id = window.setInterval(() => setBureau(bureauTimes()), 1000);
+    return () => window.clearInterval(id);
+  }, [reduceMotion]);
 
   useEffect(() => {
     return () => {
@@ -332,25 +345,34 @@ export default function LoginPage() {
               </p>
             </motion.div>
           ) : (
-            <motion.div
-              key="brand-header"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
-              transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
-              className="flex w-full flex-col items-center mb-phi-8"
-            >
-              {/* Same voice as the home page: mono eyebrow, then the mark. */}
-              <p className="type-label-section m-0 mb-phi-5 text-center tabular-nums">
+            <div key="brand-header" className="flex w-full flex-col items-center">
+              {/* Settle-in stagger: kicker, then the mark+subtitle, then the
+                  fields below settle in turn (see form-view). Resting state
+                  is fully visible without JS/on reduced motion. */}
+              <motion.p
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.05 }}
+                className="type-label-section m-0 mb-phi-5 text-center tabular-nums"
+              >
                 {dateline}
-              </p>
-              <h1 className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]">
-                Aethria<span className="wordmark-dot">.</span>
-              </h1>
-              <p className="type-label-section mt-phi-4">
-                Deal flow operating system
-              </p>
-            </motion.div>
+              </motion.p>
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.18 }}
+                className="flex w-full flex-col items-center mb-phi-8"
+              >
+                <h1 className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]">
+                  Aethria<span className="wordmark-dot">.</span>
+                </h1>
+                <p className="type-label-section mt-phi-4">
+                  Deal flow operating system
+                </p>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
@@ -428,10 +450,10 @@ export default function LoginPage() {
           ) : (
             <motion.div
               key="form-view"
-              initial={{ opacity: 0, y: 16 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
-              transition={{ duration: 0.6, ease: EASE, delay: 0.2 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
               className="w-full max-w-[420px]"
             >
               <form
@@ -551,6 +573,25 @@ export default function LoginPage() {
       >
         <AuthInstitutionalFooter />
       </motion.footer>
+
+      {/* Corner marginal furniture (lg+ only) — quiet bureau clocks + edition
+          number, mirroring the marketing gallery frame's bl/br corners. */}
+      <div
+        className="pointer-events-none fixed bottom-8 left-8 z-20 hidden lg:block plate-num"
+        aria-hidden
+      >
+        {(bureau ?? [{ label: 'London', time: '—:—:—' }, { label: 'San Francisco', time: '—:—:—' }]).map(
+          ({ label, time }) => (
+            <div key={label}>{time} &nbsp; {label}</div>
+          )
+        )}
+      </div>
+      <div
+        className="pointer-events-none fixed bottom-8 right-8 z-20 hidden lg:block plate-num"
+        aria-hidden
+      >
+        No. {edition}
+      </div>
       </div>
     </div>
   );
