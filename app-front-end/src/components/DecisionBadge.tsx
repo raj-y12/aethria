@@ -19,14 +19,14 @@ export const DECISION_BADGE_LABEL: Record<DecisionBadgeVariant, string> = {
   escalation: 'ESCALATION',
 };
 
-function badgeBackground(
+function badgeBorderColor(
   variant: DecisionBadgeVariant,
   badges?: VerdictBadgeConfig[],
 ): CSSProperties | undefined {
   if (variant !== 'INVEST' && variant !== 'MONITOR' && variant !== 'PASS') return undefined;
-  const backgroundColor = badges?.find((badge) => badge.id === variant)?.backgroundColor;
-  if (!backgroundColor) return undefined;
-  return { backgroundColor };
+  const borderColor = badges?.find((badge) => badge.id === variant)?.backgroundColor;
+  if (!borderColor) return undefined;
+  return { borderColor };
 }
 
 export default function DecisionBadge({
@@ -49,7 +49,7 @@ export default function DecisionBadge({
   queue?: boolean;
 }) {
   const text = label ?? DECISION_BADGE_LABEL[variant];
-  const style = badgeBackground(variant, badges);
+  const style = badgeBorderColor(variant, badges);
 
   return (
     <span

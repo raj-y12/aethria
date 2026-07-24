@@ -42,7 +42,15 @@ describe('memo-calibrated mono typography roles', () => {
   });
 
   it('protects semantic verdict text colours from role defaults', () => {
+    // Escalation is the one filled "fire alarm" chip — it needs the !important
+    // override to guarantee white text against its filled background.
     expect(DECISION_BADGE_CLASS.escalation).toContain('!text-white');
-    expect(Object.values(DECISION_BADGE_CLASS).every((classes) => classes.includes('!text-'))).toBe(true);
+    // Every other verdict is a transparent outline chip (marketing parity —
+    // label reads the verdict, not fill colour): plain `text-oxford` classes
+    // already win over the zero-specificity `:where(.type-status)` role
+    // default, so no `!important` override is needed or expected there.
+    const outlineVariants = Object.entries(DECISION_BADGE_CLASS).filter(([variant]) => variant !== 'escalation');
+    expect(outlineVariants.every(([, classes]) => classes.includes('text-oxford'))).toBe(true);
+    expect(outlineVariants.every(([, classes]) => !classes.includes('!text-'))).toBe(true);
   });
 });

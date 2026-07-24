@@ -330,12 +330,12 @@ export const DEFAULT_SCORE_BANDS: ScoreBand[] = [
 ];
 
 export const DEFAULT_VERDICT_BADGES: VerdictBadgeConfig[] = [
-  { id: 'INVEST', label: 'Invest', backgroundColor: '#bfe3cc' },
-  { id: 'MONITOR', label: 'Monitor', backgroundColor: '#e5d39f' },
-  { id: 'PASS', label: 'Pass', backgroundColor: '#eabfb7' },
-  { id: 'STRONG', label: 'Strong', backgroundColor: '#bfe3cc' },
-  { id: 'MEDIUM', label: 'Medium', backgroundColor: '#e5d39f' },
-  { id: 'WEAK', label: 'Weak', backgroundColor: '#eabfb7' },
+  { id: 'INVEST', label: 'Invest', backgroundColor: '#c3d3c9' },
+  { id: 'MONITOR', label: 'Monitor', backgroundColor: '#cfccbb' },
+  { id: 'PASS', label: 'Pass', backgroundColor: '#d6c4c0' },
+  { id: 'STRONG', label: 'Strong', backgroundColor: '#c3d3c9' },
+  { id: 'MEDIUM', label: 'Medium', backgroundColor: '#cfccbb' },
+  { id: 'WEAK', label: 'Weak', backgroundColor: '#d6c4c0' },
 ];
 
 export const VERDICT_BADGE_LABELS: Record<VerdictBadgeId, string> = DEFAULT_VERDICT_BADGES.reduce(
