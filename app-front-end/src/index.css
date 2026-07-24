@@ -22,7 +22,7 @@
   --color-brand-mark: #3d6b5e;
   --color-brand-mark-inverse: #7aab9a;
   /* Escalation-only: use only for escalation dots, pulse, counts, critical human-attention alerts. */
-  --color-accent: #6E2A3C;
+  --color-escalation: #6E2A3C;
   /* Pipe column headers, WorkGrid row selected/hover, memo summary — oxford @ 3%. */
   --color-register-tint: rgba(var(--color-oxford-rgb), 0.03);
   /* Validation strip: paper only (palette whitelist). */

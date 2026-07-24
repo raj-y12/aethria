@@ -17,7 +17,7 @@
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
   --memo-wash: rgba(var(--color-oxford-rgb), 0.035);
-  --memo-accent: var(--color-accent, #6E2A3C);
+  --memo-accent: var(--color-escalation, #6E2A3C);
   --memo-gutter: clamp(24px, 5.5cqi, 58px);
   --memo-section-space: clamp(54px, 8cqi, 82px);
   --memo-body-size: clamp(0.875rem, 0.83rem + 0.16cqi, 1rem);

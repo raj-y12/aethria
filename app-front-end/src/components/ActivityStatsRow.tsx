@@ -49,7 +49,7 @@ export default function ActivityStatsRow({
               fontSize: 'clamp(52px, 10vw, 96px)',
               lineHeight: 0.85,
               letterSpacing: '-0.015em',
-              color: stat.accent ? 'var(--color-accent)' : 'var(--color-oxford)',
+              color: stat.accent ? 'var(--color-escalation)' : 'var(--color-oxford)',
               minWidth: `${stat.value.toLocaleString().length}ch`,
             }}
           >
