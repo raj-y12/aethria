@@ -1,6 +1,6 @@
 /** Bottom chrome on login / session summary screens. */
 export const INSTITUTIONAL_ACCESS_COPY = 'Confidential · Institutional Access';
-export const COLOPHON_COPY = 'Set in Playfair Display, Figtree & Space Mono · London · San Francisco';
+export const COLOPHON_COPY = 'Set in Playfair Display, Instrument Sans & Space Mono · London · San Francisco';
 
 export const institutionalAccessFooterClass =
   'type-label-section m-0';

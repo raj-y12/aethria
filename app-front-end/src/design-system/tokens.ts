@@ -89,7 +89,7 @@ export const tokens = {
     display: '"Playfair Display", Georgia, "Times New Roman", serif',
     /** Wordmark / type-hero only — Playfair Display. */
     wordmark: '"Playfair Display", Georgia, serif',
-    body: '"Figtree Variable", system-ui, -apple-system, sans-serif',
+    body: '"Instrument Sans", system-ui, -apple-system, sans-serif',
     mono: '"Space Mono", ui-monospace, monospace',
   },
   /**

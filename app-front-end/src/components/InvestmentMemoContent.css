@@ -7,7 +7,7 @@
 
 .memoPanel {
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, serif);
-  --memo-font-sans: var(--font-sans, "Figtree Variable", system-ui, sans-serif);
+  --memo-font-sans: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-paper: var(--color-paper, #D9D7D4);
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);

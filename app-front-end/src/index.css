@@ -2,7 +2,7 @@
 /*
  * Aethria — High-fidelity institutional design (aligned with web-front-end).
  * Palette: deep blue #0a1629, paper #D9D7D4, body ink #1c2836, shell/memo on paper, accent #6E2A3C (escalations only).
- * Figtree Variable (body + UI, matches web-front-end warmth). Display: Playfair Display (editorial headings, verdicts, memos). Wordmark: Playfair Display (wordmark ONLY). Metadata: Space Mono.
+ * Instrument Sans (body + UI, matches web-front-end). Display: Playfair Display (editorial headings, verdicts, memos). Wordmark: Playfair Display (wordmark ONLY). Metadata: Space Mono.
  * Frames: 1px rgba(var(--color-oxford-rgb), 0.06). No rounded corners.
  * Text hierarchy: Oxford opacity ladder 100, 80, 60, 40, 25. Line-height: 1.5 labels, 1.5 body.
  */
@@ -34,7 +34,7 @@
   /* Typography roles — aligned with web-front-end font stack */
   --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
   --font-wordmark: 'Playfair Display', 'Georgia', serif;
-  --font-sans: 'Figtree Variable', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, monospace;
   /* Semantic text hierarchy — aligned with web-front-end */
   --text-primary:            rgba(var(--color-oxford-rgb), 0.90);
@@ -61,7 +61,7 @@
   --clerk-color-input: var(--color-paper);
   --clerk-color-input-foreground: var(--color-oxford);
   --clerk-color-ring: var(--color-oxford);
-  --clerk-font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
+  --clerk-font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
   --clerk-font-family-buttons: "Space Mono", ui-monospace, monospace;
   --clerk-border-radius: 0;
   /* Motion tokens — aligned with tokens.ts */
@@ -216,14 +216,14 @@
   border: 1px solid rgba(var(--color-oxford-rgb), 0.06) !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-card {
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
   border: 1px solid rgba(var(--color-oxford-rgb), 0.06) !important;
   border-radius: 0 !important;
-  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 .cl-scrollBox {
   background-color: var(--color-paper) !important;
@@ -235,7 +235,7 @@
 [data-clerk-portal] > div {
   background-color: var(--color-paper) !important;
   color: var(--color-oxford) !important;
-  font-family: "Figtree Variable", system-ui, -apple-system, sans-serif !important;
+  font-family: "Instrument Sans", system-ui, -apple-system, sans-serif !important;
 }
 [data-clerk-portal] [role="dialog"] {
   background-color: var(--color-paper) !important;
@@ -294,7 +294,7 @@
     overflow-x: hidden;
     background-color: var(--color-paper);
     color: var(--text-primary);
-    font-family: "Figtree Variable", system-ui, -apple-system, sans-serif;
+    font-family: "Instrument Sans", system-ui, -apple-system, sans-serif;
     font-size: 14px;
     font-weight: 400;
     line-height: var(--phi); /* golden ratio — 1.618034 */
