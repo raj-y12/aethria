@@ -9,7 +9,7 @@
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, serif);
   --memo-font-sans: var(--font-sans, "Figtree Variable", system-ui, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
-  --memo-paper: var(--color-paper, #f4f1ea);
+  --memo-paper: var(--color-paper, #D9D7D4);
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);
   --memo-ink-body: rgba(var(--color-oxford-rgb), 0.82);
   --memo-ink-muted: rgba(var(--color-oxford-rgb), 0.6);
@@ -17,7 +17,7 @@
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
   --memo-wash: rgba(var(--color-oxford-rgb), 0.035);
-  --memo-accent: var(--color-accent, #7d2b3a);
+  --memo-accent: var(--color-accent, #6E2A3C);
   --memo-gutter: clamp(24px, 5.5cqi, 58px);
   --memo-section-space: clamp(54px, 8cqi, 82px);
   --memo-body-size: clamp(0.875rem, 0.83rem + 0.16cqi, 1rem);
@@ -117,7 +117,6 @@
   color: rgba(var(--color-oxford-rgb), 0.64);
   font-family: var(--memo-font-display);
   font-size: clamp(1rem, 0.94rem + 0.3cqi, 1.2rem);
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -208,7 +207,7 @@
 }
 
 .memoGateStrip--error {
-  border-color: rgba(125, 43, 58, 0.3);
+  border-color: rgba(110, 42, 60, 0.3);
 }
 
 .memoGateStripInner {
@@ -379,7 +378,6 @@
   color: var(--memo-ink-body);
   font-family: var(--memo-font-display);
   font-size: 0.9375rem;
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -395,7 +393,6 @@
   color: var(--memo-ink);
   font-family: var(--memo-font-display);
   font-size: clamp(1.45rem, 1.2rem + 1.15cqi, 2rem);
-  font-style: italic;
   line-height: 1.38;
   letter-spacing: -0.018em;
   text-wrap: pretty;
@@ -1333,7 +1330,6 @@
 
 .memoScoreEvidenceNote {
   margin: 0;
-  font-style: italic;
 }
 
 .memoScoreMoat,
@@ -1657,7 +1653,7 @@
 }
 
 .memoRiskAckButton {
-  border: 1px solid rgba(125, 43, 58, 0.32);
+  border: 1px solid rgba(110, 42, 60, 0.32);
   background: transparent;
   color: var(--memo-accent);
 }

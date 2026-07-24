@@ -1,10 +1,10 @@
 /**
  * Aethria design tokens — aligned with docs/design/brand-assets and web-front-end.
  *
- * Palette: deep blue #001433, paper #F4F1EA, paperBright/paperDeep variants,
- * inverse on deep blue #F4F1EA; body text uses blue-tinted charcoal #26313f, not black.
+ * Palette: deep blue #0a1629, paper #D9D7D4, paperBright/paperDeep variants,
+ * inverse on deep blue #D9D7D4; body text uses blue-tinted charcoal #1c2836, not black.
  * Typography: Geist Sans matches the brand poster’s geometric sans; Playfair Display handles editorial display and the wordmark.
- * Burgundy #7D2B3A (accent) is escalation-only — see color.accent. Heritage gold #a88a5e is decorative only (dividers, chrome) — color.heritageGold.
+ * Burgundy #6E2A3C (accent) is escalation-only — see color.accent.
  * Typography: Playfair Display (display/editorial headings and wordmark). Geist Sans (body/UI). Space Mono (labels, tabs, meta, data — ALL CAPS on labels/tabs).
  * Brand scale: section-label 11px/0.14em, tab/meta 11px/0.10–0.06em, body 14px/1.618.
  * Frames: 1px rgba(0,27,71,0.06). No rounded corners.
@@ -45,39 +45,36 @@ export const phiSpacing = {
  */
 export const surface = {
   /** Primary canvas — same as paper */
-  canvas: '#F4F1EA',
+  canvas: '#D9D7D4',
   /** Raised chrome — sidebar/header lifts */
-  raised: '#f8f5ee',
+  raised: '#E1DFDC',
   /** Recessed rows / inset strips — matches paperDeep */
-  recessed: '#E7E0D4',
+  recessed: '#CDCBC7',
   /** Selected/hover row tint — oxford @ 3%, aligns with --color-register-tint */
-  selectedTint: 'rgba(0, 20, 51, 0.03)',
+  selectedTint: 'rgba(10, 22, 41, 0.03)',
 } as const;
 
 export const tokens = {
   color: {
-    oxford: '#001433',
-    paper: '#F4F1EA',
+    oxford: '#0a1629',
+    paper: '#D9D7D4',
     /** Slightly lifted surfaces (panels, raised chrome) — web paper family. */
-    paperBright: '#F8F5EE',
+    paperBright: '#E1DFDC',
     /** Recessed / selected rows — same hue family as paper. */
-    paperDeep: '#E7E0D4',
+    paperDeep: '#CDCBC7',
     /** Body / long-form prose on paper, deliberately blue-tinted rather than black. */
-    charcoal: '#26313f',
-    ivory: '#F4F1EA',
-    bone: '#f2f4f8',
-    mist: '#f2f4f8',
+    charcoal: '#1c2836',
+    ivory: '#D9D7D4',
+    bone: '#E1DFDC',
+    mist: '#E1DFDC',
     /** Escalation-only: use only for escalation dots, pulse, escalation counts, critical alerts requiring human attention. */
-    accent: '#7D2B3A',
+    accent: '#6E2A3C',
     /** Wordmark punctuation dot — verdigris; never use for status or alerts. */
     brandMark: '#3d6b5e',
     brandMarkInverse: '#7aab9a',
-    /** Decorative warm metal — hairlines, non-semantic highlights. Never use for alerts or status. */
-    heritageGold: '#a88a5e',
-    heritageGoldSoft: 'rgba(168, 138, 94, 0.35)',
     /** Warning/validation: subtle warm tint derived from paper; not Tailwind amber. Use for validation errors, non-critical alerts. */
-    warningBg: '#F4F1EA',
-    warningBorder: 'rgba(0, 20, 51, 0.25)',
+    warningBg: '#D9D7D4',
+    warningBorder: 'rgba(10, 22, 41, 0.25)',
   },
   /** Oxford opacity ladder: 100, 80, 60, 40, 25. Use these for all muted Oxford text and semantic borders. */
   oxfordOpacity: {
@@ -136,7 +133,7 @@ export const tokens = {
     status: { size: '10px', lineHeight: 1.4, letterSpacing: '0.075em', fontWeight: 600, font: 'mono' as const, uppercase: true },
     action: { size: '10px', lineHeight: 1.4, letterSpacing: '0.075em', fontWeight: 400, font: 'mono' as const, uppercase: true },
   },
-  frameBorder: '1px solid rgba(0, 20, 51, 0.06)',
+  frameBorder: '1px solid rgba(10, 22, 41, 0.06)',
   motion: {
     /** Strong ease-out — UI entering, dropdowns, popovers. Starts fast, feels responsive. */
     ease: [0.16, 1, 0.3, 1] as [number, number, number, number],

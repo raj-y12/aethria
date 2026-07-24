@@ -21,24 +21,23 @@ Institutional, editorial UI. Modelled after a private equity firm's internal dea
 
 | Token | Hex / Value | Role |
 |---|---|---|
-| `oxford` | `#001B47` | Primary text, borders at full opacity |
-| `paper` | `#F4F1EA` | Page & panel background |
-| `paper-bright` | `#F8F5EE` | Raised surface, sheet overlay |
-| `ivory` | `#F4F1EA` | Document surface |
-| `charcoal` | `#26313f` (`--color-charcoal`) | Primary body prose on paper |
-| `heritage-gold` | `#a88a5e` | Heritage decorative accent — section rules, diamonds |
-| `gold-soft` | `rgba(168,138,94,0.35)` | Gold tint surfaces |
-| `escalation` | `#8F4A32` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
+| `oxford` | `#0a1629` | Primary text, borders at full opacity |
+| `paper` | `#D9D7D4` | Page & panel background |
+| `paper-bright` | `#E1DFDC` | Raised surface, sheet overlay |
+| `paper-deep` | `#CDCBC7` | Recessed surface — selected rows |
+| `ivory` | `#D9D7D4` | Document surface |
+| `charcoal` | `#1c2836` (`--color-charcoal`) | Primary body prose on paper |
+| `escalation` | `#6E2A3C` | **Human-attention alerts only** — escalation dots, counts, critical intervention states |
 | `brand-mark` | `#3d6b5e` | **Wordmark punctuation dot only** — shared with marketing; never for status |
 | `brand-mark-inverse` | `#7aab9a` | Wordmark dot on oxford/dark chrome |
-| `hairline` | `rgba(0,27,71,0.06)` | Default 1px borders (structural frames) |
-| `hairline-strong` | `rgba(0,27,71,0.12)` | Emphasized dividers |
-| `field-border` | `rgba(0,27,71,0.15)` | Input / select borders |
-| `field-border-strong` | `rgba(0,27,71,0.20)` | Focused input border |
-| `registerTint` | `rgba(0,27,71,0.03)` | WorkGrid row hover / column header fill |
-| `lookup.DEFAULT` | `#B5893E` | On-demand lookup origin chip |
-| `lookup.surface` | `#E8D7B4` | Lookup chip background |
-| `lookup.ink` | `#3D2A12` | Lookup chip text |
+| `hairline` | `rgba(10,22,41,0.06)` | Default 1px borders (structural frames) |
+| `hairline-strong` | `rgba(10,22,41,0.12)` | Emphasized dividers |
+| `field-border` | `rgba(10,22,41,0.15)` | Input / select borders |
+| `field-border-strong` | `rgba(10,22,41,0.20)` | Focused input border |
+| `registerTint` | `rgba(10,22,41,0.03)` | WorkGrid row hover / column header fill |
+| `lookup.DEFAULT` | `#8C7A4E` | On-demand lookup origin chip |
+| `lookup.surface` | `#D6D0BE` | Lookup chip background |
+| `lookup.ink` | `#2C2514` | Lookup chip text |
 
 ### Text opacity ladder (oxford as base)
 
@@ -55,9 +54,8 @@ Use Tailwind's opacity modifier: `text-oxford/100`, `text-oxford/80`, etc.
 
 ### Cross-app semantic contract (mandatory)
 
-- `escalation` is always `#8F4A32` and is never used as a decorative accent.
+- `escalation` is always `#6E2A3C` and is never used as a decorative accent.
 - `brand-mark` (verdigris) is for the wordmark dot only — never for alerts, badges, or links.
-- `heritage-gold` is decorative only and never used for critical status semantics.
 - In code, avoid introducing new raw hex values in class strings when a semantic token exists.
 
 ---
@@ -155,7 +153,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 ## Borders & Surfaces
 
 - **All borders**: `1px solid` — no `2px`, no `dashed`, no `dotted` (except dev only).
-- **Default border colour**: `hairline` = `rgba(0,27,71,0.06)`.
+- **Default border colour**: `hairline` = `rgba(10,22,41,0.06)`.
 - **Component frames**: `border border-hairline` → `.app-chrome-frame`.
 - **Raised surfaces**: `border border-hairline bg-paper-bright` → `.app-chrome-frame-raised`.
 - **No `border-radius` on product chrome.** Tailwind's `rounded-*` should resolve to `0` for all app shell/UI surfaces.
@@ -175,7 +173,7 @@ Golden ratio Fibonacci sequence. Every layout value maps to a named step.
 
 ### Section decoration (web-front-end pattern, use in editorial contexts)
 - `.doc-rule-with-diamond` — full-width 1px rule + centered 4×4 oxford diamond
-- `.paper-dot-grid` — `#F4F1EA` bg with `rgba(0,27,71,0.055)` 1px dots at 28px
+- `.paper-dot-grid` — `#D9D7D4` bg with `rgba(10,22,41,0.08)` 1px dots at 28px
 - `.section-numeral` — `Space Mono 9px`, tracking `0.12em`, `oxford/20`
 
 ---
@@ -310,7 +308,7 @@ animation: market-tape-marquee 96s linear infinite;
 
 ### Canonical (new code must follow)
 
-- Use semantic tokens first (`oxford`, `paper`, `escalation`, `heritage-gold`, `hairline`).
+- Use semantic tokens first (`oxford`, `paper`, `escalation`, `hairline`).
 - Keep product UI surfaces square and shadowless.
 - Use typography roles exactly as defined in this document.
 - Prefer token utilities and design-system primitives over ad-hoc per-component styling.

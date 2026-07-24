@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        oxford: '#111820',
+        oxford: '#0a1629',
         paper: '#d9d7d4',
         ivory: '#d9d7d4',
         canvas: '#d9d7d4',

@@ -40,7 +40,7 @@ export const REVIEWER_BADGE_CLASS: Record<ReviewerQualityBand, string> = {
 export type QueueAnnotationVariant = 'burgundy' | 'gold' | 'positive';
 
 export const QUEUE_ANNOTATION_CLASS: Record<QueueAnnotationVariant, string> = {
-  burgundy: 'bg-[#7D2B3A] !text-[#F4F1EA]',
+  burgundy: 'bg-[#6E2A3C] !text-[#D9D7D4]',
   gold: 'bg-[#d9c9a3] !text-[#4a3810]',
   positive: 'bg-[#b5d4bc] !text-[#17442d]',
 };

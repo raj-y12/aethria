@@ -50,10 +50,20 @@ function Readout({ label, value, tone }: { label: string; value: number; tone?: 
   );
 }
 
-function SectionHead({ title, detail }: { title: string; detail?: string }) {
+/** Group header — mono kicker + draw-in top rule, with an optional quiet
+ * ghost-numeral count in the plate-num voice beside the title. */
+function SectionHead({ title, detail, count }: { title: string; detail?: string; count?: number }) {
   return (
-    <div className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.075] pt-phi-4">
-      <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
+    <div className="relative flex items-baseline justify-between gap-phi-4 pt-phi-4">
+      <div className="rule-draw absolute inset-x-0 top-0 h-px bg-oxford/[0.075]" aria-hidden />
+      <span className="flex items-baseline gap-phi-2">
+        <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
+        {count != null ? (
+          <span className="plate-num" aria-hidden>
+            {count}
+          </span>
+        ) : null}
+      </span>
       {detail ? <span className="type-meta tabular-nums">{detail}</span> : null}
     </div>
   );
@@ -133,6 +143,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           className={workspaceLayout.headerBottom}
           eyebrow="Conviction"
           title="Portfolio"
+          plateIndex="03 — 04"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
               <Readout label="Invested" value={buckets.invested.length} />
@@ -147,7 +158,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           {/* ── Decision ledger (the record) ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
             <section aria-label="Decision ledger">
-              <SectionHead title="The book" detail={`${activeRows.length} shown`} />
+              <SectionHead title="The book" detail={`${activeRows.length} shown`} count={activeRows.length} />
               <div aria-label="Deal state" className="mt-phi-3 flex flex-wrap gap-phi-2">
                 {LEDGER_SEGMENTS.map((seg) => {
                   const active = seg.key === activeState;
@@ -278,6 +289,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               <SectionHead
                 title="Watchlist"
                 detail={`${data.watchlistAnalytics.total}${data.watchlistAnalytics.stale ? ` · ${data.watchlistAnalytics.stale} stale` : ''}`}
+                count={data.watchlistAnalytics.total}
               />
               {watchlistEntries.length === 0 ? (
                 <QuietEmpty>Nothing held under observation.</QuietEmpty>
@@ -309,7 +321,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
             </section>
 
             <section aria-label="Signals">
-              <SectionHead title="Signals" detail={recentSignals.length ? `Last ${recentSignals.length}` : undefined} />
+              <SectionHead
+                title="Signals"
+                detail={recentSignals.length ? `Last ${recentSignals.length}` : undefined}
+                count={recentSignals.length || undefined}
+              />
               {recentSignals.length === 0 ? (
                 <QuietEmpty>No high-priority events detected in the last cycle.</QuietEmpty>
               ) : (
