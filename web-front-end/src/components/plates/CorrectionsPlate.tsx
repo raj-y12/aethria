@@ -12,7 +12,7 @@ export default function CorrectionsPlate() {
       index="05 — 08"
       title="Corrections & Revisions"
       capLeft="Corrections & Revisions — Plate 05"
-      capRight="The masthead, rewriting itself"
+      capRight="Every revision, versioned and logged"
     >
       <div className="corrections reveal d2">
         <h4>Meta-Agent — daily pass</h4>
@@ -25,13 +25,12 @@ export default function CorrectionsPlate() {
           conviction, not drift.
         </p>
         <p>
-          <b>Mutated</b> — underperforming scout prompts are rewritten, re-hashed, and versioned before the next
-          cycle runs.
+          <b>Revised</b> — underperforming scout prompts are revised and versioned before the next cycle runs.
         </p>
       </div>
       <p className="caption reveal d3">
-        The newsroom edits itself. Once a day the meta-agent reads pipeline outcomes and rewrites the instrument that
-        produced them — weights, thresholds, prompts — each revision logged and versioned, never silent.
+        Once a day the meta-agent reviews pipeline outcomes and calibrates the system that produced them — weights,
+        thresholds, prompts — each revision versioned and logged, never silent.
       </p>
     </Plate>
   );

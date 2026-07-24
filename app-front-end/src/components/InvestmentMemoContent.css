@@ -7,7 +7,7 @@
 
 .memoPanel {
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, serif);
-  --memo-font-sans: var(--font-sans, "Figtree Variable", system-ui, sans-serif);
+  --memo-font-sans: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
   --memo-paper: var(--color-paper, #D9D7D4);
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);
@@ -17,7 +17,7 @@
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
   --memo-wash: rgba(var(--color-oxford-rgb), 0.035);
-  --memo-accent: var(--color-accent, #6E2A3C);
+  --memo-accent: var(--color-escalation, #6E2A3C);
   --memo-gutter: clamp(24px, 5.5cqi, 58px);
   --memo-section-space: clamp(54px, 8cqi, 82px);
   --memo-body-size: clamp(0.875rem, 0.83rem + 0.16cqi, 1rem);
@@ -115,7 +115,7 @@
   max-width: 40rem;
   margin: 15px 0 0;
   color: rgba(var(--color-oxford-rgb), 0.64);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1rem, 0.94rem + 0.3cqi, 1.2rem);
   line-height: 1.5;
 }
@@ -336,7 +336,7 @@
   max-width: 42rem;
   margin: clamp(20px, 3cqi, 30px) 0 0;
   color: rgba(var(--color-oxford-rgb), 0.82);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.125rem, 1rem + 0.65cqi, 1.45rem);
   line-height: 1.48;
   letter-spacing: -0.012em;
@@ -347,7 +347,7 @@
 .memoDossierStat {
   margin: clamp(14px, 2cqi, 20px) 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.3rem, 1.2rem + 0.5cqi, 1.55rem);
   font-weight: 500;
   line-height: 1.25;
@@ -376,7 +376,7 @@
 .memoDossierCallout > p:last-child {
   margin: 7px 0 0;
   color: var(--memo-ink-body);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.9375rem;
   line-height: 1.5;
 }
@@ -723,7 +723,7 @@
 .memoDecisionRecommendation {
   margin: 5px 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -840,7 +840,7 @@
 .memoDecisionHistoryDecision {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -1262,13 +1262,29 @@
 }
 
 .memoScoreVal {
-  font-family: var(--memo-font-mono);
-  font-size: 0.75rem;
+  font-family: var(--memo-font-display);
+  font-size: 1rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .memoScoreVal--muted {
   color: var(--memo-ink-muted);
+}
+
+/* "Not scored" is a word, not a numeral — the 16px Playfair treatment above is
+   sized for single digits and overflows the fixed 46px/44px column with a real
+   word. Fall back to the mono micro-label voice used for other muted states so
+   it reads as "no data" and wraps cleanly inside the track instead of spilling
+   into .memoScoreTake. */
+.memoScoreVal--unscored {
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-variant-numeric: normal;
 }
 
 .memoScoreTake {
@@ -1500,7 +1516,7 @@
 .memoEvRiskTitle {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1rem;
   line-height: 1.42;
 }
@@ -1758,7 +1774,7 @@
 
 .memoDisclosureTitle {
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.98rem;
   font-weight: 500;
   letter-spacing: -0.012em;

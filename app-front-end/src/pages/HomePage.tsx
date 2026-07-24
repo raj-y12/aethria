@@ -25,16 +25,14 @@ function recOf(s: Startup): string | null {
  */
 const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
 
-/** A door — one entry in the editorial nav band. Numeral, label, and a quiet reading. */
+/** A door — one entry in the editorial nav band. Label and a quiet reading. */
 function HomeDoor({
-  numeral,
   label,
   detail,
   tone = 'default',
   index,
   onClick,
 }: {
-  numeral: string;
   label: string;
   detail: string;
   tone?: 'default' | 'escalation';
@@ -70,12 +68,6 @@ function HomeDoor({
         }`}
       />
 
-      <span
-        className={`plate-num relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] group-hover:text-oxford`}
-        aria-hidden
-      >
-        {numeral}
-      </span>
       <span className="relative z-10 inline-block px-[3px]">
         <span
           className={`type-action type-action-strong block transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[1px] group-hover:text-oxford`}
@@ -254,7 +246,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
             {/* ── On the desk — the door to Flow, carrying its scent ── */}
             {attention.length > 0 && (
-              <Reveal delay={0.34} className="focus-frame mt-phi-7 w-full max-w-[46rem]">
+              <Reveal delay={0.34} className="mt-phi-7 w-full max-w-[46rem]">
                 <button
                   type="button"
                   onClick={() => navigate('/v1/flow')}
@@ -313,14 +305,12 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                 aria-label="Workspaces"
               >
                 <HomeDoor
-                  numeral="III"
                   label="Portfolio"
                   detail={`${convictionCount} conviction · ${watchTotal} watching`}
                   index={0}
                   onClick={() => navigate('/v1/portfolio')}
                 />
                 <HomeDoor
-                  numeral="IV"
                   label="Fund"
                   detail={
                     mandateVersion != null

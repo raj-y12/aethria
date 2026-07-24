@@ -1,4 +1,5 @@
 import DottedMarketMap from './DottedMarketMap';
+import { scrollToAnchor } from '../lib/scrollToAnchor';
 
 /**
  * Full-viewport opening plate (Izanami calm). Classes (.hero/.hero-veil/.hero-center/
@@ -22,6 +23,18 @@ export default function HeroPlate({ enter = true }: { enter?: boolean }) {
       <div className="hero-center">
         <div className="hero-kicker">Private-market intelligence</div>
         <h1 className="hero-statement">Private-market judgment, on the record.</h1>
+        <p className="hero-standfirst">
+          Aethria sources private companies, evaluates each opportunity against your fund mandate, and preserves
+          every decision as institutional memory.
+        </p>
+        <div className="hero-ctas">
+          <a href="#access" className="cta-primary" onClick={(e) => scrollToAnchor(e, '#access')}>
+            Request access
+          </a>
+          <a href="#market" className="cta-secondary" onClick={(e) => scrollToAnchor(e, '#market')}>
+            View the system
+          </a>
+        </div>
       </div>
     </section>
   );

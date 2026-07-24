@@ -3,8 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { SpineNavButton } from './SystemBar';
 import AgentLogoutModal from './AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
-import { usePrefersReducedMotion } from '../hooks';
-import { bureauTimes, editionNo } from '../lib/clocks';
 import type { ExecutionReadiness } from './institutional/ExecutionReadinessPanel';
 
 export type SpinePipelineState = 'Live' | 'Idle' | 'Off' | 'Issue' | 'Stopping';
@@ -145,20 +143,6 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
   }, []);
   const timeShort = time.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const dateShort = time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
-
-  // Bureau clocks — quiet foot furniture, mirrors the marketing gallery frame.
-  const reduceMotion = usePrefersReducedMotion();
-  const [bureau, setBureau] = useState<{ label: string; time: string }[] | null>(null);
-  const [edition] = useState(editionNo());
-  useEffect(() => {
-    setBureau(bureauTimes());
-    if (reduceMotion) return;
-    const id = window.setInterval(() => setBureau(bureauTimes()), 1000);
-    return () => window.clearInterval(id);
-  }, [reduceMotion]);
-  const bureauLine = (bureau ?? [])
-    .map(({ label, time: t }) => `${t} ${label === 'San Francisco' ? 'SF' : 'LON'}`)
-    .join(' · ');
 
   const hasEscalations = telemetry.pendingEscalations > 0;
   const pipelineTone = PIPELINE_TONE[telemetry.pipelineState];
@@ -335,13 +319,6 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 {agentActionError}
               </p>
             ) : null}
-            {/* Bureau clocks + edition — quiet foot furniture, mirrors the
-                marketing gallery frame's bl/br corners. Combined onto one
-                line: the rail is narrow, two lines would crowd the operator
-                block. */}
-            <p className="type-meta type-meta-inverse mt-phi-2 truncate tabular-nums" aria-hidden>
-              {bureauLine ? `${bureauLine} · ` : ''}No. {edition}
-            </p>
           </footer>
         </div>
       </aside>

@@ -575,7 +575,16 @@ export default function LoginPage() {
       </motion.footer>
 
       {/* Corner marginal furniture (lg+ only) — quiet bureau clocks + edition
-          number, mirroring the marketing gallery frame's bl/br corners. */}
+          number, mirroring the marketing gallery frame's bl/br corners. No
+          top-right: login has no nav target worth putting there. */}
+      <div
+        className="pointer-events-none fixed top-8 left-8 z-20 hidden lg:block"
+        aria-hidden
+      >
+        <span className="font-wordmark text-[15px] font-medium leading-none text-oxford/70">
+          Aethria<span className="wordmark-dot">.</span>
+        </span>
+      </div>
       <div
         className="pointer-events-none fixed bottom-8 left-8 z-20 hidden lg:block plate-num"
         aria-hidden

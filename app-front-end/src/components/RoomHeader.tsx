@@ -12,7 +12,6 @@ export default function RoomHeader({
   title,
   sub,
   readouts,
-  plateIndex,
   className = '',
 }: {
   eyebrow: string;
@@ -21,22 +20,13 @@ export default function RoomHeader({
   sub?: ReactNode;
   /** Right-aligned instrument readouts (mono numerals). */
   readouts?: ReactNode;
-  /** Quiet plate-head numeral (e.g. "02 — 04"), set beside the eyebrow. */
-  plateIndex?: string;
   className?: string;
 }) {
   return (
     <header className={`flex flex-wrap items-end justify-between gap-x-phi-7 gap-y-phi-5 ${className}`.trim()}>
       <div className="min-w-0">
         <Reveal delay={0.02} y={6}>
-          <div className="flex items-baseline gap-phi-3">
-            <p className="type-label-section">{eyebrow}</p>
-            {plateIndex ? (
-              <span className="plate-num" aria-hidden>
-                {plateIndex}
-              </span>
-            ) : null}
-          </div>
+          <p className="type-label-section type-label-section--eyebrow">{eyebrow}</p>
         </Reveal>
         <Reveal delay={0.08} y={10}>
           <h1 className="type-display mt-phi-3 break-words text-[clamp(28px,3vw,42px)] leading-[1.08] text-oxford">

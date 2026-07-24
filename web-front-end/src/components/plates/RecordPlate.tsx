@@ -53,6 +53,16 @@ export default function RecordPlate() {
             </div>
           ))}
         </div>
+        <div className="record-reasoning reveal d3">
+          <div>
+            <h5>Why it fits the mandate</h5>
+            <p>First credible team to own this layer of the stack. The timing window is open now.</p>
+          </div>
+          <div>
+            <h5>What could break the thesis</h5>
+            <p>Defensibility leans on a single integration partner. Replaceable inside eighteen months.</p>
+          </div>
+        </div>
       </div>
       <p className="caption left reveal d3">
         B2B Infrastructure · Series A · London. A specimen record: reviewers score each dimension one to ten against

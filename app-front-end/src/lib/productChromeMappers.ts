@@ -4,11 +4,7 @@ import type { LookupResultSnapshotProps, MandateCardProps } from '@aethria/produ
 import { getReviewerQualityBand } from '../design-system/semantics';
 import type { Startup } from '../types/startup';
 import { normalizeStructuredScoring } from './reviewScoring';
-import {
-  DEFAULT_VERDICT_BADGES,
-  badgeTextColorForBackground,
-  type VerdictBadgeConfig,
-} from './fundConfiguration';
+import { badgeTextColorForBackground, DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
 
 const DIMENSION_KEYS = ['market', 'execution', 'product', 'technical', 'defensibility'] as const;
 const DIMENSION_LABELS: Record<(typeof DIMENSION_KEYS)[number], string> = {
@@ -144,7 +140,8 @@ export function buildLookupSnapshotProps(
   const recommendation = startup.partner?.recommendation;
   const verdict = recommendation ? `${recommendation}.` : band ? `${band}.` : 'REVIEWING.';
 
-  // Match the queue: a filled badge in the configured (soft-palette) colour.
+  // Filled chip, matching DecisionBadge: configured colour is the fill,
+  // with a computed contrasting ink for readability.
   const badges = verdictBadges ?? DEFAULT_VERDICT_BADGES;
   const verdictColor = recommendation
     ? badges.find((b) => b.id === recommendation)?.backgroundColor ?? null

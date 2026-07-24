@@ -154,7 +154,15 @@ export default function AssessmentScorecard({
           className="memoScoreRow"
         >
           <span className="memoScoreName">{dim.label}</span>
-          <span className={unscored || lowConfidence ? 'memoScoreVal memoScoreVal--muted' : 'memoScoreVal'}>
+          <span
+            className={
+              unscored
+                ? 'memoScoreVal memoScoreVal--unscored'
+                : lowConfidence
+                  ? 'memoScoreVal memoScoreVal--muted'
+                  : 'memoScoreVal'
+            }
+          >
             {renderNumbers(scoreText)}
           </span>
           <span className="memoScoreTake">

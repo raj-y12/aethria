@@ -218,6 +218,119 @@
   max-width: 16ch;
   margin: 0 auto;
 }
+.hero-standfirst {
+  font-family: var(--font-sans);
+  font-size: clamp(14px, 1.6vw, 16px);
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 46ch;
+  margin: 1.75rem auto 0;
+}
+.hero-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+.cta-primary {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 0.75rem 1.5rem;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.cta-primary:hover {
+  background: var(--accent);
+  color: var(--stock);
+}
+.cta-secondary {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 0.2s ease;
+}
+.cta-secondary:hover {
+  color: var(--ink);
+}
+
+/* Plate 03 — a bold statement above the review spread, elevating the plate's
+   thesis beyond its marginal caption. */
+.review-statement {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  max-width: 30ch;
+  margin: 1.25rem 0 2rem;
+}
+
+/* Plate 02 — reasoning over score: why the record fits the mandate, and
+   what could break it, reusing the real Review-plate copy for the same
+   specimen. */
+.record-reasoning {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+.record-reasoning h5 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin: 0 0 0.5rem;
+}
+.record-reasoning p {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .record-reasoning {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* Plate 04 — the pipeline order, a printed process-map line above the
+   staff columns. Mono, monochrome, no boxes — matches the newsroom's
+   editorial voice rather than a colourful flowchart. */
+.newsroom-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0;
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.newsroom-flow .arrow {
+  color: var(--ink-4);
+  margin: 0 0.6rem;
+}
+@media (max-width: 640px) {
+  .newsroom-flow {
+    font-size: 9px;
+  }
+}
 
 /* Ink-settle load-in. Resting state (no .hero-in) stays fully visible for prerender/no-JS. */
 .hero-in .hero-kicker {
