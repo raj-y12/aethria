@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router';
 import { SpineNavButton } from './SystemBar';
 import AgentLogoutModal from './AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
-import { editionNo } from '../lib/clocks';
 import type { ExecutionReadiness } from './institutional/ExecutionReadinessPanel';
 
 export type SpinePipelineState = 'Live' | 'Idle' | 'Off' | 'Issue' | 'Stopping';
@@ -144,8 +143,6 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
   }, []);
   const timeShort = time.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const dateShort = time.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
-
-  const [edition] = useState(editionNo());
 
   const hasEscalations = telemetry.pendingEscalations > 0;
   const pipelineTone = PIPELINE_TONE[telemetry.pipelineState];
@@ -322,9 +319,6 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 {agentActionError}
               </p>
             ) : null}
-            <p className="type-meta type-meta-inverse mt-phi-2 tabular-nums" aria-hidden>
-              No. {edition}
-            </p>
           </footer>
         </div>
       </aside>
