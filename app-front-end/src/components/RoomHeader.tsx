@@ -30,7 +30,7 @@ export default function RoomHeader({
       <div className="min-w-0">
         <Reveal delay={0.02} y={6}>
           <div className="flex items-baseline gap-phi-3">
-            <p className="type-label-section">{eyebrow}</p>
+            <p className="type-label-section type-label-section--eyebrow">{eyebrow}</p>
             {plateIndex ? (
               <span className="plate-num" aria-hidden>
                 {plateIndex}

@@ -688,6 +688,23 @@
     color: var(--color-brand-mark-inverse);
   }
 
+  /** Verdigris eyebrow dot — precedes a room-header eyebrow (marketing's
+      .accent-eyebrow::before). Scoped modifier, not the base .type-label-section,
+      which also labels forms/tables/tabs where a dot would be wrong. */
+  .type-label-section--eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .type-label-section--eyebrow::before {
+    content: '';
+    flex-shrink: 0;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-brand-mark);
+  }
+
 /* Underline draw-in from left (used on active labels/headings) */
 @keyframes underline-draw {
   from { transform: scaleX(0); }
