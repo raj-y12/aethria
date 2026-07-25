@@ -42,6 +42,38 @@ class _CreateConnection:
         return "INSERT 0 1"
 
 
+@pytest.mark.asyncio
+async def test_invest_ruling_creates_canonical_portfolio_position_only_for_explicit_invest():
+    connection = _CreateConnection()
+    connection.fetchrows[0]["company_id"] = "company-a"
+    calls = []
+
+    class Portfolio:
+        async def create_position_on_connection(self, conn, **kwargs):
+            calls.append(kwargs)
+            return {"position_id": "position-a"}
+
+    repository = DecisionRepository(_Pool(connection), portfolio_repository=Portfolio())
+    await repository.create_ruling(
+        HumanRulingInput(
+            user_id="user-a", opportunity_id="opportunity-a", decision="invest",
+            rationale="The evidence and mandate support investment.", investor_confidence=0.8,
+        ),
+        actor_id="operator-a",
+    )
+    assert len(calls) == 1
+    assert calls[0]["user_id"] == "user-a"
+    assert calls[0]["opportunity_id"] == "opportunity-a"
+    assert calls[0]["company_id"] == "company-a"
+    assert calls[0]["rationale"] == "The evidence and mandate support investment."
+    assert calls[0]["investor_confidence"] == 0.8
+    outbox_events = [
+        call[2][4] for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    ]
+    assert "portfolio_position.created" in outbox_events
+
+
 def _workflow_action_row(**overrides):
     row = {
         "workflow_action_id": "4bc2c17a-9943-4d17-8bdf-0a556b6e07c8",

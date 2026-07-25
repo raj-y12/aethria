@@ -35,9 +35,10 @@ def _json(value: Any, default: Any):
 
 
 class DecisionRepository:
-    def __init__(self, pool: Any, *, authority_service: Any = None):
+    def __init__(self, pool: Any, *, authority_service: Any = None, portfolio_repository: Any = None):
         self.pool = pool
         self.authority_service = authority_service
+        self.portfolio_repository = portfolio_repository
 
     async def _require_write_path(self, *, user_id: str, operation: str) -> None:
         if self.authority_service is not None:
@@ -69,7 +70,7 @@ class DecisionRepository:
                     await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="human ruling creation")
                 opportunity = await conn.fetchrow(
                     """
-                    select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,
+                    select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,o.company_id,
                            o.workflow_version,
                            r.recommended_state
                     from public.opportunities o
@@ -125,6 +126,29 @@ class DecisionRepository:
                     ruling.opportunity_id, uid, ruling_id,
                     ruling_to_opportunity_state(ruling.decision),
                 )
+                if ruling.decision.value == "invest":
+                    if self.portfolio_repository is None:
+                        raise RuntimeError("Canonical portfolio repository is required for INVEST rulings")
+                    await self.portfolio_repository.create_position_on_connection(
+                        conn,
+                        user_id=uid,
+                        opportunity_id=ruling.opportunity_id,
+                        company_id=str(opportunity["company_id"]),
+                        ruling_id=ruling_id,
+                        rationale=ruling.rationale,
+                        investor_confidence=ruling.investor_confidence,
+                    )
+                    await self._outbox(
+                        conn, user_id=uid, aggregate_type="portfolio_position",
+                        aggregate_id=ruling.opportunity_id,
+                        event_type="portfolio_position.created",
+                        payload={
+                            "opportunity_id": ruling.opportunity_id,
+                            "ruling_id": ruling_id,
+                            "decision": "invest",
+                            "compatibility_reason": "explicit human INVEST ruling",
+                        },
+                    )
                 if ruling.decision.value == "monitor":
                     await self._insert_action(
                         conn, user_id=uid, opportunity_id=ruling.opportunity_id,

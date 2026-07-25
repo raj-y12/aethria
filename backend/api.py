@@ -148,6 +148,7 @@ from evaluation_v2.prerequisites import (
     load_evaluation_prerequisites,
 )
 from decisions.repository import DecisionRepository
+from portfolio.repository import PortfolioRepository
 from monitoring.repository import MonitoringRepository
 from fund_intelligence.repository import FundIntelligenceRepository
 from outcomes.repository import ChannelOutcomeRepository
@@ -993,10 +994,16 @@ async def _start_durable_job_services(app: FastAPI) -> None:
     )
     app.state.decision_repository = (
         DecisionRepository(
-            _durable_job_pool, authority_service=app.state.authority_service
+            _durable_job_pool, authority_service=app.state.authority_service,
+            portfolio_repository=(PortfolioRepository(_durable_job_pool, authority_service=app.state.authority_service)
+                                  if _durable_job_pool is not None else None),
         )
         if _durable_job_pool is not None
         else None
+    )
+    app.state.portfolio_repository = (
+        PortfolioRepository(_durable_job_pool, authority_service=app.state.authority_service)
+        if _durable_job_pool is not None else None
     )
     app.state.monitoring_repository = (
         MonitoringRepository(_durable_job_pool) if _durable_job_pool is not None else None
@@ -1052,6 +1059,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     app.state.evidence_repository = None
     app.state.evaluation_repository = None
     app.state.decision_repository = None
+    app.state.portfolio_repository = None
     app.state.monitoring_repository = None
     app.state.fund_intelligence_repository = None
     app.state.channel_outcome_repository = None
@@ -1133,6 +1141,7 @@ async def _lifespan(app: FastAPI):
         app.state.evidence_repository = None
         app.state.evaluation_repository = None
         app.state.decision_repository = None
+        app.state.portfolio_repository = None
         app.state.monitoring_repository = None
         app.state.fund_intelligence_repository = None
         app.state.channel_outcome_repository = None
@@ -1218,6 +1227,9 @@ app.include_router(_evaluations_router.router)
 from routers import decisions as _decisions_router  # noqa: E402
 
 app.include_router(_decisions_router.router)
+from routers import portfolio as _portfolio_router  # noqa: E402
+
+app.include_router(_portfolio_router.router)
 from routers import monitoring as _monitoring_router  # noqa: E402
 
 app.include_router(_monitoring_router.router)
