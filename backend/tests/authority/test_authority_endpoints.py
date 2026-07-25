@@ -263,6 +263,117 @@ def test_canonical_write_rejects_direct_legacy_startup_mutation_with_typed_confl
     assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
 
 
+def test_canonical_write_escalation_never_updates_legacy_startup_without_linked_opportunity(
+    monkeypatch,
+):
+    import api
+
+    client = _client(
+        monkeypatch,
+        _AuthorityRepository(rollout=_rollout(mode=RolloutMode.CANONICAL_WRITE)),
+    )
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            assert kwargs == {
+                "user_id": "tenant-a",
+                "legacy_startup_id": "d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1",
+            }
+            return None
+
+    class LegacyStorage:
+        def update_startup_partial(self, *_args):
+            raise AssertionError("canonical escalation must not update legacy startups")
+
+    api.app.state.identity_repository = IdentityRepository()
+    monkeypatch.setattr(api, "_get_storage", lambda _request: LegacyStorage())
+    response = client.post(
+        "/api/escalations/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1/resolve",
+        headers=_auth(),
+        json={"decision": "YES", "notes": "Strong evidence supports advancing."},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
+
+
+def test_canonical_write_escalation_delegates_linked_opportunity_to_canonical_ruling(
+    monkeypatch,
+):
+    import api
+
+    client = _client(
+        monkeypatch,
+        _AuthorityRepository(rollout=_rollout(mode=RolloutMode.CANONICAL_WRITE)),
+    )
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **_kwargs):
+            return type("Opportunity", (), {"opportunity_id": "opportunity-1"})()
+
+    class DecisionRepository:
+        def __init__(self):
+            self.calls = []
+
+        async def create_ruling(self, ruling, *, actor_id):
+            self.calls.append((ruling, actor_id))
+            return {"ruling_id": "ruling-1", "opportunity_id": ruling.opportunity_id}
+
+    class LegacyStorage:
+        def get_by_id(self, *_args):
+            raise AssertionError("canonical escalation must not read a legacy startup")
+
+    decisions = DecisionRepository()
+    api.app.state.identity_repository = IdentityRepository()
+    api.app.state.decision_repository = decisions
+    monkeypatch.setattr(api, "_get_storage", lambda _request: LegacyStorage())
+    response = client.post(
+        "/api/escalations/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1/resolve",
+        headers=_auth(),
+        json={"decision": "YES", "notes": "Strong evidence supports advancing."},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["canonical"] is True
+    assert response.json()["ruling"]["ruling_id"] == "ruling-1"
+    assert decisions.calls[0][0].decision.value == "advance"
+    assert decisions.calls[0][1] == "tenant-a"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/api/startups", "/api/startups/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1"],
+)
+def test_canonical_read_primary_startup_routes_do_not_fall_back_to_legacy_dtos(
+    monkeypatch, path
+):
+    import api
+
+    client = _client(
+        monkeypatch,
+        _AuthorityRepository(
+            rollout=_rollout(
+                mode=RolloutMode.CANONICAL_READ,
+                version=4,
+                last_reconciliation_status="green",
+            )
+        ),
+    )
+
+    class LegacyStorage:
+        def get_by_id(self, *_args):
+            raise AssertionError("canonical read must not query the legacy startup DTO")
+
+        def get_list_projection_rows(self, **_kwargs):
+            raise AssertionError("canonical read must not query the legacy startup DTO")
+
+    monkeypatch.setattr(api, "_get_storage", lambda _request: LegacyStorage())
+    response = client.get(path, headers=_auth())
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_READ_NOT_CERTIFIED"
+
+
 @pytest.mark.asyncio
 async def test_repository_write_paths_use_the_injected_authority_guard_before_database_access():
     from decisions.models import HumanRulingInput

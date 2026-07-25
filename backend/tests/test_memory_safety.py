@@ -75,7 +75,8 @@ def test_supabase_add_startup_duplicate_checks_are_targeted():
     assert ("limit", 20) in table.calls
 
 
-def test_startups_endpoint_uses_bounded_projection(monkeypatch):
+@pytest.mark.asyncio
+async def test_startups_endpoint_uses_bounded_projection(monkeypatch):
     import api
 
     captured = {}
@@ -92,13 +93,14 @@ def test_startups_endpoint_uses_bounded_projection(monkeypatch):
     monkeypatch.setattr(api, "_get_storage", lambda request: FakeStorage())
     monkeypatch.setattr(api, "_get_user_last_seen_at", lambda user_id: None)
 
-    result = api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
+    result = await api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
 
     assert result == []
     assert captured == {"limit": api.DEFAULT_STARTUPS_LIST_LIMIT, "offset": 0}
 
 
-def test_startups_endpoint_does_not_full_row_fallback_on_projection_failure(monkeypatch):
+@pytest.mark.asyncio
+async def test_startups_endpoint_does_not_full_row_fallback_on_projection_failure(monkeypatch):
     """A failed projection (e.g. transient EAGAIN) must NOT trigger a full-row
     select(*) fetch -- that amplifier drove RSS/egress until OOM. Expect a 503."""
     import api
@@ -120,7 +122,7 @@ def test_startups_endpoint_does_not_full_row_fallback_on_projection_failure(monk
     monkeypatch.setattr(api, "_get_user_last_seen_at", lambda user_id: None)
 
     with pytest.raises(HTTPException) as exc:
-        api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
+        await api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
 
     assert exc.value.status_code == 503
     assert storage.paginated_called is False

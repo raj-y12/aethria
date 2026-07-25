@@ -1881,14 +1881,37 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
     return {**obj, "scout": scout, "review": thin_rev, "partner": thin_part}
 
 
+async def _reject_uncertified_canonical_legacy_read(request: Request) -> None:
+    """Do not serve legacy startup DTOs after canonical-read activation."""
+    app_state = getattr(getattr(request, "app", None), "state", None)
+    if (
+        getattr(app_state, "authority_service", None) is None
+        and getattr(app_state, "authority_repository", None) is None
+    ):
+        return
+    from authority.models import RolloutMode
+    from routers.authority import authority_for_request
+
+    authority = await authority_for_request(request)
+    if authority.mode is RolloutMode.CANONICAL_READ:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "AUTHORITY_CANONICAL_READ_NOT_CERTIFIED",
+                "message": "Canonical startup read DTOs are not certified for this endpoint",
+            },
+        )
+
+
 @app.get("/api/startups")
-def get_startups(
+async def get_startups(
     request: Request,
     limit: int = DEFAULT_STARTUPS_LIST_LIMIT,
     offset: int = 0,
 ):
     limit = max(1, min(int(limit or DEFAULT_STARTUPS_LIST_LIMIT), MAX_STARTUPS_LIST_LIMIT))
     offset = max(0, int(offset or 0))
+    await _reject_uncertified_canonical_legacy_read(request)
     storage = _get_storage(request)
     last_seen_at = _get_user_last_seen_at(getattr(request.state, "user_id", None))
     if isinstance(storage, SupabaseStartupsStorage):
@@ -2049,9 +2072,10 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
 
 
 @app.get("/api/startups/{startup_id}")
-def get_startup_detail(request: Request, startup_id: str):
+async def get_startup_detail(request: Request, startup_id: str):
     """Full scout/review/partner JSON for one startup (on-demand; not used for grid polling)."""
     validate_route_id(startup_id, field_name="startup_id")
+    await _reject_uncertified_canonical_legacy_read(request)
     storage = _get_storage(request)
     raw = storage.get_by_id(startup_id)
     if not raw:
@@ -3494,8 +3518,76 @@ def get_escalations(request: Request):
     return items
 
 
+def _canonical_only_conflict(message: str) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={"code": "AUTHORITY_CANONICAL_ONLY", "message": message},
+    )
+
+
+async def _resolve_canonical_escalation(
+    request: Request,
+    *,
+    user_id: str,
+    startup_id: str,
+    decision: str,
+    notes: Any,
+    risk_acknowledged: bool,
+    mandate_exception: bool,
+    authority: Any,
+) -> Dict[str, Any]:
+    """Translate a legacy escalation action into the canonical ruling boundary."""
+    from authority.models import RolloutMode
+    from decisions.models import HumanRulingDecision, HumanRulingInput
+    from routers.authority import authority_metadata
+
+    if authority.mode is RolloutMode.CANONICAL_READ:
+        raise _canonical_only_conflict(
+            "Canonical read mode does not permit escalation rulings"
+        )
+    identity_repository = getattr(request.app.state, "identity_repository", None)
+    decision_repository = getattr(request.app.state, "decision_repository", None)
+    if identity_repository is None or decision_repository is None:
+        raise _canonical_only_conflict(
+            "Canonical escalation routing is unavailable for this tenant"
+        )
+    opportunity = await identity_repository.get_opportunity_by_legacy_projection(
+        user_id=user_id, legacy_startup_id=startup_id
+    )
+    if opportunity is None:
+        raise _canonical_only_conflict(
+            "Legacy startup is not linked to a canonical opportunity"
+        )
+    decision_map = {
+        "YES": HumanRulingDecision.ADVANCE,
+        "NO": HumanRulingDecision.PASS,
+        "MAYBE": HumanRulingDecision.MONITOR,
+    }
+    record = await decision_repository.create_ruling(
+        HumanRulingInput(
+            user_id=user_id,
+            opportunity_id=opportunity.opportunity_id,
+            decision=decision_map[decision],
+            rationale=str(notes or "").strip() or "Canonical escalation resolution",
+            risk_acknowledgement=(
+                "Legacy escalation risk acknowledgement" if risk_acknowledged else None
+            ),
+            mandate_exception=(
+                "Legacy escalation mandate exception" if mandate_exception else None
+            ),
+        ),
+        actor_id=user_id,
+    )
+    return {
+        "status": "ok",
+        "canonical": True,
+        "ruling": record,
+        "authority": authority_metadata(authority),
+    }
+
+
 @app.post("/api/escalations/{startup_id}/resolve")
-def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
+async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
     """
     Resolve an escalation by writing human_resolution to the startup record.
     Body: {decision: "YES"|"NO"|"MAYBE", notes: str}
@@ -3512,6 +3604,27 @@ def resolve_escalation(request: Request, startup_id: str, body: Dict[str, Any]):
     mandate_exception = bool(body.get("mandate_exception", False)) and decision == "YES"
     if decision not in ("YES", "NO", "MAYBE"):
         raise HTTPException(status_code=422, detail="decision must be YES, NO, or MAYBE")
+
+    app_state = getattr(getattr(request, "app", None), "state", None)
+    if (
+        getattr(app_state, "authority_service", None) is not None
+        or getattr(app_state, "authority_repository", None) is not None
+    ):
+        from authority.models import RolloutMode
+        from routers.authority import authority_for_request
+
+        authority = await authority_for_request(request)
+        if authority.mode in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
+            return await _resolve_canonical_escalation(
+                request,
+                user_id=uid,
+                startup_id=startup_id,
+                decision=decision,
+                notes=notes,
+                risk_acknowledged=risk_acknowledged,
+                mandate_exception=mandate_exception,
+                authority=authority,
+            )
 
     storage = _get_storage(request)
     existing = storage.get_by_id(startup_id)
