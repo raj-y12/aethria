@@ -95,7 +95,7 @@ export default function AgentLogoutModal({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: reduceMotion ? 0 : 0.4, ease: [0.16, 1, 0.3, 1] }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
+          className="paper-dot-grid fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
           role="dialog"
           aria-modal="true"
           aria-labelledby="agent-logout-title"

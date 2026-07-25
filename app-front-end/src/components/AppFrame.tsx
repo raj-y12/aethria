@@ -18,6 +18,7 @@ import AppSpine, {
   isSpineRouteActive,
   type SpineMandate,
   type SpineOverride,
+  type SpinePipelineState,
   type SpineTelemetry,
 } from './AppSpine';
 import MobileHeader from './MobileHeader';
@@ -69,6 +70,18 @@ interface AppFrameContextValue {
   setSpineOverride: (override: SpineOverride | null) => void;
   /** False only while bare chrome is becoming a full workspace frame. */
   workspaceChromeReady: boolean;
+  /**
+   * The pipeline readout the spine shows. Bare-chrome rooms (the front door)
+   * hide the spine, so they read it from here to stay honest about liveness.
+   */
+  pipelineState: SpinePipelineState;
+  /**
+   * False until settings and loop status have both resolved. The derivation
+   * falls through to 'Off' then 'Idle' while they are still absent, so a
+   * consumer that renders the state as a headline claim must wait for this or
+   * it will flash "Off" on every cold load.
+   */
+  pipelineStateReady: boolean;
 }
 
 const AppFrameContext = createContext<AppFrameContextValue | null>(null);
@@ -310,6 +323,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     setPageOverlayOpen,
     setSpineOverride,
     workspaceChromeReady: resolvedWorkspaceChromeReady,
+    pipelineState,
+    // undefined = the loop-status query has not resolved; null = it resolved empty.
+    pipelineStateReady: data.settings != null && loopStatus !== undefined,
   };
 
   const chromeTransition = transitionOrReduced(reduceMotion, {

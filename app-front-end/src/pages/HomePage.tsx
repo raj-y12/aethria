@@ -6,7 +6,8 @@ import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import type { ActivitySummary } from '../api/activity';
-import { usePrefersReducedMotion } from '../hooks';
+import { useCountUp, usePrefersReducedMotion } from '../hooks';
+import type { SpinePipelineState } from '../components/AppSpine';
 import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
@@ -89,6 +90,49 @@ function HomeDoor({
 }
 
 /**
+ * The spine's PIPELINE_TONE restated in paper values. The front door hides the
+ * spine, so this is the only place the operator can see whether the pipeline is
+ * actually running — it has to stay honest, especially about 'Issue'.
+ */
+const PIPELINE_PAPER_TONE: Record<SpinePipelineState, { dot: string; text: string }> = {
+  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/60' },
+  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/45' },
+  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/45' },
+  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/45' },
+  Issue: { dot: 'bg-escalation escalation-dot-active', text: 'text-escalation' },
+};
+
+/**
+ * The pipeline readout. role="status" so a state change is announced; when the
+ * pipeline is in trouble it becomes the route to fixing it, as the spine does.
+ */
+function PipelineIndicator({ state }: { state: SpinePipelineState }) {
+  const tone = PIPELINE_PAPER_TONE[state];
+  const dot = <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-none ${tone.dot}`} />;
+
+  // role="status" lives on the wrapper, never on the Link — it would override
+  // the link role and stop the issue route being announced as navigable.
+  return (
+    <span role="status" className={`inline-flex items-center ${tone.text}`}>
+      {state === 'Issue' ? (
+        <Link
+          to="/v1/settings"
+          className="inline-flex items-center gap-phi-2 btn-interaction transition-opacity hover:opacity-80"
+        >
+          {dot}
+          Pipeline issue
+        </Link>
+      ) : (
+        <span className="inline-flex items-center gap-phi-2">
+          {dot}
+          Pipeline {state.toLowerCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
  * A caption rail — the marketing plate's vertical side furniture, carrying live
  * state rather than decoration. Hidden below 900px exactly like the gallery's
  * `.plate-cap-l/-r`. aria-hidden: every reading here is already spoken by the
@@ -116,7 +160,7 @@ function HomeRail({ side, text }: { side: 'left' | 'right'; text: string }) {
 export default function HomePage({ data, sinceAway }: { data: SystemData; sinceAway: ActivitySummary | null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { openDispatch, dispatchActive } = useAppFrame();
+  const { openDispatch, dispatchActive, pipelineState, pipelineStateReady } = useAppFrame();
   // What the agents did since the last visit (marks the report seen; null when
   // the login screen already presented it or nothing happened).
   const {
@@ -159,13 +203,11 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           ? 'The pipeline is working. Nothing needs you.'
           : 'The desk is clear.';
 
-  const subline = [
-    `${startups.length.toLocaleString()} in pipeline`,
-    `${openCount.toLocaleString()} open`,
-    convictionCount > 0 ? `${convictionCount.toLocaleString()} conviction` : null,
-  ]
-    .filter(Boolean)
-    .join('  ·  ');
+  // The counts settle on mount and re-settle whenever the SSE stream lands a
+  // change, so the readings visibly move as the agents work.
+  const totalUp = useCountUp(startups.length);
+  const openUp = useCountUp(openCount);
+  const convictionUp = useCountUp(convictionCount);
 
   // ── The briefing ───────────────────────────────────────────────────────────
   const attention = useMemo(() => getDeskAttention(startups), [startups]);
@@ -224,12 +266,17 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           </p>
         </Reveal>
 
-        {/* ── The plate head — the dateline over a drawn rule ── */}
+        {/* ── The dateline + pipeline readout. No rule — the headline carries the page. ── */}
         <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
-          <p className="type-label-section text-center tabular-nums">
-            {eyebrow}
+          <p className="type-label-section flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
+            <span>{eyebrow}</span>
+            {pipelineStateReady && (
+              <>
+                <span aria-hidden className="text-oxford/20">·</span>
+                <PipelineIndicator state={pipelineState} />
+              </>
+            )}
           </p>
-          <span aria-hidden className="rule-draw mt-phi-3 block h-px bg-oxford/[0.12]" />
         </Reveal>
 
         {/* ── The framed briefing — the login page's bracket move ── */}
@@ -266,8 +313,16 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-meta text-center tabular-nums">
-                {subline}
+              <p className="type-meta flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 text-center tabular-nums">
+                <span>{totalUp.toLocaleString()} in pipeline</span>
+                <span aria-hidden className="text-oxford/20">·</span>
+                <span>{openUp.toLocaleString()} open</span>
+                {convictionCount > 0 && (
+                  <>
+                    <span aria-hidden className="text-oxford/20">·</span>
+                    <span>{convictionUp.toLocaleString()} conviction</span>
+                  </>
+                )}
               </p>
             </Reveal>
 

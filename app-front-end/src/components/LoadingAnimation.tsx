@@ -16,7 +16,7 @@ export default function LoadingAnimation({
   const reduceMotion = usePrefersReducedMotion();
 
   const containerClass = fullScreen
-    ? 'fixed inset-0 min-h-[100dvh] bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
+    ? 'paper-dot-grid fixed inset-0 min-h-[100dvh] bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
     : 'flex flex-col items-center justify-center min-h-[200px] py-12 overflow-hidden bg-paper';
 
   return (
