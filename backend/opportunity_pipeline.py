@@ -27,6 +27,7 @@ from evidence.models import (
 from evidence.service import detect_prompt_injection
 from identity.models import IdentityAdmission, SourceObservationInput
 from tenant_context import require_user_id
+from triage.models import TriageDisposition
 
 
 @dataclass(frozen=True)
@@ -52,12 +53,16 @@ class OpportunityPipeline:
         evaluation_repository: Any,
         prerequisites_loader: Any,
         authority_service: Any = None,
+        triage_service: Any = None,
+        triage_repository: Any = None,
     ) -> None:
         self.identity_service = identity_service
         self.evidence_repository = evidence_repository
         self.evaluation_repository = evaluation_repository
         self.prerequisites_loader = prerequisites_loader
         self.authority_service = authority_service
+        self.triage_service = triage_service
+        self.triage_repository = triage_repository
 
     async def process(
         self,
@@ -72,6 +77,8 @@ class OpportunityPipeline:
         uid = require_user_id(user_id, context="OpportunityPipeline.process")
         if observation.user_id != uid:
             raise ValueError("observation tenant does not match pipeline tenant")
+        references = list(references)
+        claims = list(claims)
         admission: IdentityAdmission = await self.identity_service.admit(observation)
         if admission.blocks_evaluation or not admission.opportunity_id or not admission.company_id:
             return PipelineResult(
@@ -85,6 +92,23 @@ class OpportunityPipeline:
         prerequisites = await self.prerequisites_loader(user_id=uid)
         if hasattr(prerequisites, "require_tenant"):
             prerequisites.require_tenant(uid, context="OpportunityPipeline.process")
+
+        if self.triage_service is not None:
+            assessment = self.triage_service.assess(
+                user_id=uid, opportunity_id=admission.opportunity_id,
+                admission=admission, prerequisites=prerequisites,
+                references=list(references), trigger=trigger,
+                observed_name=observation.observed_name,
+            ).model_copy(update={"observation_ids": [admission.observation_id]})
+            if self.triage_repository is not None:
+                await self.triage_repository.create(assessment)
+            if assessment.disposition is not TriageDisposition.DEEP_REVIEW:
+                return PipelineResult(
+                    status="completed", code=f"triage_{assessment.disposition.value}",
+                    user_id=uid, opportunity_id=admission.opportunity_id,
+                    company_id=admission.company_id, observation_id=admission.observation_id,
+                    metadata={"triage": assessment.model_dump(mode="json")},
+                )
 
         artifact_ids: list[str] = []
         evidence_item_ids: list[str] = []

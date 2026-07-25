@@ -153,6 +153,8 @@ from monitoring.repository import MonitoringRepository
 from fund_intelligence.repository import FundIntelligenceRepository
 from outcomes.repository import ChannelOutcomeRepository
 from opportunity_pipeline import OpportunityPipeline
+from triage.repository import TriageRepository
+from triage.service import TriageService
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
     reprocess_startups_missing_fund_thesis,
@@ -1014,6 +1016,9 @@ async def _start_durable_job_services(app: FastAPI) -> None:
     app.state.channel_outcome_repository = (
         ChannelOutcomeRepository(_durable_job_pool) if _durable_job_pool is not None else None
     )
+    app.state.triage_repository = (
+        TriageRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
     app.state.opportunity_pipeline = (
         OpportunityPipeline(
             identity_service=IdentityService(app.state.identity_repository),
@@ -1023,6 +1028,8 @@ async def _start_durable_job_services(app: FastAPI) -> None:
                 fund_intelligence_repository=app.state.fund_intelligence_repository, **kwargs
             ),
             authority_service=app.state.authority_service,
+            triage_service=TriageService(),
+            triage_repository=app.state.triage_repository,
         )
         if app.state.identity_repository is not None
         else None
@@ -1064,6 +1071,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     app.state.fund_intelligence_repository = None
     app.state.channel_outcome_repository = None
     app.state.opportunity_pipeline = None
+    app.state.triage_repository = None
 
 
 @asynccontextmanager
@@ -1146,6 +1154,7 @@ async def _lifespan(app: FastAPI):
         app.state.fund_intelligence_repository = None
         app.state.channel_outcome_repository = None
         app.state.opportunity_pipeline = None
+        app.state.triage_repository = None
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
