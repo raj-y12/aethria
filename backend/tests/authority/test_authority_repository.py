@@ -363,6 +363,26 @@ async def test_workflow_outbox_carries_linked_legacy_startup_and_reason():
 
 
 @pytest.mark.asyncio
+async def test_conn_aware_workflow_transition_carries_projection_fields():
+    legacy_startup_id = "4f591cb7-3c0d-44c5-a663-8dab0bc94e6d"
+    connection = _Connection(fetchrows=[
+        _rollout_row(),
+        _workflow_row(workflow_state="monitoring", workflow_version=1,
+                      last_transition_id=str(uuid4()), legacy_startup_id=legacy_startup_id),
+    ])
+    repository = AuthorityRepository(_Pool(connection))
+    await repository.transition_workflow_on_connection(
+        connection, user_id="tenant-a", opportunity_id=uuid4(), expected_version=0,
+        target_state=WorkflowState.MONITORING, transition_id=uuid4(),
+    )
+    outbox = next(call for call in connection.calls
+                  if call[0] == "execute" and "insert into public.domain_outbox" in call[1])
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == legacy_startup_id
+    assert payload["compatibility_reason"] == "workflow transitioned to monitoring"
+
+
+@pytest.mark.asyncio
 async def test_rearm_clears_kill_switch_only_with_green_reconciliation_and_audits_it():
     connection = _Connection(
         fetchrows=[

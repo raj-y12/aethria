@@ -445,9 +445,17 @@ class AuthorityRepository:
             returning user_id,opportunity_id,workflow_state,workflow_version,block_code,block_detail,block_recovery,last_transition_id,legacy_startup_id,updated_at""",
             uid, opportunity, expected, target.value, block_code, block_detail, block_recovery, transition)
         record = self._workflow(row, user_id=uid)
+        legacy_startup_id = (
+            str(row["legacy_startup_id"])
+            if row is not None and row.get("legacy_startup_id")
+            else None
+        )
+        compatibility_reason = block_detail or f"workflow transitioned to {record.state.value}"
         await self._outbox(conn, user_id=uid, aggregate_type="opportunity", aggregate_id=opportunity,
             event_type="opportunity.workflow_changed", payload={"opportunity_id": opportunity,
             "workflow_state": record.state.value, "workflow_version": record.version,
             "transition_id": transition, "block_code": block_code,
+            "legacy_startup_id": legacy_startup_id,
+            "compatibility_reason": compatibility_reason,
             "rollout_version": rollout.version})
         return record
