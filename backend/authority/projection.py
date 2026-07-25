@@ -26,6 +26,9 @@ class ProjectionTenantMismatch(ValueError):
 class UnresolvedLegacyProjection(RuntimeError):
     """An authority event has no tenant-scoped legacy startup projection."""
 
+class ProjectionDeferred(RuntimeError):
+    """Projection is temporarily disallowed; the outbox event must be retried."""
+
 
 @dataclass(frozen=True)
 class LegacyProjectionPatch:

@@ -282,6 +282,39 @@ class AuthorityRepository:
                 )
                 return updated
 
+    async def set_reconciliation_status(
+        self, *, user_id: str, expected_version: int, actor_id: str, status: str
+    ) -> RolloutRecord:
+        """Audited, optimistic-concurrency update used before canonical re-arm/read."""
+        uid = require_user_id(user_id, context="AuthorityRepository.set_reconciliation_status")
+        normalized = str(status or "").strip().lower()
+        if normalized not in {"green", "red", "pending"}:
+            raise ValueError("reconciliation status must be green, red, or pending")
+        actor = str(actor_id or "").strip()
+        if not actor:
+            raise ValueError("actor_id is required")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await self._bootstrap_rollout(conn, user_id=uid)
+                current = self._rollout(await conn.fetchrow(
+                    "select * from public.tenant_authority_rollouts where user_id=$1 for update", uid
+                ), user_id=uid)
+                if current.version != expected_version:
+                    raise AuthorityConflict("stale authority rollout version")
+                row = await conn.fetchrow(
+                    """update public.tenant_authority_rollouts
+                       set last_reconciliation_status=$3, version=version+1,
+                           activated_by=$4
+                       where user_id=$1 and version=$2 returning *""",
+                    uid, expected_version, normalized, actor,
+                )
+                updated = self._rollout(row, user_id=uid)
+                await self._outbox(conn, user_id=uid, aggregate_type="authority_rollout",
+                    aggregate_id=uid, event_type="authority.reconciliation_updated",
+                    payload={"user_id": uid, "version": updated.version,
+                             "status": normalized, "actor_id": actor})
+                return updated
+
     @staticmethod
     def _block_values(
         *, target_state: WorkflowState, block: Optional[Mapping[str, Any]]

@@ -94,7 +94,10 @@ class OutboxPublisher:
                     continue
             elif name != event.event_type:
                 continue
-            await consumer(**event_data)
+            result = await consumer(**event_data)
+            if name == "authority" and result is None:
+                from authority.projection import ProjectionDeferred
+                raise ProjectionDeferred("authority projection deferred; event remains retryable")
 
     async def publish_once(self) -> int:
         events = await self.repository.claim_outbox_batch()

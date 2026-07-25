@@ -76,6 +76,13 @@ class AuthorityService:
             )
         return context
 
+    async def require_legacy_pipeline_path(self, *, user_id: str) -> AuthorityContext:
+        """Reject legacy Scout/Reviewer/Partner writes once canonical authority owns them."""
+        context = await self.authority(user_id=user_id)
+        if context.kill_switch or context.mode in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
+            raise AuthorityBlocked("legacy pipeline is blocked by canonical authority")
+        return context
+
     async def rollback(
         self,
         *,
@@ -124,6 +131,13 @@ class AuthorityService:
             expected_version=expected_version,
             actor_id=actor_id,
             reason=normalized_reason,
+        )
+
+    async def set_reconciliation_status(self, *, user_id: str, expected_version: int,
+                                        actor_id: str, status: str) -> RolloutRecord:
+        uid = require_user_id(user_id, context="AuthorityService.set_reconciliation_status")
+        return await self.repository.set_reconciliation_status(
+            user_id=uid, expected_version=expected_version, actor_id=actor_id, status=status
         )
 
 

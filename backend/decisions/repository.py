@@ -68,6 +68,7 @@ class DecisionRepository:
                 opportunity = await conn.fetchrow(
                     """
                     select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,
+                           o.workflow_version,
                            r.recommended_state
                     from public.opportunities o
                     left join public.recommendations r
@@ -146,6 +147,13 @@ class DecisionRepository:
                         "compatibility_reason": ruling.rationale,
                     },
                 )
+                if self.authority_service is not None and hasattr(self.authority_service, "repository"):
+                    await self.authority_service.repository.transition_workflow(
+                        user_id=uid, opportunity_id=ruling.opportunity_id,
+                        expected_version=int(opportunity.get("workflow_version") or 0),
+                        target_state=("monitoring" if ruling.decision.value == "monitor" else "completed"),
+                        transition_id=uuid4(),
+                    )
                 payload = dict(row)
                 payload["override_type"] = override.value if override else None
                 return payload

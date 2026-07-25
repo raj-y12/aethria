@@ -83,7 +83,8 @@ class EvaluationRepository:
             async with conn.transaction(isolation="repeatable_read"):
                 previous = await conn.fetchrow(
                     """
-                    select o.service_level, o.decision_state, o.legacy_startup_id, r.*
+                    select o.service_level, o.decision_state, o.legacy_startup_id,
+                           o.workflow_version, r.*
                     from public.opportunities o
                     left join public.recommendations r
                       on r.user_id = o.user_id
@@ -235,6 +236,12 @@ class EvaluationRepository:
                         ),
                     },
                 )
+                if self.authority_service is not None and hasattr(self.authority_service, "repository"):
+                    await self.authority_service.repository.transition_workflow(
+                        user_id=uid, opportunity_id=opportunity_id,
+                        expected_version=int(previous.get("workflow_version") or 0),
+                        target_state="ruling_pending", transition_id=uuid4(),
+                    )
                 return {
                     "evaluation_id": evaluation_id,
                     "recommendation_id": recommendation_id,

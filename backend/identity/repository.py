@@ -377,9 +377,11 @@ class IdentityRepository:
             """
             insert into public.opportunities (
               opportunity_id, user_id, company_id, context_key, decision_state,
+              workflow_state, workflow_version, block_code, block_detail, block_recovery,
               service_level, first_observation_id, latest_observation_id,
               legacy_startup_id, created_at, updated_at
-            ) values ($1, $2, $3, $4, 'discovered', 1, $5, $5, $6::uuid, now(), now())
+            ) values ($1, $2, $3, $4, 'discovered', 'admitted', 0, null, null, null,
+                      1, $5, $5, $6::uuid, now(), now())
             on conflict (user_id, company_id, context_key)
             do update set latest_observation_id = excluded.latest_observation_id,
                           legacy_startup_id = coalesce(
@@ -519,6 +521,12 @@ class IdentityRepository:
                         "created": created,
                     },
                 )
+                if self.authority_service is not None and created and hasattr(self.authority_service, "repository"):
+                    await self.authority_service.repository.transition_workflow(
+                        user_id=uid, opportunity_id=opportunity.opportunity_id,
+                        expected_version=0, target_state="admitted",
+                        transition_id=uuid4(),
+                    )
                 return IdentityAdmission(
                     user_id=uid,
                     observation_id=observation_id,

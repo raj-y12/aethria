@@ -137,7 +137,7 @@ from jobs.outbox import OutboxPublisher
 from jobs.postgres import create_pool as create_durable_job_pool
 from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
-from authority.repository import AuthorityRepository
+from authority.repository import AuthorityRepository, AuthorityBlocked
 from authority.service import AuthorityService
 from identity.repository import IdentityRepository
 from evidence.repository import EvidenceRepository
@@ -969,6 +969,8 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         if app.state.authority_repository is not None
         else None
     )
+    if _durable_job_repository is not None:
+        _durable_job_repository.authority_service = app.state.authority_service
     app.state.authority_projection_consumer = None
     app.state.identity_repository = (
         IdentityRepository(
@@ -2823,6 +2825,14 @@ async def trigger_agents(request: Request):
     When Ops/Agents is off, enqueue a manual one-shot cycle.
     """
     user_id = require_authenticated_user(request)
+    authority_service = getattr(request.app.state, "authority_service", None)
+    if authority_service is not None:
+        try:
+            await authority_service.require_legacy_pipeline_path(user_id=user_id)
+        except AuthorityBlocked as exc:
+            return JSONResponse(status_code=409, content={
+                "detail": {"code": "AUTHORITY_CANONICAL_ONLY", "message": str(exc)}
+            })
     use_supabase = env_config.use_supabase_storage()
     if not use_supabase:
         _logger_agents.info(

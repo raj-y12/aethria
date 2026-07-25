@@ -32,6 +32,7 @@ from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from resolver.company_resolver import CompanyResolution, resolve_company
+from authority.repository import AuthorityBlocked
 
 
 async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
@@ -54,6 +55,13 @@ async def _checkpoint(repository, job, stage, status, metadata):
 
 async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
     payload = PipelineCyclePayload.model_validate(job.payload)
+    authority_service = getattr(repository, "authority_service", None)
+    if authority_service is not None:
+        try:
+            await authority_service.require_legacy_pipeline_path(user_id=job.user_id)
+        except AuthorityBlocked as exc:
+            raise JobExecutionBlocked(code="AUTHORITY_CANONICAL_ONLY", detail=str(exc),
+                                      recovery_action="Run the canonical pipeline path.") from exc
     await _checkpoint(repository, job, "pipeline_cycle", "started", {})
     try:
         evaluation_prerequisites = await load_evaluation_prerequisites(
