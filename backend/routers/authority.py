@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, model_validator
 
 from authority.models import RolloutMode, RolloutRecord
 from authority.projection import AuthorityProjectionConsumer
@@ -17,6 +17,8 @@ from authority.repository import (
 )
 from authority.service import AuthorityContext, AuthorityService
 from identity.projection import StartupCompatibilityProjectionRepository
+from identity.backfill import CanonicalIdentityBackfill
+from identity.service import IdentityService
 from security.request_guards import require_authenticated_user
 
 
@@ -51,6 +53,12 @@ class ReplayProjectionBody(_AuthorityBody):
 class ReconciliationBody(_AuthorityBody):
     expected_version: StrictInt = Field(ge=0)
     status: str = Field(min_length=1, max_length=20)
+
+
+class BackfillBody(_AuthorityBody):
+    apply: StrictBool = False
+    after: Optional[str] = Field(default=None, max_length=200)
+    batch_size: StrictInt = Field(default=100, ge=1, le=500)
 
 
 def _service(request: Request) -> AuthorityService:
@@ -216,6 +224,32 @@ async def update_reconciliation(request: Request, body: ReconciliationBody):
     except (AuthorityConflict, AuthorityTransitionError, AuthorityBlocked, ValueError) as exc:
         raise _conflict(exc) from exc
     return rollout_payload(record)
+
+
+@router.post("/api/authority/backfill")
+async def backfill_legacy_startups(request: Request, body: BackfillBody):
+    """Run one resumable legacy-startup backfill batch.
+
+    Apply mode is intentionally legal only during the authority ``backfill``
+    phase; dry-runs are allowed in any non-canonical phase for planning.
+    """
+    user_id = require_authenticated_user(request)
+    authority = await authority_for_request(request)
+    if body.apply and authority.mode is not RolloutMode.BACKFILL:
+        raise _conflict(ValueError("legacy backfill writes require backfill authority mode"))
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    repository = getattr(request.app.state, "identity_repository", None)
+    if pool is None or repository is None:
+        raise HTTPException(status_code=503, detail="Canonical identity store unavailable")
+    runner = CanonicalIdentityBackfill(
+        pool,
+        repository=repository,
+        service=IdentityService(repository),
+    )
+    report = await runner.run_batch(
+        user_id=user_id, apply=body.apply, after=body.after, batch_size=body.batch_size
+    )
+    return with_authority_metadata(report.model_dump(mode="json"), authority)
 
 
 __all__ = [

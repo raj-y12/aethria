@@ -409,6 +409,22 @@ def test_canonical_read_primary_startup_routes_do_not_fall_back_to_legacy_dtos(
     assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_READ_NOT_CERTIFIED"
 
 
+def test_backfill_apply_requires_backfill_authority_mode(monkeypatch):
+    client = _client(
+        monkeypatch,
+        _AuthorityRepository(
+            rollout=_rollout(mode=RolloutMode.CANONICAL_WRITE, version=3)
+        ),
+    )
+    response = client.post(
+        "/api/authority/backfill",
+        headers=_auth(),
+        json={"apply": True, "batch_size": 10},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CONFLICT"
+
+
 @pytest.mark.parametrize(
     ("rollout", "expected_code"),
     [
