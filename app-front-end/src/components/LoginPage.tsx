@@ -547,7 +547,7 @@ export default function LoginPage() {
                             </motion.span>
                           ) : (
                             <>
-                              <span>Enter Aethria</span>
+                              <span>Enter</span>
                               <span
                                 className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
                                 aria-hidden
