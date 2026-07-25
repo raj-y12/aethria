@@ -27,6 +27,32 @@ const APP_ROOT = '/v1';
 const SETTINGS_ROOT = `${APP_ROOT}/settings`;
 const ADMIN_ROOT = '/admin';
 
+function rolloutLabel(mode: string): string {
+  return mode.replace(/_/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function AuthorityRolloutNotice({
+  status,
+  blockedReason,
+}: {
+  status: ReturnType<typeof useSystemData>['authorityStatus'];
+  blockedReason: string | null;
+}) {
+  if (!status) return null;
+  const reconciliation = status.last_reconciliation_status ?? 'not recorded';
+  return (
+    <div
+      role={blockedReason ? 'alert' : 'status'}
+      aria-label="Authority rollout status"
+      className={`flex flex-none flex-wrap items-center gap-x-phi-4 gap-y-phi-1 border-b px-6 py-2 type-label-tab ${blockedReason ? 'border-escalation/30 bg-escalation/10 text-oxford' : 'border-oxford/10 bg-paper text-oxford/70'}`}
+    >
+      <span>Authority: {rolloutLabel(status.mode)}</span>
+      <span>Reconciliation: {reconciliation}</span>
+      {blockedReason ? <span className="text-escalation">{blockedReason}</span> : null}
+    </div>
+  );
+}
+
 function AppShell() {
   const { pathname } = useLocation();
   const { userId } = useAuth();
@@ -91,6 +117,10 @@ function AppShell() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
+      <AuthorityRolloutNotice
+        status={systemData.authorityStatus}
+        blockedReason={systemData.authorityBlockedReason}
+      />
       <AppFrame
         data={systemData}
         startupsError={systemData.startupsError}

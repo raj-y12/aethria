@@ -36,6 +36,11 @@ POLICY_UPGRADE_MIGRATION = (
 LOOKUP_OUTCOMES_SECURITY_MIGRATION = (
     "20260721150000_lookup_job_outcomes_rls.sql"
 )
+AUTHORITY_CONTROL_MIGRATION = "20260722090000_authority_control.sql"
+_AUTHORITY_TABLES = {
+    "tenant_authority_rollouts": "tenant_authority_rollouts_service_role_all",
+    "authority_projection_receipts": "authority_projection_receipts_service_role_all",
+}
 
 _MATERIALITY_COLUMNS = (
     ("evaluation_runs", "evidence_materiality_digest"),
@@ -130,6 +135,63 @@ def _lookup_outcomes_security_version_check(
         "passed" if not missing else "failed",
         "authoritative lookup outcome RLS schema version is recorded",
         missing=missing,
+    )
+
+
+def _authority_migration_file_check(repo_root: Path = REPO_ROOT) -> Dict[str, Any]:
+    missing = []
+    if not (repo_root / "supabase" / "migrations" / AUTHORITY_CONTROL_MIGRATION).exists():
+        missing.append(AUTHORITY_CONTROL_MIGRATION)
+    return _check(
+        "authority_control_migration_file",
+        "passed" if not missing else "failed",
+        "tenant authority rollout and projection-receipt migration is present",
+        missing=missing,
+    )
+
+
+def _authority_migration_version_check(versions: set[str]) -> Dict[str, Any]:
+    required = AUTHORITY_CONTROL_MIGRATION.split("_", 1)[0]
+    missing = [] if required in versions else [required]
+    return _check(
+        "authority_control_migration_applied",
+        "passed" if not missing else "failed",
+        "tenant authority rollout and projection-receipt schema version is recorded",
+        missing=missing,
+    )
+
+
+def _authority_security_check(
+    *, table_rows: List[Any], policy_rows: List[Any]
+) -> Dict[str, Any]:
+    table_state = {
+        str(_policy_row_value(row, "table_name")): bool(_policy_row_value(row, "relrowsecurity"))
+        for row in table_rows
+    }
+    observed_policies = {
+        str(_policy_row_value(row, "tablename")): row for row in policy_rows
+    }
+    missing_tables = sorted(name for name in _AUTHORITY_TABLES if name not in table_state)
+    rls_missing = sorted(name for name in _AUTHORITY_TABLES if not table_state.get(name, False))
+    invalid_policies = []
+    for table, expected_name in _AUTHORITY_TABLES.items():
+        row = observed_policies.get(table)
+        if not row or not (
+            str(_policy_row_value(row, "policyname")) == expected_name
+            and _policy_roles(_policy_row_value(row, "roles")) == {"service_role"}
+            and str(_policy_row_value(row, "cmd")).upper() == "ALL"
+            and _policy_predicate(_policy_row_value(row, "qual")) == "true"
+            and _policy_predicate(_policy_row_value(row, "with_check")) == "true"
+        ):
+            invalid_policies.append(table)
+    passed = not missing_tables and not rls_missing and not invalid_policies
+    return _check(
+        "authority_control_rls_and_policies",
+        "passed" if passed else "failed",
+        "authority rollout and projection receipts are isolated to the service role",
+        missing_tables=missing_tables,
+        rls_missing=rls_missing,
+        invalid_policies=invalid_policies,
     )
 
 
@@ -283,6 +345,7 @@ def _code_checks() -> List[Dict[str, Any]]:
     checks.append(_migration_files_check())
     checks.append(_policy_upgrade_migration_file_check())
     checks.append(_lookup_outcomes_security_migration_file_check())
+    checks.append(_authority_migration_file_check())
     proposal_only = True
     for target, payload in (
         (object.__new__(ScoutReweighter), [{"scout_type": "x"}]),
@@ -318,6 +381,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 "policy_impact_previews", "governed_policy_versions", "import_batches",
                 "import_rows", "outcome_observations", "outcome_evidence_links",
                 "lookup_job_outcomes",
+                "tenant_authority_rollouts", "authority_projection_receipts",
             }
             rows = await conn.fetch(
                 """
@@ -425,6 +489,21 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                     grant_rows=list(lookup_grant_rows),
                 )
             )
+            authority_policy_rows = await conn.fetch(
+                """
+                select tablename, policyname, roles, cmd, qual, with_check
+                from pg_policies
+                where schemaname = 'public'
+                  and tablename = any($1::text[])
+                """,
+                sorted(_AUTHORITY_TABLES),
+            )
+            checks.append(
+                _authority_security_check(
+                    table_rows=list(rows),
+                    policy_rows=list(authority_policy_rows),
+                )
+            )
             migration_table = await conn.fetchval(
                 "select to_regclass('supabase_migrations.schema_migrations')::text"
             )
@@ -437,6 +516,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
             checks.append(_migration_versions_check(versions))
             checks.append(_policy_upgrade_version_check(versions))
             checks.append(_lookup_outcomes_security_version_check(versions))
+            checks.append(_authority_migration_version_check(versions))
             policy_upgrade_rpc = await conn.fetchval(
                 """
                 select to_regprocedure(
@@ -460,6 +540,13 @@ async def _run() -> Dict[str, Any]:
     checks = _code_checks()
     dsn = database_dsn()
     if not dsn:
+        checks.append(
+            _check(
+                "authority_control_rls_and_policies",
+                "blocked",
+                "direct PostgreSQL DSN is required to certify authority RLS and service-role policies",
+            )
+        )
         checks.append(
             _check(
                 "direct_database_dsn",

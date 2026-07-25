@@ -111,6 +111,7 @@ Apply the prior Phase 0–2 chain first, then:
 8. `20260721130000_upgrade_fund_policy_rpc.sql`
 9. `20260721143000_patch_upgrade_fund_policy_settings.sql`
 10. `20260721150000_lookup_job_outcomes_rls.sql`
+11. `20260722090000_authority_control.sql`
 
 Do not expose the new UI before the first seven migrations and Phase 0–2
 dependencies are applied. Apply migrations 8 and 9 before running the
@@ -119,6 +120,14 @@ durable lookup jobs: it enables RLS on `lookup_job_outcomes`, removes inherited
 table privileges, and grants CRUD only to `service_role` under an explicit
 service-role policy. The repositories intentionally fail closed when their
 direct PostgreSQL store is unavailable.
+
+Migration 11 installs the tenant-scoped authority rollout record and idempotent
+compatibility-projection receipt table. It enables RLS for both tables, removes
+client grants, and permits service-role access only through exact `FOR ALL`
+policies. The Phase 8 readiness command reports the migration file immediately;
+with a direct DSN it also verifies the applied version, both RLS flags, and both
+service-role policies. Without that DSN those live database checks remain
+uncertified and `ready` remains false.
 
 The readiness gate checks both the Supabase migration ledger and the live
 `information_schema.columns` projection. Migration `20260720120000` is ready
@@ -201,6 +210,46 @@ With `TEST_DATABASE_URL` configured, run the PostgreSQL-gated suites as part of 
 - Direct database readiness: blocked by missing DSN (`ready: false`, expected in this workspace).
 - Target migration application, RLS enforcement, UUID/JSON codecs, triggers, foreign keys, and transactional race behavior: not certified locally.
 - Authority-control behavior: code-certified by the local suites above; target-database enforcement remains uncertified.
+- Authority control: authenticated manual lookup remains admitted in legacy and
+  shadow modes; canonical-write compatibility projection records an idempotent
+  receipt. The frontend renders the rollout mode, reconciliation state, and
+  explicit rollback recovery instruction without inferring authority from legacy
+  startup rows.
+
+## Authority-control rollout certification (2026-07-25)
+
+The executable authority certification is
+`backend/tests/authority/test_authority_certification.py`. It verifies that an
+authenticated tenant can submit manual lookup work during both legacy and shadow
+rollout, and that canonical-write compatibility projection produces a receipt.
+The frontend authority client and hook are covered by
+`app-front-end/src/api/authority.test.ts` and
+`app-front-end/src/hooks/useAuthority.test.tsx`: they use Clerk-authenticated
+requests and TanStack Query, require an optimistic-lock version for transitions,
+retain blocked opportunities rather than filtering them from the queue, expose
+rollback recovery text, and invalidate dependent authority/status/opportunity
+queries after rollback.
+
+Observed in this worktree:
+
+```bash
+pytest -q backend/tests/authority backend/tests/identity backend/tests/decisions backend/tests/evaluation_v2 -rs
+# 716 passed, 4 target-PostgreSQL skips, 1 existing TestClient deprecation warning
+
+cd app-front-end && npm test
+# 61 files passed; 280 tests passed
+
+cd app-front-end && npm run lint && npm run build
+# exit 0; 868 modules transformed
+
+python3 backend/scripts/check_phase8_readiness.py --json
+# authority migration file passed; authority RLS/policy and direct-DSN checks
+# blocked because no DATABASE_URL or SUPABASE_DB_URL is configured; ready=false
+```
+
+The current frontend runner is Vitest, so its equivalent targeted invocation
+does not accept Jest's `--runInBand` flag. Run `npm test --
+src/api/authority.test.ts src/hooks/useAuthority.test.tsx` instead.
 
 ## Task 8 decision-safety certification (2026-07-20)
 

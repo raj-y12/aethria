@@ -31,6 +31,8 @@ import type {
 } from '../types/startup';
 import type { Settings } from '../api/settings';
 import { fetchSystemStatus, type SystemStatus } from '../api/system';
+import { useAuthority } from './useAuthority';
+import type { AuthorityStatus } from '../api/authority';
 
 const emptyRejection: RejectionAnalytics = {
   most_common_red_flags: [],
@@ -67,6 +69,9 @@ export interface SystemData {
   fundThesisRuntimeLoading: boolean;
   fundThesisRuntimeError: string | null;
   settings: Settings | null;
+  authorityStatus: AuthorityStatus | null;
+  authorityBlockedReason: string | null;
+  canonicalReadActive: boolean;
   pendingEscalationCount: number;
   startupsError: string | null;
   /** First startups fetch has settled (or cache was warm-hydrated) — safe to kick off background work. */
@@ -106,6 +111,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
   const queryClient = useQueryClient();
   const { tabVisible: isTabVisible, userActive } = useQueryLiveGate();
   const liveGate: QueryLiveGate = { tabVisible: isTabVisible, userActive };
+  const authority = useAuthority();
 
   const prevSystemPanelOpen = useRef(systemPanelOpen);
   useEffect(() => {
@@ -142,6 +148,10 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     // poll tick. Exponential backoff: ~1s, 2s, 4s, 8s.
     retry: 4,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
+    // Legacy startup DTOs remain the queue until a reconciled canonical-read
+    // rollout explicitly takes authority. Existing cached rows are retained;
+    // a blocked opportunity is never filtered from the visible queue here.
+    enabled: !authority.isCanonicalRead,
   });
 
   const escalationsQuery = useQuery({
@@ -307,6 +317,9 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     fundThesisRuntimeLoading: fundThesisRuntimeQuery.isPending,
     fundThesisRuntimeError: fundThesisRuntimeQuery.isError ? 'Could not load thesis runtime' : null,
     settings: settingsQuery.data ?? null,
+    authorityStatus: authority.status,
+    authorityBlockedReason: authority.blockedReason,
+    canonicalReadActive: authority.isCanonicalRead,
     pendingEscalationCount,
     startupsError: startupsQuery.isError ? 'Could not load startups' : null,
     startupsReady: !startupsQuery.isPending,
