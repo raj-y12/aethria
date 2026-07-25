@@ -263,6 +263,41 @@ def test_canonical_write_rejects_direct_legacy_startup_mutation_with_typed_confl
     assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/startups/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1/acknowledge",
+        "/api/escalations/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1/resolve",
+    ],
+)
+def test_rollback_kill_switch_fences_legacy_writes_before_storage_access(monkeypatch, path):
+    import api
+
+    client = _client(
+        monkeypatch,
+        _AuthorityRepository(rollout=_rollout(mode=RolloutMode.LEGACY, kill_switch=True)),
+    )
+    monkeypatch.setattr(
+        api,
+        "_get_storage",
+        lambda _request: (_ for _ in ()).throw(
+            AssertionError("kill switch must reject before legacy storage access")
+        ),
+    )
+    response = client.post(
+        path,
+        headers=_auth(),
+        json=(
+            {"decision": "NO", "notes": "The opportunity does not fit the mandate."}
+            if "/escalations/" in path
+            else None
+        ),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
+
+
 def test_canonical_write_escalation_never_updates_legacy_startup_without_linked_opportunity(
     monkeypatch,
 ):
@@ -372,6 +407,46 @@ def test_canonical_read_primary_startup_routes_do_not_fall_back_to_legacy_dtos(
 
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_READ_NOT_CERTIFIED"
+
+
+@pytest.mark.parametrize(
+    ("rollout", "expected_code"),
+    [
+        (
+            _rollout(
+                mode=RolloutMode.CANONICAL_READ,
+                version=4,
+                last_reconciliation_status="green",
+            ),
+            "AUTHORITY_CANONICAL_READ_NOT_CERTIFIED",
+        ),
+        (_rollout(mode=RolloutMode.LEGACY, kill_switch=True), "AUTHORITY_CANONICAL_ONLY"),
+    ],
+)
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/startups/d3d44fa8-6f39-4d8c-bcf4-f979a0fc0cf1/memo",
+        "/api/escalations",
+    ],
+)
+def test_canonical_or_killed_legacy_reads_fail_closed_before_storage(
+    monkeypatch, rollout, expected_code, path
+):
+    import api
+
+    client = _client(monkeypatch, _AuthorityRepository(rollout=rollout))
+    monkeypatch.setattr(
+        api,
+        "_get_storage",
+        lambda _request: (_ for _ in ()).throw(
+            AssertionError("authority read fence must run before legacy storage access")
+        ),
+    )
+    response = client.get(path, headers=_auth())
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == expected_code
 
 
 @pytest.mark.asyncio

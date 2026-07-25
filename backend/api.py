@@ -1893,6 +1893,14 @@ async def _reject_uncertified_canonical_legacy_read(request: Request) -> None:
     from routers.authority import authority_for_request
 
     authority = await authority_for_request(request)
+    if authority.kill_switch:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "AUTHORITY_CANONICAL_ONLY",
+                "message": "Legacy startup reads are disabled by the authority kill switch",
+            },
+        )
     if authority.mode is RolloutMode.CANONICAL_READ:
         raise HTTPException(
             status_code=409,
@@ -2126,9 +2134,11 @@ async def _reject_direct_legacy_startup_write(request: Request) -> None:
         # Local-only development without durable authority tables remains legacy.
         return
     from authority.models import RolloutMode
-    from routers.authority import authority_for_request
+    from routers.authority import require_write_path
 
-    authority = await authority_for_request(request)
+    authority = await require_write_path(
+        request, operation="legacy startup acknowledgement"
+    )
     if authority.mode in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
         raise HTTPException(
             status_code=409,
@@ -2140,7 +2150,7 @@ async def _reject_direct_legacy_startup_write(request: Request) -> None:
 
 
 @app.get("/api/startups/{startup_id}/memo")
-def get_startup_memo(request: Request, startup_id: str):
+async def get_startup_memo(request: Request, startup_id: str):
     """
     Memo readiness + optional persisted markdown (Supabase).
     Never blocks on memo generation.
@@ -2149,6 +2159,7 @@ def get_startup_memo(request: Request, startup_id: str):
     from pipeline_state import get_pipeline_state_row
 
     validate_route_id(startup_id, field_name="startup_id")
+    await _reject_uncertified_canonical_legacy_read(request)
     storage = _get_storage(request)
     uid = request.state.user_id
     if isinstance(storage, SupabaseStartupsStorage):
@@ -3492,11 +3503,12 @@ async def trigger_meta_cycle(request: Request):
 
 
 @app.get("/api/escalations")
-def get_escalations(request: Request):
+async def get_escalations(request: Request):
     """
     Returns all startups where human_review_required=True and human_resolution is None.
     Shapes each result as EscalationItem (frontend type) with nested scout/review/partner.
     """
+    await _reject_uncertified_canonical_legacy_read(request)
     storage = _get_storage(request)
     pending_raw = _get_pending_escalations(storage)
     items: List[Dict[str, Any]] = []
@@ -3611,9 +3623,11 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
         or getattr(app_state, "authority_repository", None) is not None
     ):
         from authority.models import RolloutMode
-        from routers.authority import authority_for_request
+        from routers.authority import require_write_path
 
-        authority = await authority_for_request(request)
+        authority = await require_write_path(
+            request, operation="escalation resolution"
+        )
         if authority.mode in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
             return await _resolve_canonical_escalation(
                 request,
