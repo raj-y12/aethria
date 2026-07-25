@@ -60,6 +60,21 @@ class AuthorityService:
         uid = require_user_id(user_id, context="AuthorityService.authority")
         return self._context(await self.repository.get_rollout(user_id=uid))
 
+    async def transition(self, *, user_id: str, expected_version: int,
+                         target_mode: RolloutMode, actor_id: str,
+                         snapshot_id: str | None = None):
+        context = await self.authority(user_id=user_id)
+        if target_mode is RolloutMode.CANONICAL_READ and context.last_reconciliation_status != "green":
+            raise AuthorityTransitionError("canonical read requires green reconciliation")
+        if target_mode is RolloutMode.CANONICAL_READ:
+            raise AuthorityTransitionError(
+                "canonical read is not certified: canonical queue/detail DTO capability is unavailable"
+            )
+        return await self.repository.transition_rollout(
+            user_id=user_id, expected_version=expected_version,
+            target_mode=target_mode, actor_id=actor_id, snapshot_id=snapshot_id,
+        )
+
     async def require_write_path(self, *, user_id: str, operation: str) -> AuthorityContext:
         uid = require_user_id(user_id, context="AuthorityService.require_write_path")
         operation_name = str(operation or "").strip()

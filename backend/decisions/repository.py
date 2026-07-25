@@ -241,6 +241,8 @@ class DecisionRepository:
         action = WorkflowActionType(action_type)
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="workflow action creation")
                 recommendation = await conn.fetchrow(
                     """
                     select r.missing_information,o.legacy_startup_id from public.opportunities o
@@ -292,6 +294,8 @@ class DecisionRepository:
         await self._require_write_path(user_id=uid, operation="workflow action approval")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="workflow action approval")
                 row = await conn.fetchrow(
                     """
                     update public.workflow_actions as wa

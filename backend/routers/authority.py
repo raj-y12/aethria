@@ -171,7 +171,7 @@ async def transition_authority(request: Request, body: TransitionBody):
     # field can select or impersonate another tenant.
     user_id = require_authenticated_user(request)
     try:
-        record = await _service(request).repository.transition_rollout(
+        record = await _service(request).transition(
             user_id=user_id,
             expected_version=body.expected_version,
             target_mode=body.target_mode,

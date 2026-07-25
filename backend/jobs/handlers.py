@@ -74,14 +74,22 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
             detail=exc.detail,
             recovery_action=exc.recovery_action,
         ) from exc
+    except AuthorityBlocked as exc:
+        raise JobExecutionBlocked(code="AUTHORITY_CANONICAL_ONLY", detail=str(exc),
+                                  recovery_action="Resume through canonical authority.") from exc
     try:
+        async def _runtime_authority_fence() -> None:
+            await _raise_if_cancelled(repository, job)
+            if authority_service is not None:
+                await authority_service.require_legacy_pipeline_path(user_id=job.user_id)
+
         result = await run_one_pipeline_cycle(
             job.user_id,
             manual_one_shot=payload.manual_one_shot,
             pipeline_run_id=job.pipeline_run_id,
             identity_repository=IdentityRepository(repository.pool),
             evaluation_prerequisites=evaluation_prerequisites,
-            ownership_check=lambda: _raise_if_cancelled(repository, job),
+            ownership_check=_runtime_authority_fence,
         )
     except EvaluationPrerequisiteError as exc:
         raise JobExecutionBlocked(
