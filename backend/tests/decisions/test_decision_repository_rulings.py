@@ -1,8 +1,9 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from decisions.models import HumanRulingInput
+from decisions.models import HumanRulingInput, WorkflowActionType
 from decisions.repository import DecisionRepository
 
 
@@ -27,6 +28,49 @@ class _CreateConnection:
             },
             {"ruling_id": "ruling-a"},
         ]
+        self.calls = []
+
+    def transaction(self):
+        return _Acquire(self)
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append(("fetchrow", sql, args))
+        return self.fetchrows.pop(0)
+
+    async def execute(self, sql, *args):
+        self.calls.append(("execute", sql, args))
+        return "INSERT 0 1"
+
+
+def _workflow_action_row(**overrides):
+    row = {
+        "workflow_action_id": "4bc2c17a-9943-4d17-8bdf-0a556b6e07c8",
+        "user_id": "user-a",
+        "opportunity_id": "opportunity-a",
+        "action_type": "draft_information_request",
+        "trigger_type": "operator",
+        "trigger_id": None,
+        "status": "pending_approval",
+        "generated_content": json.dumps({"draft": "Please share retention data.", "requires_approval": True}),
+        "approved_content": None,
+        "missing_evidence": json.dumps(["retention"]),
+        "requires_approval": True,
+        "due_at": None,
+        "completed_at": None,
+        "external_destination": None,
+        "external_reference": None,
+        "approved_by": None,
+        "approved_at": None,
+        "created_at": "2026-07-21T12:00:00Z",
+        "updated_at": "2026-07-21T12:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+class _WorkflowActionConnection:
+    def __init__(self, rows):
+        self.fetchrows = list(rows)
         self.calls = []
 
     def transaction(self):
@@ -119,3 +163,83 @@ async def test_created_ruling_outbox_carries_legacy_startup_and_rationale():
     assert payload["legacy_startup_id"] == "6df278f2-679f-4a7f-8dd9-27109904d093"
     assert payload["rationale"] == "Outside this fund's mandate."
     assert payload["compatibility_reason"] == "Outside this fund's mandate."
+
+
+@pytest.mark.asyncio
+async def test_workflow_action_created_emits_linked_legacy_projection_payload():
+    from authority.projection import AuthorityProjectionConsumer
+
+    connection = _WorkflowActionConnection([
+        {
+            "missing_information": json.dumps(["retention"]),
+            "legacy_startup_id": "cc52907a-c8ae-4a41-b9e5-259929d26f56",
+        },
+        _workflow_action_row(),
+    ])
+    repository = DecisionRepository(_Pool(connection))
+
+    await repository.create_action(
+        user_id="user-a",
+        opportunity_id="opportunity-a",
+        action_type=WorkflowActionType.DRAFT_INFORMATION_REQUEST,
+    )
+
+    outbox = next(
+        call for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    )
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == "cc52907a-c8ae-4a41-b9e5-259929d26f56"
+    assert payload["compatibility_reason"] == "workflow action created: draft_information_request"
+
+    class ProjectionRepository:
+        async def get_projection_receipt(self, **_kwargs):
+            return None
+
+        async def apply_legacy_projection(self, *, patch, **_kwargs):
+            self.patch = patch.patch
+            return SimpleNamespace(receipt_id="receipt-a")
+
+    projection_repository = ProjectionRepository()
+    receipt = await AuthorityProjectionConsumer(projection_repository).apply(
+        user_id="user-a",
+        event_id=outbox[2][0],
+        aggregate_type=outbox[2][2],
+        aggregate_id=outbox[2][3],
+        event_type=outbox[2][4],
+        payload=payload,
+    )
+    assert receipt.receipt_id == "receipt-a"
+    assert projection_repository.patch["agent_trace"]["authority_projection"]["canonical_workflow_reason"] == (
+        "workflow action created: draft_information_request"
+    )
+
+
+@pytest.mark.asyncio
+async def test_workflow_action_approval_joins_opportunity_for_projection_payload():
+    row = _workflow_action_row(
+        status="approved",
+        approved_by="operator-a",
+        approved_at="2026-07-21T13:00:00Z",
+        legacy_startup_id="5d82d549-205e-4cff-a831-316095c6f6e4",
+    )
+    connection = _WorkflowActionConnection([row])
+    repository = DecisionRepository(_Pool(connection))
+
+    await repository.approve_action(
+        user_id="user-a",
+        workflow_action_id=row["workflow_action_id"],
+        approved_by="operator-a",
+    )
+
+    update = next(call for call in connection.calls if call[0] == "fetchrow")
+    update_sql = " ".join(update[1].split()).lower()
+    assert "from public.opportunities as o" in update_sql
+    assert "wa.opportunity_id=o.opportunity_id" in update_sql
+    outbox = next(
+        call for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    )
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == "5d82d549-205e-4cff-a831-316095c6f6e4"
+    assert payload["compatibility_reason"] == "workflow action approved: draft_information_request"

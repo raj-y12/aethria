@@ -223,7 +223,7 @@ class DecisionRepository:
             async with conn.transaction():
                 recommendation = await conn.fetchrow(
                     """
-                    select r.missing_information from public.opportunities o
+                    select r.missing_information,o.legacy_startup_id from public.opportunities o
                     left join public.recommendations r
                       on r.user_id=o.user_id and r.recommendation_id=o.current_recommendation_id
                     where o.user_id=$1 and o.opportunity_id=$2 for update of o
@@ -248,6 +248,14 @@ class DecisionRepository:
                         "opportunity_id": opportunity_id,
                         "action_type": action.value,
                         "requires_approval": record.requires_approval,
+                        "legacy_startup_id": (
+                            str(recommendation["legacy_startup_id"])
+                            if recommendation.get("legacy_startup_id")
+                            else None
+                        ),
+                        "compatibility_reason": (
+                            f"workflow action created: {action.value}"
+                        ),
                     },
                 )
                 return record
@@ -265,12 +273,14 @@ class DecisionRepository:
             async with conn.transaction():
                 row = await conn.fetchrow(
                     """
-                    update public.workflow_actions
+                    update public.workflow_actions as wa
                     set status='approved',approved_by=$3,approved_at=now(),
                         approved_content=coalesce($4::jsonb,generated_content),updated_at=now()
-                    where workflow_action_id=$1 and user_id=$2
-                      and status='pending_approval' and requires_approval=true
-                    returning *
+                    from public.opportunities as o
+                    where wa.workflow_action_id=$1 and wa.user_id=$2
+                      and wa.opportunity_id=o.opportunity_id and o.user_id=wa.user_id
+                      and wa.status='pending_approval' and wa.requires_approval=true
+                    returning wa.*,o.legacy_startup_id
                     """,
                     workflow_action_id, uid, approved_by,
                     json.dumps(approved_content) if approved_content is not None else None,
@@ -278,6 +288,7 @@ class DecisionRepository:
                 if row is None:
                     raise LookupError("Pending action not found for tenant")
                 payload = db_row(row)
+                legacy_startup_id = payload.pop("legacy_startup_id", None)
                 payload["generated_content"] = _json(payload.get("generated_content"), {})
                 payload["approved_content"] = _json(payload.get("approved_content"), None)
                 payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])
@@ -290,6 +301,14 @@ class DecisionRepository:
                         "workflow_action_id": workflow_action_id,
                         "approved_by": approved_by,
                         "external_write_performed": False,
+                        "opportunity_id": record.opportunity_id,
+                        "action_type": record.action_type.value,
+                        "legacy_startup_id": (
+                            str(legacy_startup_id) if legacy_startup_id else None
+                        ),
+                        "compatibility_reason": (
+                            f"workflow action approved: {record.action_type.value}"
+                        ),
                     },
                 )
                 return record
