@@ -37,6 +37,10 @@ LOOKUP_OUTCOMES_SECURITY_MIGRATION = (
     "20260721150000_lookup_job_outcomes_rls.sql"
 )
 AUTHORITY_CONTROL_MIGRATION = "20260722090000_authority_control.sql"
+CANONICAL_EXTENSION_MIGRATIONS = (
+    "20260725120000_canonical_portfolio_positions.sql",
+    "20260725130000_triage_assessments.sql",
+)
 _AUTHORITY_TABLES = {
     "tenant_authority_rollouts": "tenant_authority_rollouts_service_role_all",
     "authority_projection_receipts": "authority_projection_receipts_service_role_all",
@@ -146,6 +150,19 @@ def _authority_migration_file_check(repo_root: Path = REPO_ROOT) -> Dict[str, An
         "authority_control_migration_file",
         "passed" if not missing else "failed",
         "tenant authority rollout and projection-receipt migration is present",
+        missing=missing,
+    )
+
+
+def _canonical_extension_migrations_check(repo_root: Path = REPO_ROOT) -> Dict[str, Any]:
+    missing = [
+        name for name in CANONICAL_EXTENSION_MIGRATIONS
+        if not (repo_root / "supabase" / "migrations" / name).exists()
+    ]
+    return _check(
+        "canonical_extension_migration_files",
+        "passed" if not missing else "failed",
+        "canonical portfolio and triage migrations are present",
         missing=missing,
     )
 
@@ -389,6 +406,7 @@ def _code_checks() -> List[Dict[str, Any]]:
     checks.append(_policy_upgrade_migration_file_check())
     checks.append(_lookup_outcomes_security_migration_file_check())
     checks.append(_authority_migration_file_check())
+    checks.append(_canonical_extension_migrations_check())
     proposal_only = True
     for target, payload in (
         (object.__new__(ScoutReweighter), [{"scout_type": "x"}]),
@@ -425,6 +443,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 "import_rows", "outcome_observations", "outcome_evidence_links",
                 "lookup_job_outcomes",
                 "tenant_authority_rollouts", "authority_projection_receipts",
+                "canonical_portfolio_positions", "triage_assessments",
             }
             rows = await conn.fetch(
                 """
