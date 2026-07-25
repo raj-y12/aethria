@@ -8,7 +8,7 @@ const CHAR_MAX_MS = 90;
 const MEMO_DELAY_MS = 500;
 
 // Command phrasing, like the mockup ("look up  anthropic") — double space after "up" is intentional.
-const TYPED_QUERY = `look up  ${DEMO_LOOKUP_QUERY.toLowerCase()}`;
+const TYPED_QUERY = `${DEMO_LOOKUP_QUERY.toLowerCase()}`;
 
 /** Plate 06 — place a query: the real on-demand lookup, reused from product-chrome. */
 export default function QueryPlate() {
