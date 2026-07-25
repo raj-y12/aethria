@@ -1,6 +1,7 @@
 from collections import deque
 from datetime import datetime, timezone
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -11,6 +12,21 @@ from evaluation_v2.models import (
     EvidenceEligibilityPolicy,
 )
 from evaluation_v2.repository import EvaluationRepository
+
+
+class _ProjectionRepository:
+    def __init__(self):
+        self.receipts = {}
+        self.patch = None
+
+    async def get_projection_receipt(self, *, user_id, event_id, consumer):
+        return self.receipts.get((user_id, event_id, consumer))
+
+    async def apply_legacy_projection(self, *, user_id, event_id, consumer, patch, **_kwargs):
+        self.patch = patch.patch
+        receipt = SimpleNamespace(receipt_id=f"receipt:{event_id}")
+        self.receipts[(user_id, event_id, consumer)] = receipt
+        return receipt
 
 
 class _Connection:
@@ -69,6 +85,7 @@ class _EvaluationConnection:
         return {
             "service_level": 1,
             "decision_state": "active",
+            "legacy_startup_id": "5fa9d11a-5f21-45c1-9ad3-d755990c3164",
             "recommendation_id": None,
         }
 
@@ -235,6 +252,46 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
     assert relationship["evidence_expires_at"] == "2026-08-01T00:00:00+00:00"
     assert relationship["artifact_effective_at"] == "2026-07-01T00:00:00+00:00"
     assert relationship["retrieved_at"] == "2026-07-01T01:00:00+00:00"
+    _, outbox_args = next(
+        (sql, args)
+        for sql, args in connection.execute_calls
+        if "insert into public.domain_outbox" in sql
+    )
+    outbox_payload = json.loads(outbox_args[-1])
+    assert outbox_payload["legacy_startup_id"] == "5fa9d11a-5f21-45c1-9ad3-d755990c3164"
+    assert outbox_payload["compatibility_reason"]
+
+
+@pytest.mark.asyncio
+async def test_actual_evaluation_outbox_payload_projects_to_a_receipted_legacy_patch():
+    from authority.projection import AuthorityProjectionConsumer
+
+    connection = _EvaluationConnection()
+    await EvaluationRepository(_Pool(connection)).evaluate(
+        user_id="user-a",
+        opportunity_id="opportunity-1",
+        actor_id="actor-a",
+        trigger_type="manual",
+        policy=_evaluation_policy(),
+    )
+    _, args = next(
+        (sql, args)
+        for sql, args in connection.execute_calls
+        if "insert into public.domain_outbox" in sql
+    )
+    projection_repository = _ProjectionRepository()
+    receipt = await AuthorityProjectionConsumer(projection_repository).apply(
+        user_id="user-a",
+        event_id=args[0],
+        aggregate_type="evaluation",
+        aggregate_id=args[2],
+        event_type=args[3],
+        payload=json.loads(args[-1]),
+    )
+
+    assert receipt.receipt_id == f"receipt:{args[0]}"
+    assert projection_repository.patch["review_info"]["canonical_evaluation_id"]
+    assert projection_repository.patch["partner_info"]["recommendation"] == "MONITOR"
 
 
 @pytest.mark.asyncio

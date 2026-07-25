@@ -92,6 +92,7 @@ class AuthorityRepository:
         payload = db_row(row)
         if payload.get("user_id") != user_id:
             raise AuthorityConflict("workflow state tenant mismatch")
+        payload.pop("legacy_startup_id", None)
         payload["state"] = payload.pop("workflow_state")
         payload["version"] = payload.pop("workflow_version")
         return WorkflowStateRecord.model_validate(payload)
@@ -347,7 +348,8 @@ class AuthorityRepository:
                         last_transition_id=$8,updated_at=now()
                     where user_id=$1 and opportunity_id=$2 and workflow_version=$3
                     returning user_id,opportunity_id,workflow_state,workflow_version,
-                              block_code,block_detail,block_recovery,last_transition_id,updated_at
+                              block_code,block_detail,block_recovery,last_transition_id,
+                              legacy_startup_id,updated_at
                     """,
                     uid,
                     str(opportunity),
@@ -357,6 +359,11 @@ class AuthorityRepository:
                     block_detail,
                     block_recovery,
                     str(transition),
+                )
+                legacy_startup_id = (
+                    str(row["legacy_startup_id"])
+                    if row is not None and row.get("legacy_startup_id")
+                    else None
                 )
                 record = self._workflow(row, user_id=uid)
                 await self._outbox(
@@ -371,6 +378,10 @@ class AuthorityRepository:
                         "workflow_version": record.version,
                         "transition_id": str(transition),
                         "block_code": block_code,
+                        "legacy_startup_id": legacy_startup_id,
+                        "compatibility_reason": (
+                            block_detail or f"workflow transitioned to {record.state.value}"
+                        ),
                     },
                 )
                 return record

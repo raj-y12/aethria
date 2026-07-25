@@ -1,5 +1,6 @@
 from collections import deque
 from datetime import datetime, timezone
+import json
 from uuid import UUID, uuid4
 
 import pytest
@@ -326,6 +327,39 @@ async def test_workflow_change_and_outbox_are_atomic_when_outbox_fails():
 
     assert any("update public.opportunities" in call[1].lower() for call in connection.calls)
     assert any("domain_outbox" in call[1].lower() for call in connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_workflow_outbox_carries_linked_legacy_startup_and_reason():
+    legacy_startup_id = "4f591cb7-3c0d-44c5-a663-8dab0bc94e6d"
+    connection = _Connection(
+        fetchrows=[
+            _rollout_row(),
+            _workflow_row(
+                workflow_state="monitoring",
+                workflow_version=1,
+                last_transition_id=str(uuid4()),
+                legacy_startup_id=legacy_startup_id,
+            ),
+        ]
+    )
+    repository = AuthorityRepository(_Pool(connection))
+
+    await repository.transition_workflow(
+        user_id="tenant-a",
+        opportunity_id=uuid4(),
+        expected_version=0,
+        target_state=WorkflowState.MONITORING,
+        transition_id=uuid4(),
+    )
+
+    outbox = next(
+        call for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    )
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == legacy_startup_id
+    assert payload["compatibility_reason"] == "workflow transitioned to monitoring"
 
 
 @pytest.mark.asyncio

@@ -502,6 +502,12 @@ class IdentityRepository:
                         "observation_id": observation_id,
                         "company_id": company.company_id,
                         "opportunity_id": opportunity.opportunity_id,
+                        "legacy_startup_id": (
+                            str(opportunity.legacy_startup_id)
+                            if opportunity.legacy_startup_id
+                            else None
+                        ),
+                        "compatibility_reason": "canonical identity resolved",
                         "created": created,
                     },
                 )
@@ -595,6 +601,12 @@ class IdentityRepository:
                         "observation_id": observation_id,
                         "company_id": company_id,
                         "opportunity_id": opportunity.opportunity_id,
+                        "legacy_startup_id": (
+                            str(opportunity.legacy_startup_id)
+                            if opportunity.legacy_startup_id
+                            else None
+                        ),
+                        "compatibility_reason": "canonical identity resolved",
                         "created": False,
                     },
                 )
@@ -797,6 +809,12 @@ class IdentityRepository:
                         "observation_id": case.observation_id,
                         "company_id": selected_company_id,
                         "opportunity_id": opportunity.opportunity_id,
+                        "legacy_startup_id": (
+                            str(opportunity.legacy_startup_id)
+                            if opportunity.legacy_startup_id
+                            else None
+                        ),
+                        "compatibility_reason": "canonical identity resolved",
                         "resolved_by": actor,
                     },
                 )
@@ -1200,6 +1218,12 @@ class IdentityRepository:
                         "observation_id": case.observation_id,
                         "company_id": company.company_id,
                         "opportunity_id": opportunity.opportunity_id,
+                        "legacy_startup_id": (
+                            str(opportunity.legacy_startup_id)
+                            if opportunity.legacy_startup_id
+                            else None
+                        ),
+                        "compatibility_reason": "canonical identity resolved",
                         "created": created,
                         "resolved_by": actor,
                     },

@@ -86,7 +86,7 @@ def test_recommendation_mapping_keeps_insufficient_evidence_visible_and_never_pa
         },
     )
 
-    assert patch.patch["partner_info"]["recommendation"] == "REVIEW"
+    assert patch.patch["partner_info"]["recommendation"] == "MONITOR"
     assert patch.patch["partner_info"]["canonical_recommendation_state"] == "insufficient_evidence"
     assert patch.patch["partner_info"]["canonical_recommendation_reason"] == "Need customer references"
     assert patch.patch["partner_info"]["canonical_recommendation_id"]
@@ -103,7 +103,7 @@ def test_advance_recommendation_does_not_create_a_portfolio_position():
         },
     )
 
-    assert patch.patch["partner_info"]["recommendation"] == "YES"
+    assert patch.patch["partner_info"]["recommendation"] == "MONITOR"
     assert "portfolio" not in patch.patch
     assert "portfolio_position" not in patch.patch
 
@@ -127,6 +127,7 @@ def test_human_ruling_maps_to_human_resolution_with_canonical_ids_and_reason():
         "notes": "Outside mandate",
         "canonical_ruling_id": ruling_id,
         "canonical_opportunity_id": opportunity_id,
+        "canonical_ruling_rationale": "Outside mandate",
     }
 
 
@@ -186,7 +187,7 @@ async def test_projection_is_idempotent_and_never_writes_canonical_tables():
     second = await projector.apply(**event)
 
     assert first.receipt_id == second.receipt_id
-    assert legacy_repo.patch["partner_info"]["recommendation"] == "REVIEW"
+    assert legacy_repo.patch["partner_info"]["recommendation"] == "MONITOR"
     assert legacy_repo.canonical_writes == []
 
 
@@ -201,6 +202,30 @@ async def test_projection_rejects_cross_tenant_event_before_legacy_patch():
 
     assert legacy_repo.patch == {}
     assert legacy_repo.receipts == {}
+
+
+@pytest.mark.asyncio
+async def test_emitted_evaluation_event_projects_a_valid_legacy_value_and_reason():
+    legacy_repo = _LegacyRepository()
+    projector = AuthorityProjectionConsumer(legacy_repo)
+    event = event_for(
+        "evaluation.completed",
+        payload={
+            "legacy_startup_id": "startup-a",
+            "evaluation_id": str(uuid4()),
+            "recommendation_id": str(uuid4()),
+            "recommended_state": "insufficient_evidence",
+            "compatibility_reason": "Evidence coverage below policy minimum.",
+        },
+    )
+
+    receipt = await projector.apply(**event)
+
+    assert receipt is not None
+    assert legacy_repo.patch["review_info"]["canonical_evaluation_id"] == event["payload"]["evaluation_id"]
+    assert legacy_repo.patch["review_info"]["canonical_evaluation_reason"] == "Evidence coverage below policy minimum."
+    assert legacy_repo.patch["partner_info"]["recommendation"] == "MONITOR"
+    assert legacy_repo.patch["partner_info"]["canonical_recommendation_state"] == "insufficient_evidence"
 
 
 @pytest.mark.asyncio

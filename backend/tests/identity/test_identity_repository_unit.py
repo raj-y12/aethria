@@ -167,7 +167,13 @@ async def test_record_observation_is_tenant_idempotent_by_external_event():
 
 @pytest.mark.asyncio
 async def test_company_admission_commits_identity_opportunity_and_outbox_together():
-    connection = _Connection(fetchrows=[_company_row(), _opportunity_row()])
+    legacy_startup_id = "bc9ccd98-ba8d-46d4-9c4d-5f0c6925d02a"
+    connection = _Connection(
+        fetchrows=[
+            _company_row(),
+            _opportunity_row(legacy_startup_id=legacy_startup_id),
+        ]
+    )
     repository = IdentityRepository(_Pool(connection))
 
     result = await repository.create_company_admission(
@@ -189,6 +195,13 @@ async def test_company_admission_commits_identity_opportunity_and_outbox_togethe
     assert "update public.source_observations" in sql
     assert "insert into public.domain_outbox" in sql
     assert "observation_resolved" in str(connection.calls)
+    outbox = next(
+        call for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    )
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == legacy_startup_id
+    assert payload["compatibility_reason"] == "canonical identity resolved"
 
 
 @pytest.mark.asyncio

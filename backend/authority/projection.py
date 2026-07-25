@@ -11,10 +11,9 @@ import hashlib
 import json
 from dataclasses import dataclass
 from typing import Any, Mapping
-from uuid import UUID
-
 from authority.models import ProjectionReceipt
 from tenant_context import require_user_id
+from utils.partner_codes import legacy_partner_from_institutional_recommendation
 
 
 COMPATIBILITY_CONSUMER = "startups_compatibility"
@@ -22,6 +21,10 @@ COMPATIBILITY_CONSUMER = "startups_compatibility"
 
 class ProjectionTenantMismatch(ValueError):
     """An event payload tried to project data owned by another tenant."""
+
+
+class UnresolvedLegacyProjection(RuntimeError):
+    """An authority event has no tenant-scoped legacy startup projection."""
 
 
 @dataclass(frozen=True)
@@ -64,18 +67,17 @@ def _canonical_ids(payload: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _recommendation_display(state: str) -> str:
-    """Keep uncertainty visible rather than projecting it as a legacy pass."""
-    normalized = state.strip().lower()
-    if normalized in {"insufficient_evidence", "review", "pending"}:
-        return "REVIEW"
-    if normalized in {"advance", "invest", "yes"}:
-        # A recommendation is not a portfolio position or a human investment.
-        return "YES"
-    if normalized in {"monitor", "maybe"}:
-        return "MONITOR"
-    if normalized in {"pass", "no"}:
-        return "PASS"
-    return "REVIEW"
+    """Use the central compatibility map so legacy rows remain model-valid."""
+    aliases = {
+        "yes": "ADVANCE",
+        "invest": "ADVANCE",
+        "no": "PASS",
+        "maybe": "MONITOR",
+        "review": "INSUFFICIENT_EVIDENCE",
+        "pending": "INSUFFICIENT_EVIDENCE",
+    }
+    canonical = aliases.get(state.strip().lower(), state.strip().upper())
+    return legacy_partner_from_institutional_recommendation(canonical).value
 
 
 def legacy_patch_for_event(
@@ -98,13 +100,13 @@ def legacy_patch_for_event(
     event = str(event_type or "").strip()
     if event in {"observation_resolved", "identity_case.resolved", "identity.resolved"}:
         identity = {**canonical, "canonical_identity_status": "resolved"}
-        if (reason := _optional_text(payload, "reason", "resolution_reason")):
+        if (reason := _optional_text(payload, "compatibility_reason", "reason", "resolution_reason")):
             identity["canonical_identity_reason"] = reason
         return LegacyProjectionPatch(startup_id, {"scout_info": identity})
 
     if event in {"evaluation.completed", "evaluation.created"}:
         evaluation = {**canonical, "canonical_evaluation_status": "completed"}
-        if (reason := _optional_text(payload, "reason", "summary")):
+        if (reason := _optional_text(payload, "compatibility_reason", "reason", "rationale", "summary")):
             evaluation["canonical_evaluation_reason"] = reason
         patch: dict[str, Any] = {"review_info": evaluation}
         state = _optional_text(payload, "recommended_state", "state")
@@ -123,7 +125,7 @@ def legacy_patch_for_event(
             "recommendation": _recommendation_display(state),
             "canonical_recommendation_state": state.lower(),
         }
-        if (reason := _optional_text(payload, "reason", "rationale", "change_explanation")):
+        if (reason := _optional_text(payload, "compatibility_reason", "reason", "rationale", "change_explanation")):
             partner["canonical_recommendation_reason"] = reason
         if state.strip().lower() == "insufficient_evidence":
             partner["human_review_required"] = True
@@ -136,20 +138,27 @@ def legacy_patch_for_event(
             "notes": _optional_text(payload, "rationale", "reason") or "",
             **canonical,
         }
+        if (rationale := _optional_text(payload, "rationale", "compatibility_reason", "reason")):
+            resolution["canonical_ruling_rationale"] = rationale
         return LegacyProjectionPatch(startup_id, {"human_resolution": resolution})
 
     if event in {"memo.created", "memo.generated", "investment_memo.created"}:
         memo = _optional_text(payload, "markdown", "investment_memo_markdown", "content")
-        patch = {"agent_trace": {**canonical, "canonical_memo_event": event}}
+        trace = {**canonical, "canonical_memo_event": event}
+        if (reason := _optional_text(payload, "compatibility_reason", "reason", "rationale")):
+            trace["canonical_memo_reason"] = reason
+        patch = {"agent_trace": trace}
         if memo is not None:
             patch["investment_memo_markdown"] = memo
         return LegacyProjectionPatch(startup_id, patch)
 
     if event in {"opportunity.workflow_changed", "workflow_action.created", "workflow_action.approved"}:
         workflow = {**canonical, "canonical_workflow_event": event}
-        for key in ("workflow_state", "workflow_version", "block_code", "reason"):
+        for key in ("workflow_state", "workflow_version", "block_code"):
             if payload.get(key) is not None:
                 workflow[f"canonical_{key}"] = payload[key]
+        if (reason := _optional_text(payload, "compatibility_reason", "reason", "rationale")):
+            workflow["canonical_workflow_reason"] = reason
         return LegacyProjectionPatch(startup_id, {"agent_trace": {"authority_projection": workflow}})
 
     return None
@@ -209,6 +218,10 @@ class AuthorityProjectionConsumer:
             raise ProjectionTenantMismatch("authority event payload tenant mismatch")
         patch = legacy_patch_for_event(event_type, payload)
         if patch is None:
+            if is_authority_projection_event(event_type):
+                raise UnresolvedLegacyProjection(
+                    "authority event has no resolvable legacy startup projection"
+                )
             return None
         existing = await self.repository.get_projection_receipt(
             user_id=uid, event_id=str(event_id), consumer=self.consumer

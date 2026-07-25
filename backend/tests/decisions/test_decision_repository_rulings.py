@@ -1,5 +1,8 @@
+import json
+
 import pytest
 
+from decisions.models import HumanRulingInput
 from decisions.repository import DecisionRepository
 
 
@@ -11,6 +14,31 @@ class _Connection:
     async def fetch(self, sql, *args):
         self.calls.append((sql, args))
         return self.rows
+
+
+class _CreateConnection:
+    def __init__(self):
+        self.fetchrows = [
+            {
+                "current_ruling_id": None,
+                "current_recommendation_id": None,
+                "recommended_state": "advance",
+                "legacy_startup_id": "6df278f2-679f-4a7f-8dd9-27109904d093",
+            },
+            {"ruling_id": "ruling-a"},
+        ]
+        self.calls = []
+
+    def transaction(self):
+        return _Acquire(self)
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append(("fetchrow", sql, args))
+        return self.fetchrows.pop(0)
+
+    async def execute(self, sql, *args):
+        self.calls.append(("execute", sql, args))
+        return "INSERT 0 1"
 
 
 class _Acquire:
@@ -66,3 +94,28 @@ async def test_list_rulings_is_tenant_scoped_and_newest_first():
     assert "order by hr.created_at desc" in " ".join(sql.split()).lower()
     assert args == ("user-a", "opportunity-1", 20)
     assert records[0].ruling_id == "ruling-2"
+
+
+@pytest.mark.asyncio
+async def test_created_ruling_outbox_carries_legacy_startup_and_rationale():
+    connection = _CreateConnection()
+    repository = DecisionRepository(_Pool(connection))
+
+    await repository.create_ruling(
+        HumanRulingInput(
+            user_id="user-a",
+            opportunity_id="opportunity-a",
+            decision="pass",
+            rationale="Outside this fund's mandate.",
+        ),
+        actor_id="operator-a",
+    )
+
+    outbox = next(
+        call for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    )
+    payload = json.loads(outbox[2][-1])
+    assert payload["legacy_startup_id"] == "6df278f2-679f-4a7f-8dd9-27109904d093"
+    assert payload["rationale"] == "Outside this fund's mandate."
+    assert payload["compatibility_reason"] == "Outside this fund's mandate."

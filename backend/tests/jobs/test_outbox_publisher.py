@@ -170,3 +170,35 @@ async def test_authority_projection_failure_leaves_outbox_event_retryable():
     assert repository.published == []
     assert repository.failed[0]["event_id"] == "event-authority-1"
     assert "legacy projection unavailable" in repository.failed[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_unresolved_authority_projection_is_not_published_or_receipted():
+    from authority.projection import AuthorityProjectionConsumer
+
+    class ProjectionRepository:
+        async def get_projection_receipt(self, **kwargs):
+            return None
+
+        async def apply_legacy_projection(self, **kwargs):
+            raise AssertionError("unresolved event must not claim a receipt")
+
+    outbox = importlib.import_module("jobs.outbox")
+    event = SimpleNamespace(
+        event_id="event-authority-unresolved",
+        user_id="user-a",
+        aggregate_type="opportunity",
+        aggregate_id="opportunity-a",
+        event_type="evaluation.completed",
+        payload={"evaluation_id": "evaluation-a", "opportunity_id": "opportunity-a"},
+    )
+    repository = _Repository([event])
+    publisher = outbox.OutboxPublisher(
+        repository,
+        consumers={"authority": AuthorityProjectionConsumer(ProjectionRepository()).apply},
+    )
+
+    assert await publisher.publish_once() == 0
+    assert repository.published == []
+    assert repository.failed[0]["event_id"] == "event-authority-unresolved"
+    assert "legacy startup" in repository.failed[0]["error"]

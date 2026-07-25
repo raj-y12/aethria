@@ -69,7 +69,7 @@ class EvaluationRepository:
             async with conn.transaction(isolation="repeatable_read"):
                 previous = await conn.fetchrow(
                     """
-                    select o.service_level, o.decision_state, r.*
+                    select o.service_level, o.decision_state, o.legacy_startup_id, r.*
                     from public.opportunities o
                     left join public.recommendations r
                       on r.user_id = o.user_id
@@ -210,6 +210,15 @@ class EvaluationRepository:
                         "recommendation_id": recommendation_id,
                         "opportunity_id": opportunity_id,
                         "recommended_state": recommendation.state.value,
+                        "legacy_startup_id": (
+                            str(previous["legacy_startup_id"])
+                            if previous.get("legacy_startup_id")
+                            else None
+                        ),
+                        "compatibility_reason": (
+                            recommendation.change_explanation
+                            or "canonical evaluation completed"
+                        ),
                     },
                 )
                 return {

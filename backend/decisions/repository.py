@@ -59,7 +59,7 @@ class DecisionRepository:
             async with conn.transaction():
                 opportunity = await conn.fetchrow(
                     """
-                    select o.current_ruling_id,o.current_recommendation_id,
+                    select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,
                            r.recommended_state
                     from public.opportunities o
                     left join public.recommendations r
@@ -129,6 +129,13 @@ class DecisionRepository:
                         "opportunity_id": ruling.opportunity_id,
                         "decision": ruling.decision.value,
                         "override_type": override.value if override else None,
+                        "legacy_startup_id": (
+                            str(opportunity["legacy_startup_id"])
+                            if opportunity.get("legacy_startup_id")
+                            else None
+                        ),
+                        "rationale": ruling.rationale,
+                        "compatibility_reason": ruling.rationale,
                     },
                 )
                 payload = dict(row)
