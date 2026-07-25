@@ -7,6 +7,11 @@ from evaluation_v2.prerequisites import (
     load_evaluation_prerequisites,
 )
 from evaluation_v2.repository import EvaluationLifecycleError
+from routers.authority import (
+    has_authority_control_plane,
+    require_write_path,
+    with_authority_metadata,
+)
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -36,6 +41,7 @@ async def get_current_evaluation(request: Request, opportunity_id: str):
 async def evaluate_opportunity(request: Request, opportunity_id: str):
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="evaluation creation")
     try:
         prerequisites = await load_evaluation_prerequisites(
             user_id=user_id,
@@ -57,7 +63,11 @@ async def evaluate_opportunity(request: Request, opportunity_id: str):
         )
         if current is None:
             raise RuntimeError("Completed evaluation projection is unavailable")
-        return current
+        return (
+            with_authority_metadata(current, authority)
+            if has_authority_control_plane(request)
+            else current
+        )
     except EvaluationPrerequisiteError as exc:
         status_code = (
             409

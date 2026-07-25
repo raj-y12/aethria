@@ -196,9 +196,16 @@ def _projection_hash(patch: LegacyProjectionPatch) -> str:
 class AuthorityProjectionConsumer:
     """Receipt-first, tenant-scoped consumer over an atomic projection repository."""
 
-    def __init__(self, repository: Any, *, consumer: str = COMPATIBILITY_CONSUMER):
+    def __init__(
+        self,
+        repository: Any,
+        *,
+        consumer: str = COMPATIBILITY_CONSUMER,
+        authority_service: Any = None,
+    ):
         self.repository = repository
         self.consumer = consumer
+        self.authority_service = authority_service
 
     async def apply(
         self,
@@ -211,6 +218,10 @@ class AuthorityProjectionConsumer:
         payload: Mapping[str, Any],
     ) -> ProjectionReceipt | Any | None:
         uid = require_user_id(user_id, context="AuthorityProjectionConsumer.apply")
+        if self.authority_service is not None:
+            authority = await self.authority_service.authority(user_id=uid)
+            if not authority.legacy_projection_allowed:
+                return None
         if not isinstance(payload, Mapping):
             raise ValueError("authority event payload must be an object")
         embedded_user_id = _optional_text(payload, "user_id")

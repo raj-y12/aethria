@@ -137,6 +137,8 @@ from jobs.outbox import OutboxPublisher
 from jobs.postgres import create_pool as create_durable_job_pool
 from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
+from authority.repository import AuthorityRepository
+from authority.service import AuthorityService
 from identity.repository import IdentityRepository
 from evidence.repository import EvidenceRepository
 from evaluation_v2.repository import EvaluationRepository
@@ -958,17 +960,39 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         _durable_job_error = error_name
     app.state.durable_job_repository = _durable_job_repository
     app.state.durable_job_error = _durable_job_error
+    app.state.durable_job_pool = _durable_job_pool
+    app.state.authority_repository = (
+        AuthorityRepository(_durable_job_pool) if _durable_job_pool is not None else None
+    )
+    app.state.authority_service = (
+        AuthorityService(app.state.authority_repository)
+        if app.state.authority_repository is not None
+        else None
+    )
+    app.state.authority_projection_consumer = None
     app.state.identity_repository = (
-        IdentityRepository(_durable_job_pool) if _durable_job_pool is not None else None
+        IdentityRepository(
+            _durable_job_pool, authority_service=app.state.authority_service
+        )
+        if _durable_job_pool is not None
+        else None
     )
     app.state.evidence_repository = (
         EvidenceRepository(_durable_job_pool) if _durable_job_pool is not None else None
     )
     app.state.evaluation_repository = (
-        EvaluationRepository(_durable_job_pool) if _durable_job_pool is not None else None
+        EvaluationRepository(
+            _durable_job_pool, authority_service=app.state.authority_service
+        )
+        if _durable_job_pool is not None
+        else None
     )
     app.state.decision_repository = (
-        DecisionRepository(_durable_job_pool) if _durable_job_pool is not None else None
+        DecisionRepository(
+            _durable_job_pool, authority_service=app.state.authority_service
+        )
+        if _durable_job_pool is not None
+        else None
     )
     app.state.monitoring_repository = (
         MonitoringRepository(_durable_job_pool) if _durable_job_pool is not None else None
@@ -1003,6 +1027,10 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     _durable_job_worker = None
     _durable_outbox_publisher = None
     app.state.durable_job_repository = None
+    app.state.durable_job_pool = None
+    app.state.authority_repository = None
+    app.state.authority_service = None
+    app.state.authority_projection_consumer = None
     app.state.identity_repository = None
     app.state.evidence_repository = None
     app.state.evaluation_repository = None
@@ -1079,6 +1107,10 @@ async def _lifespan(app: FastAPI):
     else:
         app.state.durable_job_repository = None
         app.state.durable_job_error = None
+        app.state.durable_job_pool = None
+        app.state.authority_repository = None
+        app.state.authority_service = None
+        app.state.authority_projection_consumer = None
         app.state.identity_repository = None
         app.state.evidence_repository = None
         app.state.evaluation_repository = None
@@ -1149,6 +1181,9 @@ app.include_router(_analytics_router.router)
 from routers import jobs as _jobs_router  # noqa: E402
 
 app.include_router(_jobs_router.router)
+from routers import authority as _authority_router  # noqa: E402
+
+app.include_router(_authority_router.router)
 from routers import identity as _identity_router  # noqa: E402
 
 app.include_router(_identity_router.router)
@@ -2028,6 +2063,7 @@ def get_startup_detail(request: Request, startup_id: str):
 async def acknowledge_startup(request: Request, startup_id: str):
     """Mark a startup as seen by the current user when they open the memo."""
     validate_route_id(startup_id, field_name="startup_id")
+    await _reject_direct_legacy_startup_write(request)
     # Several sequential sync Supabase round trips: keep them off the event loop.
     return await asyncio.to_thread(_acknowledge_startup_sync, request, startup_id)
 
@@ -2054,6 +2090,29 @@ def _acknowledge_startup_sync(request: Request, startup_id: str):
         updated,
         last_seen_at=_get_user_last_seen_at(getattr(request.state, "user_id", None)),
     )
+
+
+async def _reject_direct_legacy_startup_write(request: Request) -> None:
+    """Keep legacy startup mutations off an activated canonical tenant."""
+    app_state = getattr(getattr(request, "app", None), "state", None)
+    if (
+        getattr(app_state, "authority_service", None) is None
+        and getattr(app_state, "authority_repository", None) is None
+    ):
+        # Local-only development without durable authority tables remains legacy.
+        return
+    from authority.models import RolloutMode
+    from routers.authority import authority_for_request
+
+    authority = await authority_for_request(request)
+    if authority.mode in {RolloutMode.CANONICAL_WRITE, RolloutMode.CANONICAL_READ}:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "AUTHORITY_CANONICAL_ONLY",
+                "message": "Direct legacy startup writes are disabled for this authority mode",
+            },
+        )
 
 
 @app.get("/api/startups/{startup_id}/memo")

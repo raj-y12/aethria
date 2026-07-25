@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import pytest
 
 from identity.models import (
     CompanyRecord,
@@ -10,6 +11,8 @@ from identity.models import (
     SourceChannel,
     SourceObservationRecord,
 )
+from authority.models import RolloutMode, RolloutRecord
+from authority.service import AuthorityService
 from security.rate_limiter import InMemorySecurityStore
 from utils.timeutil import utcnow
 
@@ -130,7 +133,24 @@ class _Repository:
         return self.case
 
 
-def _client(monkeypatch, repository, *, user_id="user-a"):
+class _AuthorityRepository:
+    def __init__(self, rollout):
+        self.rollout = rollout
+
+    async def get_rollout(self, *, user_id):
+        assert user_id == self.rollout.user_id
+        return self.rollout
+
+
+def _authority(mode=RolloutMode.LEGACY):
+    return AuthorityService(
+        _AuthorityRepository(
+            RolloutRecord(user_id="user-a", mode=mode, version=2)
+        )
+    )
+
+
+def _client(monkeypatch, repository, *, user_id="user-a", authority_service=None):
     import api
 
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: user_id)
@@ -140,6 +160,7 @@ def _client(monkeypatch, repository, *, user_id="user-a"):
         InMemorySecurityStore(),
     )
     api.app.state.identity_repository = repository
+    api.app.state.authority_service = authority_service or _authority()
     return TestClient(api.app)
 
 
@@ -245,4 +266,50 @@ def test_resolution_rejects_invalid_action_shape_without_database_details(monkey
     )
 
     assert response.status_code == 422
+    assert repository.actions == []
+
+
+@pytest.mark.parametrize(
+    ("mode", "canonical_writes_allowed"),
+    [(RolloutMode.LEGACY, False), (RolloutMode.SHADOW, True)],
+)
+def test_identity_resolution_keeps_legacy_shape_and_adds_authority_metadata(
+    monkeypatch, mode, canonical_writes_allowed
+):
+    repository = _Repository()
+    response = _client(
+        monkeypatch, repository, authority_service=_authority(mode)
+    ).post(
+        f"/api/identity-cases/{repository.case.identity_case_id}/resolve",
+        headers={"Authorization": "Bearer t"},
+        json={"action": "match", "selected_company_id": repository.company.company_id},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "resolved"
+    assert response.json()["authority"] == {
+        "mode": mode.value,
+        "version": 2,
+        "kill_switch": False,
+        "canonical_writes_allowed": canonical_writes_allowed,
+        "canonical_reads_allowed": False,
+        "last_reconciliation_status": None,
+    }
+    assert repository.actions[0][0] == "match"
+
+
+def test_identity_resolution_is_blocked_before_mutation_in_canonical_read(monkeypatch):
+    repository = _Repository()
+    response = _client(
+        monkeypatch,
+        repository,
+        authority_service=_authority(RolloutMode.CANONICAL_READ),
+    ).post(
+        f"/api/identity-cases/{repository.case.identity_case_id}/resolve",
+        headers={"Authorization": "Bearer t"},
+        json={"action": "match", "selected_company_id": repository.company.company_id},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
     assert repository.actions == []

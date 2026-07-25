@@ -35,8 +35,15 @@ def _json(value: Any, default: Any):
 
 
 class DecisionRepository:
-    def __init__(self, pool: Any):
+    def __init__(self, pool: Any, *, authority_service: Any = None):
         self.pool = pool
+        self.authority_service = authority_service
+
+    async def _require_write_path(self, *, user_id: str, operation: str) -> None:
+        if self.authority_service is not None:
+            await self.authority_service.require_write_path(
+                user_id=user_id, operation=operation
+            )
 
     @staticmethod
     async def _outbox(conn, *, user_id, aggregate_type, aggregate_id, event_type, payload):
@@ -52,6 +59,7 @@ class DecisionRepository:
 
     async def create_ruling(self, ruling: HumanRulingInput, *, actor_id: str) -> Dict[str, Any]:
         uid = require_user_id(ruling.user_id, context="DecisionRepository.create_ruling")
+        await self._require_write_path(user_id=uid, operation="human ruling creation")
         actor = str(actor_id or "").strip()
         if not actor:
             raise ValueError("actor_id is required")

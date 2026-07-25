@@ -36,9 +36,22 @@ class EvaluationLifecycleError(RuntimeError):
 
 
 class EvaluationRepository:
-    def __init__(self, pool: Any, *, clock: Callable[[], datetime] = utcnow):
+    def __init__(
+        self,
+        pool: Any,
+        *,
+        clock: Callable[[], datetime] = utcnow,
+        authority_service: Any = None,
+    ):
         self.pool = pool
         self._clock = clock
+        self.authority_service = authority_service
+
+    async def _require_write_path(self, *, user_id: str, operation: str) -> None:
+        if self.authority_service is not None:
+            await self.authority_service.require_write_path(
+                user_id=user_id, operation=operation
+            )
 
     @staticmethod
     async def _outbox(conn: Any, *, user_id: str, aggregate_id: str, event_type: str, payload: Dict[str, Any]):
@@ -65,6 +78,7 @@ class EvaluationRepository:
         prompt_manifest: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="EvaluationRepository.evaluate")
+        await self._require_write_path(user_id=uid, operation="evaluation creation")
         async with self.pool.acquire() as conn:
             async with conn.transaction(isolation="repeatable_read"):
                 previous = await conn.fetchrow(

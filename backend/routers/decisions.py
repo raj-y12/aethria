@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from decisions.models import HumanRulingDecision, HumanRulingInput, OverrideType, WorkflowActionType
+from routers.authority import require_write_path, with_authority_metadata
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -45,8 +46,9 @@ def _repository(request: Request):
 async def create_ruling(request: Request, opportunity_id: str, body: RulingBody):
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="human ruling creation")
     try:
-        return await _repository(request).create_ruling(
+        record = await _repository(request).create_ruling(
             HumanRulingInput(
                 user_id=user_id,
                 opportunity_id=opportunity_id,
@@ -54,6 +56,7 @@ async def create_ruling(request: Request, opportunity_id: str, body: RulingBody)
             ),
             actor_id=user_id,
         )
+        return with_authority_metadata(record, authority)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Opportunity or recommendation not found") from exc
 

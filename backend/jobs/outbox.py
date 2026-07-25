@@ -60,10 +60,13 @@ class OutboxPublisher:
     def _authority_consumer(repository: Any) -> Consumer:
         """Build the canonical-to-legacy startup projector for durable outbox use."""
         from authority.projection import AuthorityProjectionConsumer
+        from authority.repository import AuthorityRepository
+        from authority.service import AuthorityService
         from identity.projection import StartupCompatibilityProjectionRepository
 
         consumer = AuthorityProjectionConsumer(
-            StartupCompatibilityProjectionRepository(repository.pool)
+            StartupCompatibilityProjectionRepository(repository.pool),
+            authority_service=AuthorityService(AuthorityRepository(repository.pool)),
         )
 
         async def apply(**event: Any) -> Any:

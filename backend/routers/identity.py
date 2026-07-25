@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
 from identity.models import IdentityCaseStatus, IdentityStatus
+from routers.authority import authority_for_request, require_write_path, with_authority_metadata
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -232,13 +233,15 @@ async def resolve_identity_case(
     validate_route_id(identity_case_id, field_name="identity_case_id")
     user_id = require_authenticated_user(request)
     repository = _repository(request)
+    authority = await authority_for_request(request)
     case, existing = await _resolved_or_existing(
         repository, user_id=user_id, identity_case_id=identity_case_id
     )
     if existing is not None:
-        return _admission(existing)
+        return with_authority_metadata(_admission(existing), authority)
     if case.status is not IdentityCaseStatus.OPEN:
-        return _case(case)
+        return with_authority_metadata(_case(case), authority)
+    authority = await require_write_path(request, operation="identity linkage")
     try:
         if body.action == "match":
             validate_route_id(body.selected_company_id, field_name="selected_company_id")
@@ -249,7 +252,7 @@ async def resolve_identity_case(
                 resolved_by=user_id,
                 resolution_note=body.resolution_note,
             )
-            return _admission(result)
+            return with_authority_metadata(_admission(result), authority)
         if body.action == "create":
             result = await repository.create_company_from_case(
                 user_id=user_id,
@@ -259,23 +262,25 @@ async def resolve_identity_case(
                 resolved_by=user_id,
                 resolution_note=body.resolution_note,
             )
-            return _admission(result)
+            return with_authority_metadata(_admission(result), authority)
         if body.action == "defer":
-            return _case(
-                await repository.defer_case(
+            return with_authority_metadata(
+                _case(await repository.defer_case(
                     user_id=user_id,
                     identity_case_id=identity_case_id,
                     resolved_by=user_id,
                     resolution_note=body.resolution_note,
-                )
+                )),
+                authority,
             )
-        return _case(
-            await repository.reject_case(
+        return with_authority_metadata(
+            _case(await repository.reject_case(
                 user_id=user_id,
                 identity_case_id=identity_case_id,
                 resolved_by=user_id,
                 resolution_note=body.resolution_note,
-            )
+            )),
+            authority,
         )
     except LookupError as exc:
         raise HTTPException(status_code=409, detail="Identity case state changed") from exc

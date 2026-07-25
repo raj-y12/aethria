@@ -84,8 +84,15 @@ def _inserted(command_status: Any) -> bool:
 
 
 class IdentityRepository:
-    def __init__(self, pool: Any):
+    def __init__(self, pool: Any, *, authority_service: Any = None):
         self.pool = pool
+        self.authority_service = authority_service
+
+    async def _require_write_path(self, *, user_id: str, operation: str) -> None:
+        if self.authority_service is not None:
+            await self.authority_service.require_write_path(
+                user_id=user_id, operation=operation
+            )
 
     @staticmethod
     async def _insert_outbox(
@@ -418,6 +425,7 @@ class IdentityRepository:
             observation.user_id,
             context="IdentityRepository.create_company_admission",
         )
+        await self._require_write_path(user_id=uid, operation="identity linkage")
         primary_domain = next(
             (
                 item.normalized_value
@@ -715,6 +723,7 @@ class IdentityRepository:
         """
 
         uid = require_user_id(user_id, context="IdentityRepository.resolve_case")
+        await self._require_write_path(user_id=uid, operation="identity linkage")
         actor = str(resolved_by or "").strip()
         if not actor:
             raise ValueError("resolved_by is required")
@@ -1092,6 +1101,7 @@ class IdentityRepository:
         uid = require_user_id(
             user_id, context="IdentityRepository.create_company_from_case"
         )
+        await self._require_write_path(user_id=uid, operation="identity linkage")
         name = str(canonical_name or "").strip()
         domain = normalize_domain(canonical_domain)
         actor = str(resolved_by or "").strip()
