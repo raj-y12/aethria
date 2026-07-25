@@ -239,9 +239,9 @@ jobs:
             supabase/migrations/20260715270000_fund_intelligence.sql \
             supabase/migrations/20260715280000_channels_outcomes.sql \
             supabase/migrations/20260716090000_review_fixes.sql \
-            supabase/migrations/20260721150000_lookup_job_outcomes_rls.sql
-            supabase/migrations/20260722090000_authority_control.sql
-            supabase/migrations/20260725120000_canonical_portfolio_positions.sql
+            supabase/migrations/20260721150000_lookup_job_outcomes_rls.sql \
+            supabase/migrations/20260722090000_authority_control.sql \
+            supabase/migrations/20260725120000_canonical_portfolio_positions.sql \
             supabase/migrations/20260725130000_triage_assessments.sql
           do
             psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
