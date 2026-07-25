@@ -226,6 +226,7 @@ class DecisionRepository:
         external_destination: Optional[str] = None,
     ) -> WorkflowActionRecord:
         uid = require_user_id(user_id, context="DecisionRepository.create_action")
+        await self._require_write_path(user_id=uid, operation="workflow action creation")
         action = WorkflowActionType(action_type)
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -277,6 +278,7 @@ class DecisionRepository:
         approved_content: Optional[Dict[str, Any]] = None,
     ) -> WorkflowActionRecord:
         uid = require_user_id(user_id, context="DecisionRepository.approve_action")
+        await self._require_write_path(user_id=uid, operation="workflow action approval")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(

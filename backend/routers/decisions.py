@@ -81,6 +81,7 @@ async def list_rulings(
 async def create_action(request: Request, opportunity_id: str, body: ActionBody):
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="workflow action creation")
     try:
         record = await _repository(request).create_action(
             user_id=user_id, opportunity_id=opportunity_id,
@@ -89,7 +90,7 @@ async def create_action(request: Request, opportunity_id: str, body: ActionBody)
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Opportunity not found") from exc
-    return record.model_dump(mode="json")
+    return with_authority_metadata(record.model_dump(mode="json"), authority)
 
 
 @router.get("/api/opportunities/{opportunity_id}/actions")
@@ -104,6 +105,7 @@ async def list_actions(request: Request, opportunity_id: str, limit: int = Query
 async def approve_action(request: Request, workflow_action_id: str, body: ApproveActionBody):
     validate_route_id(workflow_action_id, field_name="workflow_action_id")
     user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="workflow action approval")
     try:
         record = await _repository(request).approve_action(
             user_id=user_id, workflow_action_id=workflow_action_id,
@@ -111,4 +113,4 @@ async def approve_action(request: Request, workflow_action_id: str, body: Approv
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Pending action not found") from exc
-    return record.model_dump(mode="json")
+    return with_authority_metadata(record.model_dump(mode="json"), authority)

@@ -452,6 +452,7 @@ def test_canonical_or_killed_legacy_reads_fail_closed_before_storage(
 @pytest.mark.asyncio
 async def test_repository_write_paths_use_the_injected_authority_guard_before_database_access():
     from decisions.models import HumanRulingInput
+    from decisions.models import WorkflowActionType
     from decisions.repository import DecisionRepository
     from evaluation_v2.repository import EvaluationRepository
     from identity.repository import IdentityRepository
@@ -494,11 +495,25 @@ async def test_repository_write_paths_use_the_injected_authority_guard_before_da
             ),
             actor_id="operator-a",
         )
+    with pytest.raises(AuthorityBlocked):
+        await decisions.create_action(
+            user_id="tenant-a",
+            opportunity_id="opportunity-1",
+            action_type=WorkflowActionType.SCHEDULE_MONITOR_REVIEW,
+        )
+    with pytest.raises(AuthorityBlocked):
+        await decisions.approve_action(
+            user_id="tenant-a",
+            workflow_action_id="action-1",
+            approved_by="operator-a",
+        )
 
     assert guard.calls == [
         {"user_id": "tenant-a", "operation": "identity linkage"},
         {"user_id": "tenant-a", "operation": "evaluation creation"},
         {"user_id": "tenant-a", "operation": "human ruling creation"},
+        {"user_id": "tenant-a", "operation": "workflow action creation"},
+        {"user_id": "tenant-a", "operation": "workflow action approval"},
     ]
 
 

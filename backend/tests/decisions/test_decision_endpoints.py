@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+import pytest
 
 from authority.models import RolloutMode, RolloutRecord
 from authority.service import AuthorityService
@@ -8,8 +9,10 @@ from security.rate_limiter import InMemorySecurityStore
 
 
 class _AuthorityRepository:
-    def __init__(self, mode: RolloutMode):
-        self.rollout = RolloutRecord(user_id="user-a", mode=mode, version=1)
+    def __init__(self, mode: RolloutMode, *, kill_switch: bool = False):
+        self.rollout = RolloutRecord(
+            user_id="user-a", mode=mode, version=1, kill_switch=kill_switch
+        )
 
     async def get_rollout(self, *, user_id):
         assert user_id == "user-a"
@@ -72,3 +75,63 @@ def test_human_ruling_is_blocked_before_mutation_in_canonical_read(monkeypatch):
     assert response.status_code == 409
     assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
     assert repository.ruling_calls == []
+
+
+class _ActionRepository(_DecisionRepository):
+    async def create_action(self, **_kwargs):
+        raise AssertionError("authority fence must run before action creation")
+
+    async def approve_action(self, **_kwargs):
+        raise AssertionError("authority fence must run before action approval")
+
+
+@pytest.mark.parametrize(
+    "kill_switch",
+    [False, True],
+)
+def test_action_create_fails_before_repository_on_canonical_read_or_kill_switch(
+    monkeypatch, kill_switch
+):
+    import api
+
+    repository = _ActionRepository()
+    client = _client(monkeypatch, mode=RolloutMode.CANONICAL_READ, repository=repository)
+    if kill_switch:
+        api.app.state.authority_service = AuthorityService(
+            _AuthorityRepository(RolloutMode.LEGACY, kill_switch=True)
+        )
+
+    response = client.post(
+        "/api/opportunities/opportunity-1/actions",
+        headers={"Authorization": "Bearer clerk-token"},
+        json={"action_type": "schedule_monitor_review"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
+
+
+@pytest.mark.parametrize(
+    "kill_switch",
+    [False, True],
+)
+def test_action_approve_fails_before_repository_on_canonical_read_or_kill_switch(
+    monkeypatch, kill_switch
+):
+    import api
+
+    repository = _ActionRepository()
+    client = _client(monkeypatch, mode=RolloutMode.CANONICAL_READ, repository=repository)
+    if kill_switch:
+        api.app.state.authority_service = AuthorityService(
+            _AuthorityRepository(RolloutMode.LEGACY, kill_switch=True)
+        )
+
+    response = client.post(
+        "/api/actions/workflow-action-1/approve",
+        headers={"Authorization": "Bearer clerk-token"},
+        json={},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "AUTHORITY_CANONICAL_ONLY"
