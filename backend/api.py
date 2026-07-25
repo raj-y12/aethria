@@ -140,6 +140,7 @@ from jobs.worker import DurableJobWorker
 from authority.repository import AuthorityRepository, AuthorityBlocked
 from authority.service import AuthorityService
 from identity.repository import IdentityRepository
+from identity.service import IdentityService
 from evidence.repository import EvidenceRepository
 from evaluation_v2.repository import EvaluationRepository
 from evaluation_v2.prerequisites import (
@@ -150,6 +151,7 @@ from decisions.repository import DecisionRepository
 from monitoring.repository import MonitoringRepository
 from fund_intelligence.repository import FundIntelligenceRepository
 from outcomes.repository import ChannelOutcomeRepository
+from opportunity_pipeline import OpportunityPipeline
 from pipeline_runner import (
     _rss_mb as _pipeline_rss_mb,
     reprocess_startups_missing_fund_thesis,
@@ -1005,6 +1007,19 @@ async def _start_durable_job_services(app: FastAPI) -> None:
     app.state.channel_outcome_repository = (
         ChannelOutcomeRepository(_durable_job_pool) if _durable_job_pool is not None else None
     )
+    app.state.opportunity_pipeline = (
+        OpportunityPipeline(
+            identity_service=IdentityService(app.state.identity_repository),
+            evidence_repository=app.state.evidence_repository,
+            evaluation_repository=app.state.evaluation_repository,
+            prerequisites_loader=lambda **kwargs: load_evaluation_prerequisites(
+                fund_intelligence_repository=app.state.fund_intelligence_repository, **kwargs
+            ),
+            authority_service=app.state.authority_service,
+        )
+        if app.state.identity_repository is not None
+        else None
+    )
 
 
 async def _stop_durable_job_services(app: FastAPI) -> None:
@@ -1040,6 +1055,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
     app.state.monitoring_repository = None
     app.state.fund_intelligence_repository = None
     app.state.channel_outcome_repository = None
+    app.state.opportunity_pipeline = None
 
 
 @asynccontextmanager
@@ -1120,6 +1136,7 @@ async def _lifespan(app: FastAPI):
         app.state.monitoring_repository = None
         app.state.fund_intelligence_repository = None
         app.state.channel_outcome_repository = None
+        app.state.opportunity_pipeline = None
     # Resume persistent per-user loops for users that had agents enabled before restart
     await _resume_all_user_loops()
     yield
@@ -1189,6 +1206,9 @@ app.include_router(_authority_router.router)
 from routers import identity as _identity_router  # noqa: E402
 
 app.include_router(_identity_router.router)
+from routers import opportunities as _opportunities_router  # noqa: E402
+
+app.include_router(_opportunities_router.router)
 from routers import evidence as _evidence_router  # noqa: E402
 
 app.include_router(_evidence_router.router)

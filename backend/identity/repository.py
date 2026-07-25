@@ -925,6 +925,53 @@ class IdentityRepository:
             )
         return _opportunity_from_row(row)
 
+    async def list_opportunities(self, *, user_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Canonical queue projection; never falls back to ``startups``."""
+        uid = require_user_id(user_id, context="IdentityRepository.list_opportunities")
+        bounded = max(1, min(int(limit), 200))
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select o.*, c.canonical_name, c.canonical_domain,
+                       r.recommended_state, r.confidence as recommendation_confidence
+                from public.opportunities o
+                join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
+                left join public.recommendations r
+                  on r.user_id=o.user_id and r.recommendation_id=o.current_recommendation_id
+                where o.user_id=$1 and o.workflow_state <> 'archived'
+                order by o.updated_at desc limit $2
+                """, uid, bounded,
+            )
+        return [dict(row) for row in rows]
+
+    async def get_decision_view(self, *, user_id: str, opportunity_id: str) -> Optional[Dict[str, Any]]:
+        """Single canonical read model for queue, memo, and ruling handoff."""
+        uid = require_user_id(user_id, context="IdentityRepository.get_decision_view")
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select o.*, c.canonical_name, c.canonical_domain,
+                       r.recommendation_id, r.recommended_state, r.attention_priority,
+                       r.confidence as recommendation_confidence, r.decision_drivers,
+                       r.principal_risks, r.missing_information, r.change_conditions,
+                       e.evaluation_id, e.evidence_snapshot_hash, e.policy_version_id,
+                       e.thesis_version_id
+                from public.opportunities o
+                join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
+                left join public.recommendations r
+                  on r.user_id=o.user_id and r.recommendation_id=o.current_recommendation_id
+                left join public.evaluation_runs e
+                  on e.user_id=o.user_id and e.evaluation_id=o.current_evaluation_id
+                where o.user_id=$1 and o.opportunity_id=$2
+                """, uid, opportunity_id,
+            )
+        if row is None:
+            return None
+        payload = dict(row)
+        for key in ("decision_drivers", "principal_risks", "missing_information", "change_conditions"):
+            payload[key] = _json_value(payload.get(key), [])
+        return payload
+
     async def list_linked_legacy_startup_ids(self, *, user_id: str) -> List[str]:
         uid = require_user_id(
             user_id,

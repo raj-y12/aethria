@@ -29,6 +29,25 @@ export interface Opportunity {
   updated_at: string;
 }
 
+export interface OpportunityDecisionView extends Opportunity {
+  canonical_name: string;
+  canonical_domain?: string | null;
+  workflow_state?: string;
+  workflow_version?: number;
+  recommended_state?: string | null;
+  recommendation_confidence?: number | null;
+  attention_priority?: number | null;
+  recommendation_id?: string | null;
+  evaluation_id?: string | null;
+  evidence_snapshot_hash?: string | null;
+  thesis_version_id?: string | null;
+  policy_version_id?: string | null;
+  decision_drivers?: string[];
+  principal_risks?: string[];
+  missing_information?: string[];
+  change_conditions?: string[];
+}
+
 export interface SourceObservation {
   observation_id: string;
   channel: string;
@@ -90,6 +109,15 @@ export function fetchCompany(companyId: string): Promise<Company> {
 
 export function fetchOpportunity(opportunityId: string): Promise<Opportunity> {
   return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}`);
+}
+
+export async function fetchOpportunities(limit = 100): Promise<OpportunityDecisionView[]> {
+  const result = await apiRequest<{ opportunities?: OpportunityDecisionView[] }>(`/api/opportunities?limit=${limit}`);
+  return Array.isArray(result.opportunities) ? result.opportunities : [];
+}
+
+export function fetchOpportunityDecisionView(opportunityId: string): Promise<OpportunityDecisionView> {
+  return apiRequest(`/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/decision-view`);
 }
 
 export function fetchOpportunityByLegacyStartup(startupId: string): Promise<Opportunity | null> {

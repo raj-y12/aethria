@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field, model_validator
 
 from identity.models import IdentityCaseStatus, IdentityStatus
-from routers.authority import authority_for_request, require_write_path, with_authority_metadata
+from routers.authority import authority_for_request, has_authority_control_plane, require_write_path, with_authority_metadata
 from security.request_guards import require_authenticated_user, validate_route_id
 
 
@@ -163,6 +163,31 @@ async def get_opportunity(request: Request, opportunity_id: str):
     if record is None:
         raise HTTPException(status_code=404, detail="Opportunity not found")
     return _opportunity(record)
+
+
+@router.get("/api/opportunities")
+async def list_opportunities(
+    request: Request,
+    limit: int = Query(default=100, ge=1, le=200),
+):
+    user_id = require_authenticated_user(request)
+    authority = await authority_for_request(request) if has_authority_control_plane(request) else None
+    records = await _repository(request).list_opportunities(user_id=user_id, limit=limit)
+    payload = {"opportunities": records}
+    return with_authority_metadata(payload, authority) if authority else payload
+
+
+@router.get("/api/opportunities/{opportunity_id}/decision-view")
+async def get_decision_view(request: Request, opportunity_id: str):
+    validate_route_id(opportunity_id, field_name="opportunity_id")
+    user_id = require_authenticated_user(request)
+    authority = await authority_for_request(request) if has_authority_control_plane(request) else None
+    record = await _repository(request).get_decision_view(
+        user_id=user_id, opportunity_id=opportunity_id
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return with_authority_metadata(record, authority) if authority else record
 
 
 @router.get("/api/startups/{legacy_startup_id}/opportunity")
