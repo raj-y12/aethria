@@ -11,6 +11,7 @@ import type { SpinePipelineState } from '../components/AppSpine';
 import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
+import { FRONT_DOOR_WORDMARK } from '../design-system/wordmark';
 import { getDealAttentionReason, getDeskAttention, isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
@@ -261,7 +262,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
       <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
         {/* ── The mark ── */}
         <Reveal delay={0.02} y={-6}>
-          <p className="text-center font-wordmark text-[clamp(18px,1.45vw,23px)] font-medium leading-tight text-oxford">
+          <p className={`text-center ${FRONT_DOOR_WORDMARK.face} ${FRONT_DOOR_WORDMARK.size} text-oxford`}>
             Aethria<span className="wordmark-dot">.</span>
           </p>
         </Reveal>

@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePrefersReducedMotion } from '../hooks';
+import { FRONT_DOOR_WORDMARK } from '../design-system/wordmark';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import ActivityStatsRow, { activityStatsFromSummary } from './ActivityStatsRow';
 import {
@@ -31,14 +32,8 @@ const INTRO_MS = 1150;
 const MORPH_EASE = [0.32, 0.72, 0, 1] as const;
 /** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
 const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
-/**
- * One size for the plate mark and the sign-in mark, deliberately shared. When
- * the two differ, Framer has to animate the size change as a transform scale,
- * which stretches the glyphs for the length of the morph. Matching them makes
- * the handoff pure translation, so the mark stays crisp the whole way. Change
- * this in one place or the morph stops being free.
- */
-const WORDMARK_SIZE = 'text-[clamp(2.6rem,6vw,4rem)]';
+/** Shared with Home so every front-door mark matches — see design-system/wordmark. */
+const WORDMARK_FACE = `${FRONT_DOOR_WORDMARK.face} ${FRONT_DOOR_WORDMARK.size}`;
 
 function LoginField({
   id,
@@ -342,9 +337,7 @@ export default function LoginPage() {
             >
               {/* A ghost of the mark sizes the bracket box exactly, without the
                   brackets ever becoming the mark's parent. */}
-              <span className={`invisible font-wordmark ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em]`}>
-                Aethria.
-              </span>
+              <span className={`invisible ${WORDMARK_FACE}`}>Aethria.</span>
             </motion.span>
           )}
         </AnimatePresence>
@@ -355,7 +348,7 @@ export default function LoginPage() {
             initial={{ y: 18 }}
             animate={{ y: 0 }}
             transition={{ duration: 0.7, ease: EASE }}
-            className={`font-wordmark m-0 text-center ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em] text-oxford`}
+            className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
           >
             Aethria
             <motion.span
@@ -463,7 +456,7 @@ export default function LoginPage() {
                 <motion.h1
                   layoutId={WORDMARK_LAYOUT_ID}
                   transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: MORPH_EASE }}
-                  className={`font-wordmark m-0 text-center ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em] text-oxford`}
+                  className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
                 >
                   Aethria<span className="wordmark-dot">.</span>
                 </motion.h1>
