@@ -71,15 +71,24 @@ def _migration_files_check(repo_root: Path = REPO_ROOT) -> Dict[str, Any]:
     )
 
 
-def _migration_versions_check(versions: set[str]) -> Dict[str, Any]:
-    required_versions = {
-        name.split("_", 1)[0] for name in PHASE3_8_MIGRATIONS
+def _migration_versions_check(
+    versions: set[str], migration_names: set[str] | None = None
+) -> Dict[str, Any]:
+    migration_names = migration_names or set()
+    required = {
+        name.split("_", 1)[0]: name.split("_", 1)[1].removesuffix(".sql")
+        for name in PHASE3_8_MIGRATIONS
     }
+    missing = sorted(
+        version
+        for version, semantic_name in required.items()
+        if version not in versions and semantic_name not in migration_names
+    )
     return _check(
         "phase3_8_migrations_applied",
-        "passed" if required_versions <= versions else "failed",
+        "passed" if not missing else "failed",
         "all Phase 3–8 schema versions are recorded",
-        missing=sorted(required_versions - versions),
+        missing=missing,
     )
 
 
@@ -99,9 +108,13 @@ def _policy_upgrade_migration_file_check(
     )
 
 
-def _policy_upgrade_version_check(versions: set[str]) -> Dict[str, Any]:
+def _policy_upgrade_version_check(
+    versions: set[str], migration_names: set[str] | None = None
+) -> Dict[str, Any]:
     required = POLICY_UPGRADE_MIGRATION.split("_", 1)[0]
-    missing = [] if required in versions else [required]
+    semantic_name = POLICY_UPGRADE_MIGRATION.split("_", 1)[1].removesuffix(".sql")
+    migration_names = migration_names or set()
+    missing = [] if required in versions or semantic_name in migration_names else [required]
     return _check(
         "policy_upgrade_migration_applied",
         "passed" if not missing else "failed",
@@ -130,10 +143,12 @@ def _lookup_outcomes_security_migration_file_check(
 
 
 def _lookup_outcomes_security_version_check(
-    versions: set[str],
+    versions: set[str], migration_names: set[str] | None = None
 ) -> Dict[str, Any]:
     required = LOOKUP_OUTCOMES_SECURITY_MIGRATION.split("_", 1)[0]
-    missing = [] if required in versions else [required]
+    semantic_name = LOOKUP_OUTCOMES_SECURITY_MIGRATION.split("_", 1)[1].removesuffix(".sql")
+    migration_names = migration_names or set()
+    missing = [] if required in versions or semantic_name in migration_names else [required]
     return _check(
         "lookup_outcomes_security_migration_applied",
         "passed" if not missing else "failed",
@@ -167,9 +182,13 @@ def _canonical_extension_migrations_check(repo_root: Path = REPO_ROOT) -> Dict[s
     )
 
 
-def _authority_migration_version_check(versions: set[str]) -> Dict[str, Any]:
+def _authority_migration_version_check(
+    versions: set[str], migration_names: set[str] | None = None
+) -> Dict[str, Any]:
     required = AUTHORITY_CONTROL_MIGRATION.split("_", 1)[0]
-    missing = [] if required in versions else [required]
+    semantic_name = AUTHORITY_CONTROL_MIGRATION.split("_", 1)[1].removesuffix(".sql")
+    migration_names = migration_names or set()
+    missing = [] if required in versions or semantic_name in migration_names else [required]
     return _check(
         "authority_control_migration_applied",
         "passed" if not missing else "failed",
@@ -582,16 +601,21 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
             migration_table = await conn.fetchval(
                 "select to_regclass('supabase_migrations.schema_migrations')::text"
             )
-            versions = set()
+            migration_rows = []
             if migration_table:
-                versions = {
-                    str(row["version"])
-                    for row in await conn.fetch("select version from supabase_migrations.schema_migrations")
-                }
-            checks.append(_migration_versions_check(versions))
-            checks.append(_policy_upgrade_version_check(versions))
-            checks.append(_lookup_outcomes_security_version_check(versions))
-            checks.append(_authority_migration_version_check(versions))
+                migration_rows = await conn.fetch(
+                    "select version, name from supabase_migrations.schema_migrations"
+                )
+            versions = {str(row["version"]) for row in migration_rows}
+            migration_names = {
+                str(dict(row).get("name"))
+                for row in migration_rows
+                if dict(row).get("name")
+            }
+            checks.append(_migration_versions_check(versions, migration_names))
+            checks.append(_policy_upgrade_version_check(versions, migration_names))
+            checks.append(_lookup_outcomes_security_version_check(versions, migration_names))
+            checks.append(_authority_migration_version_check(versions, migration_names))
             policy_upgrade_rpc = await conn.fetchval(
                 """
                 select to_regprocedure(
