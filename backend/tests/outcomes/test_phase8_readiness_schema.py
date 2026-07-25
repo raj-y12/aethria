@@ -33,6 +33,13 @@ def test_applied_migration_ledger_requires_materiality_digest_version():
     assert check["missing"] == ["20260720120000"]
 
 
+def test_canonical_extension_ledger_requires_both_extension_versions():
+    versions = {"20260725120000"}
+    check = readiness._canonical_extension_versions_check(versions)
+    assert check["status"] == "failed"
+    assert check["missing"] == ["20260725130000"]
+
+
 def _materiality_rows():
     return [
         {

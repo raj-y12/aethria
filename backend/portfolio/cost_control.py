@@ -79,7 +79,12 @@ class CostController:
         self.weekly_cost_ceiling = float(limits.get("weekly_cost_ceiling", 0.0) or 0.0)
 
     def _using_supabase(self) -> bool:
-        return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        return bool(
+            self.user_id
+            and env_config.use_supabase_storage()
+            and os.getenv("SUPABASE_URL")
+            and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        )
     
     def _load_budgets(self):
         """Load budget state from Supabase (preferred) or file fallback."""

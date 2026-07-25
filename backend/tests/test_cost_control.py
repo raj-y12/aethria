@@ -35,6 +35,14 @@ def test_measurement_only_controller_records_usage_without_enforcing_limits(
     }
 
 
+def test_local_storage_override_disables_supabase_budget_reads(monkeypatch, tmp_path):
+    monkeypatch.setattr("portfolio.cost_control.env_config.use_supabase_storage", lambda: False)
+    monkeypatch.setenv("SUPABASE_URL", "https://configured.example")
+    monkeypatch.setenv("SUPABASE_SERVICE_ROLE_KEY", "configured")
+    controller = _controller(monkeypatch, tmp_path, enforce_limits=False)
+    assert controller._using_supabase() is False
+
+
 def test_enforcing_controller_preserves_existing_budget_gate(monkeypatch, tmp_path):
     controller = _controller(monkeypatch, tmp_path, enforce_limits=True)
     controller.default_budgets["scout"]["calls"] = 0

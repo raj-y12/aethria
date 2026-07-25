@@ -182,6 +182,24 @@ def _canonical_extension_migrations_check(repo_root: Path = REPO_ROOT) -> Dict[s
     )
 
 
+def _canonical_extension_versions_check(
+    versions: set[str], migration_names: set[str] | None = None
+) -> Dict[str, Any]:
+    migration_names = migration_names or set()
+    missing = []
+    for filename in CANONICAL_EXTENSION_MIGRATIONS:
+        version, semantic_name = filename.split("_", 1)
+        semantic_name = semantic_name.removesuffix(".sql")
+        if version not in versions and semantic_name not in migration_names:
+            missing.append(version)
+    return _check(
+        "canonical_extension_migrations_applied",
+        "passed" if not missing else "failed",
+        "canonical portfolio and triage schema versions are recorded",
+        missing=sorted(missing),
+    )
+
+
 def _authority_migration_version_check(
     versions: set[str], migration_names: set[str] | None = None
 ) -> Dict[str, Any]:
@@ -613,6 +631,7 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 if dict(row).get("name")
             }
             checks.append(_migration_versions_check(versions, migration_names))
+            checks.append(_canonical_extension_versions_check(versions, migration_names))
             checks.append(_policy_upgrade_version_check(versions, migration_names))
             checks.append(_lookup_outcomes_security_version_check(versions, migration_names))
             checks.append(_authority_migration_version_check(versions, migration_names))
