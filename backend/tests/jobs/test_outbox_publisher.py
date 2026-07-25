@@ -143,3 +143,30 @@ async def test_stale_policy_event_projects_the_current_authoritative_version(mon
         {"scoringWeights": [{"key": "market", "weight": 30}]}
     ]
     assert repository.published == [{"event_id": "event-policy-old"}]
+
+
+@pytest.mark.asyncio
+async def test_authority_projection_failure_leaves_outbox_event_retryable():
+    outbox = importlib.import_module("jobs.outbox")
+    event = SimpleNamespace(
+        event_id="event-authority-1",
+        user_id="user-a",
+        aggregate_type="opportunity",
+        aggregate_id="opportunity-a",
+        event_type="recommendation.created",
+        payload={"legacy_startup_id": "startup-a", "state": "advance"},
+    )
+    repository = _Repository([event])
+
+    async def explode(**kwargs):
+        raise RuntimeError("legacy projection unavailable")
+
+    publisher = outbox.OutboxPublisher(
+        repository,
+        consumers={"authority": explode},
+    )
+
+    assert await publisher.publish_once() == 0
+    assert repository.published == []
+    assert repository.failed[0]["event_id"] == "event-authority-1"
+    assert "legacy projection unavailable" in repository.failed[0]["error"]

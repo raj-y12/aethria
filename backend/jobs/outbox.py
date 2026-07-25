@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Awaitable, Callable, Mapping, Optional
 
 import metrics
 from event_bus import publish as event_publish
@@ -11,6 +11,7 @@ from event_bus import publish as event_publish
 
 Publish = Callable[[str, str, dict], Awaitable[None]]
 Project = Callable[[str, str, dict], Awaitable[None]]
+Consumer = Callable[..., Awaitable[Any]]
 
 
 async def _publish_to_event_bus(user_id: str, event_type: str, payload: dict) -> None:
@@ -42,14 +43,55 @@ class OutboxPublisher:
         *,
         publish: Publish = _publish_to_event_bus,
         project: Project = _project_legacy_read_models,
+        consumers: Mapping[str, Consumer] | None = None,
         poll_interval_seconds: float = 2.0,
     ):
         self.repository = repository
         self.publish = publish
         self.project = project
+        self.consumers: dict[str, Consumer] = dict(consumers or {})
+        if consumers is None and hasattr(repository, "pool"):
+            self.consumers["authority"] = self._authority_consumer(repository)
         self.poll_interval_seconds = max(0.05, float(poll_interval_seconds))
         self._stopping = asyncio.Event()
         self._runner: Optional[asyncio.Task] = None
+
+    @staticmethod
+    def _authority_consumer(repository: Any) -> Consumer:
+        """Build the canonical-to-legacy startup projector for durable outbox use."""
+        from authority.projection import AuthorityProjectionConsumer
+        from identity.projection import StartupCompatibilityProjectionRepository
+
+        consumer = AuthorityProjectionConsumer(
+            StartupCompatibilityProjectionRepository(repository.pool)
+        )
+
+        async def apply(**event: Any) -> Any:
+            return await consumer.apply(**event)
+
+        return apply
+
+    async def _consume(self, event: Any, payload: dict) -> None:
+        """Run registered compatibility consumers without changing policy projection."""
+        if not self.consumers:
+            return
+        from authority.projection import is_authority_projection_event
+
+        event_data = {
+            "user_id": event.user_id,
+            "event_id": event.event_id,
+            "aggregate_type": event.aggregate_type,
+            "aggregate_id": event.aggregate_id,
+            "event_type": event.event_type,
+            "payload": payload,
+        }
+        for name, consumer in self.consumers.items():
+            if name == "authority":
+                if not is_authority_projection_event(event.event_type):
+                    continue
+            elif name != event.event_type:
+                continue
+            await consumer(**event_data)
 
     async def publish_once(self) -> int:
         events = await self.repository.claim_outbox_batch()
@@ -78,6 +120,7 @@ class OutboxPublisher:
                         "governed_policy_version_id"
                     ]
                 await self.project(event.user_id, event.event_type, payload)
+                await self._consume(event, payload)
                 if projected_version_id is not None:
                     current = await self.repository.get_current_governed_policy_projection(
                         user_id=event.user_id
