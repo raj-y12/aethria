@@ -89,6 +89,25 @@ function HomeDoor({
 }
 
 /**
+ * A caption rail — the marketing plate's vertical side furniture, carrying live
+ * state rather than decoration. Hidden below 900px exactly like the gallery's
+ * `.plate-cap-l/-r`. aria-hidden: every reading here is already spoken by the
+ * subline or the Fund door, so the rail is a visual echo, not new information.
+ */
+function HomeRail({ side, text }: { side: 'left' | 'right'; text: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-1/2 z-10 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-oxford/40 [text-orientation:mixed] [writing-mode:vertical-rl] min-[900px]:block ${
+        side === 'left' ? 'left-phi-5' : 'right-phi-5'
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
  * Home — the front door as a briefing. One centered column on paper: the mark,
  * the situation spoken in serif with a since-you-left digest, the few deals on
  * the desk (the door to Flow), and two quiet doors to Portfolio and Fund.
@@ -176,6 +195,13 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()} · ${now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
 
+  // The rails read the same state the briefing does — no separate source.
+  const railLeft = `Pipeline — ${openCount.toLocaleString()} open`;
+  const railRight =
+    mandateVersion != null
+      ? `Mandate v${mandateVersion}${mandateAmended ? ` — amended ${mandateAmended}` : ''}`
+      : 'No mandate';
+
   // First-run: no mandate published yet. Show a quiet editorial prompt.
   // We wait until the readiness check resolves (loading=false) to avoid a
   // flash for returning users — the hook defaults mandatePublished:true on
@@ -184,7 +210,13 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
-      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
+      {/* ── The plate's caption rails ── */}
+      <HomeRail side="left" text={railLeft} />
+      <HomeRail side="right" text={railRight} />
+
+      {/* sm:px-phi-7 (55px) clears the focus-frame brackets, which reach 40px
+          past the framed body; px-phi-6 (34px) would not. */}
+      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
         {/* ── The mark ── */}
         <Reveal delay={0.02} y={-6}>
           <p className="text-center font-wordmark text-[clamp(18px,1.45vw,23px)] font-medium leading-tight text-oxford">
@@ -192,13 +224,16 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           </p>
         </Reveal>
 
-        {/* ── The situation, spoken ── */}
-        <Reveal delay={0.1} className="mt-phi-7">
+        {/* ── The plate head — the dateline over a drawn rule ── */}
+        <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
           <p className="type-label-section text-center tabular-nums">
             {eyebrow}
           </p>
+          <span aria-hidden className="rule-draw mt-phi-3 block h-px bg-oxford/[0.12]" />
         </Reveal>
 
+        {/* ── The framed briefing — the login page's bracket move ── */}
+        <div className="focus-frame mt-phi-4 flex w-full max-w-[42rem] flex-col items-center">
         {showFirstRun ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
@@ -324,6 +359,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
             </div>
           </>
         )}
+        </div>
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.36} className="mt-phi-7">
