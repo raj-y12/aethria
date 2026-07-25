@@ -14,7 +14,9 @@ export default defineConfig({
   fullyParallel: true,
   reporter: 'list',
   use: {
-    baseURL: `http://localhost:${PORT}`,
+  // Match the explicit host used by webServer. On CI, `localhost` may resolve
+  // to IPv6 while Vite is bound only to 127.0.0.1, yielding a blank SPA shell.
+  baseURL: `http://127.0.0.1:${PORT}`,
     trace: 'on-first-retry',
   },
   projects: [
