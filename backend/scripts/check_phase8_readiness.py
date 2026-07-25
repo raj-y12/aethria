@@ -162,29 +162,67 @@ def _authority_migration_version_check(versions: set[str]) -> Dict[str, Any]:
 
 
 def _authority_security_check(
-    *, table_rows: List[Any], policy_rows: List[Any]
+    *, table_rows: List[Any], policy_rows: List[Any], grant_rows: List[Any]
 ) -> Dict[str, Any]:
     table_state = {
         str(_policy_row_value(row, "table_name")): bool(_policy_row_value(row, "relrowsecurity"))
         for row in table_rows
     }
-    observed_policies = {
-        str(_policy_row_value(row, "tablename")): row for row in policy_rows
-    }
     missing_tables = sorted(name for name in _AUTHORITY_TABLES if name not in table_state)
     rls_missing = sorted(name for name in _AUTHORITY_TABLES if not table_state.get(name, False))
     invalid_policies = []
     for table, expected_name in _AUTHORITY_TABLES.items():
-        row = observed_policies.get(table)
-        if not row or not (
+        observed = [
+            row for row in policy_rows
+            if str(_policy_row_value(row, "tablename")) == table
+        ]
+        row = observed[0] if len(observed) == 1 else None
+        policy_ok = row is not None and (
             str(_policy_row_value(row, "policyname")) == expected_name
             and _policy_roles(_policy_row_value(row, "roles")) == {"service_role"}
             and str(_policy_row_value(row, "cmd")).upper() == "ALL"
             and _policy_predicate(_policy_row_value(row, "qual")) == "true"
             and _policy_predicate(_policy_row_value(row, "with_check")) == "true"
-        ):
+        )
+        if not policy_ok:
             invalid_policies.append(table)
-    passed = not missing_tables and not rls_missing and not invalid_policies
+    unexpected_policy_tables = sorted({
+        str(_policy_row_value(row, "tablename"))
+        for row in policy_rows
+        if str(_policy_row_value(row, "tablename")) not in _AUTHORITY_TABLES
+    })
+    expected_service_grants = {"SELECT", "INSERT", "UPDATE", "DELETE"}
+    client_grants = []
+    service_grants = {}
+    for table in _AUTHORITY_TABLES:
+        grants = [
+            row for row in grant_rows
+            if str(_policy_row_value(row, "table_name")) == table
+        ]
+        client_grants.extend(
+            f"{table}:{str(_policy_row_value(row, 'grantee')).strip().lower()}:{str(_policy_row_value(row, 'privilege_type')).strip().upper()}"
+            for row in grants
+            if str(_policy_row_value(row, "grantee")).strip().lower()
+            in {"public", "anon", "authenticated"}
+        )
+        service_grants[table] = sorted(
+            str(_policy_row_value(row, "privilege_type")).strip().upper()
+            for row in grants
+            if str(_policy_row_value(row, "grantee")).strip().lower() == "service_role"
+        )
+    wrong_service_grants = {
+        table: grants
+        for table, grants in service_grants.items()
+        if set(grants) != expected_service_grants or len(grants) != len(expected_service_grants)
+    }
+    passed = (
+        not missing_tables
+        and not rls_missing
+        and not invalid_policies
+        and not unexpected_policy_tables
+        and not client_grants
+        and not wrong_service_grants
+    )
     return _check(
         "authority_control_rls_and_policies",
         "passed" if passed else "failed",
@@ -192,6 +230,11 @@ def _authority_security_check(
         missing_tables=missing_tables,
         rls_missing=rls_missing,
         invalid_policies=invalid_policies,
+        unexpected_policy_tables=unexpected_policy_tables,
+        client_grants=sorted(client_grants),
+        service_grants=service_grants,
+        expected_service_grants=sorted(expected_service_grants),
+        wrong_service_grants=wrong_service_grants,
     )
 
 
@@ -498,10 +541,23 @@ async def _database_checks(dsn: str) -> List[Dict[str, Any]]:
                 """,
                 sorted(_AUTHORITY_TABLES),
             )
+            authority_grant_rows = await conn.fetch(
+                """
+                select table_name, grantee, privilege_type
+                from information_schema.table_privileges
+                where table_schema = 'public'
+                  and table_name = any($1::text[])
+                  and lower(grantee) in (
+                    'public', 'anon', 'authenticated', 'service_role'
+                  )
+                """,
+                sorted(_AUTHORITY_TABLES),
+            )
             checks.append(
                 _authority_security_check(
                     table_rows=list(rows),
                     policy_rows=list(authority_policy_rows),
+                    grant_rows=list(authority_grant_rows),
                 )
             )
             migration_table = await conn.fetchval(

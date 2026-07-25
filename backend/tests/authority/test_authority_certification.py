@@ -147,6 +147,76 @@ def test_readiness_requires_the_authority_migration_and_service_role_rls():
                 "with_check": "true",
             },
         ],
+        grant_rows=[
+            {"table_name": table, "grantee": "service_role", "privilege_type": privilege}
+            for table in ("tenant_authority_rollouts", "authority_projection_receipts")
+            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+        ],
     )
 
     assert check["status"] == "passed"
+
+
+@pytest.mark.parametrize(
+    ("extra_policy", "extra_grant"),
+    [
+        (
+            {
+                "tablename": "tenant_authority_rollouts",
+                "policyname": "tenant_authority_rollouts_authenticated_read",
+                "roles": ["authenticated"],
+                "cmd": "SELECT",
+                "qual": "true",
+                "with_check": "true",
+            },
+            None,
+        ),
+        (
+            {
+                "tablename": "authority_projection_receipts",
+                "policyname": "authority_projection_receipts_anon_read",
+                "roles": ["anon"],
+                "cmd": "SELECT",
+                "qual": "true",
+                "with_check": "true",
+            },
+            None,
+        ),
+        (None, {"table_name": "authority_projection_receipts", "grantee": "anon", "privilege_type": "SELECT"}),
+    ],
+)
+def test_readiness_rejects_extra_client_authority_policy_or_grant(extra_policy, extra_grant):
+    policies = [
+        {
+            "tablename": table,
+            "policyname": policy,
+            "roles": ["service_role"],
+            "cmd": "ALL",
+            "qual": "true",
+            "with_check": "true",
+        }
+        for table, policy in {
+            "tenant_authority_rollouts": "tenant_authority_rollouts_service_role_all",
+            "authority_projection_receipts": "authority_projection_receipts_service_role_all",
+        }.items()
+    ]
+    grants = [
+        {"table_name": table, "grantee": "service_role", "privilege_type": privilege}
+        for table in ("tenant_authority_rollouts", "authority_projection_receipts")
+        for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
+    ]
+    if extra_policy:
+        policies.append(extra_policy)
+    if extra_grant:
+        grants.append(extra_grant)
+
+    check = readiness._authority_security_check(
+        table_rows=[
+            {"table_name": "tenant_authority_rollouts", "relrowsecurity": True},
+            {"table_name": "authority_projection_receipts", "relrowsecurity": True},
+        ],
+        policy_rows=policies,
+        grant_rows=grants,
+    )
+
+    assert check["status"] == "failed"

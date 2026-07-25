@@ -148,10 +148,10 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     // poll tick. Exponential backoff: ~1s, 2s, 4s, 8s.
     retry: 4,
     retryDelay: (attempt) => Math.min(1_000 * 2 ** attempt, 8_000),
-    // Legacy startup DTOs remain the queue until a reconciled canonical-read
-    // rollout explicitly takes authority. Existing cached rows are retained;
-    // a blocked opportunity is never filtered from the visible queue here.
-    enabled: !authority.isCanonicalRead,
+    // Canonical startup DTOs are not available in this slice, so authority
+    // status alone must not turn off the only queue query on a cold load.
+    // A later canonical-read implementation must replace this query atomically;
+    // blocked opportunities are never filtered from the visible queue here.
   });
 
   const escalationsQuery = useQuery({

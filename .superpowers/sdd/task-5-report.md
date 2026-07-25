@@ -8,7 +8,7 @@
   Query. Successful mutations invalidate authority, system-status, startup,
   escalation, and institutional-opportunity query families.
 - Integrated authority state into `useSystemData` and `App`: the legacy queue
-  remains enabled until reconciled canonical-read status is active; rollout,
+  remains enabled until a canonical DTO/query can replace it atomically; rollout,
   reconciliation, and rollback-recovery state are visible without deriving
   authority from legacy startup rows.
 - Added executable frontend and backend certification coverage, including
@@ -52,3 +52,12 @@ blocked because DATABASE_URL/SUPABASE_DB_URL is absent; ready=false
   commands were used.
 - No manual lookup redesign, evidence/evaluation/recommendation/portfolio UI,
   historical backfill, or canonical read DTO work was added in this slice.
+
+## Follow-up correction (2026-07-25)
+
+- Readiness now requires exactly one service-role-only `FOR ALL` policy per
+  authority table, rejects added anon/authenticated policies, and verifies the
+  exact CRUD service-role grants with no client grants.
+- A cold canonical-read status no longer disables the only legacy startup query.
+  The regression test starts with an empty cache and verifies that the queue
+  fetch still occurs until a future canonical DTO/query is available.
