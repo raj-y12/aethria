@@ -122,6 +122,14 @@ class AuthorityRepository:
                 )
                 return self._rollout(row, user_id=uid)
 
+    async def assert_write_path_on_connection(self, conn: Any, *, user_id: str, operation: str) -> RolloutRecord:
+        uid = require_user_id(user_id, context="AuthorityRepository.assert_write_path_on_connection")
+        await self._bootstrap_rollout(conn, user_id=uid)
+        record = self._rollout(await conn.fetchrow("select * from public.tenant_authority_rollouts where user_id=$1 for update", uid), user_id=uid)
+        if record.kill_switch or record.mode in {RolloutMode.CANONICAL_READ}:
+            raise AuthorityBlocked(f"{operation} blocked by authority rollout")
+        return record
+
     async def transition_rollout(
         self,
         *,
@@ -418,3 +426,27 @@ class AuthorityRepository:
                     },
                 )
                 return record
+
+    async def transition_workflow_on_connection(self, conn: Any, **kwargs: Any) -> WorkflowStateRecord:
+        """Apply a workflow transition inside a caller-owned transaction."""
+        uid = require_user_id(kwargs["user_id"], context="AuthorityRepository.transition_workflow_on_connection")
+        target = WorkflowState(kwargs["target_state"])
+        opportunity = str(kwargs["opportunity_id"])
+        expected = kwargs["expected_version"]
+        transition = str(kwargs["transition_id"])
+        block_code, block_detail, block_recovery = self._block_values(target_state=target, block=kwargs.get("block"))
+        await self._bootstrap_rollout(conn, user_id=uid)
+        rollout = self._rollout(await conn.fetchrow("select * from public.tenant_authority_rollouts where user_id=$1 for update", uid), user_id=uid)
+        if rollout.kill_switch:
+            raise AuthorityBlocked("authority kill switch is active")
+        row = await conn.fetchrow("""update public.opportunities set workflow_state=$4,workflow_version=workflow_version+1,
+            block_code=$5,block_detail=$6,block_recovery=$7,last_transition_id=$8,updated_at=now()
+            where user_id=$1 and opportunity_id=$2 and workflow_version=$3
+            returning user_id,opportunity_id,workflow_state,workflow_version,block_code,block_detail,block_recovery,last_transition_id,legacy_startup_id,updated_at""",
+            uid, opportunity, expected, target.value, block_code, block_detail, block_recovery, transition)
+        record = self._workflow(row, user_id=uid)
+        await self._outbox(conn, user_id=uid, aggregate_type="opportunity", aggregate_id=opportunity,
+            event_type="opportunity.workflow_changed", payload={"opportunity_id": opportunity,
+            "workflow_state": record.state.value, "workflow_version": record.version,
+            "transition_id": transition, "block_code": block_code})
+        return record

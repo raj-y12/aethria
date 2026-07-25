@@ -81,6 +81,8 @@ class EvaluationRepository:
         await self._require_write_path(user_id=uid, operation="evaluation creation")
         async with self.pool.acquire() as conn:
             async with conn.transaction(isolation="repeatable_read"):
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="evaluation creation")
                 previous = await conn.fetchrow(
                     """
                     select o.service_level, o.decision_state, o.legacy_startup_id,
@@ -236,8 +238,9 @@ class EvaluationRepository:
                         ),
                     },
                 )
-                if self.authority_service is not None and hasattr(self.authority_service, "repository"):
-                    await self.authority_service.repository.transition_workflow(
+                if self.authority_service is not None and hasattr(getattr(self.authority_service, "repository", None), "transition_workflow_on_connection"):
+                    await self.authority_service.repository.transition_workflow_on_connection(
+                        conn,
                         user_id=uid, opportunity_id=opportunity_id,
                         expected_version=int(previous.get("workflow_version") or 0),
                         target_state="ruling_pending", transition_id=uuid4(),

@@ -65,6 +65,8 @@ class DecisionRepository:
             raise ValueError("actor_id is required")
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="human ruling creation")
                 opportunity = await conn.fetchrow(
                     """
                     select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,
@@ -147,8 +149,9 @@ class DecisionRepository:
                         "compatibility_reason": ruling.rationale,
                     },
                 )
-                if self.authority_service is not None and hasattr(self.authority_service, "repository"):
-                    await self.authority_service.repository.transition_workflow(
+                if self.authority_service is not None and hasattr(getattr(self.authority_service, "repository", None), "transition_workflow_on_connection"):
+                    await self.authority_service.repository.transition_workflow_on_connection(
+                        conn,
                         user_id=uid, opportunity_id=ruling.opportunity_id,
                         expected_version=int(opportunity.get("workflow_version") or 0),
                         target_state=("monitoring" if ruling.decision.value == "monitor" else "completed"),

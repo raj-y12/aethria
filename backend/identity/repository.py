@@ -440,6 +440,8 @@ class IdentityRepository:
         name = str(canonical_name or observation.observed_name).strip()
         async with self.pool.acquire() as conn:
             async with conn.transaction():
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="identity linkage")
                 row = await conn.fetchrow(
                     """
                     insert into public.companies (
@@ -521,8 +523,9 @@ class IdentityRepository:
                         "created": created,
                     },
                 )
-                if self.authority_service is not None and created and hasattr(self.authority_service, "repository"):
-                    await self.authority_service.repository.transition_workflow(
+                if self.authority_service is not None and created and hasattr(getattr(self.authority_service, "repository", None), "transition_workflow_on_connection"):
+                    await self.authority_service.repository.transition_workflow_on_connection(
+                        conn,
                         user_id=uid, opportunity_id=opportunity.opportunity_id,
                         expected_version=0, target_state="admitted",
                         transition_id=uuid4(),

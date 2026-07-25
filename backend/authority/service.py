@@ -83,6 +83,9 @@ class AuthorityService:
             raise AuthorityBlocked("legacy pipeline is blocked by canonical authority")
         return context
 
+    async def assert_write_path_on_connection(self, conn: object, *, user_id: str, operation: str):
+        return await self.repository.assert_write_path_on_connection(conn, user_id=user_id, operation=operation)
+
     async def rollback(
         self,
         *,
