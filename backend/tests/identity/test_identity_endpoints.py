@@ -25,7 +25,7 @@ class _Repository:
     def __init__(self):
         self.company = CompanyRecord(
             company_id="5a75bade-5807-474f-a6aa-4c02da080cf6",
-            user_id="user-a",
+            user_id="user_a",
             canonical_name="Acme",
             canonical_domain="acme.com",
             identity_confidence=1,
@@ -33,7 +33,7 @@ class _Repository:
         )
         self.observation = SourceObservationRecord(
             observation_id="0f344581-8b14-461f-ab71-3aafe2e06f11",
-            user_id="user-a",
+            user_id="user_a",
             channel=SourceChannel.MANUAL_LOOKUP,
             observed_name="Acme",
             observed_domain="acme.com",
@@ -42,7 +42,7 @@ class _Repository:
         )
         self.opportunity = OpportunityRecord(
             opportunity_id="03a37384-94cc-4d1e-b5c6-b77b40d2e8cc",
-            user_id="user-a",
+            user_id="user_a",
             company_id=self.company.company_id,
             first_observation_id=self.observation.observation_id,
             latest_observation_id=self.observation.observation_id,
@@ -50,7 +50,7 @@ class _Repository:
         )
         self.case = IdentityResolutionCaseRecord(
             identity_case_id="5fefdc39-aef8-4993-b356-95cb927027ef",
-            user_id="user-a",
+            user_id="user_a",
             observation_id=self.observation.observation_id,
             status=IdentityCaseStatus.OPEN,
             reason_code="multiple_strong_candidates",
@@ -78,19 +78,19 @@ class _Repository:
         return self.opportunity
 
     async def list_observations(self, *, user_id, status=None, limit=100):
-        return [self.observation] if user_id == "user-a" else []
+        return [self.observation] if user_id == "user_a" else []
 
     async def list_cases(self, *, user_id, status="open", limit=100):
-        return [self.case] if user_id == "user-a" and self.case.status.value == status else []
+        return [self.case] if user_id == "user_a" and self.case.status.value == status else []
 
     async def get_case(self, *, user_id, identity_case_id):
-        return self.case if user_id == "user-a" and identity_case_id == self.case.identity_case_id else None
+        return self.case if user_id == "user_a" and identity_case_id == self.case.identity_case_id else None
 
     async def get_admission_for_observation(self, *, user_id, observation_id):
         if self.case.status is not IdentityCaseStatus.RESOLVED:
             return None
         return IdentityAdmission(
-            user_id="user-a",
+            user_id="user_a",
             observation_id=observation_id,
             status=IdentityStatus.RESOLVED,
             company_id=self.company.company_id,
@@ -145,12 +145,12 @@ class _AuthorityRepository:
 def _authority(mode=RolloutMode.LEGACY):
     return AuthorityService(
         _AuthorityRepository(
-            RolloutRecord(user_id="user-a", mode=mode, version=2)
+            RolloutRecord(user_id="user_a", mode=mode, version=2)
         )
     )
 
 
-def _client(monkeypatch, repository, *, user_id="user-a", authority_service=None):
+def _client(monkeypatch, repository, *, user_id="user_a", authority_service=None):
     import api
 
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: user_id)
@@ -239,7 +239,7 @@ def test_operator_can_match_create_defer_and_reject_with_server_actor(monkeypatc
     )
 
     assert matched.status_code == repeated.status_code == 200
-    assert repository.actions[0][1]["resolved_by"] == "user-a"
+    assert repository.actions[0][1]["resolved_by"] == "user_a"
     assert len([action for action in repository.actions if action[0] == "match"]) == 1
 
     for action in ("create", "defer", "reject"):

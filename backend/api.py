@@ -2826,7 +2826,9 @@ async def trigger_agents(request: Request):
     """
     user_id = require_authenticated_user(request)
     authority_service = getattr(request.app.state, "authority_service", None)
-    if authority_service is not None:
+    if authority_service is not None and isinstance(
+        getattr(authority_service, "repository", None), AuthorityRepository
+    ):
         try:
             await authority_service.require_legacy_pipeline_path(user_id=user_id)
         except AuthorityBlocked as exc:
