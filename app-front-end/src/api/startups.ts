@@ -1,5 +1,6 @@
 import type { Startup } from '../types/startup';
 import { authedFetch } from './auth';
+import type { OpportunityDecisionView } from './identity';
 
 const API_BASE =
   typeof window !== 'undefined'
@@ -11,10 +12,48 @@ export async function fetchStartups(): Promise<Startup[]> {
     const { fixtureStartups } = await import('../fixtures/startups');
     return fixtureStartups;
   }
+  const authorityRes = await authedFetch(`${API_BASE}/api/authority/status`, { headers: { Accept: 'application/json' } });
+  if (authorityRes.ok) {
+    const authority = await authorityRes.json() as { mode?: string; canonical_reads_allowed?: boolean };
+    if (authority.mode === 'canonical_read' && authority.canonical_reads_allowed === true) {
+      const canonicalRes = await authedFetch(`${API_BASE}/api/opportunities?limit=250`, { headers: { Accept: 'application/json' } });
+      if (!canonicalRes.ok) throw new Error(`Canonical opportunities API error: ${canonicalRes.status}`);
+      const data = await canonicalRes.json() as { opportunities?: OpportunityDecisionView[] };
+      return (data.opportunities ?? []).map(canonicalOpportunityToStartup);
+    }
+  }
   const res = await authedFetch(`${API_BASE}/api/startups`, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Startups API error: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
+}
+
+/** Compatibility shape for existing queue components; source of truth is canonical. */
+export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionView): Startup {
+  const recommendation = opportunity.recommended_state;
+  const partnerRecommendation = recommendation === 'invested' ? 'INVEST' : recommendation === 'pass' ? 'PASS' : 'MONITOR';
+  return {
+    id: opportunity.legacy_startup_id ?? opportunity.opportunity_id,
+    scout: {
+      id: opportunity.opportunity_id,
+      scout_type: 'canonical',
+      name: opportunity.canonical_name,
+      one_line: opportunity.canonical_domain ? `${opportunity.canonical_name} · ${opportunity.canonical_domain}` : opportunity.canonical_name,
+      sector: '',
+      why_now: '',
+      confidence: 1,
+      lookup_website: opportunity.canonical_domain ?? undefined,
+    },
+    partner: {
+      recommendation: partnerRecommendation,
+      confidence: opportunity.recommendation_confidence ?? undefined,
+      decision_drivers: opportunity.decision_drivers ?? [],
+      risks: opportunity.principal_risks ?? [],
+      human_review_required: true,
+    },
+    queue_reason: opportunity.workflow_state ?? opportunity.decision_state,
+    priority_reason: opportunity.attention_priority != null ? `Priority ${opportunity.attention_priority}` : null,
+  };
 }
 
 /**
@@ -46,6 +85,18 @@ export async function fetchStartupDetail(startupId: string): Promise<Startup | n
   if (import.meta.env.VITE_USE_FIXTURES === '1') {
     const { fixtureStartups } = await import('../fixtures/startups');
     return fixtureStartups.find((s) => s.id === startupId) ?? null;
+  }
+  const authorityRes = await authedFetch(`${API_BASE}/api/authority/status`, { headers: { Accept: 'application/json' } });
+  if (authorityRes.ok) {
+    const authority = await authorityRes.json() as { mode?: string; canonical_reads_allowed?: boolean };
+    if (authority.mode === 'canonical_read' && authority.canonical_reads_allowed === true) {
+      const canonicalRes = await authedFetch(
+        `${API_BASE}/api/opportunities/${encodeURIComponent(startupId)}/decision-view`,
+        { headers: { Accept: 'application/json' } },
+      );
+      if (!canonicalRes.ok) return null;
+      return canonicalOpportunityToStartup(await canonicalRes.json() as OpportunityDecisionView);
+    }
   }
   const res = await authedFetch(
     `${API_BASE}/api/startups/${encodeURIComponent(startupId)}`,
