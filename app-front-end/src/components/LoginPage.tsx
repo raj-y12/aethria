@@ -17,6 +17,15 @@ import { fetchStartupsWithToken } from '../api/startups';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+/**
+ * The arrival plate, compressed from the marketing gallery loader's 2450ms to
+ * ~1150ms — on the sign-in page this sits between the operator and the password
+ * field, so it stays short and any key or pointer skips it outright.
+ */
+const INTRO_MS = 1150;
+/** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
+const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
+
 function LoginField({
   id,
   label,
@@ -77,6 +86,7 @@ export default function LoginPage() {
   const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState<Phase>('form');
+  const [introDone, setIntroDone] = useState(false);
   const [welcomeName, setWelcomeName] = useState('');
   const [activity, setActivity] = useState<ActivitySummary | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -115,6 +125,26 @@ export default function LoginPage() {
     hasRedirectedRef.current = true;
     navigate('/v1', { replace: true });
   }, [isLoaded, isSignedIn, navigate, phase]);
+
+  // The arrival plate. Derived rather than stored so it can never strand a
+  // signed-in user behind an animation on their way to the redirect, and so
+  // reduced-motion skips it outright instead of playing it invisibly.
+  const showIntro = !reduceMotion && !introDone && isLoaded && !isSignedIn && phase === 'form';
+
+  useEffect(() => {
+    if (!showIntro) return;
+    const timer = window.setTimeout(() => setIntroDone(true), INTRO_MS);
+    // Any intent to act dismisses the plate — it must never cost the operator
+    // a keystroke, including the first character of a password.
+    const skip = () => setIntroDone(true);
+    window.addEventListener('keydown', skip);
+    window.addEventListener('pointerdown', skip);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('pointerdown', skip);
+    };
+  }, [showIntro]);
 
   // Shake the input fields when an error is set
   useEffect(() => {
@@ -280,7 +310,43 @@ export default function LoginPage() {
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(28px, 6vw, 72px)' }}
       >
+      {/* Default AnimatePresence mode on purpose: the plate and the sign-in
+          frame must overlap for one commit so Framer can hand the wordmark
+          across. mode="wait" would unmount the source first and kill the morph. */}
+      <AnimatePresence>
+      {showIntro ? (
+        <motion.div
+          key="intro"
+          /* Absolute so the exiting plate leaves the flex flow immediately —
+             in normal flow it would occupy space through its 400ms fade and
+             shove the sign-in frame down, then snap it back. */
+          className="absolute inset-0 flex flex-col items-center justify-center"
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+        >
+          <div className="focus-frame">
+            <motion.h1
+              layoutId={WORDMARK_LAYOUT_ID}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.52, ease: EASE }}
+              className="font-wordmark m-0 text-center text-[clamp(2.6rem,6vw,4rem)] font-medium leading-[0.9] tracking-[-0.02em] text-oxford"
+            >
+              Aethria
+              <motion.span
+                className="wordmark-dot inline-block"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.2, ease: EASE, delay: 0.38 }}
+              >
+                .
+              </motion.span>
+            </motion.h1>
+          </div>
+        </motion.div>
+      ) : (
       <motion.div
+        key="main"
         className="w-full max-w-[42rem] flex flex-col items-center"
         animate={
           entering
@@ -364,20 +430,26 @@ export default function LoginPage() {
               >
                 {dateline}
               </motion.p>
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.18 }}
-                className="flex w-full flex-col items-center mb-phi-6"
-              >
-                <h1 className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]">
+              {/* The wordmark carries no y-translate of its own — it arrives by
+                  morphing out of the arrival plate, and a moving parent would
+                  fight Framer's layout measurement. The tagline animates alone. */}
+              <div className="flex w-full flex-col items-center mb-phi-6">
+                <motion.h1
+                  layoutId={WORDMARK_LAYOUT_ID}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.62, ease: EASE }}
+                  className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]"
+                >
                   Aethria<span className="wordmark-dot">.</span>
-                </h1>
-                <p className="type-label-section mt-phi-4">
+                </motion.h1>
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.12 }}
+                  className="type-label-section mt-phi-4"
+                >
                   Deal flow operating system
-                </p>
-              </motion.div>
+                </motion.p>
+              </div>
 
               <motion.div
                 key="form-view"
@@ -544,11 +616,13 @@ export default function LoginPage() {
           ) : null}
         </AnimatePresence>
       </motion.div>
+      )}
+      </AnimatePresence>
 
       {/* Footer */}
       <motion.footer
         initial={{ opacity: 0 }}
-        animate={{ opacity: entering ? 0 : 1 }}
+        animate={{ opacity: entering || showIntro ? 0 : 1 }}
         transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 1 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
