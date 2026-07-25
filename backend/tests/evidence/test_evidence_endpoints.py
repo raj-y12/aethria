@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from evidence.models import EvidencePlanRecord
+from types import SimpleNamespace
 from security.rate_limiter import InMemorySecurityStore
 
 
@@ -44,6 +45,12 @@ class _Repository:
         from utils.timeutil import utcnow
         return {"claim_id": kwargs["claim_id"], "status": "contradicted", "updated_at": utcnow()}
 
+    async def ingest_artifact(self, artifact, *, items):
+        self.calls.append(("confidential", artifact, items))
+        return SimpleNamespace(artifact_id="artifact-private", access_class=artifact.access_class), [
+            SimpleNamespace(evidence_item_id="item-private")
+        ]
+
 
 def _client(monkeypatch, repository, user_id="user-a"):
     import api
@@ -74,3 +81,25 @@ def test_claim_correction_actor_comes_from_authentication(monkeypatch):
     )
     assert response.status_code == 200
     assert repository.calls[0][1]["actor_id"] == "user-a"
+
+
+def test_confidential_intake_is_operator_verified_and_never_returns_secret_location(monkeypatch):
+    repository = _Repository()
+    response = _client(monkeypatch, repository).post(
+        "/api/opportunities/opportunity-1/confidential-evidence",
+        headers={"Authorization": "Bearer t"},
+        json={
+            "title": "Founder interview",
+            "storage_reference": "s3://tenant-secret/interview.txt",
+            "content_hash": "abcdef12345678",
+            "excerpt": "Retention is improving.",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["access_class"] == "tenant_confidential"
+    assert response.json()["source_uri"] is None
+    _, artifact, items = repository.calls[-1]
+    assert artifact.storage_reference.startswith("s3://")
+    assert artifact.access_class.value == "tenant_confidential"
+    assert items[0].verification_state.value == "verified"
+    assert items[0].operator_attribution == "user-a"

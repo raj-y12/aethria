@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from typing import List, Literal, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from security.request_guards import require_authenticated_user, validate_route_id
+from evidence.models import AccessClass, ArtifactType, EvidenceArtifactInput, EvidenceItemInput, TrustClass, VerificationState
 
 
 router = APIRouter(tags=["evidence"])
@@ -24,6 +26,16 @@ class EvidencePlanBody(BaseModel):
 class ClaimCorrectionBody(BaseModel):
     action: Literal["withdraw", "contradict", "mark_stale", "supersede"]
     rationale: str = Field(min_length=3, max_length=1000)
+
+
+class ConfidentialEvidenceBody(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    storage_reference: str = Field(min_length=1, max_length=2000)
+    content_hash: str = Field(min_length=8, max_length=200)
+    excerpt: Optional[str] = Field(default=None, max_length=2000)
+    item_type: str = Field(default="confidential_note", min_length=1, max_length=160)
+    normalized_value: Dict[str, Any] = Field(default_factory=dict)
+    effective_at: Optional[datetime] = None
 
 
 def _repository(request: Request):
@@ -70,6 +82,41 @@ async def create_evidence_plan(
         budget_usd=body.budget_usd,
     )
     return plan.model_dump(mode="json")
+
+
+@router.post("/api/opportunities/{opportunity_id}/confidential-evidence")
+async def ingest_confidential_evidence(
+    request: Request, opportunity_id: str, body: ConfidentialEvidenceBody
+):
+    validate_route_id(opportunity_id, field_name="opportunity_id")
+    user_id = require_authenticated_user(request)
+    artifact, items = await _repository(request).ingest_artifact(
+        EvidenceArtifactInput(
+            user_id=user_id, opportunity_id=opportunity_id,
+            artifact_type=ArtifactType.INTERVIEW_NOTE,
+            title=body.title, content_hash=body.content_hash,
+            storage_reference=body.storage_reference,
+            trust_class=TrustClass.OPERATOR,
+            access_class=AccessClass.TENANT_CONFIDENTIAL,
+            untrusted_input=False, prompt_injection_detected=False,
+            effective_at=body.effective_at,
+        ),
+        items=[EvidenceItemInput(
+            user_id=user_id, item_type=body.item_type,
+            normalized_value=body.normalized_value,
+            display_excerpt=body.excerpt or "Confidential evidence received.",
+            effective_at=body.effective_at,
+            verification_state=VerificationState.VERIFIED,
+            source_quality=1.0, extraction_confidence=1.0,
+            operator_attribution=user_id,
+        )],
+    )
+    return {
+        "artifact_id": artifact.artifact_id,
+        "access_class": artifact.access_class.value,
+        "item_ids": [item.evidence_item_id for item in items],
+        "source_uri": None,
+    }
 
 
 @router.post("/api/claims/{claim_id}/correct")
