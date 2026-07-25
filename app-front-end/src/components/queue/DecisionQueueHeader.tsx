@@ -26,7 +26,7 @@ const SORT_OPTIONS: { value: SortFilter; label: string }[] = [
 ];
 
 const SORT_CHEVRON =
-  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%23001433' fill-opacity='0.4' d='M0 2.5h8L4 6.5z'/%3E%3C/svg%3E\")";
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8'%3E%3Cpath fill='%230a1629' fill-opacity='0.4' d='M0 2.5h8L4 6.5z'/%3E%3C/svg%3E\")";
 
 const sortSelectStyle: CSSProperties = { backgroundImage: SORT_CHEVRON };
 

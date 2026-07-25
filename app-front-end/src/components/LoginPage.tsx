@@ -17,6 +17,70 @@ import { fetchStartupsWithToken } from '../api/startups';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+/**
+ * The arrival plate, compressed from the marketing gallery loader's 2450ms to
+ * ~1150ms — on the sign-in page this sits between the operator and the password
+ * field, so it stays short and any key or pointer skips it outright.
+ */
+const INTRO_MS = 1150;
+/**
+ * Gentler than EASE for the morph. EASE ([0.16,1,0.3,1]) front-loads almost all
+ * its travel, which is right for a short slide but reads as a lurch when it is
+ * moving and resizing a 96px wordmark across the page.
+ */
+const MORPH_EASE = [0.32, 0.72, 0, 1] as const;
+/** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
+const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
+/**
+ * The sign-in mark. The arrival plate and the sign-in frame must render it at
+ * exactly this size: when the two differ, Framer animates the difference as a
+ * transform scale, which stretches the glyphs for the length of the morph.
+ * Matching them keeps the handoff pure translation, so the mark stays crisp.
+ */
+const WORDMARK_FACE =
+  'font-wordmark font-medium leading-[0.9] tracking-[-0.02em] text-[clamp(56px,9vw,96px)]';
+
+function LoginField({
+  id,
+  label,
+  type,
+  value,
+  onChange,
+  autoComplete,
+  onKeyDown,
+  inputRef,
+}: {
+  id: string;
+  label: string;
+  type: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete?: string;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputRef?: React.Ref<HTMLInputElement>;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label
+        htmlFor={id}
+        className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-inverse-muted)]"
+      >
+        {label}
+      </label>
+      <input
+        ref={inputRef}
+        id={id}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        autoComplete={autoComplete}
+        className="mt-2 w-full border-0 border-b border-solid border-[rgba(244,241,234,0.28)] bg-transparent pb-2.5 font-sans text-[15px] text-[var(--text-inverse)] outline-none transition-colors duration-300 placeholder:font-mono placeholder:text-[11px] placeholder:text-[rgba(244,241,234,0.35)] focus:border-[var(--color-brand-mark-inverse)]"
+      />
+    </div>
+  );
+}
+
 function friendlyIdentifier(id: string): string {
   const t = id.trim();
   if (!t) return 'there';
@@ -24,23 +88,6 @@ function friendlyIdentifier(id: string): string {
   if (at > 0) return t.slice(0, at);
   return t.length > 36 ? `${t.slice(0, 33)}…` : t;
 }
-
-/** Input with an animated underline that expands from center on focus. */
-const AnimatedInput = React.forwardRef<
-  HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & { focused: boolean }
->(({ focused, className, ...props }, ref) => (
-  <div className="relative">
-    <input ref={ref} className={className} {...props} />
-    <div className="absolute bottom-0 left-0 right-0 h-px bg-oxford/10" />
-    <motion.div
-      className="absolute bottom-0 left-0 right-0 h-px origin-center bg-oxford/40"
-      initial={{ scaleX: 0 }}
-      animate={{ scaleX: focused ? 1 : 0 }}
-      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-    />
-  </div>
-));
 
 type Phase = 'form' | 'welcome';
 
@@ -53,6 +100,7 @@ export default function LoginPage() {
   const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState<Phase>('form');
+  const [introDone, setIntroDone] = useState(false);
   const [welcomeName, setWelcomeName] = useState('');
   const [activity, setActivity] = useState<ActivitySummary | null>(null);
   const [activityLoading, setActivityLoading] = useState(false);
@@ -62,8 +110,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [entering, setEntering] = useState(false);
-  const [usernameFocused, setUsernameFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
 
   const passwordRef = useRef<HTMLInputElement>(null);
   const hasRedirectedRef = useRef(false);
@@ -93,6 +139,26 @@ export default function LoginPage() {
     hasRedirectedRef.current = true;
     navigate('/v1', { replace: true });
   }, [isLoaded, isSignedIn, navigate, phase]);
+
+  // The arrival plate. Derived rather than stored so it can never strand a
+  // signed-in user behind an animation on their way to the redirect, and so
+  // reduced-motion skips it outright instead of playing it invisibly.
+  const showIntro = !reduceMotion && !introDone && isLoaded && !isSignedIn && phase === 'form';
+
+  useEffect(() => {
+    if (!showIntro) return;
+    const timer = window.setTimeout(() => setIntroDone(true), INTRO_MS);
+    // Any intent to act dismisses the plate — it must never cost the operator
+    // a keystroke, including the first character of a password.
+    const skip = () => setIntroDone(true);
+    window.addEventListener('keydown', skip);
+    window.addEventListener('pointerdown', skip);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('keydown', skip);
+      window.removeEventListener('pointerdown', skip);
+    };
+  }, [showIntro]);
 
   // Shake the input fields when an error is set
   useEffect(() => {
@@ -258,7 +324,53 @@ export default function LoginPage() {
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(28px, 6vw, 72px)' }}
       >
+      {/* ── The arrival plate ──
+          Absolute so it never occupies flex flow; in flow it shoved the frame
+          down on swap. The brackets and the mark are siblings, not nested: the
+          brackets linger to fade out on their own, while the mark unmounts the
+          instant the frame mounts so Framer can hand it across untouched. Nest
+          them and the brackets' fade would dim the mark mid-morph. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <AnimatePresence>
+          {showIntro && (
+            <motion.span
+              key="intro-brackets"
+              aria-hidden
+              className="focus-frame focus-frame--centered"
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.34, ease: EASE }}
+            >
+              {/* A ghost of the mark sizes the bracket box exactly, without the
+                  brackets ever becoming the mark's parent. */}
+              <span className={`invisible ${WORDMARK_FACE}`}>Aethria.</span>
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {showIntro && (
+          <motion.h1
+            layoutId={WORDMARK_LAYOUT_ID}
+            initial={{ y: 18 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.7, ease: EASE }}
+            className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
+          >
+            Aethria
+            <motion.span
+              className="wordmark-dot inline-block"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.28, ease: EASE, delay: 0.42 }}
+            >
+              .
+            </motion.span>
+          </motion.h1>
+        )}
+      </div>
+
+      {!showIntro && (
       <motion.div
+        key="main"
         className="w-full max-w-[42rem] flex flex-col items-center"
         animate={
           entering
@@ -332,25 +444,125 @@ export default function LoginPage() {
               </p>
             </motion.div>
           ) : (
-            <motion.div
-              key="brand-header"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
-              transition={{ duration: 0.5, ease: EASE, delay: 0.3 }}
-              className="flex w-full flex-col items-center mb-phi-8"
-            >
-              {/* Same voice as the home page: mono eyebrow, then the mark. */}
-              <p className="type-label-section m-0 mb-phi-5 text-center tabular-nums">
+            <div key="login-frame" className="focus-frame w-full flex flex-col items-center">
+              <motion.p
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.05 }}
+                className="type-label-section m-0 mb-phi-5 text-center tabular-nums"
+              >
                 {dateline}
-              </p>
-              <h1 className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]">
-                Aethria<span className="wordmark-dot">.</span>
-              </h1>
-              <p className="type-label-section mt-phi-4">
-                Deal flow operating system
-              </p>
-            </motion.div>
+              </motion.p>
+              {/* The wordmark carries no y-translate of its own — it arrives by
+                  morphing out of the arrival plate, and a moving parent would
+                  fight Framer's layout measurement. The tagline animates alone. */}
+              <div className="flex w-full flex-col items-center mb-phi-6">
+                <motion.h1
+                  layoutId={WORDMARK_LAYOUT_ID}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: MORPH_EASE }}
+                  className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
+                >
+                  Aethria<span className="wordmark-dot">.</span>
+                </motion.h1>
+                <motion.p
+                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.12 }}
+                  className="type-label-section mt-phi-4"
+                >
+                  Deal flow operating system
+                </motion.p>
+              </div>
+
+              <motion.div
+                key="form-view"
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
+                className="w-full"
+              >
+                <div className="bg-oxford p-[clamp(1.5rem,4vw,2.5rem)]">
+                  <div
+                    ref={formShakeRef}
+                    className="relative border border-dashed border-[rgba(244,241,234,0.3)] p-6 sm:p-8"
+                  >
+                    <form
+                      onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
+                      className="flex flex-col gap-6"
+                      noValidate
+                    >
+                      <LoginField
+                        id="login-identifier"
+                        label="Email or username"
+                        type="text"
+                        value={username}
+                        onChange={setUsername}
+                        autoComplete="username"
+                        onKeyDown={(e) => handleKeyDown(e, 'username')}
+                      />
+                      <LoginField
+                        id="login-password"
+                        label="Password"
+                        type="password"
+                        value={password}
+                        onChange={setPassword}
+                        autoComplete="current-password"
+                        onKeyDown={(e) => handleKeyDown(e, 'password')}
+                        inputRef={passwordRef}
+                      />
+
+                      <AnimatePresence>
+                        {error && (
+                          <motion.p
+                            key={error}
+                            id="login-error"
+                            role="alert"
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.2, ease: EASE }}
+                            className="font-sans text-[14px] font-medium leading-relaxed text-[var(--text-inverse)]"
+                          >
+                            {error}
+                          </motion.p>
+                        )}
+                      </AnimatePresence>
+
+                      <motion.button
+                        type="submit"
+                        disabled={loading}
+                        whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
+                        transition={{ duration: 0.1 }}
+                        className="group w-full btn-aethria-solid !bg-[var(--color-paper)] !text-[var(--color-oxford)] hover:!bg-[var(--text-inverse)] disabled:opacity-40"
+                      >
+                        <span className="flex items-center justify-center">
+                          {loading ? (
+                            <motion.span
+                              animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
+                              transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                            >
+                              Authenticating...
+                            </motion.span>
+                          ) : (
+                            <>
+                              <span>Enter</span>
+                              <span
+                                className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
+                                aria-hidden
+                              >
+                                <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </motion.button>
+                    </form>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
           )}
         </AnimatePresence>
 
@@ -405,147 +617,35 @@ export default function LoginPage() {
 
               {/* The optional activity request must never gate entry. */}
               <motion.button
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
-                  whileTap={reduceMotion ? {} : { scale: 0.97 }}
-                  onClick={handleEnterSystem}
-                  disabled={entering}
-                  className="group btn-aethria-solid"
-                  style={{ padding: '0 72px' }}
-                >
-                  <span className="flex items-center justify-center">
-                    <span>Enter Aethria</span>
-                    <span
-                      className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
-                      aria-hidden
-                    >
-                      <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
-                    </span>
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+                onClick={handleEnterSystem}
+                disabled={entering}
+                className="group btn-aethria-solid"
+                style={{ padding: '0 72px' }}
+              >
+                <span className="flex items-center justify-center">
+                  <span>Enter Aethria</span>
+                  <span
+                    className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
+                    aria-hidden
+                  >
+                    <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
                   </span>
+                </span>
               </motion.button>
             </motion.div>
-          ) : (
-            <motion.div
-              key="form-view"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
-              transition={{ duration: 0.6, ease: EASE, delay: 0.2 }}
-              className="w-full max-w-[420px]"
-            >
-              <form
-                onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
-                className="flex flex-col"
-                noValidate
-              >
-                {/* Inputs live in a hairline band — the same construction as the
-                    home page's doors band. No boxes; the rules do the framing. */}
-                <div
-                  ref={formShakeRef}
-                  className="mb-phi-7 flex w-full flex-col gap-phi-6 border-y border-oxford/[0.12] py-phi-6"
-                >
-                  <div className="flex flex-col">
-                    <label
-                      htmlFor="login-identifier"
-                      className="type-label-section mb-phi-2"
-                    >
-                      Email or username
-                    </label>
-                    <AnimatedInput
-                      id="login-identifier"
-                      type="text"
-                      autoComplete="username"
-                      value={username}
-                      focused={usernameFocused}
-                      onChange={(e) => setUsername(e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e as React.KeyboardEvent, 'username')}
-                      onFocus={() => setUsernameFocused(true)}
-                      onBlur={() => setUsernameFocused(false)}
-                      aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/60 tracking-0"
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <label
-                      htmlFor="login-password"
-                      className="type-label-section mb-phi-2"
-                    >
-                      Password
-                    </label>
-                    <AnimatedInput
-                      ref={passwordRef}
-                      id="login-password"
-                      type="password"
-                      autoComplete="current-password"
-                      value={password}
-                      focused={passwordFocused}
-                      onChange={(e) => setPassword(e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(e as React.KeyboardEvent, 'password')}
-                      onFocus={() => setPasswordFocused(true)}
-                      onBlur={() => setPasswordFocused(false)}
-                      aria-describedby={error ? 'login-error' : undefined}
-                      className="w-full bg-transparent border-0 py-phi-3 font-sans text-sm text-oxford outline-none placeholder:text-oxford/60 tracking-0"
-                    />
-                  </div>
-                </div>
-
-                {/* Error — slides down into view, keyed so re-triggering replays */}
-                <AnimatePresence>
-                  {error && (
-                    <motion.p
-                      key={error}
-                      id="login-error"
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2, ease: EASE }}
-                      className="type-meta mb-phi-6 text-center text-escalation"
-                    >
-                      {error}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-
-                {/* Submit — press scale + breathing pulse when loading */}
-                <motion.button
-                  type="submit"
-                  disabled={loading}
-                  whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
-                  transition={{ duration: 0.1 }}
-                  className="group w-full btn-aethria-solid disabled:opacity-40"
-                >
-                  <span className="flex items-center justify-center">
-                    {loading ? (
-                      <motion.span
-                        animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
-                        transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                      >
-                        Authenticating...
-                      </motion.span>
-                    ) : (
-                      <>
-                        <span>Enter Aethria</span>
-                        <span
-                          className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
-                          aria-hidden
-                        >
-                          <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
-                        </span>
-                      </>
-                    )}
-                  </span>
-                </motion.button>
-              </form>
-            </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </motion.div>
+      )}
 
       {/* Footer */}
       <motion.footer
         initial={{ opacity: 0 }}
-        animate={{ opacity: entering ? 0 : 1 }}
+        animate={{ opacity: entering || showIntro ? 0 : 1 }}
         transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 1 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >

@@ -292,7 +292,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
               />
             </section>
 
-            <aside className="hidden min-h-0 min-w-0 flex-col overflow-hidden bg-paper lg:flex lg:pl-phi-4" aria-live="polite">
+            <aside className="hidden min-h-0 min-w-0 flex-col overflow-visible bg-paper lg:flex lg:pl-phi-4" aria-live="polite">
               {selectedStartup && memoStartup ? (
                 <div className="memoShellContent memoShellContent--workspace min-h-0 min-w-0 w-full flex-1 overflow-y-auto overflow-x-hidden bg-paper px-phi-0 pt-phi-3 pb-phi-6">
                   <motion.div

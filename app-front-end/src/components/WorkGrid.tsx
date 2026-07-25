@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import type { ReactElement } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -24,7 +25,6 @@ import {
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { productInteraction } from '../design-system/productSystem';
-import { QUEUE_ROW_LAYOUT_TRANSITION } from './queue/queueRowMotion';
 import {
   buildQueueRowContext,
   getVisibleRecommendation,
@@ -163,7 +163,7 @@ const WorkGrid = ({
   onViewCounts,
   entranceReady = true,
   onEntranceComplete,
-}: WorkGridProps): JSX.Element => {
+}: WorkGridProps): ReactElement => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -507,8 +507,6 @@ const WorkGrid = ({
               return (
                 <motion.div
                   key={model.startup.id}
-                  layout={!reduceMotion}
-                  transition={reduceMotion ? undefined : QUEUE_ROW_LAYOUT_TRANSITION}
                   variants={rowVariants}
                   className="min-w-0"
                 >

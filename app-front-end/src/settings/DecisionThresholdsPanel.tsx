@@ -44,7 +44,7 @@ function ThresholdHandle({
   min: number;
   max: number;
   variant: 'tick' | 'divider';
-  barRef: React.RefObject<HTMLDivElement>;
+  barRef: React.RefObject<HTMLDivElement | null>;
   onChange: (patch: Partial<DecisionThresholdBoundaries>) => void;
 }) {
   const setFromPointer = (event: PointerEvent<HTMLButtonElement>) => {

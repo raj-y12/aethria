@@ -7,17 +7,17 @@
 
 .memoPanel {
   --memo-font-display: var(--font-display, "Playfair Display", Georgia, serif);
-  --memo-font-sans: var(--font-sans, "Figtree Variable", system-ui, sans-serif);
+  --memo-font-sans: var(--font-sans, "Instrument Sans", system-ui, sans-serif);
   --memo-font-mono: var(--font-mono, "Space Mono", ui-monospace, monospace);
-  --memo-paper: var(--color-paper, #f4f1ea);
+  --memo-paper: var(--color-paper, #D9D7D4);
   --memo-ink: rgba(var(--color-oxford-rgb), 0.9);
   --memo-ink-body: rgba(var(--color-oxford-rgb), 0.82);
   --memo-ink-muted: rgba(var(--color-oxford-rgb), 0.6);
-  --memo-ink-faint: rgba(var(--color-oxford-rgb), 0.38);
+  --memo-ink-faint: rgba(var(--color-oxford-rgb), 0.5);
   --memo-rule: rgba(var(--color-oxford-rgb), 0.1);
   --memo-rule-strong: rgba(var(--color-oxford-rgb), 0.22);
   --memo-wash: rgba(var(--color-oxford-rgb), 0.035);
-  --memo-accent: var(--color-accent, #7d2b3a);
+  --memo-accent: var(--color-escalation, #6E2A3C);
   --memo-gutter: clamp(24px, 5.5cqi, 58px);
   --memo-section-space: clamp(54px, 8cqi, 82px);
   --memo-body-size: clamp(0.875rem, 0.83rem + 0.16cqi, 1rem);
@@ -83,7 +83,7 @@
   flex: 0 0 auto;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -115,9 +115,8 @@
   max-width: 40rem;
   margin: 15px 0 0;
   color: rgba(var(--color-oxford-rgb), 0.64);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1rem, 0.94rem + 0.3cqi, 1.2rem);
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -126,7 +125,7 @@
   margin: 12px 0 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -151,7 +150,7 @@
   color: var(--memo-ink-muted);
   background: transparent;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.3;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -183,7 +182,7 @@
   position: relative;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.08em;
 }
@@ -208,7 +207,7 @@
 }
 
 .memoGateStrip--error {
-  border-color: rgba(125, 43, 58, 0.3);
+  border-color: rgba(110, 42, 60, 0.3);
 }
 
 .memoGateStripInner {
@@ -228,7 +227,7 @@
 .memoPipelineKicker {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -310,7 +309,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -337,7 +336,7 @@
   max-width: 42rem;
   margin: clamp(20px, 3cqi, 30px) 0 0;
   color: rgba(var(--color-oxford-rgb), 0.82);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.125rem, 1rem + 0.65cqi, 1.45rem);
   line-height: 1.48;
   letter-spacing: -0.012em;
@@ -348,7 +347,7 @@
 .memoDossierStat {
   margin: clamp(14px, 2cqi, 20px) 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: clamp(1.3rem, 1.2rem + 0.5cqi, 1.55rem);
   font-weight: 500;
   line-height: 1.25;
@@ -360,7 +359,7 @@
   margin: 12px 0 0;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.7;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -377,9 +376,8 @@
 .memoDossierCallout > p:last-child {
   margin: 7px 0 0;
   color: var(--memo-ink-body);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.9375rem;
-  font-style: italic;
   line-height: 1.5;
 }
 
@@ -395,7 +393,6 @@
   color: var(--memo-ink);
   font-family: var(--memo-font-display);
   font-size: clamp(1.45rem, 1.2rem + 1.15cqi, 2rem);
-  font-style: italic;
   line-height: 1.38;
   letter-spacing: -0.018em;
   text-wrap: pretty;
@@ -437,7 +434,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -524,7 +521,7 @@
 .memoPrecedentOpen {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
 }
 
@@ -615,7 +612,7 @@
   padding-top: 7px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.08em;
 }
@@ -680,7 +677,7 @@
   margin: 0 0 12px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -702,7 +699,7 @@
 .memoDecisionMeta {
   margin: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -726,7 +723,7 @@
 .memoDecisionRecommendation {
   margin: 5px 0 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -822,7 +819,7 @@
   padding: 16px 0;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.45;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -843,7 +840,7 @@
 .memoDecisionHistoryDecision {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1.2rem;
   line-height: 1.2;
 }
@@ -938,7 +935,7 @@
   min-height: 42px;
   border-radius: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.065em;
   text-transform: uppercase;
 }
@@ -1053,7 +1050,7 @@
   background: transparent;
   color: var(--memo-ink-muted);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   letter-spacing: 0.055em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1089,7 +1086,7 @@
 .memoSnapshotLabel {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.55;
   letter-spacing: 0.065em;
   text-transform: uppercase;
@@ -1098,7 +1095,7 @@
 .memoSnapshotText {
   margin: 0;
   color: var(--memo-ink-body);
-  font-size: 0.8125rem;
+  font-size: 0.875rem;
   line-height: 1.58;
   overflow-wrap: anywhere;
 }
@@ -1156,7 +1153,7 @@
 .memoKillerRank {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.6;
 }
 
@@ -1209,7 +1206,7 @@
 .memoScoreSub {
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.045em;
 }
@@ -1265,13 +1262,29 @@
 }
 
 .memoScoreVal {
-  font-family: var(--memo-font-mono);
-  font-size: 0.75rem;
+  font-family: var(--memo-font-display);
+  font-size: 1rem;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .memoScoreVal--muted {
   color: var(--memo-ink-muted);
+}
+
+/* "Not scored" is a word, not a numeral — the 16px Playfair treatment above is
+   sized for single digits and overflows the fixed 46px/44px column with a real
+   word. Fall back to the mono micro-label voice used for other muted states so
+   it reads as "no data" and wraps cleanly inside the track instead of spilling
+   into .memoScoreTake. */
+.memoScoreVal--unscored {
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.625rem;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  font-variant-numeric: normal;
 }
 
 .memoScoreTake {
@@ -1333,7 +1346,6 @@
 
 .memoScoreEvidenceNote {
   margin: 0;
-  font-style: italic;
 }
 
 .memoScoreMoat,
@@ -1354,7 +1366,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1376,7 +1388,7 @@
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
 }
 
@@ -1504,7 +1516,7 @@
 .memoEvRiskTitle {
   margin: 0;
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 1rem;
   line-height: 1.42;
 }
@@ -1601,7 +1613,7 @@
   background: var(--memo-paper);
   color: var(--memo-ink);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.4;
   letter-spacing: 0.075em;
   text-transform: uppercase;
@@ -1649,7 +1661,7 @@
   padding: 10px 16px;
   border-radius: 0;
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.35;
   letter-spacing: 0.065em;
   text-transform: uppercase;
@@ -1657,7 +1669,7 @@
 }
 
 .memoRiskAckButton {
-  border: 1px solid rgba(125, 43, 58, 0.32);
+  border: 1px solid rgba(110, 42, 60, 0.32);
   background: transparent;
   color: var(--memo-accent);
 }
@@ -1698,7 +1710,7 @@
   padding: 16px 0 13px;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
-  font-size: 0.625rem;
+  font-size: 0.6875rem;
   line-height: 1.5;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -1762,7 +1774,7 @@
 
 .memoDisclosureTitle {
   color: var(--memo-ink);
-  font-family: var(--memo-font-display);
+  font-family: var(--memo-font-sans);
   font-size: 0.98rem;
   font-weight: 500;
   letter-spacing: -0.012em;

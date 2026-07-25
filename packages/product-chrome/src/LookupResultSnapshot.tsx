@@ -105,7 +105,9 @@ export default function LookupResultSnapshot({
         {verdictColor ? (
           <span
             className={cx(
-              // Match the app-front-end decision chip (VERDICT_CHIP_CLASS) exactly.
+              // Filled chip — matches the app-front-end decision chip
+              // (VERDICT_CHIP_CLASS/DecisionBadge): configured colour is the
+              // fill, with a computed contrasting ink for readability.
               'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-none font-mono font-semibold uppercase leading-none min-w-[4.25rem] px-2 py-1 text-[9px] tracking-[0.1em]',
               showCompanyName && companyName ? 'mt-2' : '',
             )}

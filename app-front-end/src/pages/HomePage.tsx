@@ -6,7 +6,8 @@ import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import type { ActivitySummary } from '../api/activity';
-import { usePrefersReducedMotion } from '../hooks';
+import { useCountUp, usePrefersReducedMotion } from '../hooks';
+import type { SpinePipelineState } from '../components/AppSpine';
 import { useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
@@ -25,16 +26,14 @@ function recOf(s: Startup): string | null {
  */
 const EASE = 'ease-[cubic-bezier(0.16,1,0.3,1)]';
 
-/** A door — one entry in the editorial nav band. Numeral, label, and a quiet reading. */
+/** A door — one entry in the editorial nav band. Label and a quiet reading. */
 function HomeDoor({
-  numeral,
   label,
   detail,
   tone = 'default',
   index,
   onClick,
 }: {
-  numeral: string;
   label: string;
   detail: string;
   tone?: 'default' | 'escalation';
@@ -70,12 +69,6 @@ function HomeDoor({
         }`}
       />
 
-      <span
-        className={`type-data relative z-10 transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[2px] text-oxford/60 group-hover:text-oxford`}
-        aria-hidden
-      >
-        {numeral}
-      </span>
       <span className="relative z-10 inline-block px-[3px]">
         <span
           className={`type-action type-action-strong block transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[1px] group-hover:text-oxford`}
@@ -97,6 +90,68 @@ function HomeDoor({
 }
 
 /**
+ * The spine's PIPELINE_TONE restated in paper values. The front door hides the
+ * spine, so this is the only place the operator can see whether the pipeline is
+ * actually running — it has to stay honest, especially about 'Issue'.
+ */
+const PIPELINE_PAPER_TONE: Record<SpinePipelineState, { dot: string; text: string }> = {
+  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/60' },
+  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/45' },
+  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/45' },
+  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/45' },
+  Issue: { dot: 'bg-escalation escalation-dot-active', text: 'text-escalation' },
+};
+
+/**
+ * The pipeline readout. role="status" so a state change is announced; when the
+ * pipeline is in trouble it becomes the route to fixing it, as the spine does.
+ */
+function PipelineIndicator({ state }: { state: SpinePipelineState }) {
+  const tone = PIPELINE_PAPER_TONE[state];
+  const dot = <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-none ${tone.dot}`} />;
+
+  // role="status" lives on the wrapper, never on the Link — it would override
+  // the link role and stop the issue route being announced as navigable.
+  return (
+    <span role="status" className={`inline-flex items-center ${tone.text}`}>
+      {state === 'Issue' ? (
+        <Link
+          to="/v1/settings"
+          className="inline-flex items-center gap-phi-2 btn-interaction transition-opacity hover:opacity-80"
+        >
+          {dot}
+          Pipeline issue
+        </Link>
+      ) : (
+        <span className="inline-flex items-center gap-phi-2">
+          {dot}
+          Pipeline {state.toLowerCase()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A caption rail — the marketing plate's vertical side furniture, carrying live
+ * state rather than decoration. Hidden below 900px exactly like the gallery's
+ * `.plate-cap-l/-r`. aria-hidden: every reading here is already spoken by the
+ * subline or the Fund door, so the rail is a visual echo, not new information.
+ */
+function HomeRail({ side, text }: { side: 'left' | 'right'; text: string }) {
+  return (
+    <span
+      aria-hidden
+      className={`pointer-events-none absolute top-1/2 z-10 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-oxford/40 [text-orientation:mixed] [writing-mode:vertical-rl] min-[900px]:block ${
+        side === 'left' ? 'left-phi-5' : 'right-phi-5'
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
  * Home — the front door as a briefing. One centered column on paper: the mark,
  * the situation spoken in serif with a since-you-left digest, the few deals on
  * the desk (the door to Flow), and two quiet doors to Portfolio and Fund.
@@ -105,7 +160,7 @@ function HomeDoor({
 export default function HomePage({ data, sinceAway }: { data: SystemData; sinceAway: ActivitySummary | null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { openDispatch, dispatchActive } = useAppFrame();
+  const { openDispatch, dispatchActive, pipelineState, pipelineStateReady } = useAppFrame();
   // What the agents did since the last visit (marks the report seen; null when
   // the login screen already presented it or nothing happened).
   const {
@@ -148,13 +203,11 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           ? 'The pipeline is working. Nothing needs you.'
           : 'The desk is clear.';
 
-  const subline = [
-    `${startups.length.toLocaleString()} in pipeline`,
-    `${openCount.toLocaleString()} open`,
-    convictionCount > 0 ? `${convictionCount.toLocaleString()} conviction` : null,
-  ]
-    .filter(Boolean)
-    .join('  ·  ');
+  // The counts settle on mount and re-settle whenever the SSE stream lands a
+  // change, so the readings visibly move as the agents work.
+  const totalUp = useCountUp(startups.length);
+  const openUp = useCountUp(openCount);
+  const convictionUp = useCountUp(convictionCount);
 
   // ── The briefing ───────────────────────────────────────────────────────────
   const attention = useMemo(() => getDeskAttention(startups), [startups]);
@@ -184,6 +237,13 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()} · ${now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
 
+  // The rails read the same state the briefing does — no separate source.
+  const railLeft = `Pipeline — ${openCount.toLocaleString()} open`;
+  const railRight =
+    mandateVersion != null
+      ? `Mandate v${mandateVersion}${mandateAmended ? ` — amended ${mandateAmended}` : ''}`
+      : 'No mandate';
+
   // First-run: no mandate published yet. Show a quiet editorial prompt.
   // We wait until the readiness check resolves (loading=false) to avoid a
   // flash for returning users — the hook defaults mandatePublished:true on
@@ -192,25 +252,39 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
-      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
+      {/* ── The plate's caption rails ── */}
+      <HomeRail side="left" text={railLeft} />
+      <HomeRail side="right" text={railRight} />
+
+      {/* sm:px-phi-7 (55px) clears the focus-frame brackets, which reach 40px
+          past the framed body; px-phi-6 (34px) would not. */}
+      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
         {/* ── The mark ── */}
         <Reveal delay={0.02} y={-6}>
-          <p className="text-center font-wordmark text-[clamp(19px,1.5vw,24px)] font-medium leading-tight text-oxford">
+          <p className="text-center font-wordmark text-[clamp(18px,1.45vw,23px)] font-medium leading-tight text-oxford">
             Aethria<span className="wordmark-dot">.</span>
           </p>
         </Reveal>
 
-        {/* ── The situation, spoken ── */}
-        <Reveal delay={0.1} className="mt-phi-7">
-          <p className="type-label-section text-center tabular-nums">
-            {eyebrow}
+        {/* ── The dateline + pipeline readout. No rule — the headline carries the page. ── */}
+        <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
+          <p className="type-label-section flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
+            <span>{eyebrow}</span>
+            {pipelineStateReady && (
+              <>
+                <span aria-hidden className="text-oxford/20">·</span>
+                <PipelineIndicator state={pipelineState} />
+              </>
+            )}
           </p>
         </Reveal>
 
+        {/* ── The framed briefing — the login page's bracket move ── */}
+        <div className="focus-frame mt-phi-4 flex w-full max-w-[42rem] flex-col items-center">
         {showFirstRun ? (
           <>
-            <Reveal delay={0.16} y={10} className="mt-phi-5">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Define your mandate.
               </h1>
             </Reveal>
@@ -232,15 +306,23 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
           </>
         ) : (
           <>
-            <Reveal delay={0.16} y={10} className="mt-phi-5">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.6vw,58px)] font-medium leading-[1.06] tracking-[-0.015em] text-oxford">
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 {headline}
               </h1>
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-meta text-center tabular-nums">
-                {subline}
+              <p className="type-meta flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 text-center tabular-nums">
+                <span>{totalUp.toLocaleString()} in pipeline</span>
+                <span aria-hidden className="text-oxford/20">·</span>
+                <span>{openUp.toLocaleString()} open</span>
+                {convictionCount > 0 && (
+                  <>
+                    <span aria-hidden className="text-oxford/20">·</span>
+                    <span>{convictionUp.toLocaleString()} conviction</span>
+                  </>
+                )}
               </p>
             </Reveal>
 
@@ -313,14 +395,12 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                 aria-label="Workspaces"
               >
                 <HomeDoor
-                  numeral="III"
                   label="Portfolio"
                   detail={`${convictionCount} conviction · ${watchTotal} watching`}
                   index={0}
                   onClick={() => navigate('/v1/portfolio')}
                 />
                 <HomeDoor
-                  numeral="IV"
                   label="Fund"
                   detail={
                     mandateVersion != null
@@ -334,6 +414,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
             </div>
           </>
         )}
+        </div>
 
         {/* ── The footer bar — Dispatch's micro-action language ── */}
         <Reveal delay={0.36} className="mt-phi-7">

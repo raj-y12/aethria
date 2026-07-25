@@ -809,7 +809,7 @@ export default function SettingsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
           >
-            <div className="mb-phi-5 border border-oxford/[0.08] lg:hidden">
+            <div className="mb-phi-5 border border-oxford/[0.16] lg:hidden">
               <OperationsStrip
                 variant="bar"
                 settings={settings}

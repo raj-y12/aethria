@@ -285,7 +285,7 @@ describe('Settings safe draft actions', () => {
       mandate: { ...liveConfiguration.mandate, fundName: 'Retryable Fund' },
     };
     const deployedSettings = { ...settings, fund_config: deployedConfiguration };
-    mocks.fetchSettings.mockResolvedValue(deployedSettings);
+    mocks.fetchSettings.mockResolvedValueOnce(settings).mockResolvedValue(deployedSettings);
     mocks.patchSettings.mockResolvedValue({ data: deployedSettings });
     mocks.publishPolicy
       .mockRejectedValueOnce(new Error('Policy service unavailable'))
@@ -329,7 +329,7 @@ describe('Settings safe draft actions', () => {
       mandate: { ...liveConfiguration.mandate, fundName: 'Checkpoint Fund' },
     };
     const checkpointSettings = { ...settings, fund_config: checkpointConfiguration };
-    mocks.fetchSettings.mockResolvedValue(checkpointSettings);
+    mocks.fetchSettings.mockResolvedValueOnce(settings).mockResolvedValue(checkpointSettings);
     mocks.patchSettings.mockResolvedValue({ data: checkpointSettings });
     mocks.publishPolicy
       .mockRejectedValueOnce(new Error('Policy service unavailable'))

@@ -5,5 +5,7 @@ export const institutionalAccessFooterClass =
   'type-label-section m-0';
 
 export default function AuthInstitutionalFooter() {
-  return <p className={institutionalAccessFooterClass}>{INSTITUTIONAL_ACCESS_COPY}</p>;
+  return (
+    <p className={institutionalAccessFooterClass}>{INSTITUTIONAL_ACCESS_COPY}</p>
+  );
 }

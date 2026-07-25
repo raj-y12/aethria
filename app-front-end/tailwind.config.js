@@ -17,41 +17,38 @@ export default {
     },
     extend: {
       colors: {
-        oxford: '#001433',
-        paper: '#f4f1ea',
+        oxford: '#0a1629',
+        paper: '#D9D7D4',
         /** Darker paper — WorkGrid selected row, etc. See --color-paper-deep */
         paperDeep: 'var(--color-paper-deep)',
-        'paper-bright': '#f8f5ee',
-        ivory: '#f4f1ea',
-        canvas: '#f4f1ea',
-        charcoal: '#26313f',
-        mist: '#f2f4f8',
+        'paper-bright': '#E1DFDC',
+        ivory: '#D9D7D4',
+        canvas: '#D9D7D4',
+        charcoal: '#1c2836',
+        mist: '#E1DFDC',
         /** Legacy alias — same family as oxford (avoid cool neutral ink). */
-        graphite: '#001433',
+        graphite: '#0a1629',
         /** Structural hairlines — prefer over raw oxford/[0.06] in new code. */
-        hairline: 'rgba(0, 20, 51, 0.06)',
-        'hairline-strong': 'rgba(0, 20, 51, 0.12)',
+        hairline: 'rgba(10, 22, 41, 0.06)',
+        'hairline-strong': 'rgba(10, 22, 41, 0.12)',
         /** Inputs, fields, subtle dividers. */
-        'field-border': 'rgba(0, 20, 51, 0.15)',
-        'field-border-strong': 'rgba(0, 20, 51, 0.20)',
+        'field-border': 'rgba(10, 22, 41, 0.15)',
+        'field-border-strong': 'rgba(10, 22, 41, 0.20)',
         /** On-demand lookup origin chip — semantic, not raw hex in components. */
         lookup: {
-          DEFAULT: '#B5893E',
-          surface: '#E8D7B4',
-          ink: '#3D2A12',
+          DEFAULT: '#8C7A4E',
+          surface: '#D6D0BE',
+          ink: '#2C2514',
         },
         /** Escalation / human-attention only — matches tokens.color.accent. */
-        escalation: '#7D2B3A',
+        escalation: '#6E2A3C',
         /** Escalation on dark (oxford) chrome — same hue, lifted for contrast. */
-        'escalation-bright': '#C97B6A',
+        'escalation-bright': '#BF7583',
         /** Wordmark dot — verdigris; not for status semantics. */
         'brand-mark': '#3d6b5e',
         'brand-mark-inverse': '#7aab9a',
-        /** Decorative — aligned with web-front-end. */
-        gold: '#a88a5e',
-        'gold-soft': 'rgba(168, 138, 94, 0.35)',
         /** Validation strip: same as paper (palette whitelist). */
-        warning: '#f4f1ea',
+        warning: '#D9D7D4',
         /** See :root --color-register-tint */
         registerTint: 'var(--color-register-tint)',
         /** Judgment-surface layering — maps to tokens.surface + index.css */

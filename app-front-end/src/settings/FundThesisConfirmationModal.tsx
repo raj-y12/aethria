@@ -98,11 +98,11 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.32 }}
-              className="mt-phi-7 min-w-0 w-full max-w-3xl border border-oxford/10 bg-paper"
+              className="focus-frame mt-phi-7 min-w-0 w-full max-w-3xl bg-paper"
             >
               <div
                 data-testid="desktop-comparison-headings"
-                className="hidden gap-x-phi-4 border-b border-oxford/[0.08] px-phi-5 py-phi-3 md:grid md:grid-cols-[minmax(9rem,22%)_minmax(0,1fr)_minmax(0,1fr)]"
+                className="hidden gap-x-phi-4 border-b border-oxford/[0.16] px-phi-5 py-phi-3 md:grid md:grid-cols-[minmax(9rem,22%)_minmax(0,1fr)_minmax(0,1fr)]"
               >
                 <span aria-hidden />
                 <p className="type-label-section text-oxford/55">Currently live</p>

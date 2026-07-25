@@ -105,7 +105,7 @@ export default function SettingsActionDialog({
           aria-modal="true"
           aria-labelledby={titleId}
           aria-describedby={descriptionId}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-paper p-phi-6"
+          className="paper-dot-grid fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-paper p-phi-6"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

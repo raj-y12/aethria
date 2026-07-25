@@ -47,6 +47,11 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
     let rafAssembly = 0;
     let cancelled = false;
     let cleanupResize: (() => void) | undefined;
+    let cleanupPointer: (() => void) | undefined;
+    // Cursor probe — the field reacts to where the reader is looking. Pointer devices only.
+    const hoverEnabled =
+      typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+    const pointer = { x: -1, y: -1, active: false };
 
     fetch(worldUrl)
       .then((r) => r.json())
@@ -177,6 +182,26 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
           return;
         }
 
+        // The reader's cursor probes the market: nearby dots warm to verdigris and
+        // faint lines reach toward the closest in-thesis names.
+        if (hoverEnabled && fx) {
+          const onMove = (e: PointerEvent) => {
+            const rect = fx.getBoundingClientRect();
+            pointer.x = e.clientX - rect.left;
+            pointer.y = e.clientY - rect.top;
+            pointer.active = true;
+          };
+          const onLeave = () => {
+            pointer.active = false;
+          };
+          fx.addEventListener('pointermove', onMove);
+          fx.addEventListener('pointerleave', onLeave);
+          cleanupPointer = () => {
+            fx.removeEventListener('pointermove', onMove);
+            fx.removeEventListener('pointerleave', onLeave);
+          };
+        }
+
         // Scout arcs shoot toward the hits; each landing pushes that hit's green
         // spread one step further out through the dot grid. Untouched, it decays back.
         const GROW_STEP = () => maxR * 0.22; // radius gained per arc landing
@@ -252,20 +277,72 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
               fxctx!.fill();
             });
           });
-          // in-thesis hits with pulse
+          // in-thesis hits with pulse — a soft glow, an expanding ring, a solid core
           targets.forEach((t) => {
             if (!t) return;
+            const glow = fxctx!.createRadialGradient(t[0], t[1], 0, t[0], t[1], 16);
+            glow.addColorStop(0, `rgba(${ACCENT_RGB},0.22)`);
+            glow.addColorStop(1, `rgba(${ACCENT_RGB},0)`);
+            fxctx!.beginPath();
+            fxctx!.arc(t[0], t[1], 16, 0, 6.283);
+            fxctx!.fillStyle = glow;
+            fxctx!.fill();
             const r = 6 + 6 * Math.abs(Math.sin(ts / 700));
             fxctx!.beginPath();
             fxctx!.arc(t[0], t[1], r, 0, 6.283);
-            fxctx!.strokeStyle = `rgba(${ACCENT_RGB},${0.4 - (r - 6) / 30})`;
+            fxctx!.strokeStyle = `rgba(${ACCENT_RGB},${0.45 - (r - 6) / 26})`;
             fxctx!.lineWidth = 1;
             fxctx!.stroke();
             fxctx!.beginPath();
-            fxctx!.arc(t[0], t[1], 3.2, 0, 6.283);
+            fxctx!.arc(t[0], t[1], 3.4, 0, 6.283);
             fxctx!.fillStyle = ACCENT;
             fxctx!.fill();
           });
+
+          // cursor probe layer — warms nearby land, reaches to the closest hits
+          if (pointer.active) {
+            const CR = Math.max(100, Math.min(W, H) * 0.17);
+            const CR2 = CR * CR;
+            for (const p of info.landPts) {
+              const dx = p[0] - pointer.x;
+              const dy = p[1] - pointer.y;
+              if (dx < -CR || dx > CR || dy < -CR || dy > CR) continue;
+              const d2 = dx * dx + dy * dy;
+              if (d2 > CR2) continue;
+              const a = 0.55 * (1 - Math.sqrt(d2) / CR);
+              if (a < 0.03) continue;
+              fxctx!.beginPath();
+              fxctx!.arc(p[0], p[1], 1.35, 0, 6.283);
+              fxctx!.fillStyle = `rgba(${ACCENT_RGB},${a})`;
+              fxctx!.fill();
+            }
+            const reach = Math.max(W, H) * 0.62;
+            targets
+              .filter((t): t is Pt => !!t)
+              .map((t) => ({ t, d: Math.hypot(t[0] - pointer.x, t[1] - pointer.y) }))
+              .sort((a, b) => a.d - b.d)
+              .slice(0, 3)
+              .forEach(({ t, d }) => {
+                const a = 0.34 * (1 - d / reach);
+                if (a <= 0.01) return;
+                fxctx!.beginPath();
+                fxctx!.moveTo(pointer.x, pointer.y);
+                fxctx!.lineTo(t[0], t[1]);
+                fxctx!.strokeStyle = `rgba(${ACCENT_RGB},${a})`;
+                fxctx!.lineWidth = 1;
+                fxctx!.stroke();
+              });
+            fxctx!.beginPath();
+            fxctx!.arc(pointer.x, pointer.y, 5.5, 0, 6.283);
+            fxctx!.strokeStyle = `rgba(${ACCENT_RGB},0.6)`;
+            fxctx!.lineWidth = 1;
+            fxctx!.stroke();
+            fxctx!.beginPath();
+            fxctx!.arc(pointer.x, pointer.y, 2, 0, 6.283);
+            fxctx!.fillStyle = ACCENT;
+            fxctx!.fill();
+          }
+
           raf = requestAnimationFrame(frame);
         };
 
@@ -341,6 +418,7 @@ export default function DottedMarketMap({ hits = [], echo = false, className }: 
       cancelAnimationFrame(raf);
       cancelAnimationFrame(rafAssembly);
       cleanupResize?.();
+      cleanupPointer?.();
     };
   }, [echo, reduce, hits]);
 

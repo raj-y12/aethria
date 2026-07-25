@@ -11,7 +11,7 @@ export default function SettingsMobileNav({
 }) {
   return (
     <nav
-      className="sticky top-0 z-20 border-b border-oxford/[0.08] bg-paper px-phi-5 py-phi-2 lg:hidden"
+      className="sticky top-0 z-20 border-b border-oxford/[0.16] bg-paper px-phi-5 py-phi-2 lg:hidden"
       aria-label="Settings navigation"
     >
       <label htmlFor="settings-mobile-section" className="sr-only">Settings section</label>
