@@ -28,6 +28,7 @@ from evidence.service import detect_prompt_injection
 from identity.models import IdentityAdmission, SourceObservationInput
 from tenant_context import require_user_id
 from triage.models import TriageDisposition
+from agents.canonical import DeterministicPartner, EvidenceReviewer
 
 
 @dataclass(frozen=True)
@@ -175,9 +176,15 @@ class OpportunityPipeline:
             policy=prerequisites.policy,
             thesis_version_id=prerequisites.thesis_version_id,
         )
+        evidence_review = EvidenceReviewer().review(evaluation)
+        partner_route = DeterministicPartner().route(evaluation, evidence_review)
         return PipelineResult(
             status="completed", code="opportunity_evaluated", user_id=uid,
             opportunity_id=admission.opportunity_id, company_id=admission.company_id,
             observation_id=admission.observation_id, evaluation=evaluation,
-            metadata={"artifact_ids": artifact_ids},
+            metadata={
+                "artifact_ids": artifact_ids,
+                "evidence_review": evidence_review.model_dump(mode="json"),
+                "partner_route": partner_route.model_dump(mode="json"),
+            },
         )
