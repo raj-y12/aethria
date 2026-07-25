@@ -448,5 +448,6 @@ class AuthorityRepository:
         await self._outbox(conn, user_id=uid, aggregate_type="opportunity", aggregate_id=opportunity,
             event_type="opportunity.workflow_changed", payload={"opportunity_id": opportunity,
             "workflow_state": record.state.value, "workflow_version": record.version,
-            "transition_id": transition, "block_code": block_code})
+            "transition_id": transition, "block_code": block_code,
+            "rollout_version": rollout.version})
         return record
