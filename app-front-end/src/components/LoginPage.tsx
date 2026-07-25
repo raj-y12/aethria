@@ -23,8 +23,22 @@ const EASE = [0.16, 1, 0.3, 1] as const;
  * field, so it stays short and any key or pointer skips it outright.
  */
 const INTRO_MS = 1150;
+/**
+ * Gentler than EASE for the morph. EASE ([0.16,1,0.3,1]) front-loads almost all
+ * its travel, which is right for a short slide but reads as a lurch when it is
+ * moving and resizing a 96px wordmark across the page.
+ */
+const MORPH_EASE = [0.32, 0.72, 0, 1] as const;
 /** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
 const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
+/**
+ * One size for the plate mark and the sign-in mark, deliberately shared. When
+ * the two differ, Framer has to animate the size change as a transform scale,
+ * which stretches the glyphs for the length of the morph. Matching them makes
+ * the handoff pure translation, so the mark stays crisp the whole way. Change
+ * this in one place or the morph stops being free.
+ */
+const WORDMARK_SIZE = 'text-[clamp(2.6rem,6vw,4rem)]';
 
 function LoginField({
   id,
@@ -310,41 +324,53 @@ export default function LoginPage() {
         className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(28px, 6vw, 72px)' }}
       >
-      {/* Default AnimatePresence mode on purpose: the plate and the sign-in
-          frame must overlap for one commit so Framer can hand the wordmark
-          across. mode="wait" would unmount the source first and kill the morph. */}
-      <AnimatePresence>
-      {showIntro ? (
-        <motion.div
-          key="intro"
-          /* Absolute so the exiting plate leaves the flex flow immediately —
-             in normal flow it would occupy space through its 400ms fade and
-             shove the sign-in frame down, then snap it back. */
-          className="absolute inset-0 flex flex-col items-center justify-center"
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.4, ease: EASE }}
-        >
-          <div className="focus-frame">
-            <motion.h1
-              layoutId={WORDMARK_LAYOUT_ID}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.52, ease: EASE }}
-              className="font-wordmark m-0 text-center text-[clamp(2.6rem,6vw,4rem)] font-medium leading-[0.9] tracking-[-0.02em] text-oxford"
+      {/* ── The arrival plate ──
+          Absolute so it never occupies flex flow; in flow it shoved the frame
+          down on swap. The brackets and the mark are siblings, not nested: the
+          brackets linger to fade out on their own, while the mark unmounts the
+          instant the frame mounts so Framer can hand it across untouched. Nest
+          them and the brackets' fade would dim the mark mid-morph. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <AnimatePresence>
+          {showIntro && (
+            <motion.span
+              key="intro-brackets"
+              aria-hidden
+              className="focus-frame focus-frame--centered"
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.34, ease: EASE }}
             >
-              Aethria
-              <motion.span
-                className="wordmark-dot inline-block"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.2, ease: EASE, delay: 0.38 }}
-              >
-                .
-              </motion.span>
-            </motion.h1>
-          </div>
-        </motion.div>
-      ) : (
+              {/* A ghost of the mark sizes the bracket box exactly, without the
+                  brackets ever becoming the mark's parent. */}
+              <span className={`invisible font-wordmark ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em]`}>
+                Aethria.
+              </span>
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {showIntro && (
+          <motion.h1
+            layoutId={WORDMARK_LAYOUT_ID}
+            initial={{ y: 18 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.7, ease: EASE }}
+            className={`font-wordmark m-0 text-center ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em] text-oxford`}
+          >
+            Aethria
+            <motion.span
+              className="wordmark-dot inline-block"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ duration: 0.28, ease: EASE, delay: 0.42 }}
+            >
+              .
+            </motion.span>
+          </motion.h1>
+        )}
+      </div>
+
+      {!showIntro && (
       <motion.div
         key="main"
         className="w-full max-w-[42rem] flex flex-col items-center"
@@ -436,8 +462,8 @@ export default function LoginPage() {
               <div className="flex w-full flex-col items-center mb-phi-6">
                 <motion.h1
                   layoutId={WORDMARK_LAYOUT_ID}
-                  transition={reduceMotion ? { duration: 0 } : { duration: 0.62, ease: EASE }}
-                  className="font-wordmark text-center text-[clamp(56px,9vw,96px)] font-medium text-oxford leading-[0.9] m-0 tracking-[-0.02em]"
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: MORPH_EASE }}
+                  className={`font-wordmark m-0 text-center ${WORDMARK_SIZE} font-medium leading-[0.9] tracking-[-0.02em] text-oxford`}
                 >
                   Aethria<span className="wordmark-dot">.</span>
                 </motion.h1>
@@ -617,7 +643,6 @@ export default function LoginPage() {
         </AnimatePresence>
       </motion.div>
       )}
-      </AnimatePresence>
 
       {/* Footer */}
       <motion.footer

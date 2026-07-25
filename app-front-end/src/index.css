@@ -780,6 +780,18 @@
     opacity: 1;
   }
 }
+/* Bracket box that centres itself over its container instead of wrapping
+   content. Lets the brackets sit beside the thing they frame rather than
+   around it — needed on the sign-in arrival plate, where the wordmark hands
+   off to a shared-layout morph and must not inherit the brackets' fade.
+   An explicit modifier because base .focus-frame sets position:relative and is
+   declared after Tailwind's utilities, so `absolute` alone loses. */
+.focus-frame--centered {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
 
 /* Dispatch idle-placeholder caret — ported from web-front-end's `.query-caret`,
    a blinking solid block after the "› look up …" prompt voice. Decorative only. */
