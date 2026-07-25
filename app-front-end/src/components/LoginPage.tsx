@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router';
 import { useSignIn, useUser, useClerk } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePrefersReducedMotion } from '../hooks';
-import { FRONT_DOOR_WORDMARK } from '../design-system/wordmark';
 import AuthInstitutionalFooter from './AuthInstitutionalFooter';
 import ActivityStatsRow, { activityStatsFromSummary } from './ActivityStatsRow';
 import {
@@ -32,8 +31,14 @@ const INTRO_MS = 1150;
 const MORPH_EASE = [0.32, 0.72, 0, 1] as const;
 /** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
 const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
-/** Shared with Home so every front-door mark matches — see design-system/wordmark. */
-const WORDMARK_FACE = `${FRONT_DOOR_WORDMARK.face} ${FRONT_DOOR_WORDMARK.size}`;
+/**
+ * The sign-in mark. The arrival plate and the sign-in frame must render it at
+ * exactly this size: when the two differ, Framer animates the difference as a
+ * transform scale, which stretches the glyphs for the length of the morph.
+ * Matching them keeps the handoff pure translation, so the mark stays crisp.
+ */
+const WORDMARK_FACE =
+  'font-wordmark font-medium leading-[0.9] tracking-[-0.02em] text-[clamp(56px,9vw,96px)]';
 
 function LoginField({
   id,
