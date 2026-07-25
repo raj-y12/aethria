@@ -1239,6 +1239,9 @@ app.include_router(_decisions_router.router)
 from routers import portfolio as _portfolio_router  # noqa: E402
 
 app.include_router(_portfolio_router.router)
+from routers import imports as _imports_router  # noqa: E402
+
+app.include_router(_imports_router.router)
 from routers import monitoring as _monitoring_router  # noqa: E402
 
 app.include_router(_monitoring_router.router)
