@@ -352,7 +352,7 @@ export default function DecisionThresholdsPanel({
         </div>
       </div>
 
-      <div className="grid gap-phi-5 border-t border-oxford/[0.055] pt-phi-5 sm:grid-cols-2">
+      <div className="grid gap-phi-7 pt-phi-5 sm:grid-cols-2">
         <ScoreInput
           id="stale-after"
           label="Stale after (hours)"

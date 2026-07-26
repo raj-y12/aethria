@@ -222,6 +222,7 @@
 }
 .settings-gallery-section {
   position: relative;
+  padding-block: var(--space-8);
 }
 .settings-gallery-section::before,
 .settings-gallery-section::after {
@@ -246,9 +247,8 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-4);
-  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.16);
   padding-bottom: var(--space-4);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-7);
 }
 .settings-gallery-plate-head h1 {
   margin: 0;

@@ -258,7 +258,7 @@ function RoomSection({
 
 function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
+    <div className="grid gap-phi-4 py-phi-6 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
       <p className="type-label-section pt-phi-2 text-xs text-oxford/70">{label}</p>
       <div className="min-w-0">{children}</div>
     </div>
@@ -282,7 +282,7 @@ function EditorialStatus({
       ? 'bg-escalation/75'
       : 'bg-oxford/30';
   return (
-    <div className="grid gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.05] py-phi-3 last:border-b-0 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
+    <div className="grid gap-x-phi-4 gap-y-phi-2 py-phi-4 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
       <p className="type-label-section text-xs text-oxford/70">{label}</p>
       <p className="type-body-sm inline-flex items-center gap-phi-2 text-oxford">
         <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
@@ -295,8 +295,8 @@ function EditorialStatus({
 
 function GroupHeader({ index, title, description }: { index: string; title: string; description: string }) {
   return (
-    <div className="group-index border-t border-oxford/[0.16] pb-phi-4 pt-phi-8">
-      <div className="flex items-baseline justify-between gap-phi-4 border-b border-oxford/[0.10] pb-phi-3">
+    <div className="group-index pb-phi-5">
+      <div className="flex items-baseline justify-between gap-phi-4">
         <h2 className="type-display text-[clamp(1.5rem,3vw,2.3rem)] font-medium leading-none tracking-[-0.015em] text-oxford">{title}</h2>
         <span className="type-status shrink-0 text-[10px] tracking-[0.16em] text-oxford/45">{index} — 04</span>
       </div>
@@ -949,7 +949,7 @@ export default function SettingsPage() {
                     title="Escalation sensitivity"
                     label="Risk posture"
                   >
-                    <div className="flex flex-col gap-phi-2 border-t border-oxford/[0.06] py-phi-4">
+                    <div className="flex flex-col gap-phi-3 py-phi-5">
                       <label htmlFor="risk-sensitivity" className={labelCls}>Sensitivity</label>
                       <select id="risk-sensitivity" value={draft.risk.sensitivity} onChange={(event) => updateRisk('sensitivity', event.target.value as RiskSensitivity)} className={selectCls} style={selectStyle}>
                         <option value="conservative">Conservative · surface more risk</option>
@@ -965,16 +965,16 @@ export default function SettingsPage() {
                   label="Reviewer mix"
                 >
                   <div className="flex flex-col">
-                    <div className="flex flex-wrap items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-4">
+                    <div className="flex flex-wrap items-baseline justify-between gap-phi-4 py-phi-5">
                       <div className="flex items-baseline gap-phi-3">
                         <p className={`type-data text-[1.6rem] ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
                         <p className="type-label-section text-xs text-oxford/70">Total weight</p>
                       </div>
                       <p className="type-note text-oxford/70">Adjust one — the rest rebalance to 100</p>
                     </div>
-                    <div className="grid grid-cols-2 border-t border-oxford/[0.06] sm:grid-cols-5">
+                    <div className="grid grid-cols-2 gap-phi-3 py-phi-3 sm:grid-cols-5">
                     {draft.scoringWeights.map((item) => (
-                      <div key={item.key} className="flex min-w-0 flex-col items-center gap-phi-2 border-b border-oxford/[0.06] px-phi-2 py-phi-4 text-center sm:border-b-0 sm:border-r last:border-r-0">
+                      <div key={item.key} className="flex min-w-0 flex-col items-center gap-phi-2 px-phi-2 py-phi-4 text-center">
                         <p className="type-label-section text-[10px] leading-tight text-oxford/60">{item.label}</p>
                         <input
                           type="number"
@@ -991,7 +991,7 @@ export default function SettingsPage() {
                       </div>
                     ))}
                     </div>
-                    <p className="border-t border-oxford/[0.06] py-phi-4 type-note text-oxford/70">
+                    <p className="pt-phi-4 type-note text-oxford/70">
                       {draft.activePolicyVersionId
                         ? `Live policy ${draft.activePolicyVersionId}. Deploying publishes the next version.`
                         : 'Deploy to publish the first scoring policy.'}
@@ -1004,7 +1004,7 @@ export default function SettingsPage() {
                     title="Memo output"
                     label="Presentation"
                   >
-                    <div className="grid gap-phi-5 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-2">
+                    <div className="grid gap-phi-7 py-phi-5 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
                         <label htmlFor="memo-style" className={labelCls}>Memo style</label>
                         <select id="memo-style" value={draft.memo.style} onChange={(event) => updateMemo('style', event.target.value as MemoStyle)} className={selectCls} style={selectStyle}>
@@ -1035,7 +1035,7 @@ export default function SettingsPage() {
                     title="Ruling workflow"
                     label="Governance"
                   >
-                    <div className="border-t border-oxford/[0.06]">
+                    <div className="py-phi-3">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
                       <ToggleRow id="risk-high-only" checked={draft.risk.onlyGateHighSeverity} onChange={(value) => updateRisk('onlyGateHighSeverity', value)} label="Only gate high severity risks" hint="Medium adverse items stay visible without blocking the ruling." />
                     </div>
@@ -1060,7 +1060,7 @@ export default function SettingsPage() {
                       <SpecRow label="Daily"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
                       <SpecRow label="Weekly"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
                     </div>
-                    <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
+                    <p className="pt-phi-5 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
 
                   </SettingsGroup>
@@ -1109,7 +1109,7 @@ export default function SettingsPage() {
                         />
                       </div>
                     ) : (
-                      <div className="border-t border-oxford/[0.06] py-phi-4">
+                      <div className="py-phi-5">
                         <p className="type-body-sm text-oxford">Status unavailable</p>
                         <p className="mt-phi-2 type-note leading-relaxed text-oxford/70">
                           Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.

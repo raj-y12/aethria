@@ -160,6 +160,8 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).toContain('settings-gallery-intro');
     expect(source).toContain('settings-gallery-section');
     expect(source).not.toContain('settings-gallery-cap');
+    expect(source).not.toContain('group-index border-t');
+    expect(source).not.toContain('group-index border-b');
     expect(topBarSource).toContain('AETHRIA / SETTINGS');
   });
 
