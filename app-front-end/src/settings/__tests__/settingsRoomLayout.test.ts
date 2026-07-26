@@ -9,7 +9,6 @@ import {
   type FundConfiguration,
 } from '../../lib/fundConfiguration';
 import operationsSource from '../OperationsStrip.tsx?raw';
-import railSource from '../SettingsRail.tsx?raw';
 import topBarSource from '../SettingsTopBar.tsx?raw';
 import source from '../SettingsPage.tsx?raw';
 import SettingsPage from '../SettingsPage';
@@ -149,7 +148,6 @@ describe('Settings focused-mode layout contract', () => {
 
   it('is a top bar + compact area nav over one scrolling reading column', () => {
     expect(source).toContain('<SettingsTopBar');
-    expect(source).toContain('<SettingsRail');
     expect(source).toContain('<SettingsMobileNav');
     expect(source).toContain('ref={contentScrollRef}');
     expect(source).toContain('overscroll-contain bg-paper');
@@ -165,10 +163,10 @@ describe('Settings focused-mode layout contract', () => {
     expect(topBarSource).toContain('AETHRIA / SETTINGS');
   });
 
-  it('keeps settings navigation compact and horizontal', () => {
-    expect(railSource).toContain('hidden flex-none border-b');
-    expect(railSource).toContain('flex max-w-[860px] items-center');
-    expect(railSource).not.toContain('SPINE_WIDTH');
+  it('keeps settings navigation in the single top header', () => {
+    expect(topBarSource).toContain('aria-label="Settings areas"');
+    expect(topBarSource).toContain('SETTINGS_GROUPS.map');
+    expect(source).not.toContain('<SettingsRail');
   });
 
   it('states the persistence model truthfully', () => {

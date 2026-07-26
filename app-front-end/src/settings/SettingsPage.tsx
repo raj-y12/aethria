@@ -18,7 +18,6 @@ import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import SettingsActionDialog from './SettingsActionDialog';
 import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
-import SettingsRail from './SettingsRail';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
 import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
@@ -804,22 +803,10 @@ export default function SettingsPage() {
         onUndo={undoRestore}
         onDeploy={requestDeploy}
         actionLabel={pendingPolicyPublish ? (saving ? 'Retrying…' : 'Retry publish') : (saving ? 'Deploying…' : 'Deploy changes')}
-      />
-
-      <SettingsRail
         activeSection={activeSection}
         attentionSection={attentionSection}
         onNavigate={scrollToSection}
       />
-
-      <div className="hidden border-b border-oxford/[0.08] bg-paper lg:block">
-        <OperationsStrip
-          variant="bar"
-          settings={settings}
-          storageUnavailable={storageNotReady}
-          onSettingsChange={setSettings}
-        />
-      </div>
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
@@ -837,7 +824,7 @@ export default function SettingsPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
           >
-            <div className="mb-phi-5 border border-oxford/[0.16] lg:hidden">
+            <div className="mb-phi-5">
               <OperationsStrip
                 variant="bar"
                 settings={settings}
