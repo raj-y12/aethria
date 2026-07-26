@@ -166,7 +166,7 @@ describe('Settings focused-mode layout contract', () => {
   it('keeps settings navigation in the system rail geometry', () => {
     expect(topBarSource).toContain('md:fixed md:inset-y-0 md:left-0');
     expect(topBarSource).toContain('md:w-36');
-    expect(topBarSource).toContain('md:[padding-top:26px]');
+    expect(topBarSource).toContain('md:[padding:26px_16px_20px]');
     expect(topBarSource).toContain('SpineNavButton');
     expect(source).toContain('md:pl-36 lg:pl-40');
   });

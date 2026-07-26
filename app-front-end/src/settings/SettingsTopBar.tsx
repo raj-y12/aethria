@@ -49,12 +49,12 @@ export default function SettingsTopBar({
 
   return (
     <motion.header
-      className="flex-none border-b border-oxford/[0.16] bg-paper md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-36 md:flex-col md:justify-between md:border-b-0 md:border-r md:border-oxford/[0.16] lg:w-40"
+      className="flex-none border-b border-oxford/[0.16] bg-paper md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-36 md:flex-col md:justify-between md:border-b-0 lg:w-40"
       initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
     >
-      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 md:flex-col md:h-full md:min-h-0 md:items-stretch md:gap-5 md:px-4 md:py-0 md:[padding-top:26px] md:[padding-bottom:20px]">
+      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 md:flex-col md:h-full md:min-h-0 md:items-stretch md:gap-5 md:[padding:26px_16px_20px]">
         <div className="flex min-w-0 items-center gap-phi-4 md:block md:shrink-0 md:px-3">
           <button
             type="button"
