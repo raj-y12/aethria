@@ -791,7 +791,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden md:pl-36 lg:pl-40">
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}

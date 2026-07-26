@@ -163,10 +163,12 @@ describe('Settings focused-mode layout contract', () => {
     expect(topBarSource).toContain('AETHRIA / SETTINGS');
   });
 
-  it('keeps settings navigation in the single top header', () => {
-    expect(topBarSource).toContain('aria-label="Settings areas"');
-    expect(topBarSource).toContain('SETTINGS_GROUPS.map');
-    expect(source).not.toContain('<SettingsRail');
+  it('keeps settings navigation in the system rail geometry', () => {
+    expect(topBarSource).toContain('md:fixed md:inset-y-0 md:left-0');
+    expect(topBarSource).toContain('md:w-36');
+    expect(topBarSource).toContain('md:[padding-top:26px]');
+    expect(topBarSource).toContain('SpineNavButton');
+    expect(source).toContain('md:pl-36 lg:pl-40');
   });
 
   it('states the persistence model truthfully', () => {
