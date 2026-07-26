@@ -173,3 +173,25 @@ def test_sync_fund_config_to_active_thesis_validates_user_id_without_name_error(
 
     assert result["skipped"] is True
     assert result["version_id"] == "version_1"
+
+
+def test_sync_fund_config_does_not_block_settings_deploy_on_embedding(monkeypatch):
+    import fund_thesis
+    import fund_thesis_ops
+    from fund_thesis_ops import sync_fund_config_to_active_thesis
+
+    calls = []
+    monkeypatch.setattr(fund_thesis, "get_active_thesis", lambda client, user_id: None)
+
+    def fake_create(client, **kwargs):
+        calls.append(kwargs)
+        return {"version_id": "version_1", "version_number": 1, "skipped": False}
+
+    monkeypatch.setattr(fund_thesis_ops, "create_fund_thesis_version_for_user", fake_create)
+
+    result = sync_fund_config_to_active_thesis(
+        object(), user_id="new_user", fund_config=_fund_config(), api_key="configured"
+    )
+
+    assert result["version_id"] == "version_1"
+    assert calls[0]["skip_embedding"] is True

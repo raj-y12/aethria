@@ -433,7 +433,11 @@ def sync_fund_config_to_active_thesis(
         api_key=api_key,
         parsed_json_override=fund_config_to_thesis_parsed_json(fc),
         pipeline_run_id=pipeline_run_id,
-        skip_embedding=not bool((api_key or "").strip()),
+        # Settings deployment is a control-plane write.  Do not block the
+        # user's save on an expensive/optional embedding request; the scoring
+        # runtime already supports an empty embedding and can use rule-based
+        # thesis alignment until a background refresh provides one.
+        skip_embedding=True,
         skip_if_unchanged=False,
     )
 

@@ -2572,7 +2572,16 @@ async def patch_settings(request: Request, body: dict):
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
     # Sync Supabase reads/writes (+ optional OpenAI thesis sync) off the event loop.
-    current = await asyncio.to_thread(_patch_settings_sync, user_id, body)
+    try:
+        current = await asyncio.to_thread(_patch_settings_sync, user_id, body)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "message": "Settings saved, but the fund thesis could not be activated. Retry deployment.",
+                "errors": [str(exc)],
+            },
+        ) from exc
 
     # If any agents are enabled after the patch, ensure the persistent background loop is running.
     # This covers the case where the user toggles agents in the UI and clicks "Save".
@@ -2645,6 +2654,10 @@ def _patch_settings_sync(user_id: str, body: dict) -> dict:
                     )
             except Exception as e:
                 _logger_agents.warning("[%s] fund_config thesis sync failed: %s", user_id[:12], e)
+                # Do not report a successful settings deployment when the
+                # active thesis could not be updated.  The settings document
+                # remains durable and the client can safely retry this step.
+                raise RuntimeError("Fund thesis sync failed; settings were saved but are not active") from e
 
     return current
 
