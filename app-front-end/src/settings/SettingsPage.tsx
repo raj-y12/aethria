@@ -240,7 +240,7 @@ function RoomSection({
     <section
       id={id}
       tabIndex={-1}
-      className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
+       className={`settings-gallery-section flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
     >
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
@@ -822,8 +822,6 @@ export default function SettingsPage() {
             </div>
 
             <div className="settings-gallery-plate">
-              <span className="settings-gallery-cap settings-gallery-cap--left">Settings · Control surface</span>
-              <span className="settings-gallery-cap settings-gallery-cap--right">Mandate · Policy · Runtime</span>
               <header className="settings-gallery-plate-head">
                 <h1>Settings</h1>
                 <span className="settings-gallery-plate-num">01 — 01</span>
@@ -953,9 +951,10 @@ export default function SettingsPage() {
                       </div>
                       <p className="type-note text-oxford/70">Adjust one — the rest rebalance to 100</p>
                     </div>
+                    <div className="grid grid-cols-2 border-t border-oxford/[0.06] sm:grid-cols-5">
                     {draft.scoringWeights.map((item) => (
-                      <div key={item.key} className="grid gap-phi-3 border-t border-oxford/[0.06] py-phi-4 md:grid-cols-[minmax(0,1fr)_92px] md:items-baseline">
-                        <p className="type-body-emphasis text-oxford">{item.label}</p>
+                      <div key={item.key} className="flex min-w-0 flex-col items-center gap-phi-2 border-b border-oxford/[0.06] px-phi-2 py-phi-4 text-center sm:border-b-0 sm:border-r last:border-r-0">
+                        <p className="type-label-section text-[10px] leading-tight text-oxford/60">{item.label}</p>
                         <input
                           type="number"
                           min={0}
@@ -965,11 +964,12 @@ export default function SettingsPage() {
                             ...current,
                             scoringWeights: rebalanceWeights(current.scoringWeights, item.key, Number(event.target.value)),
                           }))}
-                          className={`${inputCls} type-data text-right`}
+                          className="type-display w-full border-0 bg-transparent p-0 text-center text-[clamp(1.8rem,3vw,2.6rem)] leading-none text-oxford outline-none focus:ring-0"
                           aria-label={`${item.label} weight`}
                         />
                       </div>
                     ))}
+                    </div>
                     <p className="border-t border-oxford/[0.06] py-phi-4 type-note text-oxford/70">
                       {draft.activePolicyVersionId
                         ? `Live policy ${draft.activePolicyVersionId}. Deploying publishes the next version.`

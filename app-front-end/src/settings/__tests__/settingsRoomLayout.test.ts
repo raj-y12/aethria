@@ -157,8 +157,9 @@ describe('Settings focused-mode layout contract', () => {
 
   it('uses the marketing page editorial hierarchy for the settings room', () => {
     expect(source).toContain('settings-gallery-plate');
-    expect(source).toContain('settings-gallery-cap');
     expect(source).toContain('settings-gallery-intro');
+    expect(source).toContain('settings-gallery-section');
+    expect(source).not.toContain('settings-gallery-cap');
     expect(topBarSource).toContain('AETHRIA / SETTINGS');
   });
 

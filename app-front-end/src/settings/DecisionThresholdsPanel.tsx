@@ -8,16 +8,15 @@ import {
   type DecisionThresholdBoundaries,
 } from '../lib/decisionThresholds';
 import type { FundConfiguration } from '../lib/fundConfiguration';
-import { DEFAULT_VERDICT_BADGES } from '../lib/fundConfiguration';
 
 const labelCls = 'type-label-section text-xs text-oxford/70';
 const inputCls =
   'type-data w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 text-oxford outline-none transition-colors focus:border-oxford/45';
 
 const bandColors = {
-  pass: DEFAULT_VERDICT_BADGES.find((b) => b.id === 'PASS')?.backgroundColor ?? '#eabfb7',
-  monitor: DEFAULT_VERDICT_BADGES.find((b) => b.id === 'MONITOR')?.backgroundColor ?? '#e5d39f',
-  invest: DEFAULT_VERDICT_BADGES.find((b) => b.id === 'INVEST')?.backgroundColor ?? '#bfe3cc',
+  pass: '#d6a39d',
+  monitor: '#d7bf72',
+  invest: '#8dc2a1',
 };
 
 export function scoreFromPointer(clientX: number, left: number, width: number): number {
