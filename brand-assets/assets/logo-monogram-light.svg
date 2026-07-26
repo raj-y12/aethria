@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect width="512" height="512" fill="#f4f1ea"/>
-  <text x="256" y="340" text-anchor="middle" fill="#001433" font-family="'Playfair Display', Georgia, serif" font-size="320" font-weight="500">A</text>
+  <rect width="512" height="512" fill="#d9d7d4"/>
+  <path data-brand-bracket="left" d="M148 104h-44v304h44" fill="none" stroke="#0a1629" stroke-width="4"/>
+  <path data-brand-bracket="right" d="M364 104h44v304h-44" fill="none" stroke="#0a1629" stroke-width="4"/>
+  <text x="256" y="340" text-anchor="middle" fill="#0a1629" font-family="'Playfair Display', Georgia, serif" font-size="320" font-weight="500">A</text>
 </svg>

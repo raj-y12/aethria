@@ -1,3 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <text x="16" y="23" text-anchor="middle" fill="#001433" font-family="'Playfair Display', Georgia, serif" font-size="22" font-weight="500">A</text>
+  <path data-brand-bracket="left" d="M7 6H4v20h3" fill="none" stroke="#0a1629" stroke-width="0.8"/>
+  <path data-brand-bracket="right" d="M25 6h3v20h-3" fill="none" stroke="#0a1629" stroke-width="0.8"/>
+  <text x="16" y="22" text-anchor="middle" fill="#0a1629" font-family="Georgia, serif" font-size="19" font-weight="500">A</text>
 </svg>

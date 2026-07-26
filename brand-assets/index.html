@@ -392,7 +392,7 @@
       <header class="masthead">
         <div>
           <div class="eyebrow">Aethria / Brand Assets</div>
-          <h1>Make a banner.<br />Bring your own light<span class="dot">.</span></h1>
+          <h1>Make a banner.<br />Move with intent<span class="dot">.</span></h1>
           <nav class="nav" aria-label="Sections">
             <a href="#studio">Studio</a>
             <a href="#presets">Presets</a>
@@ -402,7 +402,7 @@
             <a href="#hero">Hero</a>
           </nav>
         </div>
-        <p>A live gradient-mesh studio. Pick a palette — or build your own — and export at full resolution.</p>
+        <p>A live motion-line studio. Pick a palette — or build your own — and export at full resolution.</p>
       </header>
 
       <!-- ============ STUDIO ============ -->
@@ -624,58 +624,42 @@
       ];
       var activePlatform = PLATFORMS[0];
 
-      /* ---------------- mesh renderer ---------------- */
-      var WARM = '#ff7a1a', COOL = '#1f6bff';
-
-      function buildBlobs(cfg, w, h) {
+      /* ---------------- motion streak renderer ---------------- */
+      function buildStreaks(cfg, w, h) {
         var rng = mulberry32(cfg.seed || 1);
-        var count = 7;
-        var blobs = [];
+        var count = Math.max(42, Math.round((w * h) / 13500));
+        var streaks = [];
         for (var i = 0; i < count; i++) {
-          var color = cfg.colors[i % cfg.colors.length];
-          blobs.push({
-            x: (0.04 + rng() * 0.92) * w,
+          var accent = rng() > 0.79;
+          streaks.push({
+            x: (-0.18 + rng() * 1.36) * w,
             y: (-0.1 + rng() * 1.2) * h,
-            r: (0.45 + rng() * 0.85) * h,
-            color: color,
-            hole: rng() > 0.55,
-            warmFirst: rng() > 0.5
+            length: (accent ? 0.12 : 0.2 + rng() * 0.46) * w,
+            width: accent ? 1.1 + rng() * 1.25 : 0.35 + rng() * 0.85,
+            alpha: accent ? 0.26 + rng() * 0.2 : 0.045 + rng() * 0.14,
+            angle: -0.22 + (rng() - 0.5) * 0.12,
+            color: cfg.colors[i % cfg.colors.length]
           });
         }
-        return blobs;
+        return streaks;
       }
 
-      function radial(ctx, cx, cy, r, color, a) {
-        if (r <= 0) return;
-        var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        g.addColorStop(0, rgba(color, a));
-        g.addColorStop(0.5, rgba(color, a * 0.55));
-        g.addColorStop(1, rgba(color, 0));
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      function drawBlob(ctx, b, s) {
-        var cx = b.x * s, cy = b.y * s, r = b.r * s;
-        var d = r * 0.07;
-        // body tint
-        ctx.globalCompositeOperation = 'source-over';
-        radial(ctx, cx, cy, r, b.color, 0.82);
-        // chromatic fringes + glow (additive)
-        ctx.globalCompositeOperation = 'screen';
-        var warm = mix(b.color, WARM, 0.55), cool = mix(b.color, COOL, 0.55).replace('rgb', 'rgba').replace(')', '');
-        var off = b.warmFirst ? 1 : -1;
-        radial(ctx, cx + d * off, cy + d * off, r * 0.92, mix(b.color, WARM, 0.5), 0.5);
-        radial(ctx, cx - d * off, cy - d * off, r * 0.92, mix(b.color, COOL, 0.5), 0.5);
-        radial(ctx, cx, cy, r * 0.45, b.color, 0.6); // bright core
-        // donut hole
-        if (b.hole) {
-          ctx.globalCompositeOperation = 'multiply';
-          radial(ctx, cx, cy, r * 0.4, b.holeColor || b.colorHole, 0.7);
-        }
-        ctx.globalCompositeOperation = 'source-over';
+      function drawStreakField(ctx, cfg, s) {
+        var streaks = buildStreaks(cfg, cfg.w, cfg.h);
+        ctx.save();
+        ctx.lineCap = 'square';
+        streaks.forEach(function (streak) {
+          var length = streak.length * s;
+          var x = streak.x * s, y = streak.y * s;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + Math.cos(streak.angle) * length, y + Math.sin(streak.angle) * length);
+          ctx.strokeStyle = streak.color;
+          ctx.globalAlpha = streak.alpha;
+          ctx.lineWidth = Math.max(1, streak.width * s);
+          ctx.stroke();
+        });
+        ctx.restore();
       }
 
       function applyGrain(ctx, W, H, seed, amp) {
@@ -698,6 +682,28 @@
           size -= 2;
         } while (size > 12);
         return size;
+      }
+
+      function drawBrackets(ctx, x, top, width, height, s, color) {
+        var gap = 18 * s;
+        var arm = 11 * s;
+        var left = x - gap;
+        var right = x + width + gap;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = Math.max(1, s);
+        ctx.lineCap = 'square';
+        ctx.beginPath();
+        ctx.moveTo(left + arm, top);
+        ctx.lineTo(left, top);
+        ctx.lineTo(left, top + height);
+        ctx.lineTo(left + arm, top + height);
+        ctx.moveTo(right - arm, top);
+        ctx.lineTo(right, top);
+        ctx.lineTo(right, top + height);
+        ctx.lineTo(right - arm, top + height);
+        ctx.stroke();
+        ctx.restore();
       }
 
       function drawText(ctx, cfg, s) {
@@ -780,6 +786,7 @@
           ctx.fillText(word, startX, baseline);
           ctx.fillStyle = cfg.colors[0];
           ctx.fillText('.', startX + wWidth, baseline);
+          drawBrackets(ctx, startX, baseline - size * 0.88, total, size * 1.04, s, ink);
           ctx.restore();
         }
 
@@ -814,7 +821,7 @@
         footer(pad, 'left');
       }
 
-      function renderMesh(canvas, cfg, ratio) {
+      function renderBanner(canvas, cfg, ratio) {
         var s = ratio;
         var W = Math.round(cfg.w * s), H = Math.round(cfg.h * s);
         canvas.width = W; canvas.height = H;
@@ -823,15 +830,14 @@
         // base
         ctx.fillStyle = cfg.base;
         ctx.fillRect(0, 0, W, H);
-        // blobs
-        var blobs = buildBlobs(cfg, cfg.w, cfg.h);
-        blobs.forEach(function (b) { b.holeColor = cfg.hole; drawBlob(ctx, b, s); });
-        // soft unifying wash
+        // directional streaks
+        drawStreakField(ctx, cfg, s);
+        // soft darkening wash for readable overlaid typography
         ctx.save();
         ctx.globalCompositeOperation = 'soft-light';
-        var wash = ctx.createLinearGradient(0, 0, 0, H);
+        var wash = ctx.createLinearGradient(0, 0, W, H);
         wash.addColorStop(0, rgba(cfg.base, 0.0));
-        wash.addColorStop(1, rgba(cfg.hole, 0.25));
+        wash.addColorStop(1, rgba(cfg.ink, 0.18));
         ctx.fillStyle = wash;
         ctx.fillRect(0, 0, W, H);
         ctx.restore();
@@ -878,7 +884,7 @@
         renderQueued = true;
         requestAnimationFrame(function () {
           renderQueued = false;
-          renderMesh(studioCanvas, studio, PREVIEW_RATIO);
+          renderBanner(studioCanvas, studio, PREVIEW_RATIO);
         });
       }
 
@@ -1009,7 +1015,7 @@
       document.getElementById('studio-download').addEventListener('click', function () {
         var out = document.createElement('canvas');
         var er = studio.exportRatio || EXPORT_RATIO;
-        renderMesh(out, studio, er);
+        renderBanner(out, studio, er);
         download(out, 'aethria-banner-' + (activePlatform ? activePlatform.id : 'linkedin') + '.png');
         toast('Downloaded \xb7 ' + (studio.w * er) + ' \xd7 ' + (studio.h * er));
       });
@@ -1070,7 +1076,7 @@
         card.querySelector('.dl').addEventListener('click', function (e) {
           e.stopPropagation();
           var out = document.createElement('canvas');
-          renderMesh(out, cfg, EXPORT_RATIO);
+          renderBanner(out, cfg, EXPORT_RATIO);
           download(out, 'aethria-banner-' + item.key + '.png');
           toast('Downloaded · ' + (cfg.w * EXPORT_RATIO) + ' × ' + (cfg.h * EXPORT_RATIO));
         });
@@ -1095,8 +1101,10 @@
         ctx.fillStyle = cfg.base; ctx.fillRect(0, 0, W, H);
         var isPlain = cfg.mode === 'wordmark-plain';
         if (!isPlain) {
-          var blobs = buildBlobs({ seed: cfg.seed, colors: cfg.colors }, 1000, 1000);
-          blobs.forEach(function (b) { b.holeColor = cfg.hole; drawBlob(ctx, b, s); });
+          drawStreakField(ctx, {
+            seed: cfg.seed, w: 1000, h: 1000,
+            base: cfg.base, ink: cfg.ink, colors: cfg.colors
+          }, s);
         }
         applyGrain(ctx, W, H, cfg.seed, isPlain ? 10 : 20);
         ctx.fillStyle = cfg.ink;
@@ -1104,6 +1112,7 @@
           ctx.font = '500 ' + (560 * s) + 'px "Playfair Display", Georgia, serif';
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText('A', W / 2, H / 2 + 30 * s);
+          drawBrackets(ctx, W / 2 - 180 * s, H / 2 - 255 * s, 360 * s, 510 * s, s, cfg.ink);
         } else if (isPlain) {
           var pSize = 180 * s;
           ctx.font = '500 ' + pSize + 'px "Playfair Display", Georgia, serif';
@@ -1114,6 +1123,7 @@
           ctx.textAlign = 'left';
           ctx.fillStyle = cfg.ink; ctx.fillText(pWord, pX, H / 2);
           ctx.fillStyle = cfg.accent; ctx.fillText(pDot, pX + pWw, H / 2);
+          drawBrackets(ctx, pX, H / 2 - pSize * 0.74, pWw + pDw, pSize * 0.95, s, cfg.ink);
         } else {
           ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           var size = 150 * s;
@@ -1124,6 +1134,7 @@
           ctx.textAlign = 'left';
           ctx.fillStyle = cfg.ink; ctx.fillText(word, startX, H / 2);
           ctx.fillStyle = cfg.colors[0]; ctx.fillText(dot, startX + ww, H / 2);
+          drawBrackets(ctx, startX, H / 2 - size * 0.74, ww + dw, size * 0.95, s, cfg.ink);
         }
       }
       PROFILES.forEach(function (item, n) {
@@ -1175,7 +1186,7 @@
         syncSwatches(); seedFields(); updateDims(); renderStudio();
         GALLERY.length && galleryWrap.querySelectorAll('.gcard').forEach(function (card) {
           var cfg = card._cfg;
-          renderMesh(cfg._canvas, cfg, PREVIEW_RATIO);
+          renderBanner(cfg._canvas, cfg, PREVIEW_RATIO);
           card.querySelector('.frame').classList.add('ready');
         });
         profileWrap.querySelectorAll('.gcard').forEach(function (card) {
