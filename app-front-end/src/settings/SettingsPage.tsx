@@ -240,7 +240,7 @@ function RoomSection({
     <section
       id={id}
       tabIndex={-1}
-       className={`settings-gallery-section flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
+       className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
     >
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
@@ -301,6 +301,25 @@ function GroupHeader({ index, title, description }: { index: string; title: stri
         <span className="type-status shrink-0 text-[10px] tracking-[0.16em] text-oxford/45">{index} — 04</span>
       </div>
       <p className="mt-phi-2 max-w-[48ch] type-body-sm leading-relaxed text-oxford/70">{description}</p>
+    </div>
+  );
+}
+
+function SettingsGroup({
+  index,
+  title,
+  description,
+  children,
+}: {
+  index: string;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="settings-gallery-section">
+      <GroupHeader index={index} title={title} description={description} />
+      {children}
     </div>
   );
 }
@@ -827,11 +846,11 @@ export default function SettingsPage() {
                 <span className="settings-gallery-plate-num">01 — 01</span>
               </header>
               <p className="settings-gallery-intro">Your operating mandate, decision policy, and runtime controls.</p>
-                  <GroupHeader
+                  <SettingsGroup
                     index="01"
                     title="Fund thesis"
                     description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
-                  />
+                  >
 
                   <RoomSection
                     id="thesis"
@@ -898,11 +917,13 @@ export default function SettingsPage() {
                     </SpecRow>
                   </RoomSection>
 
-                  <GroupHeader
+                  </SettingsGroup>
+
+                  <SettingsGroup
                     index="02"
                     title="Decision policy"
                     description="How evidence is scored, escalated, and routed. Changes stay in draft until you deploy a new policy version."
-                  />
+                  >
 
                 {!bandValidation.valid && (
                   <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] py-phi-3 pl-phi-3">
@@ -1020,11 +1041,13 @@ export default function SettingsPage() {
                     </div>
                   </RoomSection>
 
-                  <GroupHeader
+                  </SettingsGroup>
+
+                  <SettingsGroup
                     index="03"
                     title="Workspace runtime"
                     description="Operational limits for this workspace. Changes here save immediately and affect the running system."
-                  />
+                  >
 
                   <RoomSection
                     id="budget"
@@ -1040,11 +1063,13 @@ export default function SettingsPage() {
                     <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
 
-                  <GroupHeader
+                  </SettingsGroup>
+
+                  <SettingsGroup
                     index="04"
                     title="System"
                     description="Read-only readiness and operator diagnostics. Pipeline controls remain in the system rail and save immediately."
-                  />
+                  >
 
                   <RoomSection
                     id="system"
@@ -1097,6 +1122,7 @@ export default function SettingsPage() {
                       compact
                     />
                   </RoomSection>
+                  </SettingsGroup>
             </div>
           </motion.main>
         </div>
