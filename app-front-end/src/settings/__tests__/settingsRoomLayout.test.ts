@@ -160,15 +160,15 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).not.toContain('settings-gallery-cap');
     expect(source).not.toContain('group-index border-t');
     expect(source).not.toContain('group-index border-b');
-    expect(topBarSource).toContain('AETHRIA / SETTINGS');
+    expect(topBarSource).toContain('Aethria');
   });
 
   it('keeps settings navigation in the system rail geometry', () => {
     expect(topBarSource).toContain('md:fixed md:inset-y-0 md:left-0');
-    expect(topBarSource).toContain('md:w-36');
-    expect(topBarSource).toContain('md:[padding:26px_16px_20px]');
+    expect(topBarSource).toContain('md:w-[clamp(204px,15vw,248px)]');
+    expect(topBarSource).toContain('md:pb-phi-4 md:pt-phi-5');
     expect(topBarSource).toContain('SpineNavButton');
-    expect(source).toContain('md:pl-36 lg:pl-40');
+    expect(source).toContain('md:pl-[clamp(204px,15vw,248px)]');
   });
 
   it('states the persistence model truthfully', () => {

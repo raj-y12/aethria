@@ -5,7 +5,7 @@ import { fetchCurrentEvaluation, type RecommendationState } from '../../api/eval
 import {
   listHumanRulings,
   type HumanRuling,
-  type HumanRulingDecision,
+  type HumanRulingRecordDecision,
 } from '../../api/decisions';
 import ClaimEvidenceLedger from './ClaimEvidenceLedger';
 import HumanRulingComposer from './HumanRulingComposer';
@@ -17,7 +17,7 @@ function nestedString(value: unknown, key: string): string | null {
   return typeof candidate === 'string' ? candidate : null;
 }
 
-function decisionLabel(decision: HumanRulingDecision): string {
+function decisionLabel(decision: HumanRulingRecordDecision): string {
   return decision.charAt(0).toUpperCase() + decision.slice(1);
 }
 

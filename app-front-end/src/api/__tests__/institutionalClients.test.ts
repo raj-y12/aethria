@@ -7,7 +7,7 @@ vi.mock('../auth', () => ({ authedFetch }));
 import { fetchJob, retryJob } from '../jobs';
 import { fetchIdentityCases, resolveIdentityCase } from '../identity';
 import { correctClaim, fetchEvidenceLedger } from '../evidence';
-import { createHumanRuling, listHumanRulings } from '../decisions';
+import { createHumanRuling, createInvestmentTransition, listHumanRulings } from '../decisions';
 import { fetchCurrentEvaluation } from '../evaluations';
 import { reviewPolicyProposal } from '../fundIntelligence';
 import { createOutcome, importCsv } from '../channelsOutcomes';
@@ -125,16 +125,32 @@ describe('institutional API clients', () => {
 
   it('creates human rulings and reads their history', async () => {
     authedFetch
-      .mockResolvedValueOnce(new Response(JSON.stringify({ ruling_id: 'ruling-1', decision: 'invest' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ruling_id: 'ruling-1', decision: 'advance' }), { status: 200 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ rulings: [{ ruling_id: 'ruling-1', decision: 'invest' }] }), { status: 200 }));
 
     await createHumanRuling('opportunity-1', {
-      decision: 'invest', rationale: 'Customer evidence clears the core risk.',
+      decision: 'advance', rationale: 'Customer evidence clears the core risk.',
     });
     await expect(listHumanRulings('opportunity-1')).resolves.toMatchObject([{ ruling_id: 'ruling-1' }]);
 
     expect(authedFetch.mock.calls[0][0]).toContain('/api/opportunities/opportunity-1/rulings');
     expect(authedFetch.mock.calls[1][0]).toContain('/api/opportunities/opportunity-1/rulings?limit=');
+  });
+
+  it('records a post-diligence investment transition separately from a ruling', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      decision: 'invest', position: { position_id: 'position-1' }, idempotent: false,
+    }), { status: 200 }));
+
+    await expect(createInvestmentTransition('opportunity-1', {
+      rationale: 'Diligence is complete and the committee approved the allocation.',
+      investor_confidence: 0.86,
+    })).resolves.toMatchObject({ decision: 'invest', idempotent: false });
+    expect(authedFetch.mock.calls[0][0]).toContain('/api/opportunities/opportunity-1/investment');
+    expect(JSON.parse(authedFetch.mock.calls[0][1].body)).toEqual({
+      rationale: 'Diligence is complete and the committee approved the allocation.',
+      investor_confidence: 0.86,
+    });
   });
 
   it('reviews proposals and imports channel data with explicit idempotency', async () => {

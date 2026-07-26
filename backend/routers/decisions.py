@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from decisions.models import HumanRulingDecision, HumanRulingInput, OverrideType, WorkflowActionType
+from decisions.models import InitialHumanRulingDecision, HumanRulingInput, OverrideType, WorkflowActionType
 from routers.authority import require_write_path, with_authority_metadata
 from security.request_guards import require_authenticated_user, validate_route_id
 
@@ -16,7 +16,7 @@ router = APIRouter(tags=["decisions"])
 
 class RulingBody(BaseModel):
     recommendation_id: Optional[str] = None
-    decision: HumanRulingDecision
+    decision: InitialHumanRulingDecision
     rationale: str = Field(min_length=3, max_length=2000)
     risk_acknowledgement: Optional[str] = Field(default=None, max_length=1000)
     mandate_exception: Optional[str] = Field(default=None, max_length=1000)
@@ -33,6 +33,11 @@ class ActionBody(BaseModel):
 
 class ApproveActionBody(BaseModel):
     approved_content: Optional[Dict[str, Any]] = None
+
+
+class InvestmentBody(BaseModel):
+    rationale: str = Field(min_length=3, max_length=2000)
+    investor_confidence: float = Field(default=0.5, ge=0, le=1)
 
 
 def _repository(request: Request):
@@ -59,6 +64,27 @@ async def create_ruling(request: Request, opportunity_id: str, body: RulingBody)
         return with_authority_metadata(record, authority)
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Opportunity or recommendation not found") from exc
+
+
+@router.post("/api/opportunities/{opportunity_id}/investment")
+async def create_investment_transition(request: Request, opportunity_id: str, body: InvestmentBody):
+    """Record a post-diligence investment transition separately from disposition."""
+    validate_route_id(opportunity_id, field_name="opportunity_id")
+    user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="investment transition")
+    try:
+        record = await _repository(request).create_investment_transition(
+            user_id=user_id,
+            opportunity_id=opportunity_id,
+            rationale=body.rationale,
+            investor_confidence=body.investor_confidence,
+            actor_id=user_id,
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Opportunity not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return with_authority_metadata(record, authority)
 
 
 @router.get("/api/opportunities/{opportunity_id}/rulings")

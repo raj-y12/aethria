@@ -12,10 +12,19 @@ from utils.timeutil import utcnow
 
 
 class HumanRulingDecision(str, Enum):
+    """Canonical ruling values, including deprecated historical INVEST rows."""
     ADVANCE = "advance"
     MONITOR = "monitor"
     PASS = "pass"
     INVEST = "invest"
+
+
+class InitialHumanRulingDecision(str, Enum):
+    """The only dispositions accepted at the opportunity decision boundary."""
+
+    ADVANCE = "advance"
+    MONITOR = "monitor"
+    PASS = "pass"
 
 
 class OverrideType(str, Enum):
@@ -74,11 +83,18 @@ class HumanRulingInput(_TenantModel):
     override_note: Optional[str] = Field(default=None, max_length=1000)
 
 
+class InvestmentTransitionInput(_TenantModel):
+    opportunity_id: str
+    rationale: str = Field(min_length=3, max_length=2000)
+    investor_confidence: float = Field(default=0.5, ge=0, le=1)
+
+
 class HumanRulingRecord(HumanRulingInput):
     ruling_id: str = Field(default_factory=lambda: str(uuid4()))
     actor_id: str
     prior_ruling_id: Optional[str] = None
     created_at: datetime = Field(default_factory=utcnow)
+    ruling_context: str = "disposition"
 
 
 class WorkflowActionRecord(_TenantModel):

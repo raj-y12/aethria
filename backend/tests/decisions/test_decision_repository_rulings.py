@@ -24,6 +24,7 @@ class _CreateConnection:
                 "current_ruling_id": None,
                 "current_recommendation_id": None,
                 "recommended_state": "advance",
+                "decision_state": "advance",
                 "legacy_startup_id": "6df278f2-679f-4a7f-8dd9-27109904d093",
             },
             {"ruling_id": "ruling-a"},
@@ -72,6 +73,80 @@ async def test_invest_ruling_creates_canonical_portfolio_position_only_for_expli
         if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
     ]
     assert "portfolio_position.created" in outbox_events
+
+
+@pytest.mark.asyncio
+async def test_advance_ruling_creates_diligence_questions_action():
+    connection = _CreateConnection()
+    connection.fetchrows[0]["company_id"] = "company-a"
+    connection.fetchrows.append(_workflow_action_row(action_type="prepare_diligence_questions", status="completed"))
+    repository = DecisionRepository(_Pool(connection))
+    await repository.create_ruling(
+        HumanRulingInput(
+            user_id="user-a", opportunity_id="opportunity-a", decision="advance",
+            rationale="Evidence merits active diligence.",
+        ), actor_id="operator-a",
+    )
+    assert any(
+        call[0] == "fetchrow" and "insert into public.workflow_actions" in call[1]
+        for call in connection.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_investment_transition_is_idempotent_and_explicit():
+    connection = _CreateConnection()
+    connection.fetchrows[0]["company_id"] = "company-a"
+    connection.fetchrows[1] = None
+    connection.fetchrows.append({"ruling_id": "ruling-invest"})
+    calls = []
+
+    class Portfolio:
+        async def create_position_on_connection(self, conn, **kwargs):
+            calls.append(kwargs)
+            return {"position_id": "position-a"}
+
+    repository = DecisionRepository(_Pool(connection), portfolio_repository=Portfolio())
+    result = await repository.create_investment_transition(
+        user_id="user-a", opportunity_id="opportunity-a",
+        rationale="Diligence complete.", investor_confidence=0.9, actor_id="operator-a",
+    )
+    assert result["decision"] == "invest"
+    assert len(calls) == 1
+    outbox_events = [
+        call[2][4] for call in connection.calls
+        if call[0] == "execute" and "insert into public.domain_outbox" in call[1]
+    ]
+    assert "human_ruling.created" in outbox_events
+
+
+@pytest.mark.asyncio
+async def test_pass_cancels_open_workflow_actions():
+    connection = _CreateConnection()
+    repository = DecisionRepository(_Pool(connection))
+    await repository.create_ruling(
+        HumanRulingInput(
+            user_id="user-a", opportunity_id="opportunity-a", decision="pass",
+            rationale="The evidence does not support continued work.",
+        ), actor_id="operator-a",
+    )
+    assert any(
+        call[0] == "execute" and "status='cancelled'" in call[1]
+        for call in connection.calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_investment_transition_requires_prior_advance():
+    connection = _CreateConnection()
+    connection.fetchrows[0]["decision_state"] = "monitor"
+    connection.fetchrows[1] = None
+    repository = DecisionRepository(_Pool(connection), portfolio_repository=object())
+    with pytest.raises(ValueError, match="previously advanced"):
+        await repository.create_investment_transition(
+            user_id="user-a", opportunity_id="opportunity-a",
+            rationale="Commit now.", investor_confidence=0.8, actor_id="operator-a",
+        )
 
 
 def _workflow_action_row(**overrides):

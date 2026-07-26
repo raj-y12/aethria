@@ -121,13 +121,13 @@ describe('OpportunityIntelligence', () => {
     // Monitor matches the system lean — no override question.
     fireEvent.click(screen.getByRole('button', { name: 'Monitor' }));
     expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
-    // Invest disagrees — the question appears and the answer is sent with the ruling.
-    fireEvent.click(screen.getByRole('button', { name: 'Invest' }));
+    // Pass disagrees — the question appears and the answer is sent with the ruling.
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
     fireEvent.change(screen.getByLabelText('Override attribution'), { target: { value: 'missing_private_evidence' } });
     fireEvent.change(screen.getByLabelText('Ruling rationale'), { target: { value: 'Spoke with two design partners directly.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
     await waitFor(() => expect(api.createHumanRuling).toHaveBeenCalledWith('opportunity-1', expect.objectContaining({
-      decision: 'invest', override_type: 'missing_private_evidence',
+      decision: 'pass', override_type: 'missing_private_evidence',
     })));
   });
 

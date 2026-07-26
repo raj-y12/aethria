@@ -71,7 +71,7 @@ class DecisionRepository:
                 opportunity = await conn.fetchrow(
                     """
                     select o.current_ruling_id,o.current_recommendation_id,o.legacy_startup_id,o.company_id,
-                           o.workflow_version,
+                           o.workflow_version,o.decision_state,r.missing_information,
                            r.recommended_state
                     from public.opportunities o
                     left join public.recommendations r
@@ -126,6 +126,16 @@ class DecisionRepository:
                     ruling.opportunity_id, uid, ruling_id,
                     ruling_to_opportunity_state(ruling.decision),
                 )
+                if ruling.decision.value == "pass":
+                    await conn.execute(
+                        """
+                        update public.workflow_actions
+                        set status='cancelled', updated_at=now()
+                        where user_id=$1 and opportunity_id=$2
+                          and status in ('draft','pending_approval','approved','running')
+                        """,
+                        uid, ruling.opportunity_id,
+                    )
                 if ruling.decision.value == "invest":
                     if self.portfolio_repository is None:
                         raise RuntimeError("Canonical portfolio repository is required for INVEST rulings")
@@ -156,6 +166,14 @@ class DecisionRepository:
                         trigger_type="human_ruling", trigger_id=ruling_id,
                         missing_evidence=[], due_at=None,
                     )
+                if ruling.decision.value == "advance":
+                    missing_evidence = _json(opportunity.get("missing_information"), [])
+                    await self._insert_action(
+                        conn, user_id=uid, opportunity_id=ruling.opportunity_id,
+                        action_type=WorkflowActionType.PREPARE_DILIGENCE_QUESTIONS,
+                        trigger_type="human_ruling", trigger_id=ruling_id,
+                        missing_evidence=missing_evidence if isinstance(missing_evidence, list) else [], due_at=None,
+                    )
                 await self._outbox(
                     conn, user_id=uid, aggregate_type="human_ruling",
                     aggregate_id=ruling_id, event_type="human_ruling.created",
@@ -174,16 +192,101 @@ class DecisionRepository:
                     },
                 )
                 if self.authority_service is not None and hasattr(getattr(self.authority_service, "repository", None), "transition_workflow_on_connection"):
+                    target_state = {
+                        "advance": "evidence_active",
+                        "monitor": "monitoring",
+                        "pass": "completed",
+                    }.get(ruling.decision.value, "completed")
                     await self.authority_service.repository.transition_workflow_on_connection(
                         conn,
                         user_id=uid, opportunity_id=ruling.opportunity_id,
                         expected_version=int(opportunity.get("workflow_version") or 0),
-                        target_state=("monitoring" if ruling.decision.value == "monitor" else "completed"),
+                        target_state=target_state,
                         transition_id=uuid4(),
                     )
                 payload = dict(row)
                 payload["override_type"] = override.value if override else None
                 return payload
+
+    async def create_investment_transition(
+        self, *, user_id: str, opportunity_id: str, rationale: str,
+        investor_confidence: float, actor_id: str,
+    ) -> Dict[str, Any]:
+        """Create an idempotent post-diligence INVEST transition and position."""
+        uid = require_user_id(user_id, context="DecisionRepository.create_investment_transition")
+        await self._require_write_path(user_id=uid, operation="investment transition")
+        if self.portfolio_repository is None:
+            raise RuntimeError("Canonical portfolio repository is required for investment transitions")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                if self.authority_service is not None and hasattr(self.authority_service, "assert_write_path_on_connection"):
+                    await self.authority_service.assert_write_path_on_connection(conn, user_id=uid, operation="investment transition")
+                opportunity = await conn.fetchrow(
+                    """
+                    select current_ruling_id,current_recommendation_id,legacy_startup_id,company_id,decision_state,workflow_version
+                    from public.opportunities where user_id=$1 and opportunity_id=$2 for update
+                    """, uid, opportunity_id,
+                )
+                if opportunity is None:
+                    raise LookupError("Opportunity not found for tenant")
+                if str(opportunity.get("decision_state") or "") != "advance":
+                    raise ValueError("Investment transition requires an opportunity previously advanced to diligence")
+                existing = await conn.fetchrow(
+                    "select * from public.canonical_portfolio_positions where user_id=$1 and opportunity_id=$2",
+                    uid, opportunity_id,
+                )
+                if existing is not None:
+                    result = db_row(existing)
+                    result.update({"decision": "invest", "idempotent": True})
+                    return result
+                ruling_id = str(uuid4())
+                row = await conn.fetchrow(
+                    """
+                    insert into public.human_rulings (
+                      ruling_id,user_id,opportunity_id,recommendation_id,decision,
+                      rationale,investor_confidence,actor_id,prior_ruling_id,ruling_context,created_at
+                    ) values ($1,$2,$3,$4,'invest',$5,$6,$7,$8,'investment_transition',now()) returning *
+                    """,
+                    ruling_id, uid, opportunity_id, opportunity.get("current_recommendation_id"),
+                    rationale, investor_confidence, actor_id, opportunity.get("current_ruling_id"),
+                )
+                await conn.execute(
+                    """update public.opportunities set current_ruling_id=$3,decision_state='invested',updated_at=now()
+                    where opportunity_id=$1 and user_id=$2""", opportunity_id, uid, ruling_id,
+                )
+                position = await self.portfolio_repository.create_position_on_connection(
+                    conn, user_id=uid, opportunity_id=opportunity_id,
+                    company_id=str(opportunity["company_id"]), ruling_id=ruling_id,
+                    rationale=rationale, investor_confidence=investor_confidence,
+                )
+                await self._outbox(
+                    conn, user_id=uid, aggregate_type="human_ruling", aggregate_id=ruling_id,
+                    event_type="human_ruling.created",
+                    payload={
+                        "ruling_id": ruling_id,
+                        "opportunity_id": opportunity_id,
+                        "decision": "invest",
+                        "ruling_context": "investment_transition",
+                        "rationale": rationale,
+                    },
+                )
+                await self._outbox(
+                    conn, user_id=uid, aggregate_type="portfolio_position", aggregate_id=opportunity_id,
+                    event_type="portfolio_position.created",
+                    payload={"opportunity_id": opportunity_id, "ruling_id": ruling_id, "decision": "invest"},
+                )
+                if self.authority_service is not None and hasattr(getattr(self.authority_service, "repository", None), "transition_workflow_on_connection"):
+                    await self.authority_service.repository.transition_workflow_on_connection(
+                        conn,
+                        user_id=uid,
+                        opportunity_id=opportunity_id,
+                        expected_version=int(opportunity.get("workflow_version") or 0),
+                        target_state="completed",
+                        transition_id=uuid4(),
+                    )
+                result = db_row(row)
+                result.update({"decision": "invest", "position": position, "idempotent": False})
+                return result
 
     async def list_rulings(
         self,

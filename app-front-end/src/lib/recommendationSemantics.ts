@@ -15,7 +15,7 @@ const RECOMMENDATION_SEMANTICS: Readonly<
     label: 'Advance',
     explanation: 'Aethria sees enough grounded evidence to advance the opportunity.',
     defaultRuling: 'advance',
-    alignedRulings: ['advance', 'invest'],
+    alignedRulings: ['advance'],
   },
   monitor: {
     label: 'Monitor',

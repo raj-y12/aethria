@@ -11,7 +11,6 @@ const DECISION_OPTIONS = [
   { value: 'advance', label: 'Advance' },
   { value: 'monitor', label: 'Monitor' },
   { value: 'pass', label: 'Pass' },
-  { value: 'invest', label: 'Invest' },
 ] satisfies Array<{ value: HumanRulingDecision; label: string }>;
 
 export default function HumanRulingComposer({

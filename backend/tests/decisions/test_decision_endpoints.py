@@ -77,6 +77,54 @@ def test_human_ruling_is_blocked_before_mutation_in_canonical_read(monkeypatch):
     assert repository.ruling_calls == []
 
 
+def test_initial_human_ruling_rejects_invest(monkeypatch):
+    repository = _DecisionRepository()
+    response = _client(
+        monkeypatch, mode=RolloutMode.SHADOW, repository=repository
+    ).post(
+        "/api/opportunities/opportunity-1/rulings",
+        headers={"Authorization": "Bearer clerk-token"},
+        json={"decision": "invest", "rationale": "Commit now."},
+    )
+    assert response.status_code == 422
+    assert repository.ruling_calls == []
+
+
+class _InvestmentRepository(_DecisionRepository):
+    async def create_investment_transition(self, **kwargs):
+        self.investment_kwargs = kwargs
+        return {"ruling_id": "ruling-invest", "decision": "invest"}
+
+
+class _BlockedInvestmentRepository(_DecisionRepository):
+    async def create_investment_transition(self, **_kwargs):
+        raise ValueError("Investment transition requires a prior Advance ruling and active diligence")
+
+
+def test_investment_is_a_separate_transition(monkeypatch):
+    repository = _InvestmentRepository()
+    response = _client(
+        monkeypatch, mode=RolloutMode.SHADOW, repository=repository
+    ).post(
+        "/api/opportunities/opportunity-1/investment",
+        headers={"Authorization": "Bearer clerk-token"},
+        json={"rationale": "Diligence complete.", "investor_confidence": 0.9},
+    )
+    assert response.status_code == 200
+    assert repository.investment_kwargs["opportunity_id"] == "opportunity-1"
+
+
+def test_investment_transition_rejects_opportunity_not_ready(monkeypatch):
+    response = _client(
+        monkeypatch, mode=RolloutMode.SHADOW, repository=_BlockedInvestmentRepository()
+    ).post(
+        "/api/opportunities/opportunity-1/investment",
+        headers={"Authorization": "Bearer clerk-token"},
+        json={"rationale": "Commit now."},
+    )
+    assert response.status_code == 409
+
+
 class _ActionRepository(_DecisionRepository):
     async def create_action(self, **_kwargs):
         raise AssertionError("authority fence must run before action creation")

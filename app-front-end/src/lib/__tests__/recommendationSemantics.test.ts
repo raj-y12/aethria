@@ -8,16 +8,13 @@ import {
 describe('institutional recommendation semantics', () => {
   it.each([
     ['advance', 'advance', true],
-    ['advance', 'invest', true],
     ['monitor', 'monitor', true],
     ['pass', 'pass', true],
     ['advance', 'pass', false],
-    ['monitor', 'invest', false],
     ['pass', 'monitor', false],
     ['insufficient_evidence', 'advance', false],
     ['insufficient_evidence', 'monitor', false],
     ['insufficient_evidence', 'pass', false],
-    ['insufficient_evidence', 'invest', false],
   ] as const)('%s and %s alignment is %s', (recommendation, ruling, aligned) => {
     expect(rulingAlignsWithRecommendation(recommendation, ruling)).toBe(aligned);
   });

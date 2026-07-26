@@ -50,14 +50,13 @@ describe('HumanRulingComposer', () => {
     api.createHumanRuling.mockResolvedValue({ ruling_id: 'ruling-1', decision: 'advance' });
   });
 
-  it('offers every human ruling action and submits Advance', async () => {
+  it('offers the three opportunity dispositions and submits Advance', async () => {
     renderComposer();
 
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Advance',
       'Monitor',
       'Pass',
-      'Invest',
       'Commit ruling',
     ]);
 
@@ -80,26 +79,10 @@ describe('HumanRulingComposer', () => {
     expect(screen.getByRole('button', { name: 'Commit ruling' })).toBeDisabled();
   });
 
-  it('treats an Invest ruling as aligned with an Advance recommendation', async () => {
-    renderComposer('advance');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Invest' }));
-    expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Ruling rationale'), {
-      target: { value: 'The verified evidence now supports making the investment.' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
-
-    await waitFor(() => expect(api.createHumanRuling).toHaveBeenCalled());
-    const [, input] = api.createHumanRuling.mock.calls[0];
-    expect(input).toMatchObject({ decision: 'invest' });
-    expect(input).not.toHaveProperty('override_type');
-  });
-
   it('asks for override attribution on a true recommendation disagreement', () => {
-    renderComposer('pass');
+    renderComposer('monitor');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Invest' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
 
     expect(screen.getByLabelText('Override attribution')).toBeInTheDocument();
   });
@@ -134,7 +117,7 @@ describe('HumanRulingComposer', () => {
   it('does not preselect a ruling for insufficient evidence', () => {
     renderComposer('insufficient_evidence');
 
-    for (const label of ['Advance', 'Monitor', 'Pass', 'Invest']) {
+    for (const label of ['Advance', 'Monitor', 'Pass']) {
       expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false');
     }
   });
@@ -153,7 +136,7 @@ describe('HumanRulingComposer', () => {
       recommendedDecision: 'insufficient_evidence',
     }, queryClient));
 
-    for (const label of ['Advance', 'Monitor', 'Pass', 'Invest']) {
+    for (const label of ['Advance', 'Monitor', 'Pass']) {
       expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'false');
     }
     expect(screen.getByLabelText('Ruling rationale')).toHaveValue('');
