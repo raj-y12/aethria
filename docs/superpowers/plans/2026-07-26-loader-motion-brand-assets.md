@@ -13,7 +13,7 @@
 - Preserve all files in `brand-assets/assets/` and their current filenames/viewBox dimensions.
 - Keep banner platform sizes, controls, layouts, and PNG export resolution unchanged.
 - Use Playfair Display for the wordmark and `#3d6b5e` for its full stop.
-- Use thin open brackets matching the gallery-loader's 1px visual weight.
+- Use thin open brackets matching the gallery-loader's 1px visual weight, 14px arm length, and 26px outer offset.
 - Do not modify the marketing loader implementation or add dependencies.
 - Keep output user-scoped/backend files untouched.
 
@@ -71,7 +71,7 @@
 
 - [ ] **Step 1: Remove radial blob helpers**
 
-  Replace `buildBlobs`, `radial`, and `drawBlob` with a seeded streak generator. Each streak object must contain `x`, `y`, `length`, `width`, `alpha`, `color`, and an angle concentrated around a single diagonal direction. Generate a mixture of long, low-opacity lines and fewer short, brighter accent lines; choose colors cyclically from `cfg.colors`.
+  Replace `buildBlobs`, `radial`, and `drawBlob` with a seeded streak generator. Each streak object must contain `x`, `y`, `length`, `width`, `alpha`, `blur`, `color`, and a near-horizontal angle. Generate overlapping full-width broad blurred bands plus finer long streaks; choose subdued colors cyclically from `cfg.colors`.
 
 - [ ] **Step 2: Render the motion field**
 

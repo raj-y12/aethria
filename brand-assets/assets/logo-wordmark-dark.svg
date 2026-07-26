@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 120" width="480" height="120">
   <rect width="480" height="120" fill="#0a1629"/>
-  <path data-brand-bracket="left" d="M76 25H58v70h18" fill="none" stroke="#d9d7d4" stroke-width="1"/>
-  <path data-brand-bracket="right" d="M404 25h18v70h-18" fill="none" stroke="#d9d7d4" stroke-width="1"/>
+  <path data-brand-bracket="left" d="M93 25H79v70h14" fill="none" stroke="#d9d7d4" stroke-width="1"/>
+  <path data-brand-bracket="right" d="M366 25h14v70h-14" fill="none" stroke="#d9d7d4" stroke-width="1"/>
   <text x="105" y="79" fill="#d9d7d4" font-family="'Playfair Display', Georgia, serif" font-size="70" font-weight="500">Aethria</text>
   <text x="339" y="79" fill="#7aab9a" font-family="'Playfair Display', Georgia, serif" font-size="70" font-weight="500">.</text>
 </svg>

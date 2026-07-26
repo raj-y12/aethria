@@ -608,7 +608,7 @@
 
       /* ---------------- presets ---------------- */
       var PRESETS = {
-        aethria:  { name: 'Aethria',  base: '#e7e0d4', ink: '#001433', hole: '#001433', colors: ['#3d6b5e', '#7aab9a', '#c9d9ea', '#a88a5e'] },
+        aethria:  { name: 'Aethria',  base: '#18261f', ink: '#d9d7d4', hole: '#101a15', colors: ['#8ca85e', '#61775f', '#7b8c95', '#3d5547'] },
         spectrum: { name: 'Spectrum', base: '#c6c2b9', ink: '#f8f5ee', hole: '#0b0d12', colors: ['#ff5a1f', '#2f6bff', '#8a36ff', '#00c2b2'] },
         ember:    { name: 'Ember',    base: '#1a1410', ink: '#ffe9cf', hole: '#0d0805', colors: ['#ff7a18', '#ff3d6e', '#ffb020', '#7a2bff'] },
         tide:     { name: 'Tide',     base: '#0b1622', ink: '#eaf3ff', hole: '#050a12', colors: ['#2bd0ff', '#1f6bff', '#5a3cff', '#00e0a4'] },
@@ -627,17 +627,18 @@
       /* ---------------- motion streak renderer ---------------- */
       function buildStreaks(cfg, w, h) {
         var rng = mulberry32(cfg.seed || 1);
-        var count = Math.max(42, Math.round((w * h) / 13500));
+        var count = Math.max(96, Math.round((w * h) / 5100));
         var streaks = [];
         for (var i = 0; i < count; i++) {
-          var accent = rng() > 0.79;
+          var broad = rng() > 0.68;
           streaks.push({
-            x: (-0.18 + rng() * 1.36) * w,
+            x: (-0.32 + rng() * 0.3) * w,
             y: (-0.1 + rng() * 1.2) * h,
-            length: (accent ? 0.12 : 0.2 + rng() * 0.46) * w,
-            width: accent ? 1.1 + rng() * 1.25 : 0.35 + rng() * 0.85,
-            alpha: accent ? 0.26 + rng() * 0.2 : 0.045 + rng() * 0.14,
-            angle: -0.22 + (rng() - 0.5) * 0.12,
+            length: (broad ? 0.76 + rng() * 0.7 : 0.58 + rng() * 0.72) * w,
+            width: broad ? (0.014 + rng() * 0.045) * h : 0.45 + rng() * 1.35,
+            alpha: broad ? 0.028 + rng() * 0.085 : 0.035 + rng() * 0.12,
+            blur: broad ? 2.5 + rng() * 6 : 0,
+            angle: -0.035 + (rng() - 0.5) * 0.035,
             color: cfg.colors[i % cfg.colors.length]
           });
         }
@@ -657,6 +658,7 @@
           ctx.strokeStyle = streak.color;
           ctx.globalAlpha = streak.alpha;
           ctx.lineWidth = Math.max(1, streak.width * s);
+          ctx.filter = streak.blur ? 'blur(' + (streak.blur * s) + 'px)' : 'none';
           ctx.stroke();
         });
         ctx.restore();
@@ -685,8 +687,8 @@
       }
 
       function drawBrackets(ctx, x, top, width, height, s, color) {
-        var gap = 18 * s;
-        var arm = 11 * s;
+        var gap = 26 * s;
+        var arm = 14 * s;
         var left = x - gap;
         var right = x + width + gap;
         ctx.save();
@@ -871,8 +873,8 @@
 
       var studio = {
         w: 1584, h: 396, exportRatio: 3, seed: 7,
-        base: PRESETS.spectrum.base, ink: PRESETS.spectrum.ink, hole: PRESETS.spectrum.hole,
-        colors: PRESETS.spectrum.colors.slice(),
+        base: PRESETS.aethria.base, ink: PRESETS.aethria.ink, hole: PRESETS.aethria.hole,
+        colors: PRESETS.aethria.colors.slice(),
         layout: 'statement', titleSize: 132,
         text: { eyebrow: '→ aethria.co', title: 'Move\nFirst.', footer: 'aethria.co', corner: '01 / 06' }
       };
@@ -940,7 +942,7 @@
         b.className = 'preset-pill';
         b.type = 'button';
         b.setAttribute('data-key', key);
-        b.setAttribute('aria-pressed', key === 'spectrum' ? 'true' : 'false');
+        b.setAttribute('aria-pressed', key === 'aethria' ? 'true' : 'false');
         var swz = '<span class="swz">' + p.colors.map(function (c) { return '<i style="background:' + c + '"></i>'; }).join('') + '</span>';
         b.innerHTML = swz + '<span>' + p.name + '</span>';
         b.addEventListener('click', function () { applyPreset(key); });
