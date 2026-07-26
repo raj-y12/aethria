@@ -39,4 +39,8 @@ if (!index.includes('angle: -0.035 + (rng() - 0.5) * 0.035')) {
   throw new Error('Motion field must use the reference’s near-horizontal blur direction.');
 }
 
+if (!index.includes("base: '#0a1629', ink: '#d9d7d4'") || !index.includes("colors: ['#26313f', '#3d6b5e', '#7aab9a', '#c9d9ea']")) {
+  throw new Error('The Aethria motion preset must use the established ink, stock, verdigris, and signal palette.');
+}
+
 console.log(`Brand assets verified: ${assetNames.length} bracketed SVGs and motion-streak studio.`);
