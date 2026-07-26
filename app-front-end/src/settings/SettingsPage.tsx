@@ -296,11 +296,10 @@ function EditorialStatus({
 function GroupHeader({ index, title, description }: { index: string; title: string; description: string }) {
   return (
     <div className="group-index border-t border-oxford/[0.16] pb-phi-4 pt-phi-8">
-      <div className="flex items-center justify-between gap-phi-4">
-        <span className="type-label-section text-xs text-oxford/55">{index} / CONTROL GROUP</span>
-        <span className="type-status text-[10px] text-oxford/50">AETHRIA SYSTEM</span>
+      <div className="flex items-baseline justify-between gap-phi-4 border-b border-oxford/[0.10] pb-phi-3">
+        <h2 className="type-display text-[clamp(1.5rem,3vw,2.3rem)] font-medium leading-none tracking-[-0.015em] text-oxford">{title}</h2>
+        <span className="type-status shrink-0 text-[10px] tracking-[0.16em] text-oxford/45">{index} — 04</span>
       </div>
-      <h2 className="mt-phi-3 type-display text-[clamp(1.75rem,3vw,2.35rem)] leading-[1.04] tracking-[-0.02em] text-oxford">{title}</h2>
       <p className="mt-phi-2 max-w-[48ch] type-body-sm leading-relaxed text-oxford/70">{description}</p>
     </div>
   );
@@ -774,7 +773,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper text-oxford">
+    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden">
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
@@ -808,7 +807,7 @@ export default function SettingsPage() {
             onSelect={scrollToSection}
           />
           <motion.main
-            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[60rem] px-phi-5 pt-phi-6`}
+            className={`${workspaceLayout.pageBottom} settings-gallery-content mx-auto w-full overflow-y-visible`}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
@@ -822,15 +821,14 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="border-b border-oxford/[0.16]">
-              <header className="border-b border-oxford/[0.10] pb-phi-7">
-                <div className="flex flex-wrap items-center justify-between gap-phi-3">
-                  <span className="type-label-section text-xs text-oxford/55">CONTROL SURFACE</span>
-                  <span className="type-status text-[10px] text-oxford/50">PRIVATE WORKSPACE · V1</span>
-                </div>
-                <h1 className="mt-phi-4 type-display text-[clamp(2.2rem,5vw,4rem)] leading-[0.98] tracking-[-0.025em] text-oxford">Settings</h1>
-                <p className="mt-phi-3 max-w-[54ch] type-body leading-relaxed text-oxford/70">Your operating mandate, decision policy, and runtime controls.</p>
+            <div className="settings-gallery-plate">
+              <span className="settings-gallery-cap settings-gallery-cap--left">Settings · Control surface</span>
+              <span className="settings-gallery-cap settings-gallery-cap--right">Mandate · Policy · Runtime</span>
+              <header className="settings-gallery-plate-head">
+                <h1>Settings</h1>
+                <span className="settings-gallery-plate-num">01 — 01</span>
               </header>
+              <p className="settings-gallery-intro">Your operating mandate, decision policy, and runtime controls.</p>
                   <GroupHeader
                     index="01"
                     title="Fund thesis"

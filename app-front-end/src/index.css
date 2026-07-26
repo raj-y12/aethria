@@ -205,6 +205,94 @@
   background-repeat: repeat;
 }
 
+/* Settings room — the functional counterpart to the marketing gallery plates. */
+.settings-gallery-room {
+  background: var(--color-paper);
+  color: var(--color-oxford);
+}
+.settings-gallery-content {
+  position: relative;
+  padding: clamp(2.5rem, 8vh, 7rem) var(--space-5) var(--space-9);
+}
+.settings-gallery-plate {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+.settings-gallery-plate::before,
+.settings-gallery-plate::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  width: 14px;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.26);
+  pointer-events: none;
+}
+.settings-gallery-plate::before {
+  left: -26px;
+  border-right: 0;
+}
+.settings-gallery-plate::after {
+  right: -26px;
+  border-left: 0;
+}
+.settings-gallery-cap {
+  position: absolute;
+  top: 50%;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(var(--color-oxford-rgb), 0.44);
+  transform: translateY(-50%);
+}
+.settings-gallery-cap--left { left: calc(-1 * var(--space-9)); }
+.settings-gallery-cap--right { right: calc(-1 * var(--space-9)); }
+.settings-gallery-plate-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+.settings-gallery-plate-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.settings-gallery-plate-head .settings-gallery-plate-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: rgba(var(--color-oxford-rgb), 0.44);
+}
+.settings-gallery-intro {
+  max-width: 56ch;
+  margin: calc(-1 * var(--space-4)) 0 var(--space-7);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: rgba(var(--color-oxford-rgb), 0.54);
+}
+@media (max-width: 900px) {
+  .settings-gallery-cap { display: none; }
+  .settings-gallery-content { padding-top: var(--space-6); }
+}
+@media (max-width: 640px) {
+  .settings-gallery-plate::before,
+  .settings-gallery-plate::after { display: none; }
+  .settings-gallery-plate-head { margin-bottom: var(--space-5); }
+}
+
 /* Clerk portal content — match Aethria paper / oxford */
 .cl-modalBackdrop {
   background-color: rgba(var(--color-oxford-rgb), 0.4) !important;
