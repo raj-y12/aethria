@@ -135,7 +135,7 @@ export default function OperationsStrip({
     <section
       className={isRail
         ? 'bg-paper px-phi-4 py-phi-5'
-        : 'border-b border-oxford/[0.16] bg-paper px-phi-4 py-phi-3 lg:px-phi-6'}
+        : 'border-b border-oxford/[0.16] bg-paper px-phi-5 py-phi-4 lg:px-phi-6'}
       aria-labelledby="operations-strip-title"
       aria-label="Pipeline controls"
     >

@@ -316,10 +316,12 @@ function SettingsGroup({
   children: React.ReactNode;
 }) {
   return (
-    <div className="settings-gallery-section">
-      <GroupHeader index={index} title={title} description={description} />
-      {children}
-    </div>
+    <section className="settings-gallery-section">
+      <div className="settings-gallery-frame">
+        <GroupHeader index={index} title={title} description={description} />
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -791,7 +793,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden md:pl-36 lg:pl-40">
+    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden md:pl-[clamp(204px,15vw,248px)]">
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
@@ -818,21 +820,20 @@ export default function SettingsPage() {
             attentionSection={attentionSection}
             onSelect={scrollToSection}
           />
+          <div className="sticky top-[3.75rem] z-10 lg:top-0">
+            <OperationsStrip
+              variant="bar"
+              settings={settings}
+              storageUnavailable={storageNotReady}
+              onSettingsChange={setSettings}
+            />
+          </div>
           <motion.main
             className={`${workspaceLayout.pageBottom} settings-gallery-content mx-auto w-full overflow-y-visible`}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
           >
-            <div className="mb-phi-5">
-              <OperationsStrip
-                variant="bar"
-                settings={settings}
-                storageUnavailable={storageNotReady}
-                onSettingsChange={setSettings}
-              />
-            </div>
-
             <div className="settings-gallery-plate">
               <header className="settings-gallery-plate-head">
                 <h1>Settings</h1>

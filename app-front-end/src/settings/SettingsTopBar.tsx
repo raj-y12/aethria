@@ -49,13 +49,13 @@ export default function SettingsTopBar({
 
   return (
     <motion.header
-      className="flex-none border-b border-oxford/[0.16] bg-paper md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-36 md:flex-col md:justify-between md:border-b-0 lg:w-40"
+      className="flex-none border-b border-oxford/[0.16] bg-paper md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[clamp(204px,15vw,248px)] md:flex-col md:justify-between md:border-b-0"
       initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
     >
-      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 md:flex-col md:h-full md:min-h-0 md:items-stretch md:gap-5 md:[padding:26px_16px_20px]">
-        <div className="flex min-w-0 items-center gap-phi-4 md:block md:shrink-0 md:px-3">
+      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 md:h-full md:min-h-0 md:flex-col md:items-stretch md:gap-phi-4 md:px-phi-4 md:pb-phi-4 md:pt-phi-5">
+        <div className="flex min-w-0 items-center gap-phi-4 md:block md:shrink-0 md:px-2">
           <button
             type="button"
             onClick={onBack}
@@ -63,13 +63,11 @@ export default function SettingsTopBar({
           >
             <span aria-hidden>←</span> Aethria
           </button>
-          <span className="h-4 w-px bg-oxford/15 md:hidden" aria-hidden />
-          <p className="type-label-section text-oxford md:mt-phi-2">AETHRIA / SETTINGS</p>
         </div>
 
         {activeSection && onNavigate ? (
           <nav className="order-3 flex w-full items-center gap-phi-1 overflow-x-auto md:order-none md:flex-col md:items-stretch md:gap-0.5 md:overflow-y-auto" aria-label="Settings areas">
-            {SETTINGS_GROUPS.map((group) => {
+            {SETTINGS_GROUPS.map((group, index) => {
               const sections = SETTINGS_SECTIONS.filter((section) => section.group === group.id);
               const active = sections.some((section) => section.id === activeSection);
               const needsAttention = sections.some((section) => section.id === attentionSection);
@@ -80,6 +78,7 @@ export default function SettingsTopBar({
                   active={active}
                   ariaPressed={active}
                   onClick={() => onNavigate(sections[0].id)}
+                  shortcut={String(index + 1)}
                   compact
                   surface="paper"
                   indicatorId="settings-areas-active"
@@ -89,7 +88,7 @@ export default function SettingsTopBar({
           </nav>
         ) : null}
 
-        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1 md:mt-auto md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-3 md:px-3">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1 md:mt-auto md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-3 md:px-2">
           <span
             className={`type-status inline-flex min-w-0 items-center gap-phi-2 !text-xs ${statusClass}`}
             aria-live="polite"
