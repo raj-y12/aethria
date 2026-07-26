@@ -117,10 +117,12 @@ function AppShell() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
     >
-      <AuthorityRolloutNotice
-        status={systemData.authorityStatus}
-        blockedReason={systemData.authorityBlockedReason}
-      />
+      {systemData.authorityBlockedReason ? (
+        <AuthorityRolloutNotice
+          status={systemData.authorityStatus}
+          blockedReason={systemData.authorityBlockedReason}
+        />
+      ) : null}
       <AppFrame
         data={systemData}
         startupsError={systemData.startupsError}

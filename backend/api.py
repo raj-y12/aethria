@@ -139,6 +139,7 @@ from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
 from authority.repository import AuthorityRepository, AuthorityBlocked
 from authority.service import AuthorityService
+from authority.reconciliation import AuthorityReconciler
 from identity.repository import IdentityRepository
 from identity.service import IdentityService
 from evidence.repository import EvidenceRepository
@@ -191,6 +192,7 @@ _durable_outbox_publisher: Optional[OutboxPublisher] = None
 _durable_job_error: Optional[str] = None
 _durable_depth_snapshot: Dict[str, int] = {}
 _durable_depth_sampler_task: Optional[asyncio.Task] = None
+_authority_reconciliation_task: Optional[asyncio.Task] = None
 _cancelled_lookup_ids: OrderedDict[str, None] = OrderedDict()
 _logger_agents = logging.getLogger("api.agents")
 _logger_visible = logging.getLogger("uvicorn.error")
@@ -926,6 +928,7 @@ async def _durable_depth_sampler() -> None:
 async def _start_durable_job_services(app: FastAPI) -> None:
     global _durable_job_pool, _durable_job_repository, _durable_job_worker
     global _durable_outbox_publisher, _durable_job_error, _durable_depth_sampler_task
+    global _authority_reconciliation_task
 
     try:
         _durable_job_pool = await create_durable_job_pool()
@@ -974,6 +977,36 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         if app.state.authority_repository is not None
         else None
     )
+    if app.state.authority_repository is not None:
+        reconciler = AuthorityReconciler(_durable_job_pool)
+
+        async def _reconcile_authority_loop() -> None:
+            interval = max(30, env_config.get_float("AUTHORITY_RECONCILIATION_SECONDS"))
+            while True:
+                try:
+                    tenants = await _durable_job_pool.fetch(
+                        "select user_id from public.tenant_authority_rollouts"
+                    )
+                    for tenant in tenants:
+                        user_id = str(tenant["user_id"])
+                        current = await app.state.authority_repository.get_rollout(user_id=user_id)
+                        result = await reconciler.check_tenant(user_id)
+                        if current.last_reconciliation_status != result.status:
+                            await app.state.authority_repository.set_reconciliation_status(
+                                user_id=user_id,
+                                expected_version=current.version,
+                                actor_id="authority-reconciler",
+                                status=result.status,
+                            )
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    _logger_agents.warning(
+                        "authority reconciliation pass failed: %s", type(exc).__name__
+                    )
+                await asyncio.sleep(interval)
+
+        _authority_reconciliation_task = asyncio.create_task(_reconcile_authority_loop())
     if _durable_job_repository is not None:
         _durable_job_repository.authority_service = app.state.authority_service
     app.state.authority_projection_consumer = None
@@ -1039,6 +1072,15 @@ async def _start_durable_job_services(app: FastAPI) -> None:
 async def _stop_durable_job_services(app: FastAPI) -> None:
     global _durable_job_pool, _durable_job_repository, _durable_job_worker
     global _durable_outbox_publisher, _durable_depth_sampler_task
+    global _authority_reconciliation_task
+
+    if _authority_reconciliation_task is not None:
+        _authority_reconciliation_task.cancel()
+        try:
+            await _authority_reconciliation_task
+        except asyncio.CancelledError:
+            pass
+        _authority_reconciliation_task = None
 
     if _durable_depth_sampler_task is not None:
         _durable_depth_sampler_task.cancel()

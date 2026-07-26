@@ -243,6 +243,8 @@ REGISTRY: List[EnvVar] = [
            "Maximum durable jobs executing concurrently for one tenant."),
     EnvVar("DURABLE_OUTBOX_POLL_SECONDS", "float", "2", "Durable jobs",
            "Polling cadence for transactional outbox publication."),
+    EnvVar("AUTHORITY_RECONCILIATION_SECONDS", "float", "300", "Authority control",
+           "Background cadence for tenant-scoped canonical/legacy reconciliation."),
 
     # --- Canonical identity -------------------------------------------------
     EnvVar("IDENTITY_AUTO_RESOLVE_CONFIDENCE", "float", "0.85", "Canonical identity",
