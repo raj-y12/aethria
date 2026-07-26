@@ -56,7 +56,7 @@ export default function SettingsTopBar({
             <span aria-hidden>←</span> Aethria
           </button>
           <span className="h-4 w-px bg-oxford/15" aria-hidden />
-          <p className="type-label-section text-oxford">Settings</p>
+          <p className="type-label-section text-oxford">AETHRIA / SETTINGS</p>
         </div>
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1">

@@ -293,11 +293,15 @@ function EditorialStatus({
   );
 }
 
-function GroupHeader({ title, description }: { title: string; description: string }) {
+function GroupHeader({ index, title, description }: { index: string; title: string; description: string }) {
   return (
-    <div className="pb-phi-3 pt-phi-7">
-      <h2 className="type-display text-[1.5rem] leading-none text-oxford">{title}</h2>
-      <p className="mt-phi-2 type-body-sm text-oxford/70">{description}</p>
+    <div className="group-index border-t border-oxford/[0.16] pb-phi-4 pt-phi-8">
+      <div className="flex items-center justify-between gap-phi-4">
+        <span className="type-label-section text-xs text-oxford/55">{index} / CONTROL GROUP</span>
+        <span className="type-status text-[10px] text-oxford/50">AETHRIA SYSTEM</span>
+      </div>
+      <h2 className="mt-phi-3 type-display text-[clamp(1.75rem,3vw,2.35rem)] leading-[1.04] tracking-[-0.02em] text-oxford">{title}</h2>
+      <p className="mt-phi-2 max-w-[48ch] type-body-sm leading-relaxed text-oxford/70">{description}</p>
     </div>
   );
 }
@@ -804,7 +808,7 @@ export default function SettingsPage() {
             onSelect={scrollToSection}
           />
           <motion.main
-            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[52rem] px-phi-5 pt-phi-5`}
+            className={`${workspaceLayout.pageBottom} mx-auto w-full max-w-[60rem] px-phi-5 pt-phi-6`}
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
@@ -818,8 +822,17 @@ export default function SettingsPage() {
               />
             </div>
 
-            <div className="divide-y divide-oxford/[0.06]">
+            <div className="border-b border-oxford/[0.16]">
+              <header className="border-b border-oxford/[0.10] pb-phi-7">
+                <div className="flex flex-wrap items-center justify-between gap-phi-3">
+                  <span className="type-label-section text-xs text-oxford/55">CONTROL SURFACE</span>
+                  <span className="type-status text-[10px] text-oxford/50">PRIVATE WORKSPACE · V1</span>
+                </div>
+                <h1 className="mt-phi-4 type-display text-[clamp(2.2rem,5vw,4rem)] leading-[0.98] tracking-[-0.025em] text-oxford">Settings</h1>
+                <p className="mt-phi-3 max-w-[54ch] type-body leading-relaxed text-oxford/70">Your operating mandate, decision policy, and runtime controls.</p>
+              </header>
                   <GroupHeader
+                    index="01"
                     title="Fund thesis"
                     description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
                   />
@@ -890,6 +903,7 @@ export default function SettingsPage() {
                   </RoomSection>
 
                   <GroupHeader
+                    index="02"
                     title="Decision policy"
                     description="How evidence is scored, escalated, and routed. Changes stay in draft until you deploy a new policy version."
                   />
@@ -1009,6 +1023,7 @@ export default function SettingsPage() {
                   </RoomSection>
 
                   <GroupHeader
+                    index="03"
                     title="Workspace runtime"
                     description="Operational limits for this workspace. Changes here save immediately and affect the running system."
                   />
@@ -1028,6 +1043,7 @@ export default function SettingsPage() {
                   </RoomSection>
 
                   <GroupHeader
+                    index="04"
                     title="System"
                     description="Read-only readiness and operator diagnostics. Pipeline controls remain in the system rail and save immediately."
                   />

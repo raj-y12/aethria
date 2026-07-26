@@ -42,9 +42,9 @@ export default function SettingsRail({
       <nav className="flex min-h-0 flex-col gap-phi-4 overflow-y-auto" aria-label="Settings sections">
         {SETTINGS_GROUPS.map((group) => (
           <div key={group.id}>
-            <div className="flex items-baseline justify-between gap-phi-2 px-2 pb-phi-2">
+            <div className="flex flex-col items-start gap-phi-1 px-2 pb-phi-2">
               <p className="type-label-section text-xs text-oxford/70">{group.label}</p>
-              <span className="type-status text-xs text-oxford/70">{group.persistence}</span>
+              <span className="type-status text-[10px] text-oxford/50">{group.persistence}</span>
             </div>
             <div className="flex flex-col gap-0.5">
               {SETTINGS_SECTIONS.filter((section) => section.group === group.id).map((section) => {

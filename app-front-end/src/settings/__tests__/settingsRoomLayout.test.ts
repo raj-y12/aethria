@@ -155,6 +155,13 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).toContain('overscroll-contain bg-paper');
   });
 
+  it('uses the marketing page editorial hierarchy for the settings room', () => {
+    expect(source).toContain('CONTROL SURFACE');
+    expect(source).toContain('Your operating mandate, decision policy, and runtime controls.');
+    expect(source).toContain('group-index');
+    expect(topBarSource).toContain('AETHRIA / SETTINGS');
+  });
+
   it('keeps the settings rail on the app spine geometry', () => {
     expect(railSource).toContain("import { SPINE_WIDTH } from '../components/AppSpine';");
     expect(railSource).toContain('style={{ width: SPINE_WIDTH }}');
@@ -174,7 +181,7 @@ describe('Settings focused-mode layout contract', () => {
 
   it('replaces tabs with a scroll-spy of stacked sections', () => {
     expect(source).toContain('IntersectionObserver');
-    expect(source).toContain("divide-y divide-oxford/[0.06]");
+    expect(source).toContain('border-b border-oxford/[0.16]');
     expect(source).not.toContain("role=\"tablist\"");
     expect(source).not.toContain('activeTab');
     expect(source).not.toContain('lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]');
