@@ -806,16 +806,22 @@ export default function SettingsPage() {
         actionLabel={pendingPolicyPublish ? (saving ? 'Retrying…' : 'Retry publish') : (saving ? 'Deploying…' : 'Deploy changes')}
       />
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-        <SettingsRail
-          activeSection={activeSection}
-          attentionSection={attentionSection}
-          onNavigate={scrollToSection}
+      <SettingsRail
+        activeSection={activeSection}
+        attentionSection={attentionSection}
+        onNavigate={scrollToSection}
+      />
+
+      <div className="hidden border-b border-oxford/[0.08] bg-paper lg:block">
+        <OperationsStrip
+          variant="bar"
           settings={settings}
           storageUnavailable={storageNotReady}
           onSettingsChange={setSettings}
         />
+      </div>
 
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
           ref={contentScrollRef}
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"

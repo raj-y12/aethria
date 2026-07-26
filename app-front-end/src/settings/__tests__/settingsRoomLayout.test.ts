@@ -147,7 +147,7 @@ describe('Settings focused-mode layout contract', () => {
     expect(appSource).not.toContain("!isSettingsRoute && !isPortfolioRoute");
   });
 
-  it('is a top bar + navigation rail over one scrolling reading column', () => {
+  it('is a top bar + compact area nav over one scrolling reading column', () => {
     expect(source).toContain('<SettingsTopBar');
     expect(source).toContain('<SettingsRail');
     expect(source).toContain('<SettingsMobileNav');
@@ -165,10 +165,10 @@ describe('Settings focused-mode layout contract', () => {
     expect(topBarSource).toContain('AETHRIA / SETTINGS');
   });
 
-  it('keeps the settings rail on the app spine geometry', () => {
-    expect(railSource).toContain("import { SPINE_WIDTH } from '../components/AppSpine';");
-    expect(railSource).toContain('style={{ width: SPINE_WIDTH }}');
-    expect(railSource).toContain('px-phi-4 pb-phi-4 pt-phi-5');
+  it('keeps settings navigation compact and horizontal', () => {
+    expect(railSource).toContain('hidden flex-none border-b');
+    expect(railSource).toContain('flex max-w-[860px] items-center');
+    expect(railSource).not.toContain('SPINE_WIDTH');
   });
 
   it('states the persistence model truthfully', () => {
@@ -441,20 +441,20 @@ describe('Settings safe draft actions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Fund thesis is required'));
     await waitFor(() => expect(thesisSection).toHaveFocus());
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Fund name'), {
       target: { value: 'Corrected Thesis Fund' },
     });
-    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
-    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
 
     const correctedConfiguration = {
       ...liveConfiguration,
@@ -466,13 +466,13 @@ describe('Settings safe draft actions', () => {
     mocks.fetchSettings.mockResolvedValue(correctedSettings);
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm the new mandate' })).getByRole('button', { name: 'Confirm update' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
-    expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
   });
 });
