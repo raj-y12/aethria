@@ -1,6 +1,6 @@
 import type { FundConfiguration } from '../lib/fundConfiguration';
 
-export type SettingsPersistenceGroup = 'policy' | 'runtime';
+export type SettingsPersistenceGroup = 'thesis' | 'policy' | 'runtime' | 'system';
 
 export type SectionId =
   | 'thesis'
@@ -31,20 +31,22 @@ export interface FundThesisChangeSet {
 }
 
 export const SETTINGS_GROUPS = [
-  { id: 'policy', label: 'Fund policy', persistence: 'Deploys as a version' },
-  { id: 'runtime', label: 'Live runtime', persistence: 'Saves immediately' },
+  { id: 'thesis', label: 'Fund thesis', persistence: 'Publishes a thesis version' },
+  { id: 'policy', label: 'Decision policy', persistence: 'Publishes a policy version' },
+  { id: 'runtime', label: 'Workspace runtime', persistence: 'Saves immediately' },
+  { id: 'system', label: 'System', persistence: 'Read-only' },
 ] as const;
 
 export const SETTINGS_SECTIONS = [
-  { id: 'thesis', label: 'Fund thesis', short: 'Thesis', group: 'policy' },
-  { id: 'version', label: 'Version context', short: 'Version', group: 'policy' },
+  { id: 'thesis', label: 'Mandate', short: 'Thesis', group: 'thesis' },
+  { id: 'version', label: 'Version context', short: 'Version', group: 'thesis' },
   { id: 'thresholds', label: 'Decision thresholds', short: 'Thresholds', group: 'policy' },
   { id: 'sensitivity', label: 'Escalation sensitivity', short: 'Sensitivity', group: 'policy' },
   { id: 'weights', label: 'Scoring weights', short: 'Weights', group: 'policy' },
   { id: 'memo', label: 'Memo output', short: 'Memo', group: 'policy' },
   { id: 'workflow', label: 'Ruling workflow', short: 'Workflow', group: 'policy' },
   { id: 'budget', label: 'Cost budget', short: 'Budget', group: 'runtime' },
-  { id: 'system', label: 'System state', short: 'System', group: 'runtime' },
+  { id: 'system', label: 'System state', short: 'System', group: 'system' },
 ] as const satisfies readonly {
   id: SectionId;
   label: string;

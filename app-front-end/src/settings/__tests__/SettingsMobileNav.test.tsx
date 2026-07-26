@@ -13,8 +13,10 @@ describe('SettingsMobileNav', () => {
     );
 
     expect(screen.getByRole('combobox', { name: 'Settings section' })).toBeInstanceOf(HTMLSelectElement);
-    expect(screen.getByRole('group', { name: 'Fund policy — deploys as a version' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Live runtime — saves immediately' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Fund thesis — publishes a thesis version' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Decision policy — publishes a policy version' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Workspace runtime — saves immediately' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'System — read-only' })).toBeInTheDocument();
   });
 
   it('selects the requested settings section', () => {

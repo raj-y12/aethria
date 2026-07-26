@@ -10,9 +10,11 @@ import {
 
 describe('settings navigation model', () => {
   it('maps each settings section to its persistence group', () => {
-    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual(['policy', 'runtime']);
-    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'policy')).toHaveLength(7);
-    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'runtime')).toHaveLength(2);
+    expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual(['thesis', 'policy', 'runtime', 'system']);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'thesis')).toHaveLength(2);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'policy')).toHaveLength(5);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'runtime')).toHaveLength(1);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'system')).toHaveLength(1);
   });
 
   it('keeps fund policy preferences in the deployable pending list', () => {

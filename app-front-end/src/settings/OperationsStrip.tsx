@@ -137,6 +137,7 @@ export default function OperationsStrip({
         ? 'bg-paper px-phi-4 py-phi-5'
         : 'border-b border-oxford/[0.16] bg-paper px-phi-4 py-phi-3 lg:px-phi-6'}
       aria-labelledby="operations-strip-title"
+      aria-label="Pipeline controls"
     >
       <div className={isRail ? 'flex flex-col gap-phi-4' : 'flex flex-col gap-phi-3 lg:flex-row lg:items-center lg:gap-phi-6'}>
         <div className={isRail ? '' : 'shrink-0 lg:mr-auto'}>

@@ -9,6 +9,7 @@ import {
   type FundConfiguration,
 } from '../../lib/fundConfiguration';
 import operationsSource from '../OperationsStrip.tsx?raw';
+import railSource from '../SettingsRail.tsx?raw';
 import topBarSource from '../SettingsTopBar.tsx?raw';
 import source from '../SettingsPage.tsx?raw';
 import SettingsPage from '../SettingsPage';
@@ -154,12 +155,21 @@ describe('Settings focused-mode layout contract', () => {
     expect(source).toContain('overscroll-contain bg-paper');
   });
 
+  it('keeps the settings rail on the app spine geometry', () => {
+    expect(railSource).toContain("import { SPINE_WIDTH } from '../components/AppSpine';");
+    expect(railSource).toContain('style={{ width: SPINE_WIDTH }}');
+    expect(railSource).toContain('px-phi-4 pb-phi-4 pt-phi-5');
+  });
+
   it('states the persistence model truthfully', () => {
-    expect(source).toContain('title="Fund policy"');
-    expect(source).toContain('Changes here stay in draft until you deploy a new version.');
-    expect(source).toContain('title="Live runtime"');
+    expect(source).toContain('title="Fund thesis"');
+    expect(source).toContain('title="Decision policy"');
+    expect(source).toContain('title="Workspace runtime"');
+    expect(source).toContain('title="System"');
+    expect(source).toContain('Changes stay in draft until you deploy a new policy version.');
     expect(source).toContain('Changes here save immediately and affect the running system.');
     expect(operationsSource).toContain('These controls save immediately.');
+    expect(operationsSource).toContain('aria-label="Pipeline controls"');
   });
 
   it('replaces tabs with a scroll-spy of stacked sections', () => {
@@ -421,20 +431,20 @@ describe('Settings safe draft actions', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Fund thesis is required'));
     await waitFor(() => expect(thesisSection).toHaveFocus());
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
-    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Fund name'), {
       target: { value: 'Corrected Thesis Fund' },
     });
-    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Thesis — Needs attention' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
-    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(screen.getByRole('button', { name: /Fund thesis — Needs attention/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Mandate — Needs attention/ })).toBeInTheDocument();
 
     const correctedConfiguration = {
       ...liveConfiguration,
@@ -446,13 +456,13 @@ describe('Settings safe draft actions', () => {
     mocks.fetchSettings.mockResolvedValue(correctedSettings);
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm the new mandate' })).getByRole('button', { name: 'Confirm update' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
     fireEvent.click(within(screen.getByRole('dialog', { name: 'Restore default settings?' })).getByRole('button', { name: 'Restore defaults' }));
-    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
-    expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Mandate — Needs attention/ })).not.toBeInTheDocument();
   });
 });

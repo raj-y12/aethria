@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { SPINE_WIDTH } from '../components/AppSpine';
 import type { Settings } from '../api/settings';
 import { usePrefersReducedMotion } from '../hooks';
 import OperationsStrip from './OperationsStrip';
@@ -31,16 +32,17 @@ export default function SettingsRail({
   const reduceMotion = usePrefersReducedMotion();
   return (
     <motion.aside
-      className="hidden w-[13.5rem] flex-none flex-col overflow-y-auto border-r border-oxford/[0.16] bg-paper lg:flex"
+      className="aethria-settings-rail hidden h-full min-h-0 flex-none flex-col overflow-y-auto border-r border-oxford/[0.16] bg-paper px-phi-4 pb-phi-4 pt-phi-5 lg:flex"
       aria-label="Settings sections"
+      style={{ width: SPINE_WIDTH }}
       initial={reduceMotion ? false : { opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.45, ease: EASE, delay: 0.1 }}
     >
-      <nav className="flex flex-col gap-phi-5 px-phi-4 pb-phi-4 pt-phi-5">
+      <nav className="flex min-h-0 flex-col gap-phi-4 overflow-y-auto" aria-label="Settings sections">
         {SETTINGS_GROUPS.map((group) => (
           <div key={group.id}>
-            <div className="flex items-baseline justify-between gap-phi-2 px-phi-4 pb-phi-2">
+            <div className="flex items-baseline justify-between gap-phi-2 px-2 pb-phi-2">
               <p className="type-label-section text-xs text-oxford/70">{group.label}</p>
               <span className="type-status text-xs text-oxford/70">{group.persistence}</span>
             </div>
@@ -77,7 +79,7 @@ export default function SettingsRail({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-oxford/[0.16]">
+      <div className="mt-auto border-t border-oxford/[0.16] -mx-phi-4">
         <OperationsStrip
           variant="rail"
           settings={settings}

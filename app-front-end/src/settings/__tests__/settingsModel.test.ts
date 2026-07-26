@@ -6,10 +6,12 @@ import {
 } from '../settingsModel';
 
 describe('settings persistence model', () => {
-  it('defines the two truthful persistence groups', () => {
+  it('defines truthful settings boundaries', () => {
     expect(SETTINGS_GROUPS.map((group) => group.label)).toEqual([
-      'Fund policy',
-      'Live runtime',
+      'Fund thesis',
+      'Decision policy',
+      'Workspace runtime',
+      'System',
     ]);
   });
 

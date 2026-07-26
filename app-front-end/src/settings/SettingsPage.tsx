@@ -820,8 +820,8 @@ export default function SettingsPage() {
 
             <div className="divide-y divide-oxford/[0.06]">
                   <GroupHeader
-                    title="Fund policy"
-                    description="Changes here stay in draft until you deploy a new version."
+                    title="Fund thesis"
+                    description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
                   />
 
                   <RoomSection
@@ -888,6 +888,11 @@ export default function SettingsPage() {
                       </p>
                     </SpecRow>
                   </RoomSection>
+
+                  <GroupHeader
+                    title="Decision policy"
+                    description="How evidence is scored, escalated, and routed. Changes stay in draft until you deploy a new policy version."
+                  />
 
                 {!bandValidation.valid && (
                   <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] py-phi-3 pl-phi-3">
@@ -1004,8 +1009,8 @@ export default function SettingsPage() {
                   </RoomSection>
 
                   <GroupHeader
-                    title="Live runtime"
-                    description="Changes here save immediately and affect the running system."
+                    title="Workspace runtime"
+                    description="Operational limits for this workspace. Changes here save immediately and affect the running system."
                   />
 
                   <RoomSection
@@ -1021,6 +1026,11 @@ export default function SettingsPage() {
                     </div>
                     <p className="border-t border-oxford/[0.06] pt-phi-4 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
+
+                  <GroupHeader
+                    title="System"
+                    description="Read-only readiness and operator diagnostics. Pipeline controls remain in the system rail and save immediately."
+                  />
 
                   <RoomSection
                     id="system"
