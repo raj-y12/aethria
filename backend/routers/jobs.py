@@ -27,6 +27,24 @@ _RETRYABLE = {
     JobStatus.RETRY_WAIT,
 }
 
+_PUBLIC_FAILURE_CODES = frozenset(
+    {
+        "cluster_analysis_failed",
+        "lookup_attempt_failed",
+        "lookup_engine_initialization_failed",
+        "meta_cycle_failed",
+        "partner_candidate_failures",
+        "partner_stage_failed",
+        "pipeline_engine_initialization_failed",
+        "pipeline_execution_failed",
+        "portfolio_subjob_failures",
+        "reviewer_candidate_failures",
+        "reviewer_stage_failed",
+        "scout_lookup_failed",
+        "scout_persona_failures",
+    }
+)
+
 
 def _repository(request: Request):
     repository = getattr(request.app.state, "durable_job_repository", None)
@@ -55,6 +73,17 @@ def _safe_error(status: JobStatus) -> Optional[str]:
     return None
 
 
+def _failure_code(job: AgentJob) -> Optional[str]:
+    """Expose only a bounded machine-readable error code, never raw exception text."""
+    raw = str(job.last_error or "").strip()
+    if not raw:
+        return None
+    prefix = raw.split(":", 1)[0].strip().lower().replace(" ", "_")
+    if prefix in _PUBLIC_FAILURE_CODES:
+        return prefix
+    return "pipeline_execution_failed"
+
+
 def _serialize(job: AgentJob) -> Dict[str, Any]:
     lookup_id = getattr(job.payload, "lookup_id", None)
     return {
@@ -70,6 +99,9 @@ def _serialize(job: AgentJob) -> Dict[str, Any]:
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
         "next_attempt_at": job.next_attempt_at.isoformat(),
         "error": _safe_error(job.status),
+        "failure_code": _failure_code(job)
+        if job.status in {JobStatus.FAILED, JobStatus.DEAD_LETTER}
+        else None,
         "block_code": job.block_code if job.status is JobStatus.BLOCKED else None,
         "recovery_action": (
             job.recovery_action if job.status is JobStatus.BLOCKED else None

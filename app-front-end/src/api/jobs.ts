@@ -23,6 +23,7 @@ export interface DurableJob {
   completed_at?: string | null;
   next_attempt_at: string;
   error?: string | null;
+  failure_code?: string | null;
   block_code?: string | null;
   recovery_action?: string | null;
 }
@@ -49,4 +50,3 @@ export function cancelJob(jobId: string): Promise<DurableJob> {
 export function isJobTerminal(status: JobStatus): boolean {
   return ['succeeded', 'failed', 'dead_letter', 'cancelled'].includes(status);
 }
-

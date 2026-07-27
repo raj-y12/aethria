@@ -143,6 +143,7 @@ def test_get_job_is_tenant_scoped_and_hides_raw_errors(monkeypatch):
     assert own.status_code == 200
     assert own.json()["status"] == "dead_letter"
     assert own.json()["error"] == "Execution failed after all retry attempts."
+    assert own.json()["failure_code"] == "pipeline_execution_failed"
     assert "postgres" not in own.text
 
     other = _client(monkeypatch, repository, user_id="user-b").get(
@@ -150,6 +151,19 @@ def test_get_job_is_tenant_scoped_and_hides_raw_errors(monkeypatch):
         headers={"Authorization": "Bearer t"},
     )
     assert other.status_code == 404
+
+
+def test_failure_code_only_exposes_allowlisted_codes(monkeypatch):
+    secret_like = _job().model_copy(
+        update={"last_error": "sk_live_abc123_secret: provider failed"}
+    )
+    response = _client(monkeypatch, _Repository([secret_like])).get(
+        f"/api/jobs/{secret_like.job_id}", headers={"Authorization": "Bearer t"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["failure_code"] == "pipeline_execution_failed"
+    assert "sk_live" not in response.text
 
 
 def test_list_jobs_maps_queued_to_accepted_and_filters_status(monkeypatch):

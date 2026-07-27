@@ -1,4 +1,5 @@
 import type { SystemStatus } from '../../api/system';
+import type { DurableJob } from '../../api/jobs';
 
 export type ExecutionReadiness = 'healthy' | 'active' | 'degraded' | 'blocked' | 'unavailable';
 
@@ -26,10 +27,12 @@ function Readout({ label, value, tone = 'default' }: { label: string; value: num
 
 export default function ExecutionReadinessPanel({
   status,
+  recentJobs = [],
   loading = false,
   compact = false,
 }: {
   status?: SystemStatus | null;
+  recentJobs?: DurableJob[];
   loading?: boolean;
   compact?: boolean;
 }) {
@@ -42,6 +45,12 @@ export default function ExecutionReadinessPanel({
   const outbox = Number(counts['outbox:pending'] ?? 0);
   const label = readiness.replace(/^./, (character) => character.toUpperCase());
   const stateTone = readiness === 'blocked' || readiness === 'degraded' ? 'text-escalation' : readiness === 'healthy' || readiness === 'active' ? 'text-oxford' : 'text-oxford/55';
+  const latestFailureCode = recentJobs
+    .filter((job) => job.job_type === 'pipeline_cycle')
+    .find((job) => job.failure_code || job.block_code)?.failure_code
+    ?? recentJobs
+      .filter((job) => job.job_type === 'pipeline_cycle')
+      .find((job) => job.block_code)?.block_code;
 
   return (
     <section className={compact ? 'border-t border-oxford/[0.06] py-phi-4' : 'border-y border-oxford/10 bg-paper px-phi-5 py-phi-4'} aria-label="Execution readiness">
@@ -53,7 +62,7 @@ export default function ExecutionReadinessPanel({
             {loading ? 'Reading durable execution readiness…'
               : readiness === 'blocked' ? 'Durable execution is required, but its worker and repository are not ready. New work must remain blocked.'
                 : readiness === 'active' ? 'The worker is healthy and retrying a job automatically while other work continues.'
-                  : readiness === 'degraded' ? 'A terminal job needs operational attention. Other queued work can continue.'
+                  : readiness === 'degraded' ? `A terminal job needs operational attention.${latestFailureCode ? ` Latest code: ${latestFailureCode}.` : ''} Other queued work can continue.`
                   : readiness === 'healthy' ? (status?.durable_jobs.required ? 'Durable execution is ready. Queue counts are persisted across restarts.' : 'The development execution path is ready; durable jobs are not required in this environment.')
                     : 'Execution readiness is unavailable. Agent enablement alone does not prove that work can run.'}
           </p>

@@ -9,6 +9,7 @@ import { getQueryConfig } from '../lib/queryIntent';
 import { fetchSettings, patchSettings, publishPolicy, type Settings } from '../api/settings';
 import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import { fetchSystemStatus } from '../api/system';
+import { fetchJobs, type DurableJob } from '../api/jobs';
 import {
   fetchFundThesisSummary,
   type FundThesisSummary,
@@ -366,6 +367,13 @@ export default function SettingsPage() {
   const systemStatusQuery = useQuery({
     queryKey: ['system', 'status'],
     queryFn: fetchSystemStatus,
+    ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+  const recentJobsQuery = useQuery<DurableJob[]>({
+    queryKey: ['jobs', 'execution-diagnostics'],
+    queryFn: () => fetchJobs(['dead_letter', 'retry_wait', 'failed', 'blocked'], 12),
     ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
     refetchInterval: 30_000,
     retry: 1,
@@ -1112,6 +1120,7 @@ export default function SettingsPage() {
                     )}
                     <ExecutionReadinessPanel
                       status={systemStatusQuery.data ?? null}
+                      recentJobs={recentJobsQuery.data ?? []}
                       loading={systemStatusQuery.isPending}
                       compact
                     />

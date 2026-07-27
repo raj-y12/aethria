@@ -37,6 +37,32 @@ describe('ExecutionReadinessPanel', () => {
     expect(screen.getByLabelText('Outbox')).toHaveTextContent('4');
   });
 
+  it('shows the latest safe failure code beside terminal work', () => {
+    render(<ExecutionReadinessPanel status={{
+      status: 'ok',
+      durable_jobs: { required: true, ready: true, error: null, counts: { 'pipeline_cycle:dead_letter': 1 } },
+    }} recentJobs={[{
+      job_id: 'job-1', job_type: 'pipeline_cycle', status: 'dead_letter', attempts: 3,
+      max_attempts: 3, pipeline_run_id: 'run-1', accepted_at: '', next_attempt_at: '',
+      failure_code: 'scout_persona_failures',
+    }]} />);
+
+    expect(screen.getByText(/Latest code: scout_persona_failures/i)).toBeInTheDocument();
+  });
+
+  it('does not use lookup failures as the pipeline diagnostic', () => {
+    render(<ExecutionReadinessPanel status={{
+      status: 'ok',
+      durable_jobs: { required: true, ready: true, error: null, counts: { 'pipeline_cycle:dead_letter': 1 } },
+    }} recentJobs={[{
+      job_id: 'job-lookup', job_type: 'company_lookup', status: 'dead_letter', attempts: 3,
+      max_attempts: 3, pipeline_run_id: 'run-lookup', accepted_at: '', next_attempt_at: '',
+      failure_code: 'lookup_attempt_failed',
+    }]} />);
+
+    expect(screen.queryByText(/Latest code:/i)).not.toBeInTheDocument();
+  });
+
   it('shows automatic retrying as active while the worker is processing work', () => {
     render(<ExecutionReadinessPanel status={{
       status: 'ok',
