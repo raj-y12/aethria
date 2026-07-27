@@ -940,7 +940,7 @@ async def _start_durable_job_services(app: FastAPI) -> None:
             poll_interval_seconds=float(os.getenv("DURABLE_JOB_POLL_SECONDS", "2")),
             lease_seconds=int(os.getenv("DURABLE_JOB_LEASE_SECONDS", "90")),
             heartbeat_seconds=float(os.getenv("DURABLE_JOB_HEARTBEAT_SECONDS", "20")),
-            global_concurrency=int(os.getenv("DURABLE_JOB_GLOBAL_CONCURRENCY", "2")),
+            global_concurrency=int(os.getenv("DURABLE_JOB_GLOBAL_CONCURRENCY", "1")),
             per_tenant_concurrency=int(os.getenv("DURABLE_JOB_TENANT_CONCURRENCY", "1")),
         )
         _durable_outbox_publisher = OutboxPublisher(

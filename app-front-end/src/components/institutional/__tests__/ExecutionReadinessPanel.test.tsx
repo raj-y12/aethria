@@ -37,6 +37,26 @@ describe('ExecutionReadinessPanel', () => {
     expect(screen.getByLabelText('Outbox')).toHaveTextContent('4');
   });
 
+  it('shows automatic retrying as active while the worker is processing work', () => {
+    render(<ExecutionReadinessPanel status={{
+      status: 'ok',
+      durable_jobs: {
+        required: true,
+        ready: true,
+        error: null,
+        counts: {
+          'pipeline_cycle:queued': 4,
+          'pipeline_cycle:running': 2,
+          'pipeline_cycle:retry_wait': 1,
+        },
+      },
+    }} />);
+
+    expect(screen.getByText('Active')).toBeInTheDocument();
+    expect(screen.getByText(/retrying.*automatically/i)).toBeInTheDocument();
+    expect(screen.queryByText('Degraded')).not.toBeInTheDocument();
+  });
+
   it('reports healthy readiness when the required worker is ready and no jobs need intervention', () => {
     render(<ExecutionReadinessPanel status={{
       status: 'ok',

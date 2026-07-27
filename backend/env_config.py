@@ -176,6 +176,7 @@ REGISTRY: List[EnvVar] = [
 
     # --- Tavily (web search) -------------------------------------------------
     EnvVar("TAVILY_API_KEY", "secret", "", "Tavily", "Tavily web-search API key (scout/reviewer retrieval)."),
+    EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Tavily", "Use DuckDuckGo retrieval when Tavily is unavailable."),
     EnvVar("TAVILY_SEARCH_DEPTH", "str", "advanced", "Tavily", "Tavily search depth (basic|advanced)."),
     EnvVar("TAVILY_MAX_RESULTS_CAP", "int", "15", "Tavily", "Cap on Tavily results per query."),
     EnvVar("TAVILY_TIMEOUT", "float", "12.0", "Tavily", "Tavily request timeout (s)."),
@@ -237,7 +238,7 @@ REGISTRY: List[EnvVar] = [
            "Duration of an execution lease before another worker may recover it."),
     EnvVar("DURABLE_JOB_HEARTBEAT_SECONDS", "float", "20", "Durable jobs",
            "Heartbeat cadence for extending an active execution lease."),
-    EnvVar("DURABLE_JOB_GLOBAL_CONCURRENCY", "int", "2", "Durable jobs",
+    EnvVar("DURABLE_JOB_GLOBAL_CONCURRENCY", "int", "1", "Durable jobs",
            "Maximum durable jobs executing concurrently in one API process."),
     EnvVar("DURABLE_JOB_TENANT_CONCURRENCY", "int", "1", "Durable jobs",
            "Maximum durable jobs executing concurrently for one tenant."),
@@ -261,7 +262,6 @@ REGISTRY: List[EnvVar] = [
     EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
     EnvVar("DEBUG_SCORING", "bool", "false", "Scoring / misc", "Verbose scoring debug logs."),
     EnvVar("RETRIEVAL_SNIPPET_MAX_CHARS", "int", "2800", "Scoring / misc", "Max chars per retrieval snippet."),
-    EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Scoring / misc", "Enable the no-key retrieval fallback when Tavily returns no sources."),
     EnvVar("RECENCY_WINDOW_MONTHS", "int", "12", "Scoring / misc", "Recency window for breaking-news weighting."),
     EnvVar("LOOKUP_WEBSITE_FETCH_TIMEOUT", "float", "5.0", "Scoring / misc", "Timeout fetching a looked-up website."),
     EnvVar("DEAL_CONTEXT_LOG_PIPELINE", "bool", "", "Scoring / misc", "Log deal-context assembly during pipeline."),
