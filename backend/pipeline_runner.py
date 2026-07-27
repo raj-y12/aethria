@@ -728,6 +728,7 @@ async def _run_one_pipeline_cycle_inner(
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
         stage_results: Dict[str, StageExecutionResult] = {}
+        stage_diagnostics: Dict[str, Any] = {}
         discoveries = []
         if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
@@ -739,6 +740,8 @@ async def _run_one_pipeline_cycle_inner(
             if not isinstance(scout_result, ScoutCycleResult):
                 raise RuntimeError("Scout returned an invalid periodic stage result")
             stage_results["scout"] = scout_result.outcome
+            if scout_result.diagnostics:
+                stage_diagnostics["scout"] = scout_result.diagnostics
             discoveries = scout_result.discoveries
         elif scouts_enabled:
             stage_results["scout"] = StageExecutionResult.blocked_result(
@@ -980,6 +983,7 @@ async def _run_one_pipeline_cycle_inner(
                 stage: result.model_dump(mode="json")
                 for stage, result in stage_results.items()
             },
+            "stage_diagnostics": stage_diagnostics,
         }
         pipeline_result = PipelineExecutionResult.from_stage_results(
             stage_results,

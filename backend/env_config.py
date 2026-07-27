@@ -87,6 +87,7 @@ REGISTRY: List[EnvVar] = [
     EnvVar("ENVIRONMENT", "str", None, "Server / CORS / SSE", "Deployment env (production|prod gates docs)."),
     EnvVar("APP_ENV", "str", None, "Server / CORS / SSE", "Alt deployment env var (see ENVIRONMENT)."),
     EnvVar("FASTAPI_ENV", "str", None, "Server / CORS / SSE", "Alt deployment env var (see ENVIRONMENT)."),
+    EnvVar("RENDER", "bool", "", "Server / CORS / SSE", "Render platform marker used when ENVIRONMENT is unset."),
     EnvVar("PUBLIC_API_DOCS_ENABLED", "bool", None, "Server / CORS / SSE",
            "Expose /docs & /openapi.json in production (default off in prod)."),
     EnvVar("SSE_KEEPALIVE_SECONDS", "int", "20", "Server / CORS / SSE", "SSE keepalive comment cadence."),
@@ -312,6 +313,59 @@ def get_float(name: str) -> float:
 # Convenience typed accessors for the hottest, most-duplicated reads.
 def use_supabase_storage() -> bool:
     return get_bool("USE_SUPABASE_STORAGE")
+
+
+def is_production_env() -> bool:
+    """Return whether local/process fallbacks must be treated as unsafe.
+
+    Explicit local/dev/test environments remain usable for development. An
+    Unknown values fail closed. Render deployments are also recognized by
+    the platform-provided ``RENDER`` marker when no application label exists;
+    local checkouts can therefore keep using their explicit dev credentials.
+    """
+    value = (
+        os.getenv("ENVIRONMENT")
+        or os.getenv("APP_ENV")
+        or os.getenv("FASTAPI_ENV")
+        or ""
+    )
+    normalized = value.strip().lower()
+    if normalized in {"local", "dev", "development", "test", "testing"}:
+        return False
+    if normalized in {"production", "prod"}:
+        return True
+    if normalized:
+        return True
+    return get_bool("RENDER")
+
+
+def allow_process_local_state() -> bool:
+    """Whether process/local fallback state has been explicitly acknowledged."""
+    return get_bool("ALLOW_PROCESS_LOCAL_STATE")
+
+
+def local_fallback_allowed() -> bool:
+    """Return whether local files/memory are an intentional storage mode.
+
+    Production mode is fail-closed. Non-production processes retain the
+    historical local fallback so test/dev workflows remain usable.
+    """
+    return not is_production_env()
+
+
+def supabase_configured() -> bool:
+    """Return whether the server-side Supabase credentials are present."""
+    return bool(get_str("SUPABASE_URL").strip() and get_str("SUPABASE_SERVICE_ROLE_KEY").strip())
+
+
+def require_supabase_configured(component: str) -> None:
+    """Raise a diagnostic error instead of allowing a remote-to-local fallback."""
+    if use_supabase_storage() and not supabase_configured():
+        raise RuntimeError(
+            f"{component}: supabase_configuration_missing; "
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required when "
+            "USE_SUPABASE_STORAGE=1"
+        )
 
 
 def openai_api_key() -> str:

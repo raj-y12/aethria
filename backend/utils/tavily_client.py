@@ -23,6 +23,32 @@ import certifi
 logger = logging.getLogger("tavily")
 
 
+class ProviderSearchResults(list):
+    """List-compatible provider results with bounded, structured diagnostics."""
+
+    def __init__(self, results: List[Dict[str, str]], diagnostics: Dict[str, Any]):
+        super().__init__(results)
+        self.diagnostics = dict(diagnostics)
+
+
+def _provider_diagnostic(
+    *,
+    outcome: str,
+    reason: str | None,
+    result_count: int,
+    http_status: int | None = None,
+) -> Dict[str, Any]:
+    diagnostic: Dict[str, Any] = {
+        "provider": "tavily",
+        "outcome": outcome,
+        "reason": reason,
+        "result_count": result_count,
+    }
+    if http_status is not None:
+        diagnostic["http_status"] = http_status
+    return diagnostic
+
+
 def _tavily_body_config(max_results: int) -> tuple[int, str, bool, int, float]:
     cap = int(os.getenv("TAVILY_MAX_RESULTS_CAP", "15"))
     cap = max(5, min(cap, 20))
@@ -127,7 +153,14 @@ def tavily_search(
     api_key = os.getenv("TAVILY_API_KEY", "").strip()
     if not api_key:
         logger.info("Tavily key missing; retrieval disabled")
-        return []
+        return ProviderSearchResults(
+            [],
+            _provider_diagnostic(
+                outcome="disabled",
+                reason="missing_api_key",
+                result_count=0,
+            ),
+        )
 
     n, depth, raw_flag, raw_max, default_timeout = _tavily_body_config(max_results)
     eff_timeout = default_timeout if timeout is None else float(timeout)
@@ -184,7 +217,14 @@ def tavily_search(
             )
             if normalized:
                 out.append(normalized)
-        return out
+        return ProviderSearchResults(
+            out,
+            _provider_diagnostic(
+                outcome="success" if out else "empty",
+                reason=None if out else "no_usable_results",
+                result_count=len(out),
+            ),
+        )
     except HTTPError as e:
         # Surface the status + Tavily's error detail (e.g. invalid api key, usage limit
         # exceeded) so a dark-retrieval outage is diagnosable from logs instead of silent.
@@ -194,7 +234,22 @@ def tavily_search(
         except Exception:
             pass
         logger.warning("Tavily search failed: HTTP %s %s", getattr(e, "code", "?"), detail)
-        return []
+        return ProviderSearchResults(
+            [],
+            _provider_diagnostic(
+                outcome="error",
+                reason="http_error",
+                result_count=0,
+                http_status=getattr(e, "code", None),
+            ),
+        )
     except Exception as e:
         logger.warning("Tavily search failed: %s", e)
-        return []
+        return ProviderSearchResults(
+            [],
+            _provider_diagnostic(
+                outcome="error",
+                reason="request_error",
+                result_count=0,
+            ),
+        )

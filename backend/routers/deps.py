@@ -94,8 +94,7 @@ def client_host(request: Request) -> str:
 
 
 def is_production_env() -> bool:
-    env = (os.getenv("ENVIRONMENT") or os.getenv("APP_ENV") or os.getenv("FASTAPI_ENV") or "").lower()
-    return env in ("production", "prod")
+    return env_config.is_production_env()
 
 
 def now_iso() -> str:

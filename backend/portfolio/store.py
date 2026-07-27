@@ -2,8 +2,8 @@
 Portfolio Store - Authoritative Memory Layer.
 
 Append-only, versioned storage for all portfolio data.
-Uses Supabase when configured (including startups via portfolio_startups);
-falls back to local JSON files only when Supabase is unavailable.
+Uses Supabase when ``USE_SUPABASE_STORAGE=1`` and local JSON files only in
+explicit local/dev mode. Remote failures are surfaced to the caller.
 """
 import json
 import logging
@@ -57,12 +57,22 @@ class PortfolioStore:
             user_id: Tenant user id for Supabase-backed operations.
         """
         self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("portfolio.store")
         explicit_uid = user_id.strip() if user_id and user_id.strip() else None
-        if env_config.use_supabase_storage() and not explicit_uid:
+        remote_configured = (
+            env_config.use_supabase_storage() and env_config.supabase_configured()
+        )
+        if remote_configured and not explicit_uid:
             raise RuntimeError("PortfolioStore requires explicit user_id when Supabase storage is enabled")
+        if env_config.use_supabase_storage() and env_config.is_production_env():
+            env_config.require_supabase_configured("PortfolioStore")
+        elif not env_config.local_fallback_allowed() and not remote_configured:
+            raise RuntimeError(
+                "PortfolioStore: local_storage_disabled_in_production; "
+                "enable Supabase storage or explicitly use a non-production environment"
+            )
         self._tenant_user_id = explicit_uid
+        self.data_dir.mkdir(parents=True, exist_ok=True)
         
         # File paths (fallback mode only)
         self.files = {
@@ -84,17 +94,21 @@ class PortfolioStore:
             "agent_metrics": "portfolio_agent_metrics",
         }
 
-        # Initialize fallback files only when needed.
-        for p in self.files.values():
-            if not p.exists():
-                self._write_local_file(p, [])
+        # Initialize local files only in explicit local/dev mode.
+        if env_config.local_fallback_allowed():
+            for p in self.files.values():
+                if not p.exists():
+                    self._write_local_file(p, [])
 
     def _is_supabase_configured(self) -> bool:
-        return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+        return env_config.supabase_configured()
 
     def _using_supabase(self) -> bool:
-        # Supabase-first behavior; fallback only when credentials or tenant are missing.
-        return self._is_supabase_configured() and bool(self._tenant_user_id)
+        return (
+            env_config.use_supabase_storage()
+            and self._is_supabase_configured()
+            and bool(self._tenant_user_id)
+        )
 
     def _supabase_uid(self) -> str:
         return require_user_id(self._tenant_user_id, context="PortfolioStore")
@@ -161,8 +175,18 @@ class PortfolioStore:
             rows = (r.data or []) if hasattr(r, "data") else []
             return [self._row_to_startup_record(row) for row in rows if isinstance(row, dict)]
         except Exception as e:
-            self.logger.warning("Supabase startups read failed; using local fallback: %s", e)
-            return self._read_local_file(self.files["startups"])
+            self.logger.error(
+                "portfolio_storage_unavailable operation=read_startups backend=supabase error=%s",
+                e,
+            )
+            if not env_config.is_production_env():
+                self.logger.warning(
+                    "portfolio_storage_fallback environment=non_production operation=read_startups"
+                )
+                return self._read_local_file(self.files["startups"])
+            raise RuntimeError(
+                "PortfolioStore: supabase_read_failed; local fallback is disabled"
+            ) from e
 
     def _duplicate_startup_id_supabase(self, name: str) -> Optional[str]:
         """Return the id of an existing portfolio startup with the same (case-insensitive)
@@ -192,8 +216,18 @@ class PortfolioStore:
                 if isinstance(row, dict) and (row.get("name") or "").strip().lower() == target:
                     return row.get("id")
         except Exception as e:
-            self.logger.warning("Supabase duplicate-name check failed; allowing add: %s", e)
-        return None
+            self.logger.error(
+                "portfolio_storage_unavailable operation=duplicate_check backend=supabase error=%s",
+                e,
+            )
+            if not env_config.is_production_env():
+                self.logger.warning(
+                    "portfolio_storage_fallback environment=non_production operation=duplicate_check"
+                )
+                return None
+            raise RuntimeError(
+                "PortfolioStore: supabase_duplicate_check_failed; refusing write"
+            ) from e
 
     def _upsert_startup_supabase(self, record: Dict[str, Any]) -> str:
         uid = self._supabase_uid()
@@ -230,6 +264,10 @@ class PortfolioStore:
             if file_key == "startups":
                 return self._get_startups_supabase()
             return list_get_all(table, user_id=self._supabase_uid())
+        if not env_config.local_fallback_allowed():
+            raise RuntimeError(
+                "PortfolioStore: local_storage_disabled; remote storage is required"
+            )
         return self._read_local_file(file_path)
 
     def _read_local_file(self, file_path: Path) -> List[Dict[str, Any]]:
@@ -326,6 +364,10 @@ class PortfolioStore:
             list_upsert(table, record, user_id=uid)
             return record_id
 
+        if not env_config.local_fallback_allowed():
+            raise RuntimeError(
+                "PortfolioStore: local_storage_disabled; remote storage is required"
+            )
         file_path = self.files[file_key]
         records = self._read_file(file_path)
         existing_idx = next((i for i, r in enumerate(records) if r.get("id") == record_id), None)

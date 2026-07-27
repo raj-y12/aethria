@@ -15,6 +15,7 @@ import fcntl
 import os
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
+import env_config
 from utils.reference_validation import is_generic_reference
 from utils.partner_codes import normalize_recommendation
 
@@ -63,6 +64,10 @@ class Storage:
     """
 
     def __init__(self, file_path: str = "data/startups.json") -> None:
+        if not env_config.local_fallback_allowed():
+            raise RuntimeError(
+                "Storage: local_storage_disabled; use Supabase-backed storage outside local/dev mode"
+            )
         self.file_path = Path(file_path)
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("storage")

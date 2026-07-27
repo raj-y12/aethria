@@ -339,6 +339,8 @@ async def test_scout_periodic_result_accounts_for_every_persona(
     assert result.outcome.succeeded == succeeded
     assert result.outcome.failed == failed
     assert result.outcome.skipped == skipped
+    if skipped:
+        assert result.outcome.warnings
     assert len(result.discoveries) == succeeded
 
     if skipped and succeeded == 0:

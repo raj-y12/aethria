@@ -175,6 +175,7 @@ if __name__ == "__main__":
 
 
 def test_cost_controller_uses_saved_runtime_limits(monkeypatch, tmp_path):
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
     monkeypatch.setattr(
         "portfolio.cost_control.load_settings",
         lambda user_id=None, use_cache=True: {

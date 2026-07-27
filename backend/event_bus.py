@@ -25,6 +25,8 @@ import os
 import uuid
 from typing import Any, Awaitable, Callable, Dict, Optional, Set
 
+import env_config
+
 logger = logging.getLogger("event_bus")
 
 # Per-subscriber bound: a slow or stuck client must not grow memory without
@@ -190,7 +192,10 @@ async def _sender_loop() -> None:
                         "SELECT pg_notify($1, $2)", _NOTIFY_CHANNEL, json.dumps(msg)
                     )
             except Exception as e:  # pragma: no cover - transport hiccup
-                logger.debug("event_bus: NOTIFY failed: %s", e)
+                logger.error(
+                    "event_bus_backplane_unavailable operation=publish backend=postgres error=%s",
+                    e,
+                )
             finally:
                 _notify_queue.task_done()
         except asyncio.CancelledError:
@@ -226,7 +231,13 @@ async def start_backplane(
 
     resolved_dsn = (dsn or _database_url()).strip()
     if connect is None and not resolved_dsn:
-        logger.warning("event_bus: EVENT_BUS_BACKPLANE=postgres but DATABASE_URL is unset; staying in-process")
+        message = (
+            "event_bus_backplane_unavailable; EVENT_BUS_BACKPLANE=postgres requires "
+            "DATABASE_URL or SUPABASE_DB_URL"
+        )
+        if env_config.is_production_env() and not env_config.allow_process_local_state():
+            raise RuntimeError(message)
+        logger.warning("%s; using explicitly allowed local event bus", message)
         return False
 
     if channel:
@@ -236,7 +247,10 @@ async def start_backplane(
         try:
             import asyncpg  # type: ignore
         except ImportError:
-            logger.warning("event_bus: asyncpg not installed; cannot start postgres backplane")
+            message = "event_bus_backplane_unavailable; asyncpg is not installed"
+            if env_config.is_production_env() and not env_config.allow_process_local_state():
+                raise RuntimeError(message)
+            logger.warning("%s; using explicitly allowed local event bus", message)
             return False
         connect = asyncpg.connect
 
@@ -245,8 +259,11 @@ async def start_backplane(
         _notify_conn = await connect(resolved_dsn)
         await _listen_conn.add_listener(_NOTIFY_CHANNEL, _on_notification)
     except Exception as e:
-        logger.warning("event_bus: failed to start postgres backplane (%s); staying in-process", e)
         await _close_backplane_conns()
+        message = f"event_bus_backplane_unavailable; postgres connection failed: {e}"
+        if env_config.is_production_env() and not env_config.allow_process_local_state():
+            raise RuntimeError(message) from e
+        logger.warning("%s; using explicitly allowed local event bus", message)
         return False
 
     _notify_queue = asyncio.Queue(maxsize=_MAX_PENDING_NOTIFY)

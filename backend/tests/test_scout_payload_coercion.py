@@ -80,6 +80,76 @@ def test_coerce_payload_fixes_missing_name_and_target_users():
     assert isinstance(out["references"], list)
 
 
+def test_call_llm_records_retrieval_no_results_separately_from_model_failure(monkeypatch):
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
+    monkeypatch.setattr(
+        "scout.base.retrieve_source_pack_merged",
+        lambda **kwargs: {
+            "provider": "none",
+            "retrieval_outcome": "no_results",
+            "provider_diagnostics": [
+                {"provider": "tavily", "outcome": "disabled", "reason": "missing_api_key"},
+                {"provider": "duckduckgo_html_fallback", "outcome": "empty", "reason": "no_usable_results"},
+            ],
+            "sources": [],
+            "url_allowlist": set(),
+        },
+    )
+
+    assert scout._call_llm_sync() is None
+    assert scout.last_discovery_diagnostic == {
+        "kind": "retrieval_no_results",
+        "retrieval_outcome": "no_results",
+        "provider_diagnostics": [
+            {"provider": "tavily", "outcome": "disabled", "reason": "missing_api_key"},
+            {"provider": "duckduckgo_html_fallback", "outcome": "empty", "reason": "no_usable_results"},
+        ],
+    }
+
+
+def test_call_llm_records_validation_failure_when_retrieval_succeeded(monkeypatch):
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
+    monkeypatch.setattr(
+        "scout.base.retrieve_source_pack_merged",
+        lambda **kwargs: {
+            "provider": "tavily",
+            "retrieval_outcome": "sources_found",
+            "provider_diagnostics": [
+                {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
+            ],
+            "sources": [
+                {
+                    "source_id": "S1",
+                    "title": "Aethria",
+                    "url": "https://aethria.co",
+                    "snippet": "Investment intelligence.",
+                }
+            ],
+            "url_allowlist": {"https://aethria.co"},
+        },
+    )
+    scout.client = _FakeClient()
+    monkeypatch.setattr(scout, "_finalize_scout_payload_from_llm", lambda *args, **kwargs: None)
+
+    assert scout._call_llm_sync() is None
+    assert scout.last_discovery_diagnostic["kind"] == "validation_failure"
+    assert scout.last_discovery_diagnostic["retrieval_outcome"] == "sources_found"
+
+
 def test_postprocess_extracts_founders_from_grounded_sources_when_model_omits_them(monkeypatch):
     scout = DummyScout(
         scout_type="market_driven",

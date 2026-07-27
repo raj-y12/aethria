@@ -3,7 +3,8 @@ Cost & Token Discipline Enforcement.
 
 Tracks and enforces budgets, token limits, and cooldowns.
 Uses Supabase `portfolio_budgets` when configured with tenant context;
-falls back to local file only when Supabase is unavailable.
+uses the local file only in explicit local/dev mode. Remote failures are
+surfaced instead of creating a divergent local budget ledger.
 """
 import json
 import logging
@@ -34,12 +35,22 @@ class CostController:
         enforce_limits: bool = True,
     ):
         self.budget_file = Path(budget_file)
-        self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.logger = logging.getLogger("cost.controller")
         self.user_id = (user_id or "").strip() or None
         self.enforce_limits = bool(enforce_limits)
-        if env_config.use_supabase_storage() and not self.user_id:
+        remote_configured = (
+            env_config.use_supabase_storage() and env_config.supabase_configured()
+        )
+        if remote_configured and not self.user_id:
             raise RuntimeError("CostController requires explicit user_id when Supabase storage is enabled")
+        if env_config.use_supabase_storage() and env_config.is_production_env():
+            env_config.require_supabase_configured("CostController")
+        elif not env_config.local_fallback_allowed() and not remote_configured:
+            raise RuntimeError(
+                "CostController: local_storage_disabled_in_production; "
+                "enable Supabase storage or explicitly use a non-production environment"
+            )
+        self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.default_budgets = {
             "scout": {"calls": 100, "tokens": 100000},
             "reviewer": {"calls": 200, "tokens": 200000},
@@ -82,8 +93,7 @@ class CostController:
         return bool(
             self.user_id
             and env_config.use_supabase_storage()
-            and os.getenv("SUPABASE_URL")
-            and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+            and env_config.supabase_configured()
         )
     
     def _load_budgets(self):
@@ -97,7 +107,18 @@ class CostController:
                     self.budgets = {}
                 return
             except Exception as e:
-                self.logger.warning("Supabase budget load failed; using file fallback: %s", e)
+                self.logger.error(
+                    "cost_storage_unavailable operation=load_budget backend=supabase error=%s",
+                    e,
+                )
+                if not env_config.is_production_env():
+                    self.logger.warning(
+                        "cost_storage_fallback environment=non_production operation=load_budget"
+                    )
+                else:
+                    raise RuntimeError(
+                        "CostController: supabase_budget_load_failed; local fallback is disabled"
+                    ) from e
         if self.budget_file.exists():
             try:
                 with open(self.budget_file, "r") as f:
@@ -114,7 +135,17 @@ class CostController:
                 doc_set("portfolio_budgets", self.budgets, user_id=self.user_id)
                 return
             except Exception as e:
-                self.logger.warning("Supabase budget save failed; using file fallback: %s", e)
+                self.logger.error(
+                    "cost_storage_unavailable operation=save_budget backend=supabase error=%s",
+                    e,
+                )
+                if env_config.is_production_env():
+                    raise RuntimeError(
+                        "CostController: supabase_budget_save_failed; local fallback is disabled"
+                    ) from e
+                self.logger.warning(
+                    "cost_storage_fallback environment=non_production operation=save_budget"
+                )
         with open(self.budget_file, "w") as f:
             json.dump(self.budgets, f, indent=2)
     

@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Set
 import certifi
 
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
-from utils.tavily_client import tavily_search
+from utils.tavily_client import ProviderSearchResults, tavily_search
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
@@ -24,7 +24,15 @@ logger = logging.getLogger("retrieval_grounding")
 def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
     """Small no-key fallback for provider outages; results stay reference-validated."""
     if os.getenv("RETRIEVAL_FALLBACK_ENABLED", "1").strip().lower() in {"0", "false", "no"}:
-        return []
+        return ProviderSearchResults(
+            [],
+            {
+                "provider": "duckduckgo_html_fallback",
+                "outcome": "disabled",
+                "reason": "fallback_disabled",
+                "result_count": 0,
+            },
+        )
     # DDG's /html endpoint increasingly serves an anti-bot challenge to cloud
     # IPs. The lightweight /lite endpoint is intended for simple clients and
     # returns stable result-link markup without JavaScript.
@@ -34,6 +42,8 @@ def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
     )
     request_headers = {"User-Agent": "Mozilla/5.0 (compatible; AethriaResearch/1.0)"}
     html = ""
+    challenge_seen = False
+    request_failed = False
     try:
         context = ssl.create_default_context(cafile=certifi.where())
         for url in urls:
@@ -43,17 +53,36 @@ def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
                     candidate = response.read().decode("utf-8", errors="replace")
                 # Do not parse DDG's challenge page as an empty successful search.
                 if "challenge-form" in candidate or "anomaly.js" in candidate:
+                    challenge_seen = True
                     continue
                 html = candidate
                 break
             except Exception as exc:
+                request_failed = True
                 logger.debug("retrieval fallback endpoint failed (%s): %s", url, exc)
     except Exception as exc:
         logger.warning("retrieval fallback failed: %s", exc)
-        return []
+        return ProviderSearchResults(
+            [],
+            {
+                "provider": "duckduckgo_html_fallback",
+                "outcome": "error",
+                "reason": "request_error",
+                "result_count": 0,
+            },
+        )
     if not html:
         logger.warning("retrieval fallback returned no usable results")
-        return []
+        reason = "challenge_response" if challenge_seen else "request_error" if request_failed else "no_usable_results"
+        return ProviderSearchResults(
+            [],
+            {
+                "provider": "duckduckgo_html_fallback",
+                "outcome": "error" if reason != "no_usable_results" else "empty",
+                "reason": reason,
+                "result_count": 0,
+            },
+        )
 
     rows: List[Dict[str, str]] = []
     # Lite currently emits class='result-link'; retain support for the older
@@ -86,7 +115,37 @@ def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
         rows.append({"title": title, "url": clean_url, "snippet": ""})
         if len(rows) >= max_results:
             break
-    return rows
+    return ProviderSearchResults(
+        rows,
+        {
+            "provider": "duckduckgo_html_fallback",
+            "outcome": "success" if rows else "empty",
+            "reason": None if rows else "no_usable_results",
+            "result_count": len(rows),
+        },
+    )
+
+
+def _diagnostic_for_rows(
+    rows: List[Dict[str, str]],
+    *,
+    provider: str,
+    query: str,
+) -> Dict[str, Any]:
+    diagnostic = getattr(rows, "diagnostics", None)
+    if not isinstance(diagnostic, dict):
+        diagnostic = {
+            "provider": provider,
+            "outcome": "success" if rows else "empty",
+            "reason": None if rows else "no_usable_results",
+            "result_count": len(rows),
+        }
+    else:
+        diagnostic = dict(diagnostic)
+        diagnostic.setdefault("provider", provider)
+        diagnostic.setdefault("result_count", len(rows))
+    diagnostic["query"] = query
+    return diagnostic
 
 
 def _snippet_char_cap() -> int:
@@ -150,14 +209,26 @@ def retrieve_source_pack(
     """
     if max_results is None:
         max_results = _default_max_results()
-    used_provider = "tavily"
+    used_provider = "none"
     raw: List[Dict[str, str]] = tavily_search(
         query=query, max_results=max_results, time_range=time_range, topic=topic, days=days
     )
+    provider_diagnostics = [
+        _diagnostic_for_rows(raw, provider="tavily", query=query)
+    ]
     if not raw:
         raw = _fallback_search(query, max_results)
+        provider_diagnostics.append(
+            _diagnostic_for_rows(
+                raw,
+                provider="duckduckgo_html_fallback",
+                query=query,
+            )
+        )
         if raw:
             used_provider = "duckduckgo_html_fallback"
+    else:
+        used_provider = "tavily"
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
@@ -177,6 +248,8 @@ def retrieve_source_pack(
     )
     return {
         "provider": used_provider,
+        "retrieval_outcome": "sources_found" if sources else "no_results",
+        "provider_diagnostics": provider_diagnostics,
         "query": query,
         "sources": sources,
         "url_allowlist": allowlist,
@@ -210,7 +283,9 @@ def retrieve_source_pack_merged(
     rq = str(recency_query or "").strip()
     if not general_queries and not rq:
         return {
-            "provider": "tavily",
+            "provider": "none",
+            "retrieval_outcome": "no_results",
+            "provider_diagnostics": [],
             "query": "",
             "sources": [],
             "url_allowlist": set(),
@@ -218,9 +293,11 @@ def retrieve_source_pack_merged(
 
     merged_rows: List[Dict[str, str]] = []
     seen_norm: Set[str] = set()
-    used_provider = "tavily"
+    admitted_providers: Set[str] = set()
+    used_provider = "none"
+    provider_diagnostics: List[Dict[str, Any]] = []
 
-    def _ingest(rows: List[Dict[str, str]], limit: int | None) -> None:
+    def _ingest(rows: List[Dict[str, str]], limit: int | None, provider: str = "") -> None:
         added = 0
         for row in rows or []:
             if len(merged_rows) >= max_total_sources:
@@ -232,6 +309,8 @@ def retrieve_source_pack_merged(
             if not nu or nu in seen_norm:
                 continue
             seen_norm.add(nu)
+            if provider:
+                admitted_providers.add(provider)
             merged_rows.append(
                 {
                     "title": str(row.get("title") or "").strip(),
@@ -260,35 +339,49 @@ def retrieve_source_pack_merged(
             days=recency_window_days(),
         )
         rows = news.get("sources") or []
+        admitted_provider = str(news.get("provider") or "")
+        provider_diagnostics.extend(news.get("provider_diagnostics") or [])
+        if rows:
+            used_provider = str(news.get("provider") or used_provider)
         if not rows:
-            rows = (
-                retrieve_source_pack(
-                    query=rq, user_id=user_id, max_results=max_per_query, time_range=tr
-                ).get("sources")
-                or []
+            fallback_news = retrieve_source_pack(
+                query=rq, user_id=user_id, max_results=max_per_query, time_range=tr
             )
-        _ingest(rows, limit=reserved)
+            rows = fallback_news.get("sources") or []
+            admitted_provider = str(fallback_news.get("provider") or admitted_provider)
+            provider_diagnostics.extend(fallback_news.get("provider_diagnostics") or [])
+            if rows:
+                used_provider = str(fallback_news.get("provider") or used_provider)
+        _ingest(rows, limit=reserved, provider=admitted_provider)
 
     # General queries fill the remaining slots.
     for q in general_queries:
         if len(merged_rows) >= max_total_sources:
             break
         pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
-        if pack.get("provider") != "tavily":
+        provider_diagnostics.extend(pack.get("provider_diagnostics") or [])
+        if pack.get("sources"):
             used_provider = str(pack.get("provider") or used_provider)
-        _ingest(pack.get("sources"), limit=None)
+        _ingest(pack.get("sources"), limit=None, provider=str(pack.get("provider") or ""))
 
     cleaned_queries = ([rq] if rq else []) + general_queries
     sources = _normalize_sources(merged_rows)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
+    providers = sorted(admitted_providers)
+    provider_label = providers[0] if len(providers) == 1 else "mixed" if providers else "none"
     logger.info(
         "retrieval_grounding merged: queries=%d unique_urls=%d provider=%s",
         len(cleaned_queries),
         len(sources),
-        used_provider,
+        provider_label,
     )
     return {
-        "provider": used_provider,
+        # Keep `provider` for existing callers, but never claim one provider
+        # when the merged pack actually used several.
+        "provider": provider_label,
+        "providers": providers,
+        "retrieval_outcome": "sources_found" if sources else "no_results",
+        "provider_diagnostics": provider_diagnostics,
         "query": " | ".join(cleaned_queries[:4]),
         "sources": sources,
         "url_allowlist": allowlist,

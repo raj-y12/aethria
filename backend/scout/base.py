@@ -105,6 +105,10 @@ class Scout(ABC):
         self.model = model
         # Token usage for cost controller integration
         self._last_token_usage: int = 0
+        # Structured reason for the most recent None result. Retrieval diagnostics
+        # remain separate from model/validation failures so provider health is visible
+        # without weakening the evidence gate.
+        self.last_discovery_diagnostic: Optional[Dict[str, Any]] = None
         # Meta-Agent integration: map to agent name and load any mutated prompt
         self.agent_name = self._get_agent_name()
         self._load_prompt_from_library()
@@ -868,6 +872,7 @@ class Scout(ABC):
         """
         try:
             self._last_token_usage = 0
+            self.last_discovery_diagnostic = None
             grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
             fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
@@ -882,9 +887,15 @@ class Scout(ABC):
                     user_id=self._tenant_user_id,
                 )
                 if fail_closed and not source_pack["sources"]:
+                    self.last_discovery_diagnostic = {
+                        "kind": "retrieval_no_results",
+                        "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
+                        "provider_diagnostics": source_pack.get("provider_diagnostics", []),
+                    }
                     self.logger.warning(
-                        "grounded_citations: fail-closed; no retrieval sources provider=%s",
+                        "grounded_citations: fail-closed; no retrieval sources provider=%s diagnostics=%s",
                         source_pack.get("provider"),
+                        source_pack.get("provider_diagnostics", []),
                     )
                     return None
                 if not source_pack["sources"]:
@@ -978,10 +989,15 @@ class Scout(ABC):
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM")
+                self.last_discovery_diagnostic = {
+                    "kind": "model_failure",
+                    "reason": "empty_response",
+                    "retrieval_outcome": source_pack.get("retrieval_outcome", "not_run"),
+                }
                 return None
             
             data = json.loads(content)
-            return self._finalize_scout_payload_from_llm(
+            final = self._finalize_scout_payload_from_llm(
                 data,
                 source_pack,
                 grounded_enabled=grounded_enabled,
@@ -989,12 +1005,27 @@ class Scout(ABC):
                 explicit_website=None,
                 context_note="open discovery",
             )
+            if final is None:
+                self.last_discovery_diagnostic = {
+                    "kind": "validation_failure",
+                    "retrieval_outcome": source_pack.get("retrieval_outcome", "not_run"),
+                    "provider_diagnostics": source_pack.get("provider_diagnostics", []),
+                }
+            return final
 
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM: {e}")
+            self.last_discovery_diagnostic = {
+                "kind": "model_failure",
+                "reason": "invalid_json",
+            }
             return None
         except Exception as e:
             self.logger.error(f"LLM call failed: {e}")
+            self.last_discovery_diagnostic = {
+                "kind": "model_failure",
+                "reason": "request_error",
+            }
             return None
     
     def _call_llm_for_company_sync(
@@ -1016,6 +1047,7 @@ class Scout(ABC):
             return None
         site = (website or "").strip()
         extra_context = (additional_context or "").strip()
+        self.last_discovery_diagnostic = None
         try:
             self._last_token_usage = 0
             grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
@@ -1052,9 +1084,15 @@ class Scout(ABC):
                 # evidence (LinkedIn/Crunchbase/news) stays citable even with a website hint.
                 source_pack = self._merge_resolution_sources(source_pack, resolution)
                 if fail_closed and not source_pack["sources"]:
+                    self.last_discovery_diagnostic = {
+                        "kind": "retrieval_no_results",
+                        "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
+                        "provider_diagnostics": source_pack.get("provider_diagnostics", []),
+                    }
                     self.logger.warning(
-                        "grounded_citations: fail-closed company=%s no retrieval sources",
+                        "grounded_citations: fail-closed company=%s no retrieval sources diagnostics=%s",
                         company,
+                        source_pack.get("provider_diagnostics", []),
                     )
                     return None
                 if not source_pack["sources"]:
@@ -1162,6 +1200,11 @@ class Scout(ABC):
             content = response.choices[0].message.content
             if not content:
                 self.logger.error("Empty response from LLM (company lookup)")
+                self.last_discovery_diagnostic = {
+                    "kind": "model_failure",
+                    "reason": "empty_response",
+                    "retrieval_outcome": source_pack.get("retrieval_outcome", "not_run"),
+                }
                 return None
             data = json.loads(content)
             if site:
@@ -1176,6 +1219,11 @@ class Scout(ABC):
                 for_lookup=True,
             )
             if finalized is None:
+                self.last_discovery_diagnostic = {
+                    "kind": "validation_failure",
+                    "retrieval_outcome": source_pack.get("retrieval_outcome", "not_run"),
+                    "provider_diagnostics": source_pack.get("provider_diagnostics", []),
+                }
                 return None
             finalized = self._attach_resolution(finalized, resolution)
             if not self._matches_lookup_identity(
@@ -1213,9 +1261,17 @@ class Scout(ABC):
             return finalized
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM (company lookup): {e}")
+            self.last_discovery_diagnostic = {
+                "kind": "model_failure",
+                "reason": "invalid_json",
+            }
             return None
         except Exception as e:
             self.logger.error(f"LLM company lookup failed: {e}")
+            self.last_discovery_diagnostic = {
+                "kind": "model_failure",
+                "reason": "request_error",
+            }
             return None
 
     async def _call_llm(self) -> Optional[Dict[str, Any]]:

@@ -94,15 +94,13 @@ class SupabaseSecurityStore:
     def __init__(self, client: Any) -> None:
         self._client = client
         self._fallback = InMemorySecurityStore()
-        self._warned_fallback = False
 
-    def _warn_once(self, exc: Exception) -> None:
-        if not self._warned_fallback:
-            logger.warning(
-                "Supabase security RPC unavailable; using in-memory fallback until migration is applied: %s",
-                exc,
-            )
-            self._warned_fallback = True
+    def _raise_or_fallback(self, message: str, exc: Exception):
+        logger.error("security_store_unavailable backend=supabase error=%s", exc)
+        if not env_config.is_production_env():
+            logger.warning("security_store_fallback environment=non_production")
+            return self._fallback
+        raise RuntimeError(message) from exc
 
     def increment_fixed_window(self, key: str, *, window_seconds: int) -> Tuple[int, datetime]:
         try:
@@ -122,8 +120,10 @@ class SupabaseSecurityStore:
             expires_at = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
             return count, expires_at
         except Exception as exc:
-            self._warn_once(exc)
-            return self._fallback.increment_fixed_window(key, window_seconds=window_seconds)
+            fallback = self._raise_or_fallback(
+                "security_store_rpc_failed; in-memory rate limiting is disabled", exc
+            )
+            return fallback.increment_fixed_window(key, window_seconds=window_seconds)
 
     def acquire_lock(self, key: str, *, ttl_seconds: int) -> bool:
         try:
@@ -139,15 +139,19 @@ class SupabaseSecurityStore:
                 data = data[0] if data else False
             return bool(data)
         except Exception as exc:
-            self._warn_once(exc)
-            return self._fallback.acquire_lock(key, ttl_seconds=ttl_seconds)
+            fallback = self._raise_or_fallback(
+                "security_store_lock_failed; in-memory lock fallback is disabled", exc
+            )
+            return fallback.acquire_lock(key, ttl_seconds=ttl_seconds)
 
     def release_lock(self, key: str) -> None:
         try:
             self._client.rpc("security_release_lock", {"p_key": key}).execute()
         except Exception as exc:
-            self._warn_once(exc)
-            self._fallback.release_lock(key)
+            fallback = self._raise_or_fallback(
+                "security_store_release_failed; in-memory lock fallback is disabled", exc
+            )
+            fallback.release_lock(key)
 
 
 class FixedWindowRateLimiter:
@@ -180,16 +184,28 @@ _WARNED_MEMORY_FALLBACK = False
 
 
 def build_security_store() -> InMemorySecurityStore | SupabaseSecurityStore:
-    """Prefer Supabase in production-capable deployments; fall back to memory for dev/test."""
+    """Build the configured security store without remote-to-memory fallback."""
     global _WARNED_MEMORY_FALLBACK
     use_supabase = env_config.use_supabase_storage()
-    if use_supabase and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"):
+    if use_supabase and env_config.supabase_configured():
         try:
             from supabase_client import get_service_client
 
             return SupabaseSecurityStore(get_service_client())
         except Exception as exc:
-            logger.warning("Supabase security store unavailable; using in-memory fallback: %s", exc)
+            logger.error("security_store_unavailable operation=build backend=supabase error=%s", exc)
+            if env_config.is_production_env():
+                raise RuntimeError(
+                    "security_store_unavailable; in-memory rate limiting is disabled"
+                ) from exc
+            logger.warning("security_store_fallback environment=non_production operation=build")
+    if use_supabase and env_config.is_production_env():
+        env_config.require_supabase_configured("security_store")
+    if not env_config.local_fallback_allowed():
+        raise RuntimeError(
+            "security_store: process_local_state_disabled_in_production; "
+            "enable Supabase storage or explicitly use a non-production environment"
+        )
     if not _WARNED_MEMORY_FALLBACK:
         logger.warning("Using in-memory security rate-limit store; this is only suitable for local/dev.")
         _WARNED_MEMORY_FALLBACK = True

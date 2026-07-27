@@ -69,6 +69,7 @@ class StageExecutionResult(BaseModel):
     failed: int = Field(default=0, ge=0)
     blocked: int = Field(default=0, ge=0)
     skipped: int = Field(default=0, ge=0)
+    warnings: List[Dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_stage_outcome(self) -> "StageExecutionResult":
@@ -101,6 +102,7 @@ class StageExecutionResult(BaseModel):
         attempted: int,
         succeeded: int,
         skipped: int = 0,
+        warnings: Optional[List[Dict[str, Any]]] = None,
     ) -> "StageExecutionResult":
         return cls(
             stage=stage,
@@ -110,6 +112,7 @@ class StageExecutionResult(BaseModel):
             attempted=attempted,
             succeeded=succeeded,
             skipped=skipped,
+            warnings=warnings or [],
         )
 
     @classmethod
@@ -125,6 +128,7 @@ class StageExecutionResult(BaseModel):
         succeeded: int = 0,
         blocked: int = 0,
         skipped: int = 0,
+        warnings: Optional[List[Dict[str, Any]]] = None,
     ) -> "StageExecutionResult":
         return cls(
             stage=stage,
@@ -137,6 +141,7 @@ class StageExecutionResult(BaseModel):
             failed=failed,
             blocked=blocked,
             skipped=skipped,
+            warnings=warnings or [],
         )
 
     @classmethod
@@ -150,6 +155,7 @@ class StageExecutionResult(BaseModel):
         attempted: int,
         blocked: int,
         skipped: int = 0,
+        warnings: Optional[List[Dict[str, Any]]] = None,
     ) -> "StageExecutionResult":
         return cls(
             stage=stage,
@@ -160,6 +166,7 @@ class StageExecutionResult(BaseModel):
             attempted=attempted,
             blocked=blocked,
             skipped=skipped,
+            warnings=warnings or [],
         )
 
     @classmethod
@@ -171,6 +178,7 @@ class StageExecutionResult(BaseModel):
         detail: str,
         attempted: int = 0,
         skipped: int = 0,
+        warnings: Optional[List[Dict[str, Any]]] = None,
     ) -> "StageExecutionResult":
         return cls(
             stage=stage,
@@ -179,6 +187,7 @@ class StageExecutionResult(BaseModel):
             detail=detail,
             attempted=attempted,
             skipped=skipped,
+            warnings=warnings or [],
         )
 
 
@@ -189,6 +198,7 @@ class ScoutCycleResult(BaseModel):
 
     outcome: StageExecutionResult
     discoveries: List[Dict[str, Any]] = Field(default_factory=list)
+    diagnostics: List[Dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_scout_payload(self) -> "ScoutCycleResult":

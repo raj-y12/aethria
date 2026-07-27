@@ -79,3 +79,61 @@ def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
     pack = retrieve_source_pack(query="unknown", user_id="u1", max_results=3)
     assert pack["sources"] == []
     assert pack["url_allowlist"] == set()
+
+
+def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
+    calls = []
+
+    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+        calls.append(query)
+        if len(calls) == 1:
+            return [{"title": "Tavily result", "url": "https://tavily.example", "snippet": "x"}]
+        return []
+
+    monkeypatch.setattr("utils.retrieval_grounding.tavily_search", fake_tavily)
+    monkeypatch.setattr(
+        "utils.retrieval_grounding._fallback_search",
+        lambda query, max_results: [{"title": "DDG result", "url": "https://ddg.example", "snippet": "x"}],
+    )
+    pack = retrieve_source_pack_merged(
+        queries=["first", "second"], user_id="u1", max_per_query=3, max_total_sources=5
+    )
+    assert pack["provider"] == "mixed"
+    assert pack["providers"] == ["duckduckgo_html_fallback", "tavily"]
+
+
+def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch):
+    monkeypatch.setattr(
+        "utils.retrieval_grounding.tavily_search",
+        lambda query, max_results, time_range=None, topic=None, days=None: [],
+    )
+    monkeypatch.setattr(
+        "utils.retrieval_grounding._fallback_search",
+        lambda query, max_results: [],
+    )
+
+    pack = retrieve_source_pack(query="unknown", user_id="u1", max_results=3)
+
+    assert pack["retrieval_outcome"] == "no_results"
+    assert pack["provider"] == "none"
+    assert [item["provider"] for item in pack["provider_diagnostics"]] == [
+        "tavily",
+        "duckduckgo_html_fallback",
+    ]
+    assert all(item["outcome"] == "empty" for item in pack["provider_diagnostics"])
+
+
+def test_tavily_search_exposes_disabled_provider_diagnostic(monkeypatch):
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+
+    from utils.tavily_client import tavily_search
+
+    result = tavily_search("unknown", max_results=3)
+
+    assert result == []
+    assert result.diagnostics == {
+        "provider": "tavily",
+        "outcome": "disabled",
+        "reason": "missing_api_key",
+        "result_count": 0,
+    }

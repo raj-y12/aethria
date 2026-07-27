@@ -227,6 +227,7 @@ class ScoutEngine:
         persistence_failed_count = 0
         blocked_count = 0
         skipped_count = 0
+        diagnostics: List[Dict[str, Any]] = []
         for wave_idx in range(waves):
             remaining_slots = max_discoveries - len(discoveries)
             if remaining_slots <= 0:
@@ -260,12 +261,28 @@ class ScoutEngine:
 
                 if isinstance(result, Exception):
                     failed_count += 1
+                    diagnostics.append({
+                        "scout_type": scout.scout_type,
+                        "kind": "model_failure",
+                        "reason": "request_error",
+                    })
                     self.logger.error(
                         f"[{scout.scout_type}] Discovery failed with exception: {result}"
                     )
                 elif result is None:
                     failed_count += 1
-                    self.logger.warning(f"[{scout.scout_type}] Discovery returned None")
+                    diagnostic = getattr(scout, "last_discovery_diagnostic", None)
+                    diagnostics.append({
+                        "scout_type": scout.scout_type,
+                        **(diagnostic if isinstance(diagnostic, dict) else {
+                            "kind": "unknown_failure",
+                        }),
+                    })
+                    self.logger.warning(
+                        "[%s] Discovery returned None diagnostic=%s",
+                        scout.scout_type,
+                        getattr(scout, "last_discovery_diagnostic", None),
+                    )
                 else:
                     if self.deal_memory:
                         thesis = result.get("primary_thesis", "")
@@ -385,6 +402,7 @@ class ScoutEngine:
                 attempted=attempted_count,
                 succeeded=succeeded_count,
                 skipped=skipped_count + failed_count,
+                warnings=diagnostics,
             )
         elif failed_count:
             outcome = StageExecutionResult.skipped_result(
@@ -397,6 +415,7 @@ class ScoutEngine:
                 ),
                 attempted=attempted_count,
                 skipped=skipped_count + failed_count,
+                warnings=diagnostics,
             )
         elif blocked_count:
             outcome = StageExecutionResult.blocked_result(
@@ -428,7 +447,11 @@ class ScoutEngine:
                 attempted=attempted_count,
                 skipped=skipped_count,
             )
-        return ScoutCycleResult(outcome=outcome, discoveries=discoveries)
+        return ScoutCycleResult(
+            outcome=outcome,
+            discoveries=discoveries,
+            diagnostics=diagnostics,
+        )
 
     async def run_named_lookup(
         self,
