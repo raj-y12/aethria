@@ -4,6 +4,7 @@ import { useClerk, useUser } from '@clerk/react';
 import { useAgentsEnabled } from './useAgentsEnabled';
 import { toggleAgents } from '../api/agents';
 import { markActivitySeen } from '../api/activity';
+import { logoutAndNavigate } from './logoutFlow';
 
 /**
  * Shared sign-out + agent gating modal flow (SystemBar fixed, AccountRailPanel).
@@ -20,12 +21,7 @@ export function useAgentLogoutFlow() {
   const displayName = user?.username ?? user?.primaryEmailAddress?.emailAddress ?? 'Account';
 
   const doLogout = useCallback(async () => {
-    localStorage.removeItem('aethria_last_activity');
-    // Logout is the most reliable start of the next "away" window. Do not let
-    // a transient marker failure trap the user in the app.
-    await markActivitySeen({ keepalive: true }).catch(() => {});
-    await signOut?.();
-    navigate('/sign-in', { replace: true });
+    await logoutAndNavigate({ markActivitySeen, signOut, navigate });
   }, [navigate, signOut]);
 
   const toggleAgentsAndLogout = useCallback(
