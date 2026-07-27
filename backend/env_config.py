@@ -316,13 +316,7 @@ def use_supabase_storage() -> bool:
 
 
 def is_production_env() -> bool:
-    """Return whether local/process fallbacks must be treated as unsafe.
-
-    Explicit local/dev/test environments remain usable for development. An
-    Unknown values fail closed. Render deployments are also recognized by
-    the platform-provided ``RENDER`` marker when no application label exists;
-    local checkouts can therefore keep using their explicit dev credentials.
-    """
+    """Return whether the application explicitly declares production mode."""
     value = (
         os.getenv("ENVIRONMENT")
         or os.getenv("APP_ENV")
@@ -336,7 +330,17 @@ def is_production_env() -> bool:
         return True
     if normalized:
         return True
-    return get_bool("RENDER")
+    return False
+
+
+def is_deployed_env() -> bool:
+    """Return whether the process is deployed, including Render.
+
+    Deployed services must not fall back to local state. This is deliberately
+    separate from the API's explicit production gate because a single Render
+    instance may still use its configured in-process event bus.
+    """
+    return is_production_env() or get_bool("RENDER")
 
 
 def allow_process_local_state() -> bool:
@@ -350,7 +354,7 @@ def local_fallback_allowed() -> bool:
     Production mode is fail-closed. Non-production processes retain the
     historical local fallback so test/dev workflows remain usable.
     """
-    return not is_production_env()
+    return not is_deployed_env()
 
 
 def supabase_configured() -> bool:
