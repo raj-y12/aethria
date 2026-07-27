@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -294,4 +294,68 @@ class PipelineExecutionResult(BaseModel):
             detail=detail,
             recovery_action=recovery_action,
             **payload,
+        )
+
+    @classmethod
+    def from_stage_results(
+        cls,
+        stage_results: Mapping[str, StageExecutionResult],
+        *,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> "PipelineExecutionResult":
+        """Aggregate typed stage outcomes into one periodic-cycle result.
+
+        Stage failures take precedence over blocks, while a cycle made entirely
+        of skipped stages is explicit no-work. Keeping this translation here
+        prevents each scheduled runner from inventing its own precedence rules.
+        """
+        failed_result = next(
+            (
+                result
+                for result in stage_results.values()
+                if result.state is StageExecutionState.FAILED
+            ),
+            None,
+        )
+        if failed_result is not None:
+            return cls.stage_failure(
+                stage=failed_result.stage,
+                code=failed_result.code,
+                detail=failed_result.detail,
+                recovery_action=failed_result.recovery_action
+                or "Inspect the failed stage and retry.",
+                metadata=metadata or {},
+            )
+
+        blocked_result = next(
+            (
+                result
+                for result in stage_results.values()
+                if result.state is StageExecutionState.BLOCKED
+            ),
+            None,
+        )
+        if blocked_result is not None:
+            return cls.blocked(
+                code=blocked_result.code,
+                detail=blocked_result.detail,
+                recovery_action=blocked_result.recovery_action
+                or "Correct the stage block and retry.",
+                metadata=metadata or {},
+            )
+
+        if all(
+            result.state is StageExecutionState.SKIPPED
+            for result in stage_results.values()
+        ):
+            return cls.skipped(
+                code="pipeline_cycle_no_work",
+                detail="The pipeline cycle found no eligible evaluation work.",
+                metadata=metadata or {},
+            )
+
+        return cls.completed(
+            code="pipeline_cycle_completed",
+            detail="The pipeline cycle completed.",
+            metadata=metadata or {},
         )

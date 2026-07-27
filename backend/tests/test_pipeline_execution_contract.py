@@ -185,3 +185,68 @@ def test_scout_and_meta_payload_results_bind_payloads_to_typed_outcomes():
             ),
             report={"cycle_number": 4},
         )
+
+
+def test_pipeline_result_aggregates_stage_results_with_failure_precedence():
+    from pipeline_execution import (
+        PipelineExecutionResult,
+        PipelineExecutionState,
+        StageExecutionResult,
+    )
+
+    stages = {
+        "scout": StageExecutionResult.skipped_result(
+            stage="scout",
+            code="scout_no_eligible_work",
+            detail="Scout found no eligible work.",
+        ),
+        "reviewer": StageExecutionResult.blocked_result(
+            stage="reviewer",
+            code="reviewer_budget_blocked",
+            detail="Reviewer budget denied eligible work.",
+            recovery_action="Increase the Reviewer budget and retry.",
+            attempted=1,
+            blocked=1,
+        ),
+        "partner": StageExecutionResult.failed_result(
+            stage="partner",
+            code="partner_candidate_failures",
+            detail="Partner failed to decide.",
+            recovery_action="Inspect Partner logs and retry.",
+            attempted=1,
+            failed=1,
+        ),
+    }
+
+    result = PipelineExecutionResult.from_stage_results(
+        stages,
+        metadata={"stage_results": {name: value.model_dump() for name, value in stages.items()}},
+    )
+
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "partner"
+    assert result.code == "partner_candidate_failures"
+    assert result.metadata["stage_results"]["scout"]["code"] == "scout_no_eligible_work"
+
+
+def test_pipeline_result_aggregates_all_skipped_stages_as_no_work():
+    from pipeline_execution import (
+        PipelineExecutionResult,
+        PipelineExecutionState,
+        StageExecutionResult,
+    )
+
+    stages = {
+        stage: StageExecutionResult.skipped_result(
+            stage=stage,
+            code=f"{stage}_no_eligible_work",
+            detail=f"{stage.title()} found no eligible work.",
+        )
+        for stage in ("scout", "reviewer", "partner")
+    }
+
+    result = PipelineExecutionResult.from_stage_results(stages)
+
+    assert result.state is PipelineExecutionState.SKIPPED
+    assert result.code == "pipeline_cycle_no_work"
+    assert result.detail == "The pipeline cycle found no eligible evaluation work."

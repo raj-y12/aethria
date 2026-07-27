@@ -981,57 +981,21 @@ async def _run_one_pipeline_cycle_inner(
                 for stage, result in stage_results.items()
             },
         }
-        failed_result = next(
-            (
-                result
-                for result in stage_results.values()
-                if result.state is StageExecutionState.FAILED
-            ),
-            None,
-        )
-        if failed_result is not None:
-            metrics.observe_pipeline_cycle(_cycle_duration, outcome="error")
-            return PipelineExecutionResult.stage_failure(
-                stage=failed_result.stage,
-                code=failed_result.code,
-                detail=failed_result.detail,
-                recovery_action=failed_result.recovery_action
-                or "Inspect the failed stage and retry.",
-                metadata=result_metadata,
-            )
-        blocked_result = next(
-            (
-                result
-                for result in stage_results.values()
-                if result.state is StageExecutionState.BLOCKED
-            ),
-            None,
-        )
-        if blocked_result is not None:
-            metrics.observe_pipeline_cycle(_cycle_duration, outcome="blocked")
-            return PipelineExecutionResult.blocked(
-                code=blocked_result.code,
-                detail=blocked_result.detail,
-                recovery_action=blocked_result.recovery_action
-                or "Correct the stage block and retry.",
-                metadata=result_metadata,
-            )
-        if all(
-            result.state is StageExecutionState.SKIPPED
-            for result in stage_results.values()
-        ):
-            metrics.observe_pipeline_cycle(_cycle_duration, outcome="no_work")
-            return PipelineExecutionResult.skipped(
-                code="pipeline_cycle_no_work",
-                detail="The pipeline cycle found no eligible evaluation work.",
-                metadata=result_metadata,
-            )
-        metrics.observe_pipeline_cycle(_cycle_duration, outcome="success")
-        return PipelineExecutionResult.completed(
-            code="pipeline_cycle_completed",
-            detail="The pipeline cycle completed.",
+        pipeline_result = PipelineExecutionResult.from_stage_results(
+            stage_results,
             metadata=result_metadata,
         )
+        if pipeline_result.state is PipelineExecutionState.FAILED_STAGE:
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="error")
+            return pipeline_result
+        if pipeline_result.state is PipelineExecutionState.BLOCKED:
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="blocked")
+            return pipeline_result
+        if pipeline_result.state is PipelineExecutionState.SKIPPED:
+            metrics.observe_pipeline_cycle(_cycle_duration, outcome="no_work")
+            return pipeline_result
+        metrics.observe_pipeline_cycle(_cycle_duration, outcome="success")
+        return pipeline_result
     except Exception as e:
         metrics.observe_pipeline_cycle(time.perf_counter() - started_at, outcome="error")
         logger.exception("[%s] Pipeline cycle error: %s", user_id[:12], e)
