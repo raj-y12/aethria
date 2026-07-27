@@ -3,8 +3,10 @@ Sector clustering and concentration tracking.
 Backed by Supabase analytics_sector_concentration table.
 """
 import logging
+import math
 import re
 from collections import Counter, defaultdict
+from numbers import Real
 from pathlib import Path
 from typing import Dict, Any, List
 from datetime import datetime
@@ -23,6 +25,10 @@ _STOP_WORDS = frozenset(
     "so yet both either neither each every all any few more most other some such "
     "no only own same than too very it its this that these those".split()
 )
+
+
+def _finite_number(value: Any) -> bool:
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value)
 
 
 def _extract_keywords(text: str) -> List[str]:
@@ -62,17 +68,34 @@ class ClusterAnalyzer:
             sector_groups[sector].append(s)
 
         for sector, entries in sector_groups.items():
-            confidences = [
-                (e.get("scout_info") or {}).get("confidence_score", 0.5)
-                for e in entries
-            ]
+            confidences = []
+            for e in entries:
+                scout = e.get("scout_info") or {}
+                confidence = scout.get("confidence_score")
+                if "confidence_score" not in scout:
+                    confidences.append(0.5)
+                elif _finite_number(confidence):
+                    confidences.append(confidence)
             review_scores = []
             for e in entries:
                 ri = e.get("review_info")
                 if ri:
-                    avg = (ri.get("market_score", 0) + ri.get("product_score", 0) +
-                           ri.get("technical_score", 0) + ri.get("execution_score", 0)) / 4.0
-                    review_scores.append(avg)
+                    scores = [
+                        ri.get(field)
+                        for field in (
+                            "market_score",
+                            "product_score",
+                            "technical_score",
+                            "execution_score",
+                        )
+                    ]
+                    numeric_scores = [
+                        score
+                        for score in scores
+                        if _finite_number(score)
+                    ]
+                    if numeric_scores:
+                        review_scores.append(sum(numeric_scores) / len(numeric_scores))
             by_sector[sector] = {
                 "count": len(entries),
                 "pct_of_total": round(len(entries) / total * 100, 1),
