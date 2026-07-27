@@ -14,7 +14,7 @@ describe('ExecutionReadinessPanel', () => {
     expect(screen.queryByText(/agents are off/i)).not.toBeInTheDocument();
   });
 
-  it('shows recoverable and terminal durable work as degraded', () => {
+  it('shows active work while retaining terminal history as a readout', () => {
     render(<ExecutionReadinessPanel status={{
       status: 'ok',
       durable_jobs: {
@@ -31,13 +31,13 @@ describe('ExecutionReadinessPanel', () => {
       },
     }} />);
 
-    expect(screen.getByText('Degraded')).toBeInTheDocument();
+    expect(screen.getByText('Active')).toBeInTheDocument();
     expect(screen.getByLabelText('Retry wait')).toHaveTextContent('3');
     expect(screen.getByLabelText('Dead letter')).toHaveTextContent('1');
     expect(screen.getByLabelText('Outbox')).toHaveTextContent('4');
   });
 
-  it('shows the latest safe failure code beside terminal work', () => {
+  it('keeps historical terminal work visible without calling the pipeline degraded', () => {
     render(<ExecutionReadinessPanel status={{
       status: 'ok',
       durable_jobs: { required: true, ready: true, error: null, counts: { 'pipeline_cycle:dead_letter': 1 } },
@@ -47,7 +47,9 @@ describe('ExecutionReadinessPanel', () => {
       failure_code: 'scout_persona_failures',
     }]} />);
 
-    expect(screen.getByText(/Latest code: scout_persona_failures/i)).toBeInTheDocument();
+    expect(screen.getByText('Historical')).toBeInTheDocument();
+    expect(screen.getByText(/latest code: scout_persona_failures/i)).toBeInTheDocument();
+    expect(screen.queryByText('Degraded')).not.toBeInTheDocument();
   });
 
   it('does not use lookup failures as the pipeline diagnostic', () => {
