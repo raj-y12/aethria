@@ -352,8 +352,8 @@ def main() -> int:
         start_agents = True
         if use_supabase and not agent_user_id:
             start_agents = False
-            print("  [run.py] Supabase on but AETHRIA_AGENT_USER_ID not set — agents subprocess skipped. "
-                  "Agents run when users log in and trigger via API.", flush=True)
+            print("  [run.py] Supabase on; no AETHRIA_AGENT_USER_ID. Skipping the legacy agents subprocess. "
+                  "The API will resume user-scoped agent loops after login.", flush=True)
         agents_proc = None
         if start_agents:
             agents_cmd = [sys.executable, "run_system.py"]

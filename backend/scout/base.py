@@ -886,23 +886,22 @@ class Scout(ABC):
                     recency_query=recency_query(f"{lens} startup"),
                     user_id=self._tenant_user_id,
                 )
-                if fail_closed and not source_pack["sources"]:
+                # Open discovery must never ask the model to invent a company when
+                # retrieval is dark. Reference validation happens after generation,
+                # but that is too late: it still burns tokens and can produce noisy
+                # repair/dead-letter traffic during provider outages.
+                if not source_pack["sources"]:
                     self.last_discovery_diagnostic = {
                         "kind": "retrieval_no_results",
                         "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
                         "provider_diagnostics": source_pack.get("provider_diagnostics", []),
                     }
                     self.logger.warning(
-                        "grounded_citations: fail-closed; no retrieval sources provider=%s diagnostics=%s",
+                        "grounded_citations: no retrieval sources; skipping scout model call provider=%s diagnostics=%s",
                         source_pack.get("provider"),
                         source_pack.get("provider_diagnostics", []),
                     )
                     return None
-                if not source_pack["sources"]:
-                    self.logger.warning(
-                        "grounded_citations: enabled but retrieval returned no sources provider=%s; continuing without strict citation-source constraints",
-                        source_pack.get("provider"),
-                    )
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -1083,24 +1082,18 @@ class Scout(ABC):
                 # Resolver evidence is merged AFTER the anchor-host filter so identity
                 # evidence (LinkedIn/Crunchbase/news) stays citable even with a website hint.
                 source_pack = self._merge_resolution_sources(source_pack, resolution)
-                if fail_closed and not source_pack["sources"]:
+                if not source_pack["sources"]:
                     self.last_discovery_diagnostic = {
                         "kind": "retrieval_no_results",
                         "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
                         "provider_diagnostics": source_pack.get("provider_diagnostics", []),
                     }
                     self.logger.warning(
-                        "grounded_citations: fail-closed company=%s no retrieval sources diagnostics=%s",
+                        "grounded_citations: company=%s has no retrieval sources; skipping model call diagnostics=%s",
                         company,
                         source_pack.get("provider_diagnostics", []),
                     )
                     return None
-                if not source_pack["sources"]:
-                    self.logger.warning(
-                        "grounded_citations: company lookup enabled but retrieval returned no sources company=%s provider=%s; continuing without strict citation-source constraints",
-                        company,
-                        source_pack.get("provider"),
-                    )
             else:
                 # Even without grounded citations, resolver evidence should back the
                 # payload's references and financial grounding.

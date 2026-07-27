@@ -114,6 +114,32 @@ def test_call_llm_records_retrieval_no_results_separately_from_model_failure(mon
     }
 
 
+def test_call_llm_stays_fail_closed_when_legacy_toggle_is_false(monkeypatch):
+    """A dark provider path must not spend LLM calls inventing scout evidence."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: False)
+    monkeypatch.setattr(
+        "scout.base.retrieve_source_pack_merged",
+        lambda **kwargs: {
+            "provider": "none",
+            "retrieval_outcome": "no_results",
+            "provider_diagnostics": [],
+            "sources": [],
+            "url_allowlist": set(),
+        },
+    )
+    scout.client = _FakeClient()
+
+    assert scout._call_llm_sync() is None
+    assert scout.last_discovery_diagnostic["kind"] == "retrieval_no_results"
+
+
 def test_call_llm_records_validation_failure_when_retrieval_succeeded(monkeypatch):
     scout = DummyScout(
         scout_type="market_driven",
