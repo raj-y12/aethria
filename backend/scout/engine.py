@@ -224,6 +224,7 @@ class ScoutEngine:
         discoveries: List[ScoutOutput] = []
         attempted_count = 0
         failed_count = 0
+        persistence_failed_count = 0
         blocked_count = 0
         skipped_count = 0
         for wave_idx in range(waves):
@@ -313,6 +314,7 @@ class ScoutEngine:
                                 f"Failed to persist discovery {result.get('id')}: {e}"
                             )
                             failed_count += 1
+                            persistence_failed_count += 1
                             continue
 
                     discoveries.append(result)
@@ -334,28 +336,67 @@ class ScoutEngine:
         )
 
         succeeded_count = len(discoveries)
-        if failed_count or (blocked_count and succeeded_count):
+        if persistence_failed_count:
             outcome = StageExecutionResult.failed_result(
                 stage="scout",
-                code=(
-                    "scout_partial_budget_block"
-                    if blocked_count and not failed_count
-                    else "scout_persona_failures"
-                ),
+                code="scout_persistence_failures",
                 detail=(
-                    f"Scout completed {succeeded_count} of {attempted_count} "
-                    "selected persona attempts; one or more attempts failed or "
-                    "were blocked."
+                    f"Scout produced {succeeded_count} eligible discovery(ies), "
+                    f"but {persistence_failed_count} could not be persisted."
                 ),
                 recovery_action=(
-                    "Inspect Scout, budget, and persistence logs; correct the "
-                    "failure and retry the affected personas."
+                    "Inspect Scout storage and Supabase connectivity, then retry "
+                    "the affected cycle."
                 ),
                 attempted=attempted_count,
                 succeeded=succeeded_count,
                 failed=failed_count,
                 blocked=blocked_count,
                 skipped=skipped_count,
+            )
+        elif blocked_count and succeeded_count:
+            outcome = StageExecutionResult.failed_result(
+                stage="scout",
+                code="scout_partial_budget_block",
+                detail=(
+                    f"Scout produced {succeeded_count} eligible discovery(ies), "
+                    f"but {blocked_count} persona attempt(s) were blocked by the "
+                    "cost budget."
+                ),
+                recovery_action=(
+                    "Increase the Scout budget or wait for the budget window to "
+                    "reset, then retry the affected cycle."
+                ),
+                attempted=attempted_count,
+                succeeded=succeeded_count,
+                failed=failed_count,
+                blocked=blocked_count,
+                skipped=skipped_count,
+            )
+        elif succeeded_count and failed_count:
+            outcome = StageExecutionResult.completed(
+                stage="scout",
+                code="scout_completed_with_warnings",
+                detail=(
+                    f"Scout produced {succeeded_count} eligible discovery(ies) "
+                    f"from {attempted_count} persona attempt(s); some attempts "
+                    "were unavailable and will be retried on the next cycle."
+                ),
+                attempted=attempted_count,
+                succeeded=succeeded_count,
+                skipped=skipped_count + failed_count,
+            )
+        elif failed_count:
+            outcome = StageExecutionResult.skipped_result(
+                stage="scout",
+                code="scout_no_eligible_work",
+                detail=(
+                    f"No Scout persona produced an eligible, reference-validated "
+                    f"discovery ({failed_count} attempt(s) unavailable). The next "
+                    "scheduled cycle will retry Scout."
+                ),
+                attempted=attempted_count,
+                skipped=skipped_count + failed_count,
             )
         elif blocked_count:
             outcome = StageExecutionResult.blocked_result(

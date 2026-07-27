@@ -308,21 +308,22 @@ def _scout_discovery(startup_id="startup-1"):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("results", "expected_state", "succeeded", "failed"),
+    ("results", "expected_state", "succeeded", "failed", "skipped"),
     [
-        ([_scout_discovery()], StageExecutionState.COMPLETED, 1, 0),
-        ([RuntimeError("boom")], StageExecutionState.FAILED, 0, 1),
+        ([_scout_discovery()], StageExecutionState.COMPLETED, 1, 0, 0),
+        ([RuntimeError("boom")], StageExecutionState.SKIPPED, 0, 0, 1),
         (
             [_scout_discovery(), RuntimeError("boom")],
-            StageExecutionState.FAILED,
+            StageExecutionState.COMPLETED,
             1,
+            0,
             1,
         ),
     ],
     ids=["clean-success", "all-fail", "partial-failure"],
 )
 async def test_scout_periodic_result_accounts_for_every_persona(
-    monkeypatch, results, expected_state, succeeded, failed
+    monkeypatch, results, expected_state, succeeded, failed, skipped
 ):
     import scout.engine as scout_module
 
@@ -337,7 +338,13 @@ async def test_scout_periodic_result_accounts_for_every_persona(
     assert result.outcome.attempted == len(results)
     assert result.outcome.succeeded == succeeded
     assert result.outcome.failed == failed
+    assert result.outcome.skipped == skipped
     assert len(result.discoveries) == succeeded
+
+    if skipped and succeeded == 0:
+        assert result.outcome.code == "scout_no_eligible_work"
+    elif skipped:
+        assert result.outcome.code == "scout_completed_with_warnings"
 
 
 @pytest.mark.asyncio
@@ -382,6 +389,7 @@ async def test_scout_periodic_persistence_failure_is_not_a_success(monkeypatch):
     ).run_cycle()
 
     assert result.outcome.state is StageExecutionState.FAILED
+    assert result.outcome.code == "scout_persistence_failures"
     assert result.outcome.failed == 1
     assert result.outcome.succeeded == 0
     assert result.discoveries == []
