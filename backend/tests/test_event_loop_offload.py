@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import pipeline_runner
+import api
 from pipeline_execution import PipelineExecutionState
 
 # Runnable standalone (python -m pytest tests/test_event_loop_offload.py) —
@@ -92,6 +93,26 @@ async def test_slow_sync_settings_store_does_not_block_event_loop(monkeypatch):
 
     worst_gap = await _run_cycle_with_heartbeat()
     _assert_loop_stayed_free(worst_gap, "settings load")
+
+
+async def test_agent_loop_settings_checks_do_not_block_event_loop(monkeypatch):
+    def slow_load_settings(user_id, *, use_cache=True):
+        time.sleep(BLOCK_S)
+        return {"agent_config": {"scouts_enabled": True}}
+
+    monkeypatch.setattr(api, "load_settings", slow_load_settings)
+    monkeypatch.setattr(api, "save_settings", lambda settings, user_id: time.sleep(BLOCK_S))
+
+    stop = asyncio.Event()
+    heartbeat = asyncio.create_task(_max_heartbeat_gap(stop))
+    await asyncio.sleep(0.05)
+    try:
+        assert await api._is_user_agents_enabled("user_loop_lag_test") is True
+        await api._update_agent_run_status("user_loop_lag_test", "running")
+    finally:
+        stop.set()
+    worst_gap = await heartbeat
+    _assert_loop_stayed_free(worst_gap, "agent loop settings checks")
 
 
 class _EngineBuildReached(RuntimeError):

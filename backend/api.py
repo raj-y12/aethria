@@ -605,10 +605,10 @@ def _lookup_worker_count() -> int:
 # Per-user persistent loop helpers
 # ---------------------------------------------------------------------------
 
-def _is_user_agents_enabled(user_id: str) -> bool:
-    """Sync check — safe to call from inside the async loop (no await)."""
+async def _is_user_agents_enabled(user_id: str) -> bool:
+    """Check agent enablement without running settings I/O on the event loop."""
     try:
-        s = load_settings(user_id, use_cache=False)
+        s = await asyncio.to_thread(load_settings, user_id, use_cache=False)
         ac = s.get("agent_config") or {}
         return bool(ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"))
     except Exception:
@@ -637,7 +637,7 @@ async def _update_agent_run_status(
 ) -> None:
     """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
     try:
-        s = load_settings(user_id)
+        s = await asyncio.to_thread(load_settings, user_id)
         ac = s.setdefault("agent_config", {})
         ac["agents_status"] = status
         if execution_result is not None:
@@ -646,7 +646,7 @@ async def _update_agent_run_status(
             )
         if status == "running":
             ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
-        save_settings(s, user_id)
+        await asyncio.to_thread(save_settings, s, user_id)
     except Exception as e:
         _logger_agents.debug("[%s] Could not update agent status: %s", user_id[:12], e)
 
@@ -661,7 +661,7 @@ async def _user_agent_loop(user_id: str) -> None:
     try:
         while True:
             # Re-check enabled flag at the top of every iteration (settings can change)
-            if not _is_user_agents_enabled(user_id):
+            if not await _is_user_agents_enabled(user_id):
                 _logger_agents.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
                 _logger_visible.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
                 await _update_agent_run_status(user_id, "stopped")
@@ -741,7 +741,7 @@ async def _user_agent_loop(user_id: str) -> None:
                     user_id[:12],
                     _pipeline_rss_mb(),
                 )
-            if not _is_user_agents_enabled(user_id):
+            if not await _is_user_agents_enabled(user_id):
                 _logger_agents.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
                 _logger_visible.info("[AGENT LOOP] Stopped because Ops/Agents is OFF for user %s", user_id[:12])
                 await _update_agent_run_status(user_id, "stopped")
