@@ -107,14 +107,8 @@ function DispatchPanelBody({
   const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? `min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed${!input ? ' caret-transparent' : ''}`
+    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed'
     : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed';
-  // Embedded idle state (Dispatch's full-screen compose view) borrows the
-  // marketing query voice — a static "› look up …" prompt with a blinking
-  // block caret — instead of the plain native placeholder. Drawer/compact
-  // variants (Flow's inline dispatch) keep the native placeholder untouched.
-  const showQueryPrompt = embedded && !input;
-
   const showStatusSlot = isBusy || !!lookupMessage;
   const statusSlotCls = embedded
     ? `mt-phi-2 grid content-start gap-phi-1${showStatusSlot ? ' min-h-[44px]' : ''}`
@@ -156,10 +150,9 @@ function DispatchPanelBody({
         }`}
         aria-label="Pipeline dispatch"
       >
-        {showQueryPrompt ? (
-          <span className="pointer-events-none absolute left-0 inline-flex items-baseline gap-[2px] text-oxford/60" aria-hidden>
-            <span className="font-medium font-sans text-[13px] leading-[1.5]">› look up …</span>
-            <span className="query-caret" />
+        {embedded ? (
+          <span className="shrink-0 select-none font-mono text-[15px] font-medium leading-none text-oxford/60" aria-hidden>
+            &gt;
           </span>
         ) : null}
         <input
@@ -170,11 +163,14 @@ function DispatchPanelBody({
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') onSubmit();
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (!isBusy && input.trim()) onSubmit();
+            }
             onInputKeyDown?.(e);
           }}
-          placeholder={embedded ? '' : 'Company name or URL'}
-          aria-label={embedded ? 'Look up a company' : undefined}
+          placeholder={embedded ? 'type a company name or URL' : 'Company name or URL'}
+          aria-label={embedded ? 'Type a company name or URL' : undefined}
           autoComplete="off"
           disabled={isBusy}
           className={inputCls}
@@ -185,12 +181,12 @@ function DispatchPanelBody({
           disabled={isBusy ? !onCancel : !input.trim()}
           className={isBusy ? `${runBtnCls} text-oxford/60 hover:text-oxford/70 disabled:opacity-100` : runBtnCls}
         >
-          {isBusy ? (
-            'Cancel'
-          ) : (
+          {isBusy ? 'Cancel' : (
             <>
-              {embedded ? 'Run' : 'Run lookup'}
-              <span className="transition-transform group-hover:translate-x-px">→</span>
+              <span aria-hidden className="font-mono text-[15px] leading-none transition-transform group-hover:translate-x-px">
+                ↵
+              </span>
+              <span className="sr-only">Submit lookup</span>
             </>
           )}
         </button>
