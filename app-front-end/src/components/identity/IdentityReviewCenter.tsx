@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import IdentityReviewQueue from './IdentityReviewQueue';
+import { transitionOrReduced } from '../../design-system/motion';
+import { usePrefersReducedMotion } from '../../hooks';
 
 export default function IdentityReviewCenter() {
+  const reduceMotion = usePrefersReducedMotion();
   const [open, setOpen] = useState(false);
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null);
 
@@ -33,7 +36,7 @@ export default function IdentityReviewCenter() {
             initial={{ x: 32 }}
             animate={{ x: 0 }}
             exit={{ x: 32 }}
-            transition={{ duration: 0.18 }}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
             className="h-full w-full max-w-2xl overflow-y-auto border-l border-oxford/10 bg-paper shadow-2xl"
           >
             <IdentityReviewQueue onClose={() => setOpen(false)} linkedJobId={linkedJobId} />

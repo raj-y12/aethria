@@ -1076,6 +1076,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Blanket stop. The list below used to be the only coverage, so every new
+     animation had to remember to enlist — .empty-state-enter never did. Keyframes
+     still land on their final frame (forwards + one iteration), so entrances that
+     fade in from opacity 0 end up visible rather than stuck hidden. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Kept: these set explicit resting states the final keyframe doesn't give. */
   .escalation-pulse,
   .escalation-dot-active,
   .skeleton-shimmer,

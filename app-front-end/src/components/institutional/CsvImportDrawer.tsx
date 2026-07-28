@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { importCsv, type ImportResult, type ImportSource } from '../../api/channelsOutcomes';
+import { transitionOrReduced } from '../../design-system/motion';
+import { usePrefersReducedMotion } from '../../hooks';
 
 const MAX_IMPORT_ROWS = 500;
 
@@ -67,6 +69,7 @@ function resultBatch(result: ImportResult): { id: string; status: string; resolv
 }
 
 export default function CsvImportDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const reduceMotion = usePrefersReducedMotion();
   const queryClient = useQueryClient();
   const [source, setSource] = useState<ImportSource>('csv');
   const [csvText, setCsvText] = useState('');
@@ -126,7 +129,7 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
             initial={{ x: 32 }}
             animate={{ x: 0 }}
             exit={{ x: 32 }}
-            transition={{ duration: 0.18 }}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
             className="flex h-full w-full max-w-3xl flex-col border-l border-oxford/10 bg-paper shadow-2xl"
           >
             <header className="flex items-start justify-between gap-phi-5 border-b border-oxford/10 px-phi-6 py-phi-5">
