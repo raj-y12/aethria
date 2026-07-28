@@ -20,7 +20,7 @@ const bandColors = {
 };
 
 const DOT_COLUMNS = 101;
-const DOT_ROWS = 7;
+const DOT_ROWS = 11;
 const dotScores = Array.from({ length: DOT_COLUMNS }, (_, score) => score);
 
 export function scoreFromPointer(clientX: number, left: number, width: number): number {
@@ -129,7 +129,7 @@ function ThresholdBar({
       <div ref={barRef} className="relative h-14 w-full">
         <div
           data-testid="threshold-dot-grid"
-          className="pointer-events-none absolute inset-x-0 inset-y-1 grid place-items-center border-y border-oxford/[0.08] py-1"
+          className="pointer-events-none absolute inset-x-0 inset-y-1 grid place-items-center border-y border-oxford/[0.08] py-0.5"
           style={{
             gridTemplateColumns: `repeat(${DOT_COLUMNS}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${DOT_ROWS}, minmax(0, 1fr))`,
@@ -140,7 +140,7 @@ function ThresholdBar({
             dotScores.map((score) => (
               <span
                 key={`${row}-${score}`}
-                className="h-[2px] w-[2px] rounded-full sm:h-[3px] sm:w-[3px]"
+                className="h-[3px] w-[3px] rounded-full sm:h-1 sm:w-1"
                 style={{
                   backgroundColor: colorForScore(score),
                   opacity: row === 0 || row === DOT_ROWS - 1 ? 0.58 : 0.88,
