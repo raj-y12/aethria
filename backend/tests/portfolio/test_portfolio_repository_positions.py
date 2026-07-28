@@ -66,5 +66,5 @@ async def test_list_positions_exposes_legacy_bridge_and_is_tenant_scoped():
 @pytest.mark.asyncio
 async def test_list_positions_rejects_missing_tenant():
     repository = PortfolioRepository(_Pool(_Connection([])))
-    with pytest.raises(ValueError):
+    with pytest.raises(RuntimeError):
         await repository.list_positions(user_id="", limit=10)
