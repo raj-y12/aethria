@@ -19,9 +19,12 @@ const bandColors = {
   invest: '#8dc2a1',
 };
 
-const DOT_COLUMNS = 101;
-const DOT_ROWS = 11;
-const dotScores = Array.from({ length: DOT_COLUMNS }, (_, score) => score);
+const DOT_COLUMNS = 161;
+const DOT_ROWS = 17;
+const dotScores = Array.from({ length: DOT_COLUMNS }, (_, index) => ({
+  index,
+  score: (index / (DOT_COLUMNS - 1)) * 100,
+}));
 
 export function scoreFromPointer(clientX: number, left: number, width: number): number {
   if (width <= 0) return 0;
@@ -137,12 +140,12 @@ function ThresholdBar({
           aria-hidden
         >
           {Array.from({ length: DOT_ROWS }, (_, row) =>
-            dotScores.map((score) => (
+            dotScores.map((dot) => (
               <span
-                key={`${row}-${score}`}
-                className="h-[3px] w-[3px] rounded-full sm:h-1 sm:w-1"
+                key={`${row}-${dot.index}`}
+                className="h-px w-px rounded-full sm:h-[3px] sm:w-[3px] lg:h-1 lg:w-1"
                 style={{
-                  backgroundColor: colorForScore(score),
+                  backgroundColor: colorForScore(dot.score),
                   opacity: row === 0 || row === DOT_ROWS - 1 ? 0.58 : 0.88,
                 }}
               />
