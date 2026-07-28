@@ -16,60 +16,141 @@ _GENERIC_REF_PATTERNS = (
     "no specific sources",
 )
 
-# Substring match on normalized company name (use tokens unlikely to appear inside unrelated names).
-_MEGACAP_KEYWORDS = (
-    "google",
-    "alphabet",
-    "microsoft",
-    "azure",
-    "amazon",
-    "aws",
-    "apple",
-    "meta",
-    "facebook",
-    "ibm",
-    "oracle",
-    "salesforce",
-    "sap",
-    "nvidia",
-    "tesla",
-    "snowflake",
-    "palantir",
-    "shopify",
-    "coinbase",
-    "servicenow",
-    "twilio",
-    "atlassian",
-    "workday",
-    "adyen",
-    "robinhood",
-    "doordash",
-    "instacart",
-    "openai",
-    "anthropic",
-    "databricks",
-    "canva",
-    "figma",
-    "notion",
-    "airbnb",
-    "spotify",
-    "netflix",
-    "walmart",
-    "cisco",
-    "intel",
-    "samsung",
-    "sony",
+# Mega-cap incumbents are matched on NORMALIZED WHOLE WORDS or a normalized exact
+# alias — never on raw substrings. Substring matching silently discarded valid
+# venture-scale companies whose names merely contain an incumbent token
+# ("Metaview"/"Metabase" -> meta, "Intellia" -> intel, "Sapient"/"Sapling" -> sap,
+# "Notional" -> notion, "Canvas" -> canva), each of which raised a hard
+# ValueError in validate_scout_output and dropped the whole discovery.
+_MEGACAP_WORDS = frozenset(
+    {
+        "google",
+        "alphabet",
+        "microsoft",
+        "azure",
+        "amazon",
+        "aws",
+        "apple",
+        "meta",
+        "facebook",
+        "ibm",
+        "oracle",
+        "salesforce",
+        "sap",
+        "nvidia",
+        "tesla",
+        "snowflake",
+        "palantir",
+        "shopify",
+        "coinbase",
+        "servicenow",
+        "twilio",
+        "atlassian",
+        "workday",
+        "adyen",
+        "robinhood",
+        "doordash",
+        "instacart",
+        "openai",
+        "anthropic",
+        "databricks",
+        "canva",
+        "figma",
+        "notion",
+        "airbnb",
+        "spotify",
+        "netflix",
+        "walmart",
+        "cisco",
+        "intel",
+        "samsung",
+        "sony",
+        # Previously whole-word-only; same rule now applies to every entry.
+        "stripe",
+        "paypal",
+        "uber",
+        "lyft",
+        "visa",
+        "mastercard",
+        "intuit",
+        "square",
+        "plaid",
+        "checkout",
+        "chime",
+        "revolut",
+        "wise",
+        "klarna",
+        "affirm",
+        "sofi",
+        "roku",
+        "peloton",
+        "zoom",
+        "slack",
+        "dropbox",
+        "hubspot",
+        "zendesk",
+        "okta",
+        "crowdstrike",
+        "zscaler",
+        "cloudflare",
+        "datadog",
+        "mongodb",
+        "elastic",
+    }
 )
 
-# Short / ambiguous tokens: whole-word match only (avoids "intuit" in "intuitive", "stripe" in "stripes").
-_MEGACAP_WORD_RE = re.compile(
-    r"\b("
-    r"stripe|paypal|uber|lyft|visa|mastercard|intuit|square|plaid|checkout|"
-    r"chime|revolut|wise|klarna|affirm|sofi|roku|peloton|zoom|slack|dropbox|"
-    r"hubspot|zendesk|okta|crowdstrike|zscaler|cloudflare|datadog|mongodb|elastic"
-    r")\b",
-    re.I,
+# Multi-word incumbent names that only count as an exact normalized alias, so a
+# startup called "Meta Platforms Analytics" is not confused with the incumbent.
+_MEGACAP_EXACT_ALIASES = frozenset(
+    {
+        "meta platforms",
+        "alphabet inc",
+        "google llc",
+        "amazon web services",
+        "microsoft corporation",
+        "apple inc",
+        "international business machines",
+        "block inc",
+        "square inc",
+        "x corp",
+    }
 )
+
+# Corporate suffixes dropped before alias comparison so "Stripe, Inc." == "stripe".
+_CORPORATE_SUFFIXES = frozenset(
+    {
+        "inc",
+        "incorporated",
+        "llc",
+        "ltd",
+        "limited",
+        "plc",
+        "corp",
+        "corporation",
+        "co",
+        "company",
+        "gmbh",
+        "sas",
+        "sa",
+        "bv",
+        "nv",
+        "ag",
+        "ab",
+        "oy",
+        "as",
+        "aps",
+        "srl",
+        "spa",
+        "pte",
+        "pty",
+        "lp",
+        "llp",
+        "holdings",
+        "group",
+    }
+)
+
+_WORD_SPLIT_RE = re.compile(r"[^a-z0-9]+")
 
 # Registrable domains of large public / mega-private companies. If ALL cited URLs land only here,
 # the scout is effectively sourcing an incumbent (e.g. only stripe.com). Excludes google.com /
@@ -128,20 +209,33 @@ def is_generic_reference(s: str) -> bool:
     return any(p in lower for p in _GENERIC_REF_PATTERNS)
 
 
+def _normalized_words(name: str) -> List[str]:
+    """Lowercase alphanumeric words of a company name, corporate suffixes removed."""
+    words = [w for w in _WORD_SPLIT_RE.split((name or "").lower()) if w]
+    stripped = [w for w in words if w not in _CORPORATE_SUFFIXES]
+    # A name made up entirely of suffixes ("The Company") keeps its raw words so
+    # the caller still has something to compare.
+    return stripped or words
+
+
 def is_megacap_company(name: str) -> bool:
     """
     Heuristic: True if the company name looks like a large public/mega-cap incumbent
     (FAANG / hyperscalers, major fintech, public SaaS, etc.), which we do not consider
     as VC discovery targets for scouts.
+
+    Matching is on normalized WHOLE WORDS or a normalized exact alias only. Substring
+    matching is never used: it rejected legitimate venture-scale companies such as
+    Metaview, Metabase, Intellia, Sapient, Sapling, Notional and Canvas.
     """
     if not isinstance(name, str):
         return False
-    lower = name.strip().lower()
-    if not lower:
+    words = _normalized_words(name)
+    if not words:
         return False
-    if any(k in lower for k in _MEGACAP_KEYWORDS):
+    if any(w in _MEGACAP_WORDS for w in words):
         return True
-    return _MEGACAP_WORD_RE.search(lower) is not None
+    return " ".join(words) in _MEGACAP_EXACT_ALIASES
 
 
 def validate_references_not_only_incumbent_domains(references: List[str]) -> None:

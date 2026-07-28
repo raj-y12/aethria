@@ -403,6 +403,11 @@ class ScoutInfo(BaseModel):
     location: Optional[str] = None  # HQ or primary operating city, e.g. "Paris, FR"
     est_tam: Optional[str] = None  # Total Addressable Market estimate
     founder_names: Optional[List[str]] = None  # Structured founder names grounded in retrieved evidence
+    # Founder Resolver outcome (deterministic stage after company resolution).
+    # Structured founder candidates with role, profile links, previous employment,
+    # education, source evidence, conflicts, and per-field confidence.
+    # resolution_status: FOUND | PARTIAL | LOW_CONFIDENCE | NOT_FOUND.
+    founder_resolution: Optional[Dict[str, Any]] = None
     # Optional provenance for enriched fields (e.g. est_tam, funding_stage, references): scout | reviewer_extraction | gap_retrieval | reviewer_text_infer
     field_provenance: Optional[Dict[str, str]] = None
     # High-level references / source notes for how this opportunity was discovered.

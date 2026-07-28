@@ -87,6 +87,11 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
             if isinstance(scout_output.get("founder_names"), list)
             else None
         ),
+        founder_resolution=(
+            scout_output.get("founder_resolution")
+            if isinstance(scout_output.get("founder_resolution"), dict)
+            else None
+        ),
         field_provenance=scout_output.get("field_provenance") if isinstance(scout_output.get("field_provenance"), dict) else None,
         references=scout_output.get("references") or None,
         source_evidence=scout_output.get("source_evidence") if isinstance(scout_output.get("source_evidence"), list) else None,

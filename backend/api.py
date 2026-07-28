@@ -1441,6 +1441,8 @@ def _validate_settings(body: dict) -> list[str]:
                 errors.append("agent_config.scout_grounded_citations_enabled must be a boolean")
             if "scout_fail_closed_on_empty_retrieval" in ac and not isinstance(ac["scout_fail_closed_on_empty_retrieval"], bool):
                 errors.append("agent_config.scout_fail_closed_on_empty_retrieval must be a boolean")
+            if "scout_citation_allowlist_enforced" in ac and not isinstance(ac["scout_citation_allowlist_enforced"], bool):
+                errors.append("agent_config.scout_citation_allowlist_enforced must be a boolean")
     fi = body.get("fund_identity")
     if fi is not None:
         if not isinstance(fi, dict):

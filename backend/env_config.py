@@ -132,6 +132,18 @@ REGISTRY: List[EnvVar] = [
     EnvVar("SCOUT_ENRICH_MAX_REFERENCES", "int", "12", "Scout", "Max references kept during enrichment."),
     EnvVar("SCOUT_ENRICH_MIN_CONFIDENCE", "float", "0.4", "Scout", "Min confidence to enrich a scout result."),
 
+    # --- Founder resolution --------------------------------------------------
+    EnvVar("FOUNDER_RESOLUTION_ENABLED", "bool", "true", "Founder resolution",
+           "Run the deterministic founder-resolution stage after company resolution."),
+    EnvVar("FOUNDER_RESOLUTION_MIN_CONFIDENCE", "float", "0.35", "Founder resolution",
+           "Min candidate confidence to promote a founder name onto ScoutInfo. "
+           "The full structured resolution is stored regardless."),
+    EnvVar("FOUNDER_RESOLUTION_MAX_NAMES", "int", "8", "Founder resolution",
+           "Cap on founder names promoted onto ScoutInfo (ScoutInfo allows at most 8)."),
+    EnvVar("REVIEWER_FOUNDER_FALLBACK_RETRIEVAL", "bool", "false", "Founder resolution",
+           "Allow reviewer-side founder resolution to run extra searches when the "
+           "reviewer gap-retrieval pack names nobody. Off by default so reviews add no retrieval."),
+
     # --- Reviewer ------------------------------------------------------------
     EnvVar("REVIEWER_INTERVAL_SECONDS", "int", "60", "Reviewer", "Reviewer engine interval."),
     EnvVar("REVIEWER_BATCH_SIZE", "int", "3", "Reviewer", "Reviewer batch size per cycle."),
@@ -174,6 +186,20 @@ REGISTRY: List[EnvVar] = [
     # --- Portfolio -----------------------------------------------------------
     EnvVar("PORTFOLIO_EXECUTION_SCAN_LIMIT", "int", "200", "Portfolio", "Max positions scanned per execution cycle."),
     EnvVar("PORTFOLIO_CLUSTER_ANALYSIS_LIMIT", "int", "500", "Portfolio", "Max rows for concentration clustering."),
+
+    # --- Search provider routing ---------------------------------------------
+    # Each retrieval category resolves its provider independently, so founder
+    # (people) lookups can be routed to a specialised backend without affecting
+    # company/news/general retrieval. Values are registered provider names;
+    # every category defaults to Tavily.
+    EnvVar("SEARCH_PROVIDER_GENERAL", "str", "", "Search providers",
+           "Provider name for general search (default: tavily)."),
+    EnvVar("SEARCH_PROVIDER_NEWS", "str", "", "Search providers",
+           "Provider name for recency/news search (default: tavily)."),
+    EnvVar("SEARCH_PROVIDER_COMPANY", "str", "", "Search providers",
+           "Provider name for company identity search (default: tavily)."),
+    EnvVar("SEARCH_PROVIDER_PEOPLE", "str", "", "Search providers",
+           "Provider name for founder/people search (default: tavily)."),
 
     # --- Tavily (web search) -------------------------------------------------
     EnvVar("TAVILY_API_KEY", "secret", "", "Tavily", "Tavily web-search API key (scout/reviewer retrieval)."),

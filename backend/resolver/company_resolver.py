@@ -862,7 +862,9 @@ def resolve_company(
         queries = _build_queries(company, phase=phase, website_hint=website_hint)
         resolution.queries_used.extend(queries)
         try:
-            pack = retrieve_source_pack_merged(queries=queries, user_id=uid)
+            pack = retrieve_source_pack_merged(
+                queries=queries, user_id=uid, category="company"
+            )
         except Exception as e:
             logger.warning("resolver retrieval failed phase=%d company=%s: %s", phase, company, e)
             _log_stage(

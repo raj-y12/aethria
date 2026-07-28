@@ -3,7 +3,7 @@ from utils.retrieval_grounding import retrieve_source_pack, retrieve_source_pack
 
 def test_retrieve_source_pack_uses_tavily(monkeypatch):
     monkeypatch.setattr(
-        "utils.retrieval_grounding.tavily_search",
+        "utils.search_providers.tavily_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [
             {"title": "Hivery", "url": "https://hivery.com", "snippet": "profile"}
         ],
@@ -29,7 +29,7 @@ def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
             {"title": "C", "url": "https://c.com", "snippet": "third"},
         ]
 
-    monkeypatch.setattr("utils.retrieval_grounding.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
     pack = retrieve_source_pack_merged(
         queries=["Acme startup funding", "Acme traction customers"],
         user_id="u1",
@@ -54,7 +54,7 @@ def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
         # general queries flood enough rows to fill a small cap on their own
         return [{"title": f"g{i}", "url": f"https://g{i}.com", "snippet": "x"} for i in range(8)]
 
-    monkeypatch.setattr("utils.retrieval_grounding.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
     pack = retrieve_source_pack_merged(
         queries=["Acme funding", "Acme product", "Acme founders"],
         recency_query="Acme latest news 2026 acquisition merger",
@@ -72,7 +72,7 @@ def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
 
 def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.retrieval_grounding.tavily_search",
+        "utils.search_providers.tavily_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
     monkeypatch.setattr("utils.retrieval_grounding._fallback_search", lambda query, max_results: [])
@@ -90,7 +90,7 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
             return [{"title": "Tavily result", "url": "https://tavily.example", "snippet": "x"}]
         return []
 
-    monkeypatch.setattr("utils.retrieval_grounding.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
     monkeypatch.setattr(
         "utils.retrieval_grounding._fallback_search",
         lambda query, max_results: [{"title": "DDG result", "url": "https://ddg.example", "snippet": "x"}],
@@ -104,7 +104,7 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
 
 def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.retrieval_grounding.tavily_search",
+        "utils.search_providers.tavily_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
     monkeypatch.setattr(

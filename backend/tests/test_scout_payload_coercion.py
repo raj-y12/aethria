@@ -114,8 +114,13 @@ def test_call_llm_records_retrieval_no_results_separately_from_model_failure(mon
     }
 
 
-def test_call_llm_stays_fail_closed_when_legacy_toggle_is_false(monkeypatch):
-    """A dark provider path must not spend LLM calls inventing scout evidence."""
+def test_empty_retrieval_gate_is_independent_of_citation_enforcement(monkeypatch):
+    """The empty-retrieval gate governs generation; citations have their own gate.
+
+    With the empty-retrieval gate fail-open, a dark provider no longer blocks
+    generation — and citation enforcement stays on regardless, because there is
+    simply no allowlist to enforce against when nothing was retrieved.
+    """
     scout = DummyScout(
         scout_type="market_driven",
         system_prompt="test",
@@ -124,6 +129,46 @@ def test_call_llm_stays_fail_closed_when_legacy_toggle_is_false(monkeypatch):
     )
     monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
     monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: False)
+    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: True)
+    monkeypatch.setattr(
+        "scout.base.retrieve_source_pack_merged",
+        lambda **kwargs: {
+            "provider": "none",
+            "retrieval_outcome": "no_results",
+            "provider_diagnostics": [],
+            "sources": [],
+            "url_allowlist": set(),
+        },
+    )
+    # The shared fake asserts on the "Retrieved sources" block, which does not
+    # exist on an empty pack; record the attempt instead.
+    calls: list = []
+
+    class _RecordingCompletions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            return _FakeResponse("")
+
+    scout.client = type(
+        "C", (), {"chat": type("Chat", (), {"completions": _RecordingCompletions()})()}
+    )()
+
+    scout._call_llm_sync()
+    # The empty-retrieval gate did NOT short-circuit: generation was attempted.
+    assert calls, "fail-open on empty retrieval should still call the model"
+
+
+def test_empty_retrieval_still_skips_generation_when_fail_closed(monkeypatch):
+    """Default posture: a dark provider must not spend LLM calls inventing evidence."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
+    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: False)
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
@@ -212,7 +257,7 @@ def test_postprocess_extracts_founders_from_grounded_sources_when_model_omits_th
             "url_allowlist": {"https://techcrunch.com/aethria"},
         },
         grounded_enabled=False,
-        fail_closed=False,
+        enforce_citation_allowlist=False,
     )
 
     assert out is not None
@@ -268,7 +313,7 @@ def test_postprocess_fail_open_keeps_valid_non_allowlisted_references(monkeypatc
             "sources": [{"url": "https://acmerobotics.com", "title": "Official site", "snippet": ""}],
         },
         grounded_enabled=True,
-        fail_closed=False,
+        enforce_citation_allowlist=False,
         explicit_website="https://acmerobotics.com",
     )
     assert out is not None
@@ -308,7 +353,7 @@ def test_postprocess_fail_closed_still_enforces_allowlist(monkeypatch):
             "sources": [{"url": "https://acmerobotics.com", "title": "Official site", "snippet": ""}],
         },
         grounded_enabled=True,
-        fail_closed=True,
+        enforce_citation_allowlist=True,
         explicit_website=None,
     )
     assert out is None

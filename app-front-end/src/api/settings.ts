@@ -27,6 +27,10 @@ export interface AgentConfig {
   // Scout-specific config
   scout_region: string; // "europe" | "global"
   scout_grounded_citations_enabled?: boolean;
+  // Two independent gates. `scout_citation_allowlist_enforced` restricts cited
+  // URLs to the retrieved sources; `scout_fail_closed_on_empty_retrieval`
+  // decides whether generation runs at all when retrieval returns nothing.
+  scout_citation_allowlist_enforced?: boolean;
   scout_fail_closed_on_empty_retrieval?: boolean;
 }
 

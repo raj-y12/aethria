@@ -15,7 +15,8 @@ from typing import Any, Dict, List, Set
 import certifi
 
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
-from utils.tavily_client import ProviderSearchResults, tavily_search
+from utils.search_providers import normalize_category, provider_name, provider_search
+from utils.tavily_client import ProviderSearchResults
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
@@ -200,21 +201,34 @@ def retrieve_source_pack(
     time_range: str | None = None,
     topic: str | None = None,
     days: int | None = None,
+    category: str | None = None,
 ) -> Dict[str, Any]:
     """
     Build retrieval source pack with provider metadata and URL allowlist.
 
-    time_range: optional Tavily recency filter ("day"|"week"|"month"|"year").
-    topic/days: optional Tavily news-topic recency controls.
+    time_range: optional recency filter ("day"|"week"|"month"|"year").
+    topic/days: optional news-topic recency controls. `topic="news"` is accepted
+    for backwards compatibility and is equivalent to category="news".
+    category: which SearchProvider answers this query (general/news/company/people).
     """
     if max_results is None:
         max_results = _default_max_results()
+    # A caller asking for the news topic is asking for the news category; keep the
+    # legacy `topic` argument working for existing call sites.
+    effective_category = normalize_category(
+        category or ("news" if str(topic or "").strip().lower() == "news" else None)
+    )
+    primary_provider = provider_name(effective_category)
     used_provider = "none"
-    raw: List[Dict[str, str]] = tavily_search(
-        query=query, max_results=max_results, time_range=time_range, topic=topic, days=days
+    raw: List[Dict[str, str]] = provider_search(
+        query,
+        max_results=max_results,
+        category=effective_category,
+        time_range=time_range,
+        days=days,
     )
     provider_diagnostics = [
-        _diagnostic_for_rows(raw, provider="tavily", query=query)
+        _diagnostic_for_rows(raw, provider=primary_provider, query=query)
     ]
     if not raw:
         raw = _fallback_search(query, max_results)
@@ -228,7 +242,7 @@ def retrieve_source_pack(
         if raw:
             used_provider = "duckduckgo_html_fallback"
     else:
-        used_provider = "tavily"
+        used_provider = primary_provider
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
@@ -241,13 +255,15 @@ def retrieve_source_pack(
     )
     logger.info("DEBUG retrieval normalized_allowlist=%s", normalized_allowlist)
     logger.info(
-        "retrieval_grounding: provider=%s query=%s results=%d",
+        "retrieval_grounding: provider=%s category=%s query=%s results=%d",
         used_provider,
+        effective_category,
         query[:100],
         len(sources),
     )
     return {
         "provider": used_provider,
+        "category": effective_category,
         "retrieval_outcome": "sources_found" if sources else "no_results",
         "provider_diagnostics": provider_diagnostics,
         "query": query,
@@ -264,14 +280,17 @@ def retrieve_source_pack_merged(
     max_total_sources: int | None = None,
     recency_query: str | None = None,
     recency_time_range: str | None = None,
+    category: str | None = None,
 ) -> Dict[str, Any]:
     """
     Run retrieval for several queries, merge by normalized URL (first occurrence wins),
     cap total sources, and re-number [S1], [S2], ... for the prompt.
 
-    recency_query: optional extra query run with a Tavily time filter so fresh,
-    dated pages (funding/M&A/leadership) actually surface. The time filter is
-    scoped to ONLY this query — the identity/general queries stay unfiltered.
+    recency_query: optional extra query run with a time filter so fresh, dated
+    pages (funding/M&A/leadership) actually surface. The time filter is scoped to
+    ONLY this query — the identity/general queries stay unfiltered.
+    category: SearchProvider category for the general queries (general/company/people).
+    The recency query always runs against the `news` category.
     """
     if max_per_query is None:
         max_per_query = max(4, min(_default_max_results(), 10))
@@ -281,9 +300,11 @@ def retrieve_source_pack_merged(
 
     general_queries = [str(q).strip() for q in queries if str(q).strip()]
     rq = str(recency_query or "").strip()
+    effective_category = normalize_category(category)
     if not general_queries and not rq:
         return {
             "provider": "none",
+            "category": effective_category,
             "retrieval_outcome": "no_results",
             "provider_diagnostics": [],
             "query": "",
@@ -335,7 +356,7 @@ def retrieve_source_pack_merged(
             user_id=user_id,
             max_results=max_per_query,
             time_range=tr,
-            topic="news",
+            category="news",
             days=recency_window_days(),
         )
         rows = news.get("sources") or []
@@ -345,7 +366,11 @@ def retrieve_source_pack_merged(
             used_provider = str(news.get("provider") or used_provider)
         if not rows:
             fallback_news = retrieve_source_pack(
-                query=rq, user_id=user_id, max_results=max_per_query, time_range=tr
+                query=rq,
+                user_id=user_id,
+                max_results=max_per_query,
+                time_range=tr,
+                category=effective_category,
             )
             rows = fallback_news.get("sources") or []
             admitted_provider = str(fallback_news.get("provider") or admitted_provider)
@@ -358,7 +383,12 @@ def retrieve_source_pack_merged(
     for q in general_queries:
         if len(merged_rows) >= max_total_sources:
             break
-        pack = retrieve_source_pack(query=q, user_id=user_id, max_results=max_per_query)
+        pack = retrieve_source_pack(
+            query=q,
+            user_id=user_id,
+            max_results=max_per_query,
+            category=effective_category,
+        )
         provider_diagnostics.extend(pack.get("provider_diagnostics") or [])
         if pack.get("sources"):
             used_provider = str(pack.get("provider") or used_provider)
@@ -370,16 +400,18 @@ def retrieve_source_pack_merged(
     providers = sorted(admitted_providers)
     provider_label = providers[0] if len(providers) == 1 else "mixed" if providers else "none"
     logger.info(
-        "retrieval_grounding merged: queries=%d unique_urls=%d provider=%s",
+        "retrieval_grounding merged: queries=%d unique_urls=%d provider=%s category=%s",
         len(cleaned_queries),
         len(sources),
         provider_label,
+        effective_category,
     )
     return {
         # Keep `provider` for existing callers, but never claim one provider
         # when the merged pack actually used several.
         "provider": provider_label,
         "providers": providers,
+        "category": effective_category,
         "retrieval_outcome": "sources_found" if sources else "no_results",
         "provider_diagnostics": provider_diagnostics,
         "query": " | ".join(cleaned_queries[:4]),

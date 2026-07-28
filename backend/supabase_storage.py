@@ -1009,6 +1009,7 @@ class SupabaseStartupsStorage:
         pipeline_run_id: Optional[str] = None,
         enrichment_review_output: Optional[Dict[str, Any]] = None,
         enrichment_gap_reference_urls: Optional[List[str]] = None,
+        enrichment_founder_resolution: Optional[Any] = None,
     ) -> bool:
         pr = (pipeline_run_id or "").strip() or None
         if pr:
@@ -1042,6 +1043,12 @@ class SupabaseStartupsStorage:
                 st.scout_info,
                 review_output=enrichment_review_output,
                 gap_reference_urls=enrichment_gap_reference_urls,
+            )
+        if enrichment_founder_resolution is not None:
+            from utils.founder_enrichment import merge_founder_resolution_into_scout_info
+
+            st.scout_info = merge_founder_resolution_into_scout_info(
+                st.scout_info, enrichment_founder_resolution
             )
         st.review_info = review_info
         review_payload = (
