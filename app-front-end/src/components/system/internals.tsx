@@ -1,17 +1,18 @@
 /**
  * Internals of the Fund/System Intelligence panel: pure helpers, leaf UI
- * primitives, and the five facet tab components. Extracted verbatim from
+ * primitives, and the three facet tab components. Extracted verbatim from
  * SystemIntelligence.tsx so that file holds only the orchestrator + nav. All
  * cross-references between these pieces stay within this module.
  */
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { motion, type Variants } from 'framer-motion';
+import { Link } from 'react-router';
 import { tokens } from '../../design-system/tokens';
 import type {
-  Startup, RejectionAnalytics, WatchlistAnalytics,
-  ConcentrationAnalytics, MetaCycleReport, MetaPromptState, MetaEvalSet, PromptEvaluateResult, ScoutWeights, CalibrationState,
-  HumanFeedbackSummary, SystemHealthSnapshot, MetaInsightsPayload,
+  Startup, RejectionAnalytics,
+  MetaCycleReport, MetaPromptState, MetaEvalSet, PromptEvaluateResult, ScoutWeights, CalibrationState,
+  HumanFeedbackSummary, MetaInsightsPayload,
   CalibrationChangeSummary, WeightUpdateSummary, PromptMutationSummary,
 } from '../../types/startup';
 import type { FundThesisRuntime } from '../../api/fundThesis';
@@ -19,13 +20,10 @@ import { triggerMetaCycle, promoteMetaPrompt, resetMetaPrompt, saveMetaEvalSet, 
 import { transitionOrReduced } from '../../design-system/motion';
 import { usePrefersReducedMotion } from '../../hooks';
 import EmptyState from '../EmptyState';
-import DecisionBadge, { DECISION_BADGE_LABEL, type DecisionBadgeVariant } from '../DecisionBadge';
 import { buildFundIntelligenceSnapshot } from '../../lib/institutionalConviction';
 import { formatDate, formatDateTime } from '../../lib/dates';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../../lib/fundConfiguration';
 import ProposalInbox from '../institutional/ProposalInbox';
-import ExecutionReadinessPanel from '../institutional/ExecutionReadinessPanel';
-import type { SystemStatus } from '../../api/system';
 
 export function mandateTagList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
@@ -84,138 +82,8 @@ export function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number })
   );
 }
 
-/* ─── ROW WRAPPER ─── */
-export function RowWrapper({
-  children,
-  index,
-  onClick,
-  isSelected,
-  ariaLabel,
-}: {
-  children: React.ReactNode;
-  index: number;
-  onClick?: () => void;
-  isSelected?: boolean;
-  ariaLabel?: string;
-}) {
-  const reduceMotion = usePrefersReducedMotion();
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!onClick) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onClick();
-    }
-  };
-  return (
-    <motion.div
-      initial={reduceMotion ? {} : { opacity: 0, transform: 'translateY(6px)' }}
-      animate={{ opacity: 1, transform: 'translateY(0px)' }}
-      transition={{ delay: Math.min(index * 0.03, 0.3), duration: 0.4, ease: tokens.motion.ease }}
-      className={`group relative py-phi-3 px-phi-4 transition-colors duration-200 ease-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${onClick ? 'cursor-pointer' : ''
-        } ${isSelected ? 'bg-surface-selected' : 'hover:bg-registerTint'}`}
-      role={onClick ? 'button' : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      aria-pressed={onClick ? isSelected : undefined}
-      aria-label={onClick ? ariaLabel : undefined}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-    >
-      <div className="grid grid-cols-1 gap-phi-3 items-start lg:grid-cols-[26px_minmax(0,1fr)_auto]">
-        {children}
-      </div>
-    </motion.div>
-  );
-}
-
-export function humanResolutionBadgeVariant(decision: 'YES' | 'NO' | 'MAYBE'): DecisionBadgeVariant {
-  if (decision === 'YES') return 'INVEST';
-  if (decision === 'MAYBE') return 'MONITOR';
-  return 'PASS';
-}
-
-/* ─── DECISIONS ─── */
-export function DecisionsTab({
-  startups,
-  onStartupClick,
-  selectedStartupId,
-}: {
-  startups: Startup[];
-  onStartupClick?: (startup: Startup) => void;
-  selectedStartupId?: string | null;
-}) {
-  const decisions = startups
-    .filter((startup) => startup.human_resolution?.decision)
-    .map((startup) => {
-      const raw = startup.human_resolution!.decision as 'YES' | 'NO' | 'MAYBE';
-      return {
-        startup,
-        id: startup.id,
-        name: startup.scout?.name?.trim() || startup.id,
-        badgeVariant: humanResolutionBadgeVariant(raw),
-        notes: startup.human_resolution?.notes?.trim() ?? '',
-        resolvedAt: startup.human_resolution?.resolved_at,
-      };
-    })
-    .sort((a, b) => {
-      const ta = a.resolvedAt ? new Date(a.resolvedAt).getTime() : 0;
-      const tb = b.resolvedAt ? new Date(b.resolvedAt).getTime() : 0;
-      return tb - ta;
-    });
-
-  if (decisions.length === 0) {
-    return (
-      <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
-        <EmptyState
-          label="Human resolutions"
-          body="No escalation resolutions yet. When you resolve a human review from the deal grid, the outcome and notes appear here. Partner verdicts stay on each deal row."
-        />
-      </AnimatedTabBlock>
-    );
-  }
-
-  return (
-    <AnimatedTabBlock className="flex flex-col relative divide-y divide-oxford/[0.06]">
-      {decisions.map((item, i) => {
-        const resolvedLabel = item.resolvedAt ? formatDate(item.resolvedAt) : 'date unknown';
-        return (
-        <RowWrapper
-          key={item.id}
-          index={i}
-          onClick={onStartupClick ? () => onStartupClick(item.startup) : undefined}
-          isSelected={selectedStartupId === item.id}
-          ariaLabel={`Open memo for ${item.name}, ${DECISION_BADGE_LABEL[item.badgeVariant]}, resolved ${resolvedLabel}`}
-        >
-          <span className="type-data text-oxford/60 group-hover:text-oxford transition-colors pt-px">
-            {(i + 1).toString().padStart(2, '0')}
-          </span>
-
-          <div className="flex min-w-0 flex-col gap-phi-2">
-            <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-2">
-              <span className="type-label-tab text-oxford/80 truncate">{item.name}</span>
-              <DecisionBadge variant={item.badgeVariant} />
-            </div>
-            {item.notes ? (
-              <p className="type-note text-oxford/60 leading-relaxed max-w-2xl">
-                {item.notes}
-              </p>
-            ) : (
-              <p className="type-meta text-oxford/60">No notes</p>
-            )}
-          </div>
-
-          <div className="min-w-0 lg:text-right shrink-0">
-            <span className="type-data text-oxford/60">
-              {formatDate(item.resolvedAt)}
-            </span>
-          </div>
-        </RowWrapper>
-        );
-      })}
-    </AnimatedTabBlock>
-  );
-}
-
-export function CalibrationTab({ startups, fundConfiguration }: { startups: Startup[]; fundConfiguration?: FundConfiguration }) {
+/* ─── INTELLIGENCE ─── */
+export function FundIntelligenceSummary({ startups, fundConfiguration }: { startups: Startup[]; fundConfiguration?: FundConfiguration }) {
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const snapshot = buildFundIntelligenceSnapshot(startups, config);
   const hasDecisions = Object.values(snapshot.decisionsByOutcome).some((count) => count > 0);
@@ -224,8 +92,8 @@ export function CalibrationTab({ startups, fundConfiguration }: { startups: Star
     return (
       <AnimatedTabBlock className="py-phi-6 px-phi-4 flex items-center justify-center">
         <EmptyState
-          label="Calibration"
-          body="Calibration will emerge as decisions accumulate."
+          label="Fund intelligence"
+          body="Fund intelligence will emerge as decisions accumulate."
         />
       </AnimatedTabBlock>
     );
@@ -240,20 +108,6 @@ export function CalibrationTab({ startups, fundConfiguration }: { startups: Star
               <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">{item.value}</span>
               <span className="type-label-section">{item.label}</span>
               {item.detail ? <span className="type-meta text-oxford/60">{item.detail}</span> : null}
-            </div>
-          ))}
-        </div>
-      </TabSection>
-      <TabSection title="Decision Outcomes" label="Ledger">
-        <div className="grid grid-cols-3 gap-phi-4 max-w-xl">
-          {[
-            ['Invest', snapshot.decisionsByOutcome.YES],
-            ['Monitor', snapshot.decisionsByOutcome.MAYBE],
-            ['Pass', snapshot.decisionsByOutcome.NO],
-          ].map(([label, value]) => (
-            <div key={label} className="border-t border-oxford/[0.08] pt-phi-3">
-              <span className="type-data text-oxford/65">{value}</span>
-              <span className="type-label-section mt-phi-1 block">{label}</span>
             </div>
           ))}
         </div>
@@ -287,7 +141,7 @@ export function TabSection({ title, label, children, className = '' }: { title: 
       {label ? <span className="type-label-section">{label}</span> : null}
     </div>
   );
-  const sectionClass = `flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3 ${className}`.trim();
+  const sectionClass = `flex flex-col gap-phi-3 border-t border-oxford/[0.06] px-phi-4 pt-phi-5 pb-phi-5 first:border-t-0 first:pt-phi-3 ${className}`.trim();
 
   if (reduceMotion) {
     return (
@@ -309,80 +163,14 @@ export function TabSection({ title, label, children, className = '' }: { title: 
   );
 }
 
-/** One station of the live pipeline strip — numeral above its mono label. */
-export function PipelineStation({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone?: 'escalation';
-}) {
-  return (
-    <div className="flex flex-col gap-phi-1">
-      <span
-        className={`type-data text-[clamp(22px,2vw,30px)] leading-none ${
-          tone === 'escalation' ? 'text-escalation' : 'text-oxford'
-        }`}
-      >
-        {value}
-      </span>
-      <span className="type-label-section">{label}</span>
-    </div>
-  );
-}
-
-/* ─── ANALYTICS ─── */
-export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth, systemStatus }: {
-  rejection: RejectionAnalytics; watchlist: WatchlistAnalytics; concentration: ConcentrationAnalytics;
-  systemHealth: SystemHealthSnapshot | null;
-  systemStatus?: SystemStatus | null;
+/* ─── STRATEGIC INTELLIGENCE ─── */
+export function AnalyticsTab({ rejection }: {
+  rejection: RejectionAnalytics;
 }) {
   const maxRedFlag = Math.max(...rejection.most_common_red_flags.map((r) => r.count), 1);
-  const sectors = Object.entries(concentration.by_sector).sort((a, b) => b[1].count - a[1].count).slice(0, 8);
-  const maxSector = Math.max(...sectors.map(([, v]) => v.count), 1);
-  const q = systemHealth?.queue_depths;
 
   return (
-    <>
-      <TabSection title="Execution readiness" label="Operational">
-        <ExecutionReadinessPanel status={systemStatus} />
-      </TabSection>
-      {systemHealth && (
-        <TabSection title="Pipeline" label="Live">
-          {systemHealth.status === 'degraded' ? (
-            <p className="type-status text-escalation">
-              Pipeline telemetry is unavailable — the counts below are not current.
-            </p>
-          ) : null}
-          {/* The pipeline as the pipeline: stations joined by flow marks, the
-              held states set apart by a rule. Escalations carry the only colour. */}
-          <div className="flex flex-wrap items-end gap-x-phi-4 gap-y-phi-4 border-y border-oxford/[0.075] py-phi-5">
-            <PipelineStation label="Awaiting review" value={q?.unreviewed ?? 0} />
-            <span className="pb-[3px] font-mono text-[13px] leading-none text-oxford/25" aria-hidden>
-              →
-            </span>
-            <PipelineStation label="Awaiting partner" value={q?.undecided ?? 0} />
-            <span className="pb-[3px] font-mono text-[13px] leading-none text-oxford/25" aria-hidden>
-              →
-            </span>
-            <PipelineStation
-              label="Need ruling"
-              value={systemHealth.pending_escalations}
-              tone={systemHealth.pending_escalations > 0 ? 'escalation' : undefined}
-            />
-            <span className="mx-phi-2 h-[34px] w-px self-end bg-oxford/[0.12]" aria-hidden />
-            <PipelineStation label="Watchlist" value={q?.watchlist ?? 0} />
-          </div>
-          {systemHealth.calibration_warning ? (
-            <p className="type-meta text-oxford/60 leading-relaxed mt-phi-3 max-w-2xl">
-              Calibration note: {systemHealth.calibration_warning}
-            </p>
-          ) : null}
-        </TabSection>
-      )}
-      <TabSection title="Rejection Patterns" label="Historical">
+      <TabSection title="Rejection patterns" label="What the fund declines">
         {rejection.most_common_red_flags.length === 0 ? (
           <p className="type-status">No rejection data yet</p>
         ) : (
@@ -399,62 +187,6 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
           </div>
         )}
       </TabSection>
-
-      <TabSection title="Watchlist" label="Health">
-        <div className="flex flex-wrap gap-phi-6">
-          {[
-            { label: 'Total', value: watchlist.total },
-            { label: 'Stale', value: watchlist.stale },
-            { label: 'Avg Days', value: Math.round(watchlist.avg_days) },
-          ].map((s) => (
-            <div key={s.label} className="flex flex-col gap-phi-1">
-              <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">{s.value}</span>
-              <span className="type-label-section">{s.label}</span>
-            </div>
-          ))}
-        </div>
-        {watchlist.entries && watchlist.entries.length > 0 && (
-          <div className="mt-phi-6 flex flex-col gap-phi-3 pt-phi-2">
-            <span className="type-label-section">Companies</span>
-            <ul className="flex flex-col">
-              {watchlist.entries.slice(0, 10).map((e, i) => (
-                <li key={e.startup_id ?? `wl-${i}`} className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1 py-phi-3 first:pt-0">
-                  <span className="type-note text-oxford/70 truncate min-w-0 max-w-[min(100%,20rem)]">
-                    {e.startup_name?.trim() || e.startup_id?.slice(0, 8) || 'Unknown'}
-                  </span>
-                  <span className="type-data shrink-0 text-oxford/60">
-                    {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
-                    {e.stale_warning ? ' · stale' : ''}
-                    {e.signal_count != null && e.signal_count > 0 ? ` · ${e.signal_count} sig` : ''}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </TabSection>
-
-      <TabSection title="Sector Concentration" label="Distribution">
-        {sectors.length === 0 ? (
-          <div className="flex flex-col gap-phi-2">
-            <p className="type-status">No concentration data yet</p>
-            <p className="type-note text-oxford/60 leading-relaxed max-w-xl">
-              Distribution refreshes when the pipeline runs portfolio health and cluster analysis over your deal set.
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-phi-4">
-            {sectors.map(([sector, data], i) => (
-              <div key={sector} className="grid grid-cols-[100px_1fr_44px] gap-phi-4 items-center">
-                <span className="type-label-section truncate">{sector}</span>
-                <TacticalBar pct={(data.count / maxSector) * 100} delay={i * 0.05} />
-                <span className="type-data text-right text-oxford/60">{data.pct_of_total}%</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </TabSection>
-    </>
   );
 }
 
@@ -597,7 +329,153 @@ export function InstitutionalMandateTab({
   );
 }
 
-/* ─── META AGENT ─── */
+/* ─── LEARNING HISTORY ─── */
+function readableAgentName(value: string): string {
+  return value
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\bScout\b/g, 'scouting')
+    .replace(/\bReviewer\b/g, 'review')
+    .trim();
+}
+
+export function LearningTab({
+  reports,
+  insights,
+}: {
+  reports: MetaCycleReport[];
+  insights: MetaInsightsPayload | null;
+}) {
+  const latest = reports[0] ?? null;
+  const promptChanges = latest?.prompt_proposals?.length
+    ? latest.prompt_proposals
+    : latest?.mutations_applied ?? [];
+  const weightChanges = latest?.weight_proposals?.length
+    ? latest.weight_proposals
+    : latest?.weight_updates ?? [];
+  const calibrationChanges = latest?.calibration_proposals?.length
+    ? latest.calibration_proposals
+    : latest?.calibration_changes ?? [];
+  const feedback = latest?.signal_summary?.human_feedback ?? insights?.signal_summary?.human_feedback;
+  const changeCount = promptChanges.length + weightChanges.length + calibrationChanges.length;
+  const publishedCount = latest?.production_mutations_applied ?? 0;
+  const status = publishedCount > 0
+    ? `${publishedCount} governed change${publishedCount === 1 ? '' : 's'} published`
+    : changeCount > 0
+      ? `${changeCount} change${changeCount === 1 ? '' : 's'} awaiting review`
+      : 'No change proposed';
+
+  if (!latest && !insights?.latest) {
+    return (
+      <AnimatedTabBlock className="px-phi-4 py-phi-6">
+        <EmptyState
+          label="Learning history"
+          body="Aethria will explain what it learns after enough attributed decisions and outcomes have accumulated."
+        />
+        <Link
+          to="/v1/settings?section=governance"
+          className="type-action mx-auto mt-phi-4 block w-fit border-b border-oxford/20 pb-1 text-oxford/65 transition-colors hover:text-oxford"
+        >
+          Open agent governance
+        </Link>
+      </AnimatedTabBlock>
+    );
+  }
+
+  const cycleNumber = latest?.cycle_number ?? insights?.latest?.cycle_number;
+  const ranAt = latest?.ran_at ?? insights?.latest?.ran_at;
+  const why = insights?.why?.length ? insights.why : latest?.no_action_reasons ?? [];
+
+  return (
+    <>
+      <AnimatedTabBlock className="px-phi-4 pb-phi-5 pt-phi-4">
+        <p className="type-body max-w-2xl leading-relaxed text-oxford/70">
+          This is the fund’s learning record: what Aethria observed in your rulings,
+          what it proposed changing, and whether that change reached production.
+        </p>
+      </AnimatedTabBlock>
+
+      <TabSection
+        title={cycleNumber != null ? `Learning cycle ${cycleNumber}` : 'Latest learning cycle'}
+        label={ranAt ? formatDate(ranAt) : undefined}
+      >
+        <p className="type-display max-w-[42rem] text-[clamp(20px,2vw,28px)] leading-[1.3] text-oxford">
+          {status}
+        </p>
+        {feedback && feedback.recent_count > 0 ? (
+          <p className="type-body-sm max-w-[44rem] leading-relaxed text-oxford/65">
+            Based on {feedback.recent_count} attributed ruling{feedback.recent_count === 1 ? '' : 's'}:
+            {' '}{feedback.by_outcome.YES} invest, {feedback.by_outcome.MAYBE} monitor, and {feedback.by_outcome.NO} pass.
+            {feedback.disagreed_with_ai_count > 0
+              ? ` ${feedback.disagreed_with_ai_count} differed from Aethria’s recommendation.`
+              : ''}
+          </p>
+        ) : (
+          <p className="type-body-sm text-oxford/60">
+            No attributed human-feedback sample was recorded for this cycle.
+          </p>
+        )}
+      </TabSection>
+
+      {changeCount > 0 ? (
+        <TabSection
+          title={publishedCount > 0 ? 'What changed' : 'What Aethria proposes'}
+          label={publishedCount > 0 ? 'Governed' : 'Awaiting operator review'}
+        >
+          <div className="flex max-w-[48rem] flex-col">
+            {promptChanges.map((change, index) => (
+              <div key={`prompt-${change.agent_target}-${index}`} className="border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p className="type-body-sm text-oxford/75">
+                  Refine {readableAgentName(change.agent_target)}
+                </p>
+                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/60">{change.reasoning}</p> : null}
+              </div>
+            ))}
+            {weightChanges.map((change, index) => (
+              <div key={`weight-${change.agent_target}-${index}`} className="border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p className="type-body-sm text-oxford/75">
+                  Rebalance {readableAgentName(change.agent_target)}
+                </p>
+                <p className="type-note mt-phi-1 tabular-nums text-oxford/60">
+                  {Math.round(change.previous_weight * 100)}% → {Math.round(change.new_weight * 100)}%
+                </p>
+              </div>
+            ))}
+            {calibrationChanges.map((change, index) => (
+              <div key={`calibration-${change.parameter}-${index}`} className="border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p className="type-body-sm text-oxford/75">
+                  {change.parameter.replace(/_/g, ' ')}
+                  {change.direction ? ` · ${change.direction}` : ''}
+                </p>
+                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/60">{change.reasoning}</p> : null}
+              </div>
+            ))}
+          </div>
+        </TabSection>
+      ) : null}
+
+      {why.length > 0 ? (
+        <TabSection title="Why no further change" label="Evidence threshold">
+          <div className="flex max-w-[44rem] flex-col gap-phi-2 border-l border-oxford/20 pl-phi-4">
+            {why.map((line, index) => (
+              <p key={index} className="type-note leading-relaxed text-oxford/60">{line}</p>
+            ))}
+          </div>
+        </TabSection>
+      ) : null}
+
+      <AnimatedTabBlock className="px-phi-4 pb-phi-6 pt-phi-3">
+        <Link
+          to="/v1/settings?section=governance"
+          className="type-action inline-block border-b border-oxford/20 pb-1 text-oxford/65 transition-colors hover:text-oxford"
+        >
+          Review advanced agent governance →
+        </Link>
+      </AnimatedTabBlock>
+    </>
+  );
+}
+
+/* ─── AGENT GOVERNANCE ─── */
 /** Cycle readout — same numeral register as the pipeline strip. */
 export function MetaReadout({ label, value }: { label: string; value: number }) {
   return (

@@ -99,10 +99,11 @@ describe('PortfolioPage', () => {
     expect(api.fetchPortfolioPositions).toHaveBeenCalled();
   });
 
-  it('does not render decided-but-not-held companies as holdings', async () => {
+  it('renders decided-but-not-held companies in decision history, not holdings', async () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
-    expect(screen.queryByText('Zeta')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Decision history')).toContainElement(screen.getByText('Zeta'));
+    expect(screen.getAllByTestId('position-row')).toHaveLength(1);
   });
 
   it('shows the entry rationale, because why we hold it is the record', async () => {

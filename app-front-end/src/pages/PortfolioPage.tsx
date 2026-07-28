@@ -9,8 +9,10 @@ import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
 import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
 import OutcomePanel from '../components/institutional/OutcomePanel';
 import CrmExportAction from '../components/portfolio/CrmExportAction';
+import DecisionBadge from '../components/DecisionBadge';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
+import { formatDate } from '../lib/dates';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
@@ -91,10 +93,10 @@ const LEDGER_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(
 
 /**
  * Portfolio — the *record*: positions held, read from the canonical
- * `/api/portfolio/positions` endpoint, plus concentration, watchlist, and
- * signals. Monitoring/Passed are decision history, not holdings — their
- * counts stay here as facts, but the deals themselves live in Flow. Built
- * from data the pipeline already persists; no fabricated returns.
+ * `/api/portfolio/positions` endpoint, plus decision history, concentration,
+ * watchlist, and signals. Active judgement still lives in Flow; this page
+ * preserves what happened. Built from data the pipeline already persists; no
+ * fabricated returns.
  */
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
@@ -124,6 +126,21 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     }
     return { monitoring, passed, awaiting };
   }, [data.startups]);
+
+  const decisionHistory = useMemo(() => data.startups
+    .filter((startup) => {
+      const decision = startup.human_resolution?.decision;
+      return decision === 'MAYBE' || decision === 'NO';
+    })
+    .map((startup) => ({
+      startup,
+      decision: startup.human_resolution!.decision as 'MAYBE' | 'NO',
+      name: startup.scout?.name?.trim() || startup.id,
+      notes: startup.human_resolution?.notes?.trim() ?? '',
+      resolvedAt: startup.human_resolution?.resolved_at,
+    }))
+    .sort((a, b) => (b.resolvedAt ?? '').localeCompare(a.resolvedAt ?? '')),
+  [data.startups]);
 
   const startupNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -213,6 +230,39 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       <p className="mt-phi-2 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale}</p>
                       {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
                       <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section aria-label="Decision history">
+              <SectionHead
+                title="Decision history"
+                detail={`${decisionHistory.length} resolved`}
+              />
+              {decisionHistory.length === 0 ? (
+                <QuietEmpty>No monitoring or passed decisions yet.</QuietEmpty>
+              ) : (
+                <ul className="mt-phi-4 flex flex-col">
+                  {decisionHistory.map((item) => (
+                    <li key={item.startup.id} className="border-b border-oxford/[0.06]">
+                      <button
+                        type="button"
+                        onClick={() => openDeal(item.startup.id)}
+                        className="group flex w-full items-start justify-between gap-phi-4 py-phi-3 text-left transition-colors hover:bg-oxford/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 btn-interaction btn-interaction--no-press"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate type-body-emphasis text-oxford">{item.name}</span>
+                          {item.notes ? (
+                            <span className="mt-phi-1 block line-clamp-2 type-meta text-oxford/60">{item.notes}</span>
+                          ) : null}
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-phi-1">
+                          <DecisionBadge variant={item.decision === 'NO' ? 'PASS' : 'MONITOR'} />
+                          <span className="type-meta tabular-nums text-oxford/55">{formatDate(item.resolvedAt)}</span>
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>

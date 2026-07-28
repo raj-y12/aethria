@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
-import SystemIntelligence, { FundFacetNav, type FundFacetTab } from '../components/SystemIntelligence';
+import SystemIntelligence, { FundFacetNav, isFundFacetTab, type FundFacetTab } from '../components/SystemIntelligence';
 import { useFundConfiguration, useCountUp } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
-import type { Startup } from '../types/startup';
 
 /**
  * A readout counts up when given a numeric `value` (with optional suffix like
@@ -40,21 +39,43 @@ function drift(v: number | null | undefined): string {
  * fixed top band; only the tab panels scroll beneath it.
  */
 export default function FundPage({ data }: { data: SystemData }) {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<FundFacetTab>('thesis');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<FundFacetTab>(() =>
+    isFundFacetTab(requestedTab) ? requestedTab : 'thesis'
+  );
   const bodyScrollRef = useRef<HTMLDivElement>(null);
   const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
 
   useEffect(() => {
     bodyScrollRef.current?.scrollTo({ top: 0 });
   }, [activeTab]);
+  useEffect(() => {
+    if (isFundFacetTab(requestedTab)) {
+      setActiveTab(requestedTab);
+      return;
+    }
+    if (requestedTab != null) {
+      setSearchParams((current) => {
+        current.delete('tab');
+        return current;
+      }, { replace: true });
+    }
+  }, [requestedTab, setSearchParams]);
+
+  const changeTab = (tab: FundFacetTab) => {
+    setActiveTab(tab);
+    setSearchParams((current) => {
+      current.set('tab', tab);
+      return current;
+    }, { replace: true });
+  };
   const runtime = data.fundThesisRuntime;
 
   const fundName =
     data.settings?.fund_identity?.fund_name?.trim() ||
     (runtime?.active_version_number != null ? `Fund Thesis v${runtime.active_version_number}` : 'Fund');
 
-  const openDeal = (startup: Startup) => navigate(`/v1/flow?open=${startup.id}`);
   const stats = runtime?.alignment_stats;
 
   return (
@@ -84,7 +105,7 @@ export default function FundPage({ data }: { data: SystemData }) {
               </div>
             }
           />
-          <FundFacetNav activeTab={activeTab} onTabChange={setActiveTab} showRule={false} className="pt-phi-3" />
+          <FundFacetNav activeTab={activeTab} onTabChange={changeTab} showRule={false} className="pt-phi-3" />
         </div>
       </div>
 
@@ -95,21 +116,11 @@ export default function FundPage({ data }: { data: SystemData }) {
         <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-3`}>
           <SystemIntelligence
             activeTab={activeTab}
-            onTabChange={setActiveTab}
+            onTabChange={changeTab}
             hideNav
             startups={data.startups}
-            onStartupClick={openDeal}
-            selectedStartupId={null}
             rejectionAnalytics={data.rejectionAnalytics}
-            watchlistAnalytics={data.watchlistAnalytics}
-            concentrationAnalytics={data.concentrationAnalytics}
-            systemHealth={data.systemHealth}
-            systemStatus={data.systemStatus}
             metaReports={data.metaReports}
-            scoutWeights={data.scoutWeights}
-            calibrationState={data.calibrationState}
-            metaPromptState={data.metaPromptState}
-            metaEvalSet={data.metaEvalSet}
             metaInsights={data.metaInsights}
             fundThesisRuntime={data.fundThesisRuntime}
             fundThesisRuntimeLoading={data.fundThesisRuntimeLoading}

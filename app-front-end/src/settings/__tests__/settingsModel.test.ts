@@ -25,6 +25,7 @@ describe('settings persistence model', () => {
       'memo',
       'workflow',
       'budget',
+      'governance',
       'system',
     ]);
   });

@@ -11,6 +11,7 @@ export type SectionId =
   | 'memo'
   | 'workflow'
   | 'budget'
+  | 'governance'
   | 'system';
 
 export interface PendingChange {
@@ -34,7 +35,7 @@ export const SETTINGS_GROUPS = [
   { id: 'thesis', label: 'Fund thesis', persistence: 'Publishes a thesis version' },
   { id: 'policy', label: 'Decision policy', persistence: 'Publishes a policy version' },
   { id: 'runtime', label: 'Workspace runtime', persistence: 'Saves immediately' },
-  { id: 'system', label: 'System', persistence: 'Read-only' },
+  { id: 'system', label: 'System', persistence: 'Diagnostics and governed agent changes' },
 ] as const;
 
 export const SETTINGS_SECTIONS = [
@@ -46,6 +47,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'memo', label: 'Memo output', short: 'Memo', group: 'policy' },
   { id: 'workflow', label: 'Ruling workflow', short: 'Workflow', group: 'policy' },
   { id: 'budget', label: 'Cost budget', short: 'Budget', group: 'runtime' },
+  { id: 'governance', label: 'Agent governance', short: 'Governance', group: 'system' },
   { id: 'system', label: 'System state', short: 'System', group: 'system' },
 ] as const satisfies readonly {
   id: SectionId;

@@ -2,32 +2,31 @@ import { useState, useMemo } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type {
-  Startup, RejectionAnalytics, WatchlistAnalytics,
-  ConcentrationAnalytics, MetaCycleReport, MetaPromptState, MetaEvalSet, ScoutWeights, CalibrationState,
-  SystemHealthSnapshot, MetaInsightsPayload,
+  Startup, RejectionAnalytics,
+  MetaCycleReport, MetaInsightsPayload,
 } from '../types/startup';
 import type { FundThesisRuntime } from '../api/fundThesis';
-import type { SystemStatus } from '../api/system';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { type FundConfiguration } from '../lib/fundConfiguration';
-import IdentityReviewQueue from './identity/IdentityReviewQueue';
 
 /**
- * The five facets of the instrument, ordered by how an investor reads it:
- * what it hunts (Mandate), what the human ruled (Record), what its decisions
- * show (Patterns), how tightly it is tuned (Calibration), how it rewrites
- * itself (Evolution). Signals live in Portfolio, where they act on conviction.
+ * The three Fund facets, ordered by how an investor reads the instrument:
+ * what it hunts (Mandate), what the evidence says (Intelligence), and how the
+ * system learns from outcomes (Learning). Portfolio owns the record; Flow owns
+ * active judgement and review work.
  */
-export type FundFacetTab = 'analytics' | 'decisions' | 'calibration' | 'thesis' | 'meta';
+export type FundFacetTab = 'intelligence' | 'thesis' | 'learning';
 type Tab = FundFacetTab;
-const TABS: { key: Tab; label: string }[] = [
+export const FUND_FACET_TABS: readonly { key: Tab; label: string }[] = [
   { key: 'thesis', label: 'Mandate' },
-  { key: 'decisions', label: 'Record' },
-  { key: 'analytics', label: 'Patterns' },
-  { key: 'calibration', label: 'Calibration' },
-  { key: 'meta', label: 'Evolution' },
+  { key: 'intelligence', label: 'Intelligence' },
+  { key: 'learning', label: 'Learning' },
 ];
+
+export function isFundFacetTab(value: string | null): value is FundFacetTab {
+  return FUND_FACET_TABS.some((tab) => tab.key === value);
+}
 
 export function FundFacetNav({
   activeTab,
@@ -41,13 +40,15 @@ export function FundFacetNav({
   /** Full-width rule under the tab row (off when chrome sits flush above scroll body). */
   showRule?: boolean;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
+
   return (
     <nav
       role="tablist"
       aria-label="Fund facets"
-      className={`flex items-center gap-phi-5 overflow-x-auto no-scrollbar ${showRule ? 'border-b border-oxford/[0.08]' : ''} ${className}`.trim()}
+      className={`flex items-center gap-0.5 overflow-x-auto no-scrollbar ${showRule ? 'border-b border-oxford/[0.08]' : ''} ${className}`.trim()}
     >
-      {TABS.map((tab) => {
+      {FUND_FACET_TABS.map((tab) => {
         const isActive = activeTab === tab.key;
         return (
           <button
@@ -56,13 +57,20 @@ export function FundFacetNav({
             role="tab"
             aria-selected={isActive}
             onClick={() => onTabChange(tab.key)}
-            className={`relative -mb-px shrink-0 border-b pb-phi-3 pt-phi-1 type-label-tab transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive
-                ? 'border-oxford font-semibold text-oxford'
-                : 'border-transparent font-normal text-oxford/60 hover:text-oxford/70'
+            className={`type-action group relative min-h-[32px] shrink-0 px-phi-4 py-phi-1 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              isActive ? 'text-oxford' : 'text-oxford/60 hover:bg-oxford/[0.04] hover:text-oxford/80'
             }`}
+            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
           >
-            {tab.label}
+            {isActive ? (
+              <motion.span
+                layoutId="fund-facet-active"
+                className="absolute inset-0 bg-surface-selected"
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.77, 0, 0.175, 1] }}
+                aria-hidden
+              />
+            ) : null}
+            <span className="relative">{tab.label}</span>
           </button>
         );
       })}
@@ -72,21 +80,11 @@ export function FundFacetNav({
 
 interface SystemIntelligenceProps {
   startups: Startup[];
-  onStartupClick?: (startup: Startup) => void;
-  selectedStartupId?: string | null;
   activeTab?: FundFacetTab;
   onTabChange?: (tab: FundFacetTab) => void;
   hideNav?: boolean;
   rejectionAnalytics: RejectionAnalytics;
-  watchlistAnalytics: WatchlistAnalytics;
-  concentrationAnalytics: ConcentrationAnalytics;
-  systemHealth: SystemHealthSnapshot | null;
-  systemStatus?: SystemStatus | null;
   metaReports: MetaCycleReport[];
-  scoutWeights: ScoutWeights;
-  calibrationState: CalibrationState;
-  metaPromptState: MetaPromptState;
-  metaEvalSet: MetaEvalSet;
   metaInsights: MetaInsightsPayload | null;
   fundThesisRuntime: FundThesisRuntime | null;
   fundThesisRuntimeLoading?: boolean;
@@ -96,11 +94,10 @@ interface SystemIntelligenceProps {
 
 import {
   TAB_CONTENT_CONTAINER_VARIANTS,
-  DecisionsTab,
-  CalibrationTab,
+  FundIntelligenceSummary,
   AnalyticsTab,
   InstitutionalMandateTab,
-  MetaCommandTab,
+  LearningTab,
 } from './system/internals';
 
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
@@ -128,27 +125,11 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
         transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: tokens.motion.ease })}
         variants={tabContentContainerVariants}
       >
-          {activeTab === 'analytics' && (
-            <AnalyticsTab
-              rejection={props.rejectionAnalytics}
-              watchlist={props.watchlistAnalytics}
-              concentration={props.concentrationAnalytics}
-              systemHealth={props.systemHealth}
-              systemStatus={props.systemStatus}
-            />
-          )}
-          {activeTab === 'decisions' && (
-            <DecisionsTab
-              startups={props.startups}
-              onStartupClick={props.onStartupClick}
-              selectedStartupId={props.selectedStartupId}
-            />
-          )}
-          {activeTab === 'calibration' && (
-            <div className="space-y-phi-6">
-              <IdentityReviewQueue compact />
-              <CalibrationTab startups={props.startups} fundConfiguration={props.fundConfiguration} />
-            </div>
+          {activeTab === 'intelligence' && (
+            <>
+              <AnalyticsTab rejection={props.rejectionAnalytics} />
+              <FundIntelligenceSummary startups={props.startups} fundConfiguration={props.fundConfiguration} />
+            </>
           )}
           {activeTab === 'thesis' && (
             <InstitutionalMandateTab
@@ -157,15 +138,10 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
               error={props.fundThesisRuntimeError}
             />
           )}
-          {activeTab === 'meta' && (
-            <MetaCommandTab
+          {activeTab === 'learning' && (
+            <LearningTab
               reports={props.metaReports}
-              weights={props.scoutWeights}
-              calibration={props.calibrationState}
-              promptState={props.metaPromptState}
-              metaEvalSet={props.metaEvalSet}
               insights={props.metaInsights}
-              fundConfiguration={props.fundConfiguration}
             />
           )}
       </motion.div>

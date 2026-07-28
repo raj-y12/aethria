@@ -14,7 +14,7 @@ describe('settings navigation model', () => {
     expect(SETTINGS_SECTIONS.filter((item) => item.group === 'thesis')).toHaveLength(2);
     expect(SETTINGS_SECTIONS.filter((item) => item.group === 'policy')).toHaveLength(5);
     expect(SETTINGS_SECTIONS.filter((item) => item.group === 'runtime')).toHaveLength(1);
-    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'system')).toHaveLength(1);
+    expect(SETTINGS_SECTIONS.filter((item) => item.group === 'system')).toHaveLength(2);
   });
 
   it('keeps fund policy preferences in the deployable pending list', () => {

@@ -10,6 +10,14 @@ import { fetchAgentsStatus, type AgentsStatus } from '../api/agents';
 import { fetchSystemStatus } from '../api/system';
 import { fetchJobs, type DurableJob } from '../api/jobs';
 import {
+  fetchCalibrationState,
+  fetchMetaEvalSet,
+  fetchMetaInsights,
+  fetchMetaPromptState,
+  fetchMetaReports,
+  fetchScoutWeights,
+} from '../api/meta';
+import {
   fetchFundThesisSummary,
   type FundThesisSummary,
 } from '../api/fundThesis';
@@ -21,6 +29,7 @@ import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
 import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
+import { MetaCommandTab } from '../components/system/internals';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
 import {
   getDeploymentConfirmation,
@@ -324,13 +333,19 @@ export default function SettingsPage() {
   const navigate = useNavigate();
   const { userId } = useAuth();
   const reduceMotion = usePrefersReducedMotion();
+  const requestedSection = typeof window === 'undefined'
+    ? null
+    : new URLSearchParams(window.location.search).get('section');
+  const requestedSectionId = SETTINGS_SECTIONS.some((section) => section.id === requestedSection)
+    ? requestedSection as SectionId
+    : null;
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [thesisConfirmation, setThesisConfirmation] = useState<FundThesisChangeSet | null>(null);
-  const [activeSection, setActiveSection] = useState<SectionId>('thesis');
+  const [activeSection, setActiveSection] = useState<SectionId>(requestedSectionId ?? 'thesis');
   const [attention, setAttention] = useState<SettingsAttention | null>(null);
   const [pendingPolicyPublish, setPendingPolicyPublish] = useState<PendingPolicyPublish | null>(null);
   const [agentsStatus, setAgentsStatus] = useState<AgentsStatus | null>(null);
@@ -342,6 +357,7 @@ export default function SettingsPage() {
   const [preRestoreDraft, setPreRestoreDraft] = useState<FundConfiguration | null>(null);
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
   const hydratedRecoveryKeyRef = useRef<string | null>(null);
+  const requestedSectionHandledRef = useRef<string | null>(null);
 
   const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings, userId);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
@@ -370,6 +386,43 @@ export default function SettingsPage() {
     ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
     refetchInterval: 30_000,
     retry: 1,
+  });
+  const governanceEnabled = activeSection === 'governance';
+  const metaReportsQuery = useQuery({
+    queryKey: ['meta', 'reports'],
+    queryFn: fetchMetaReports,
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
+  });
+  const scoutWeightsQuery = useQuery({
+    queryKey: ['meta', 'weights'],
+    queryFn: fetchScoutWeights,
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
+  });
+  const calibrationQuery = useQuery({
+    queryKey: ['meta', 'calibration'],
+    queryFn: fetchCalibrationState,
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
+  });
+  const metaPromptStateQuery = useQuery({
+    queryKey: ['meta', 'prompt-state'],
+    queryFn: () => fetchMetaPromptState(),
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
+  });
+  const metaEvalSetQuery = useQuery({
+    queryKey: ['meta', 'eval-set'],
+    queryFn: fetchMetaEvalSet,
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
+  });
+  const metaInsightsQuery = useQuery({
+    queryKey: ['meta', 'insights'],
+    queryFn: fetchMetaInsights,
+    ...getQueryConfig('STATIC'),
+    enabled: governanceEnabled,
   });
 
   // Warm cache data gives an instant first paint, while the mount refetch above
@@ -492,6 +545,17 @@ export default function SettingsPage() {
     const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${id}`);
     target?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
   };
+
+  useEffect(() => {
+    if (!settings || !requestedSectionId || requestedSectionHandledRef.current === requestedSectionId) return;
+    requestedSectionHandledRef.current = requestedSectionId;
+    setActiveSection(requestedSectionId);
+    const frame = window.requestAnimationFrame(() => {
+      const target = contentScrollRef.current?.querySelector<HTMLElement>(`#${requestedSectionId}`);
+      target?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [settings, requestedSectionId, reduceMotion]);
 
   // Scroll-spy: the section nearest the top of the reading column wins. Rebinds
   // once the settings payload resolves (sections mount) — never on every draft
@@ -1057,8 +1121,46 @@ export default function SettingsPage() {
 
                   <SettingsGroup
                     title="System"
-                    description="Read-only readiness and operator diagnostics. Pipeline controls remain in the system rail and save immediately."
+                    description="Agent governance, readiness, and operator diagnostics. Changes to prompts and calibration remain explicitly reviewed."
                   >
+
+                  <RoomSection
+                    id="governance"
+                    title="Agent governance"
+                    label="Advanced controls"
+                  >
+                    <p className="type-body-sm max-w-2xl pb-phi-4 leading-relaxed text-oxford/65">
+                      Review correction proposals, test prompt drafts, and publish governed changes.
+                      The Fund page keeps the readable learning record; operational controls live here.
+                    </p>
+                    {governanceEnabled ? (
+                      <MetaCommandTab
+                        reports={metaReportsQuery.data ?? []}
+                        weights={scoutWeightsQuery.data ?? {
+                          MarketDrivenScout: 0.25,
+                          BuilderTechnicalScout: 0.25,
+                          PainPointScout: 0.25,
+                          ContrarianScout: 0.25,
+                        }}
+                        calibration={calibrationQuery.data ?? {
+                          confidence_threshold_override: null,
+                          reviewer_weak_threshold_override: null,
+                          reviewer_strong_threshold_override: null,
+                          last_calibrated_at: null,
+                          last_calibrated_cycle: 0,
+                          calibration_history: [],
+                        }}
+                        promptState={metaPromptStateQuery.data ?? { active: {}, active_detail: {}, pending: [] }}
+                        metaEvalSet={metaEvalSetQuery.data ?? { startup_ids: [], count: 0, max: 50 }}
+                        insights={metaInsightsQuery.data ?? null}
+                        fundConfiguration={draft}
+                      />
+                    ) : (
+                      <p className="type-note py-phi-4 text-oxford/60">
+                        Select Agent governance in the Settings rail to load advanced controls.
+                      </p>
+                    )}
+                  </RoomSection>
 
                   <RoomSection
                     id="system"

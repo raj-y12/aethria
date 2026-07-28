@@ -22,6 +22,7 @@ import {
 } from '../hooks';
 import { useAcknowledgeStartup } from '../hooks/useAcknowledgeStartup';
 import { fetchStartupDetail } from '../api/startups';
+import { fetchIdentityCases } from '../api/identity';
 import { getQueryConfig } from '../lib/queryIntent';
 import { isDealUnresolved } from '../lib/dealState';
 import type { SystemData } from '../hooks/useSystemData';
@@ -95,6 +96,13 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const reduceMotion = usePrefersReducedMotion();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
+  const identityCasesQuery = useQuery({
+    queryKey: ['identity', 'cases', 'open'],
+    queryFn: () => fetchIdentityCases('open', 100),
+    ...getQueryConfig('SEMI_DYNAMIC', { pollIntervalMs: 30_000 }),
+    refetchInterval: 30_000,
+  });
+  const identityReviewCount = identityCasesQuery.data?.length ?? 0;
 
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -110,6 +118,9 @@ export default function FlowPage({ data }: { data: SystemData }) {
     (view: QueueView) => setQueueView((current) => (current === view && view !== 'PRIORITY' ? 'PRIORITY' : view)),
     [],
   );
+  const openIdentityReview = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('aethria:open-identity-review'));
+  }, []);
 
   const openCount = useMemo(() => startups.filter(isDealUnresolved).length, [startups]);
   const newCount = useMemo(() => startups.filter((s) => s.is_new_to_user).length, [startups]);
@@ -246,6 +257,15 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 active={queueView === 'STALE'}
                 onClick={() => selectView('STALE')}
               />
+              {identityReviewCount > 0 ? (
+                <ReadoutKey
+                  label="Identity"
+                  value={identityReviewCount.toLocaleString()}
+                  tone="escalation"
+                  active={false}
+                  onClick={openIdentityReview}
+                />
+              ) : null}
               <button
                 type="button"
                 onClick={() => setImportOpen(true)}

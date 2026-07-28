@@ -16,7 +16,7 @@ describe('SettingsMobileNav', () => {
     expect(screen.getByRole('group', { name: 'Fund thesis — publishes a thesis version' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Decision policy — publishes a policy version' })).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Workspace runtime — saves immediately' })).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'System — read-only' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'System — diagnostics and governed agent changes' })).toBeInTheDocument();
   });
 
   it('selects the requested settings section', () => {
