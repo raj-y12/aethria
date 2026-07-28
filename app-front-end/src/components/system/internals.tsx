@@ -141,7 +141,7 @@ export function TabSection({ title, label, children, className = '' }: { title: 
       {label ? <span className="type-label-section">{label}</span> : null}
     </div>
   );
-  const sectionClass = `flex flex-col gap-phi-3 border-t border-oxford/[0.06] px-phi-4 pt-phi-5 pb-phi-5 first:border-t-0 first:pt-phi-3 ${className}`.trim();
+  const sectionClass = `flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3 ${className}`.trim();
 
   if (reduceMotion) {
     return (

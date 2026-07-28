@@ -83,7 +83,7 @@ export default function FundPage({ data }: { data: SystemData }) {
       <div className="flex-none bg-paper">
         <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
           <RoomHeader
-            className={workspaceLayout.headerBottom}
+            className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
             eyebrow={`The instrument${
               runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
             }`}
