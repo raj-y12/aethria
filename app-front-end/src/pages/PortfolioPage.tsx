@@ -132,6 +132,9 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     const raw = Number(coverageQuery.data?.coverage_ratio ?? coverageQuery.data?.coverage_rate ?? 0);
     return Math.round(raw <= 1 ? raw * 100 : raw);
   }, [coverageQuery.data]);
+  /* Unknown must never read as zero — a failed or unsettled request has no
+   * number to show, so the readout falls back to a dash rather than fabricating "0%". */
+  const coverageUnavailable = coverageQuery.isLoading || coverageQuery.isError || !coverageQuery.data;
   const concentration = useMemo(() => sectorConcentration(rows), [rows]);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
@@ -283,15 +286,17 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               <SectionHead title="Outcome coverage" />
               <div className="mt-phi-4 flex flex-col gap-phi-2">
                 <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
-                  {coverageQuery.isLoading ? '—' : `${coveragePct}%`}
+                  {coverageUnavailable ? '—' : `${coveragePct}%`}
                 </span>
-                <span className="type-body-sm text-oxford/65">
-                  of eligible decisions have a recorded outcome.
+                <span className={`type-body-sm ${coverageQuery.isError ? 'text-escalation' : 'text-oxford/65'}`}>
+                  {coverageQuery.isError
+                    ? 'Coverage is unavailable right now — unknown, not zero.'
+                    : 'of eligible decisions have a recorded outcome.'}
                 </span>
               </div>
               {(coverageQuery.data?.limitations ?? []).length > 0 ? (
                 <ul className="mt-phi-3 flex flex-col gap-phi-1">
-                  {coverageQuery.data!.limitations!.map((limitation) => (
+                  {coverageQuery.data?.limitations?.map((limitation) => (
                     <li key={limitation} className="type-meta text-oxford/55">{limitation}</li>
                   ))}
                 </ul>

@@ -147,6 +147,15 @@ describe('PortfolioPage', () => {
     expect(screen.getByText(/not causal/i)).toBeInTheDocument();
   });
 
+  it('shows a dash instead of a fabricated 0% when coverage fails to load', async () => {
+    api.fetchOutcomeCoverage.mockRejectedValue(new Error('network error'));
+    renderPage();
+    const section = await waitFor(() => screen.getByLabelText('Outcome coverage'));
+    await waitFor(() => expect(within(section).getByText(/unavailable right now/i)).toBeInTheDocument());
+    expect(within(section).getByText('—')).toBeInTheDocument();
+    expect(within(section).queryByText('0%')).not.toBeInTheDocument();
+  });
+
   it('computes concentration from the positions on screen', async () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
