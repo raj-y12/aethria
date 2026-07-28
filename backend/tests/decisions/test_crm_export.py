@@ -87,6 +87,17 @@ def test_payload_refuses_to_fabricate_a_decision_when_no_ruling_exists():
         build_crm_export_payload(company=COMPANY, ruling={}, position=None, outcomes=[])
 
 
+def test_payload_reports_missing_confidence_as_none_not_zero():
+    """A ruling with no recorded investor_confidence must export as None --
+    a CRM reading 0.0 would misrepresent "not recorded" as "zero confidence"."""
+    payload = build_crm_export_payload(
+        company=COMPANY,
+        ruling={**RULING, "investor_confidence": None},
+        position=None, outcomes=[],
+    )
+    assert payload["investor_confidence"] is None
+
+
 def test_payload_refuses_an_unrecognized_ruling_decision():
     """A decision string present but outside the known map (e.g. schema
     drift introducing a new ruling value) is refused rather than silently

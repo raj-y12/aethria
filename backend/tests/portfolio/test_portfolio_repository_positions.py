@@ -60,6 +60,7 @@ async def test_list_positions_exposes_legacy_bridge_and_is_tenant_scoped():
     sql, args = connection.calls[0][1], connection.calls[0][2]
     assert "left join public.opportunities" in sql.lower()
     assert "o.legacy_startup_id" in sql
+    assert "p.status='active'" in sql.lower()
     assert args[0] == "user-a"
 
 

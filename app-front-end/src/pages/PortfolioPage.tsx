@@ -17,9 +17,11 @@ function recOf(s: Startup): string | null {
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
-/** Instrument readout — a number with its label, no box. Counts up on arrival. */
-function Readout({ label, value, tone }: { label: string; value: number; tone?: 'escalation' }) {
-  const shown = useCountUp(value);
+/** Instrument readout — a number with its label, no box. Counts up on arrival.
+ * `value: null` means "unknown" (loading or failed source) — it renders an
+ * em dash rather than fabricating a number. */
+function Readout({ label, value, tone }: { label: string; value: number | null; tone?: 'escalation' }) {
+  const shown = useCountUp(value ?? 0);
   return (
     <div className="flex flex-col gap-phi-1">
       <span
@@ -27,7 +29,7 @@ function Readout({ label, value, tone }: { label: string; value: number; tone?: 
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
-        {shown.toLocaleString()}
+        {value == null ? '—' : shown.toLocaleString()}
       </span>
       <span className="type-label-section">{label}</span>
     </div>
@@ -104,6 +106,9 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     () => buildPositionRows(positionsQuery.data ?? [], data.startups),
     [positionsQuery.data, data.startups],
   );
+  /* Unknown must never read as zero — a loading or failed positions request
+   * has no count to show, so "Held" falls back to a dash rather than "0". */
+  const heldUnavailable = positionsQuery.isLoading || positionsQuery.isError;
 
   /* Decided-but-not-held is history, not holdings. Counts stay because they are
    * facts; the deals themselves live in Flow. */
@@ -150,7 +155,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           title="Portfolio"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <Readout label="Held" value={rows.length} />
+              <Readout label="Held" value={heldUnavailable ? null : rows.length} />
               <Readout label="Monitoring" value={decided.monitoring} />
               <Readout label="Passed" value={decided.passed} />
             </div>

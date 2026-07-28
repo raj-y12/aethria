@@ -70,14 +70,24 @@ export default function CrmExportAction({
           <p className="mt-phi-2 type-meta text-oxford/55">
             Prepared only — nothing has been sent to your CRM yet.
           </p>
-          <button
-            type="button"
-            onClick={() => approve.mutate(action!.workflow_action_id)}
-            disabled={approve.isPending}
-            className="mt-phi-3 type-status text-oxford transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-          >
-            {approve.isPending ? 'Approving…' : 'Approve and download'}
-          </button>
+          {approve.isSuccess ? (
+            <p className="mt-phi-3 type-body-sm text-oxford/70">Approved and downloaded.</p>
+          ) : (
+            <button
+              type="button"
+              onClick={() => approve.mutate(action!.workflow_action_id)}
+              disabled={approve.isPending}
+              className="mt-phi-3 type-status text-oxford transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            >
+              {approve.isPending ? 'Approving…' : 'Approve and download'}
+            </button>
+          )}
+
+          {approve.isError ? (
+            <p className="mt-phi-2 type-body-sm text-escalation">
+              Could not approve the export for {companyName}. Nothing was sent.
+            </p>
+          ) : null}
         </div>
       ) : null}
     </div>

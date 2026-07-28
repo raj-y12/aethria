@@ -64,7 +64,7 @@ class PortfolioRepository:
                 join public.companies c on c.user_id=p.user_id and c.company_id=p.company_id
                 left join public.opportunities o
                   on o.user_id=p.user_id and o.opportunity_id=p.opportunity_id
-                where p.user_id=$1 order by p.entered_at desc limit $2
+                where p.user_id=$1 and p.status='active' order by p.entered_at desc limit $2
                 """, uid, max(1, min(int(limit), 200)),
             )
         return [dict(row) for row in rows]

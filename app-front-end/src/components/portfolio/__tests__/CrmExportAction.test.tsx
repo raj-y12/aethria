@@ -10,6 +10,7 @@ vi.mock('../../../api/crmExport', async (original) => ({
 }));
 
 import CrmExportAction from '../CrmExportAction';
+import { crmRowToCsv, type CrmRow } from '../../../api/crmExport';
 
 function wrapper(children: React.ReactNode) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -53,5 +54,52 @@ describe('CrmExportAction', () => {
     fireEvent.click(screen.getByRole('button', { name: /prepare crm export/i }));
     expect(await screen.findByText(/could not prepare/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /approve and download/i })).not.toBeInTheDocument();
+  });
+
+  it('surfaces an approval failure instead of rendering nothing', async () => {
+    api.approveCrmExport.mockRejectedValue(new Error('Action already approved'));
+    wrapper(<CrmExportAction opportunityId="opportunity-1" companyName="Acme" />);
+    fireEvent.click(screen.getByRole('button', { name: /prepare crm export/i }));
+    await screen.findByText('acme.ai');
+
+    fireEvent.click(screen.getByRole('button', { name: /approve and download/i }));
+    expect(await screen.findByText(/could not approve/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /approve and download/i })).toBeInTheDocument();
+  });
+
+  it('disables the approve control once approval has succeeded, preventing a second click', async () => {
+    // jsdom has no createObjectURL — stub it so the download side effect
+    // doesn't throw and mask the success state under test.
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
+    wrapper(<CrmExportAction opportunityId="opportunity-1" companyName="Acme" />);
+    fireEvent.click(screen.getByRole('button', { name: /prepare crm export/i }));
+    await screen.findByText('acme.ai');
+
+    fireEvent.click(screen.getByRole('button', { name: /approve and download/i }));
+    await waitFor(() => expect(api.approveCrmExport).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/approved and downloaded/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /approve and download/i })).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('crmRowToCsv', () => {
+  it('neutralizes a leading formula character so it is not executed by Excel/Sheets', () => {
+    const row = {
+      dedupe_key: 'evil.ai',
+      company_name: '=HYPERLINK("https://evil.example","click")',
+      decision: 'INVEST',
+      rationale: '+cmd|/c calc',
+    } as CrmRow;
+    const csv = crmRowToCsv(row);
+    expect(csv).toContain('"\'=HYPERLINK(""https://evil.example"",""click"")"');
+    expect(csv).toContain('"\'+cmd|/c calc"');
+  });
+
+  it('leaves ordinary text untouched', () => {
+    const row = { dedupe_key: 'acme.ai', company_name: 'Acme', decision: 'INVEST', rationale: 'Solid retention.' } as CrmRow;
+    const csv = crmRowToCsv(row);
+    expect(csv).toContain('"Acme"');
+    expect(csv).toContain('"Solid retention."');
   });
 });

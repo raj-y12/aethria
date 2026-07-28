@@ -176,6 +176,19 @@ describe('PortfolioPage', () => {
     expect(screen.getByTestId('concentration-row-Fintech')).toHaveTextContent('100%');
   });
 
+  it('does not show a fabricated 0 for Held when positions fail to load', async () => {
+    api.fetchPortfolioPositions.mockRejectedValue(new Error('network error'));
+    const { container } = renderPage();
+    await waitFor(() => expect(screen.getByText(/positions unavailable/i)).toBeInTheDocument());
+    const header = container.querySelector('header');
+    expect(header).not.toBeNull();
+    const heldLabel = within(header as HTMLElement).getByText('Held');
+    const heldReadout = heldLabel.closest('div');
+    expect(heldReadout).not.toBeNull();
+    expect(within(heldReadout as HTMLElement).getByText('—')).toBeInTheDocument();
+    expect(within(heldReadout as HTMLElement).queryByText('0')).not.toBeInTheDocument();
+  });
+
   it('does not show watchlist signals on the portfolio surface', async () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));

@@ -55,7 +55,11 @@ def build_crm_export_payload(
         "domain": domain or None,
         "decision": _DECISION_MAP[decision_raw],
         "rationale": str(ruling.get("rationale") or "").strip(),
-        "investor_confidence": float(ruling.get("investor_confidence") or 0.0),
+        "investor_confidence": (
+            float(ruling["investor_confidence"])
+            if ruling.get("investor_confidence") is not None
+            else None
+        ),
         "ruled_at": str(ruling.get("created_at") or "") or None,
         "override_type": ruling.get("override_type"),
         "entered_at": (position or {}).get("entered_at"),

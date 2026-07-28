@@ -43,6 +43,13 @@ export function crmRowToCsv(row: CrmRow): string {
     'investor_confidence', 'ruled_at', 'override_type', 'entered_at',
     'latest_outcome', 'outcome_count',
   ];
-  const escape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const escape = (value: unknown) => {
+    const raw = String(value ?? '');
+    // Neutralize CSV formula injection: a leading =, +, -, or @ executes as a
+    // formula when opened in Excel/Sheets. Free text here (company names,
+    // rationales) can come from LLM output or web sources, so it is untrusted.
+    const safe = /^[=+\-@]/.test(raw) ? `'${raw}` : raw;
+    return `"${safe.replace(/"/g, '""')}"`;
+  };
   return `${columns.join(',')}\n${columns.map((column) => escape(row[column])).join(',')}`;
 }
