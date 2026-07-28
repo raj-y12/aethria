@@ -59,7 +59,7 @@ class PortfolioRepository:
             rows = await conn.fetch(
                 """
                 select p.*, c.canonical_name, c.canonical_domain,
-                       o.legacy_startup_id, o.decision_state
+                       o.legacy_startup_id
                 from public.canonical_portfolio_positions p
                 join public.companies c on c.user_id=p.user_id and c.company_id=p.company_id
                 left join public.opportunities o

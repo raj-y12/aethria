@@ -48,7 +48,6 @@ async def test_list_positions_exposes_legacy_bridge_and_is_tenant_scoped():
             "canonical_name": "Acme",
             "canonical_domain": "acme.ai",
             "legacy_startup_id": "startup-1",
-            "decision_state": "invested",
         }
     ])
     repository = PortfolioRepository(_Pool(connection))
@@ -56,7 +55,6 @@ async def test_list_positions_exposes_legacy_bridge_and_is_tenant_scoped():
     rows = await repository.list_positions(user_id="user-a", limit=10)
 
     assert rows[0]["legacy_startup_id"] == "startup-1"
-    assert rows[0]["decision_state"] == "invested"
     sql, args = connection.calls[0][1], connection.calls[0][2]
     assert "left join public.opportunities" in sql.lower()
     assert "o.legacy_startup_id" in sql

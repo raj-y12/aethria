@@ -361,28 +361,36 @@ class DecisionRepository:
         """Gather the canonical facts a CRM row needs. Read-only."""
         company = await conn.fetchrow(
             """
-            select c.canonical_name, c.canonical_domain
+            select c.canonical_name, c.canonical_domain, o.current_ruling_id
             from public.opportunities o
             join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
             where o.user_id=$1 and o.opportunity_id=$2
             """,
             user_id, opportunity_id,
         )
-        ruling = await conn.fetchrow(
-            """
-            select hr.decision, hr.rationale, hr.investor_confidence, hr.created_at, os.override_type
-            from public.human_rulings hr
-            left join public.override_signals os
-              on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
-            where hr.user_id=$1 and hr.opportunity_id=$2
-            order by hr.created_at desc limit 1
-            """,
-            user_id, opportunity_id,
-        )
         position = await conn.fetchrow(
-            "select entered_at from public.canonical_portfolio_positions where user_id=$1 and opportunity_id=$2",
+            "select entered_at, ruling_id from public.canonical_portfolio_positions where user_id=$1 and opportunity_id=$2",
             user_id, opportunity_id,
         )
+        # Precedence: the ruling the position was actually created from, else
+        # the opportunity's current ruling (covers exporting a non-holding,
+        # e.g. a PASS), else no ruling at all.
+        ruling_id = (
+            position["ruling_id"] if position and position.get("ruling_id")
+            else (company.get("current_ruling_id") if company else None)
+        )
+        ruling = None
+        if ruling_id:
+            ruling = await conn.fetchrow(
+                """
+                select hr.decision, hr.rationale, hr.investor_confidence, hr.created_at, os.override_type
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1 and hr.ruling_id=$2
+                """,
+                user_id, ruling_id,
+            )
         outcomes = await conn.fetch(
             """
             select outcome_type, valence, summary, observed_at
