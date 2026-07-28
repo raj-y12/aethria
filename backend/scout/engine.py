@@ -469,7 +469,6 @@ class ScoutEngine:
         if not is_founder_resolution_enabled():
             return None
         aliases: List[str] = []
-        location: Optional[str] = None
         known: List[str] = []
         if resolution is not None:
             for alias in (resolution.canonical_name, resolution.query):
@@ -483,7 +482,9 @@ class ScoutEngine:
                 user_id=self.tenant_user_id,
                 website=website,
                 aliases=aliases,
-                location=location,
+                # Location is not known before the scout stage produces it; the
+                # reviewer-side path passes the stored value when re-resolving.
+                location=None,
                 known_founder_names=known,
             )
         except Exception as e:

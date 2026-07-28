@@ -169,6 +169,64 @@ _NAME_REJECT = frozenset(
     }
 )
 
+# Words that never start a person's name. Retrieved snippets are attacker-
+# influenced text, and a sentence like "You Are, CEO, ..." otherwise satisfies
+# the capitalized-words shape and becomes a founder candidate.
+_NON_NAME_LEADING_WORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "this",
+        "that",
+        "these",
+        "those",
+        "it",
+        "he",
+        "she",
+        "they",
+        "we",
+        "you",
+        "i",
+        "our",
+        "your",
+        "their",
+        "his",
+        "her",
+        "its",
+        "and",
+        "or",
+        "but",
+        "if",
+        "when",
+        "while",
+        "ignore",
+        "system",
+        "assistant",
+        "user",
+        "note",
+        "click",
+        "read",
+        "learn",
+        "view",
+        "see",
+        "follow",
+        "subscribe",
+        "download",
+        "contact",
+        "about",
+        "home",
+        "search",
+        "share",
+        "copyright",
+        "all",
+        "privacy",
+        "terms",
+        "cookie",
+        "cookies",
+    }
+)
+
 # Tokens that mark a "name" as an organization rather than a person.
 _ORG_NAME_MARKERS = (
     "inc",
@@ -337,6 +395,8 @@ def _is_person_name(name: str) -> bool:
         return False
     words = n.split()
     if not (2 <= len(words) <= 3):
+        return False
+    if words[0].lower().strip(".") in _NON_NAME_LEADING_WORDS:
         return False
     if any(w.lower().strip(".") in _ORG_NAME_MARKERS for w in words):
         return False
@@ -783,6 +843,43 @@ def _log_stage(
         decision,
         reason[:160],
     )
+
+
+def build_resolution_from_evidence(
+    company: str,
+    candidates: List[FounderCandidate],
+    *,
+    website: Optional[str] = None,
+    retrieval_provider: Optional[str] = None,
+    stage: str = "evidence",
+    reason: str = "",
+    sources_found: int = 0,
+) -> FounderResolution:
+    """Wrap already-extracted candidates in a scored FounderResolution.
+
+    Lets callers that already hold evidence (e.g. the reviewer gap-retrieval
+    pack) produce the same contract as `resolve_founders` without re-running
+    retrieval, and without reaching into this module's internals.
+    """
+    resolution = FounderResolution(
+        company=company,
+        website=website,
+        founders=list(candidates),
+        retrieval_provider=retrieval_provider,
+    )
+    resolution.confidence = round(max((c.confidence for c in candidates), default=0.0), 3)
+    resolution.missing_fields = _missing_fields(candidates)
+    resolution.resolution_status = _assign_status(candidates)
+    resolution.stage_log.append(
+        FounderStageLog(
+            stage=stage,
+            sources_found=sources_found,
+            candidates=len(candidates),
+            decision=resolution.resolution_status,
+            reason=reason,
+        )
+    )
+    return resolution
 
 
 def extract_founder_candidates(

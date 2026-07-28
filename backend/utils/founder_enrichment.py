@@ -173,6 +173,7 @@ def founder_resolution_from_gap_pack(
     """
     from resolver.founder_resolver import (
         FounderEvidence,
+        build_resolution_from_evidence,
         extract_founder_candidates,
         resolve_founders,
     )
@@ -196,31 +197,15 @@ def founder_resolution_from_gap_pack(
         ]
         candidates = extract_founder_candidates(evidence)
         if candidates:
-            from resolver.founder_resolver import FounderResolution, FounderStageLog
-
-            resolution = FounderResolution(
-                company=company,
+            return build_resolution_from_evidence(
+                company,
+                candidates,
                 website=website,
-                founders=candidates,
                 retrieval_provider=str((pack or {}).get("provider") or "") or None,
+                stage="reviewer_gap_pack",
+                reason="Reused the reviewer gap-retrieval pack; no extra searches.",
+                sources_found=len(evidence),
             )
-            resolution.confidence = round(
-                max((c.confidence for c in candidates), default=0.0), 3
-            )
-            from resolver.founder_resolver import _assign_status, _missing_fields
-
-            resolution.missing_fields = _missing_fields(candidates)
-            resolution.resolution_status = _assign_status(candidates)
-            resolution.stage_log.append(
-                FounderStageLog(
-                    stage="reviewer_gap_pack",
-                    sources_found=len(evidence),
-                    candidates=len(candidates),
-                    decision=resolution.resolution_status,
-                    reason="Reused the reviewer gap-retrieval pack; no extra searches.",
-                )
-            )
-            return resolution
 
     # The gap pack named nobody — fall back to founder-specific retrieval only
     # when the caller accepts the extra provider round-trips.
@@ -230,6 +215,7 @@ def founder_resolution_from_gap_pack(
         company,
         user_id=user_id,
         website=website,
+        location=str(scout.get("location") or "").strip() or None,
         known_founder_names=[
             str(n).strip()
             for n in (scout.get("founder_names") or [])

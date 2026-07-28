@@ -127,6 +127,8 @@ REGISTRY: List[EnvVar] = [
     EnvVar("SCOUT_RAMP_THRESHOLD", "int", "5", "Scout", "Backlog below which scouting ramps up."),
     EnvVar("SCOUT_RAMP_MAX_WAVES", "int", "2", "Scout", "Max scout waves per ramped cycle."),
     EnvVar("SCOUT_RECENCY_RESERVED_SLOTS", "int", "5", "Scout", "Slots reserved for recency/breaking-news scouts."),
+    EnvVar("SCOUT_DISCOVERY_MAX_QUERIES", "int", "3", "Scout",
+           "Max open-discovery retrieval queries per scout persona (thesis-derived)."),
     EnvVar("SCOUT_RETRIEVAL_MAX_RESULTS", "int", "10", "Scout", "Max web-search results per scout query."),
     EnvVar("SCOUT_RETRIEVAL_MERGED_CAP", "int", "16", "Scout", "Cap on merged retrieval results."),
     EnvVar("SCOUT_ENRICH_MAX_REFERENCES", "int", "12", "Scout", "Max references kept during enrichment."),
@@ -204,6 +206,9 @@ REGISTRY: List[EnvVar] = [
     # --- Tavily (web search) -------------------------------------------------
     EnvVar("TAVILY_API_KEY", "secret", "", "Tavily", "Tavily web-search API key (scout/reviewer retrieval)."),
     EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Tavily", "Use DuckDuckGo retrieval when Tavily is unavailable."),
+    EnvVar("RETRIEVAL_QUERY_CONCURRENCY", "int", "4", "Tavily",
+           "Retrieval queries in flight at once within one merged pack (1 = sequential). "
+           "Merge order stays deterministic regardless of this value."),
     EnvVar("TAVILY_SEARCH_DEPTH", "str", "advanced", "Tavily", "Tavily search depth (basic|advanced)."),
     EnvVar("TAVILY_MAX_RESULTS_CAP", "int", "15", "Tavily", "Cap on Tavily results per query."),
     EnvVar("TAVILY_TIMEOUT", "float", "12.0", "Tavily", "Tavily request timeout (s)."),

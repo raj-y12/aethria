@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import ssl
+from concurrent.futures import ThreadPoolExecutor
 from html import unescape
 from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 from urllib.request import Request, urlopen
@@ -169,6 +170,58 @@ def _default_max_results() -> int:
 
 def _source_id(i: int) -> str:
     return f"S{i + 1}"
+
+
+# Retrieval is blocking HTTP, one query at a time. A single lookup issues a dozen
+# or more searches, so running them serially dominated end-to-end latency. The
+# pool is module-level and bounded: per-call pools would multiply threads across
+# concurrent pipeline cycles.
+_QUERY_EXECUTOR = ThreadPoolExecutor(
+    max_workers=8,
+    thread_name_prefix="retrieval-query",
+)
+
+
+def _query_concurrency() -> int:
+    """How many retrieval queries may be in flight at once. 1 == sequential."""
+    raw = os.getenv("RETRIEVAL_QUERY_CONCURRENCY", "4")
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 4
+    return max(1, min(n, 8))
+
+
+def _run_query_wave(
+    queries: List[str],
+    *,
+    user_id: str,
+    max_results: int,
+    category: str,
+) -> List[Dict[str, Any]]:
+    """Run queries concurrently, returning packs in the ORIGINAL query order.
+
+    Order matters: the merged pack keeps the first occurrence of each URL, so
+    preserving submission order keeps results deterministic and identical to the
+    sequential path.
+    """
+    if not queries:
+        return []
+    if len(queries) == 1 or _query_concurrency() == 1:
+        return [
+            retrieve_source_pack(
+                query=q, user_id=user_id, max_results=max_results, category=category
+            )
+            for q in queries
+        ]
+    return list(
+        _QUERY_EXECUTOR.map(
+            lambda q: retrieve_source_pack(
+                query=q, user_id=user_id, max_results=max_results, category=category
+            ),
+            queries,
+        )
+    )
 
 
 def _normalize_sources(raw_results: List[Dict[str, str]]) -> List[Dict[str, str]]:
@@ -341,9 +394,27 @@ def retrieve_source_pack_merged(
             )
             added += 1
 
+    concurrency = _query_concurrency()
+
+    # The recency query and the first wave of general queries do not depend on one
+    # another, so they are issued together; results are still INGESTED in the
+    # recency-first order below.
+    first_wave = general_queries[:concurrency] if concurrency > 1 else []
+    first_wave_future = (
+        _QUERY_EXECUTOR.submit(
+            _run_query_wave,
+            first_wave,
+            user_id=user_id,
+            max_results=max_per_query,
+            category=effective_category,
+        )
+        if first_wave and rq
+        else None
+    )
+
     # Recency FIRST, with a reserved quota, so a breaking event (acquisition, IPO,
     # round) is never starved out of the source pack by the general queries hitting
-    # the cap. The recency query runs against Tavily's news topic (recency-ranked),
+    # the cap. The recency query runs against the news category (recency-ranked),
     # with a general-search fallback if news returns nothing.
     if rq:
         from utils.recency import recency_window_days, tavily_time_range
@@ -379,20 +450,32 @@ def retrieve_source_pack_merged(
                 used_provider = str(fallback_news.get("provider") or used_provider)
         _ingest(rows, limit=reserved, provider=admitted_provider)
 
-    # General queries fill the remaining slots.
-    for q in general_queries:
-        if len(merged_rows) >= max_total_sources:
-            break
-        pack = retrieve_source_pack(
-            query=q,
-            user_id=user_id,
-            max_results=max_per_query,
-            category=effective_category,
+    # General queries fill the remaining slots, issued in concurrent waves. The
+    # cap is re-checked between waves so a full pack still stops further queries.
+    def _ingest_packs(packs: List[Dict[str, Any]]) -> None:
+        nonlocal used_provider
+        for pack in packs:
+            provider_diagnostics.extend(pack.get("provider_diagnostics") or [])
+            if pack.get("sources"):
+                used_provider = str(pack.get("provider") or used_provider)
+            _ingest(pack.get("sources"), limit=None, provider=str(pack.get("provider") or ""))
+
+    remaining = list(general_queries)
+    if first_wave_future is not None:
+        _ingest_packs(first_wave_future.result())
+        remaining = remaining[len(first_wave):]
+
+    while remaining and len(merged_rows) < max_total_sources:
+        wave = remaining[:concurrency] if concurrency > 1 else remaining[:1]
+        remaining = remaining[len(wave):]
+        _ingest_packs(
+            _run_query_wave(
+                wave,
+                user_id=user_id,
+                max_results=max_per_query,
+                category=effective_category,
+            )
         )
-        provider_diagnostics.extend(pack.get("provider_diagnostics") or [])
-        if pack.get("sources"):
-            used_provider = str(pack.get("provider") or used_provider)
-        _ingest(pack.get("sources"), limit=None, provider=str(pack.get("provider") or ""))
 
     cleaned_queries = ([rq] if rq else []) + general_queries
     sources = _normalize_sources(merged_rows)

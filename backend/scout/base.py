@@ -34,6 +34,11 @@ from utils.reference_verify import (
     registrable_domain,
 )
 from utils.recency import recency_query, scout_recency_directive
+from utils.scout_discovery_queries import (
+    build_discovery_queries,
+    build_discovery_recency_query,
+    thesis_terms,
+)
 from utils.retrieval_grounding import (
     log_pre_filter_cited_urls,
     render_sources_for_prompt,
@@ -896,12 +901,22 @@ class Scout(ABC):
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 lens = self.scout_type.replace("_", " ")
+                # Retrieval is steered by the active mandate, not just the persona:
+                # searching generic phrases and hoping a thesis fit turns up is the
+                # main reason open discovery drifts off-mandate and repeats itself.
+                thesis_ctx = getattr(self, "_fund_thesis_ctx", None)
+                queries = build_discovery_queries(lens, thesis_ctx=thesis_ctx)
+                self.logger.info(
+                    "scout discovery queries scout_type=%s thesis_scoped=%s queries=%s",
+                    self.scout_type,
+                    bool(thesis_terms(thesis_ctx)),
+                    queries,
+                )
                 source_pack = retrieve_source_pack_merged(
-                    queries=[
-                        f"{lens} early-stage startup VC funding seed series traction news",
-                        f"{lens} startup customers pilots revenue growth founders team",
-                    ],
-                    recency_query=recency_query(f"{lens} startup"),
+                    queries=queries,
+                    recency_query=build_discovery_recency_query(
+                        lens, thesis_ctx=thesis_ctx
+                    ),
                     user_id=self._tenant_user_id,
                 )
                 # Open discovery should not ask the model to invent a company when
@@ -1192,9 +1207,17 @@ class Scout(ABC):
                 '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
                 '  "est_tam": "string" | null,\n'
                 '  "location": "string" | null,\n'
+                '  "financials": {  // OPTIONAL, GROUNDED ONLY. Fill a sub-field ONLY if a retrieved source explicitly states the figure; otherwise null. NEVER estimate or infer.\n'
+                '    "funding_history": {"value": "e.g. $5M Series A (2024)", "quote": "exact sentence copied verbatim from the cited source", "source_url": "that source URL"} | null,\n'
+                '    "valuation_est": {"value": "e.g. $20M post-money", "quote": "verbatim source sentence", "source_url": "that source URL"} | null,\n'
+                '    "traction_metrics": {"value": "e.g. $2M ARR, 50 customers", "quote": "verbatim source sentence", "source_url": "that source URL"} | null,\n'
+                '    "ip_status": {"value": "e.g. 2 patents granted", "quote": "verbatim source sentence", "source_url": "that source URL"} | null\n'
+                '  },\n'
                 '  "references": ["string", ...]\n'
                 "}\n\n"
                 "Include a founder_names array containing every explicitly named founder or co-founder in the retrieved evidence; use [] only when no names are supported. "
+                "financials: fill a sub-field ONLY when a retrieved source explicitly states the exact figure — copy the figure into value, the source's exact sentence into quote, and that source's URL into source_url. "
+                "If a figure is not present verbatim in your sources, use null. Never estimate, round, or infer funding, valuation, revenue, or IP numbers; unverifiable financials MUST be null. "
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
                 "Prefer primary sources first: official company domain, official docs/blog, product pages, or company-owned GitHub/LinkedIn profile. "
                 "Do not rely only on directory/paywalled sources (PitchBook/Crunchbase/Tracxn/CBInsights) if primary sources are available. "
