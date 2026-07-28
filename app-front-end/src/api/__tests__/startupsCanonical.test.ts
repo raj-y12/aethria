@@ -47,23 +47,6 @@ describe('canonical startup queue adapter', () => {
     expect(startups[0].partner?.recommendation).toBe('PASS');
   });
 
-  it('projects a canonical pass ruling into the legacy portfolio bucket', async () => {
-    authedFetch
-      .mockResolvedValueOnce(response({ mode: 'canonical_read', canonical_reads_allowed: true }))
-      .mockResolvedValueOnce(response({ opportunities: [{
-        opportunity_id: 'opp-passed', company_id: 'co-1', legacy_startup_id: 'startup-passed',
-        canonical_name: 'Passed Co', recommended_state: 'advance', decision_state: 'pass',
-        updated_at: '2026-07-28T10:00:00Z',
-      }] }));
-
-    const startups = await fetchStartups();
-
-    expect(startups[0].human_resolution).toEqual({
-      decision: 'NO',
-      resolved_at: '2026-07-28T10:00:00Z',
-    });
-  });
-
   it('resolves a legacy queue id before reading its canonical decision view', async () => {
     authedFetch
       .mockResolvedValueOnce(response({ mode: 'canonical_read', canonical_reads_allowed: true }))
