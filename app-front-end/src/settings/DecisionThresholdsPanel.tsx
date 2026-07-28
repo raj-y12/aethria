@@ -85,7 +85,7 @@ function ThresholdHandle({
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
         setFromPointer(event);
       }}
-      className="group absolute top-1/2 z-[2] flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/55"
+      className="group absolute top-1/2 z-[2] flex h-full w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/55"
       style={{ left: `${value}%` }}
     >
       <span
@@ -126,7 +126,7 @@ function ThresholdBar({
 
   return (
     <div className="pt-phi-6">
-      <div ref={barRef} className="relative h-14 w-full">
+      <div ref={barRef} className="relative h-20 w-full lg:h-24">
         <div
           data-testid="threshold-dot-grid"
           className="pointer-events-none absolute inset-x-0 inset-y-1 grid place-items-center border-y border-oxford/[0.08] py-0.5"
