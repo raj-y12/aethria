@@ -26,5 +26,5 @@ def require_user_id(user_id: Optional[str], *, context: str = "tenant") -> str:
     """Fail fast when tenant is missing."""
     s = (user_id or "").strip()
     if not s:
-        raise RuntimeError(f"Missing explicit user_id ({context}); unsafe execution blocked.")
+        raise ValueError(f"Missing explicit user_id ({context}); unsafe execution blocked.")
     return s
