@@ -8,6 +8,7 @@ import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
 import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
 import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
 import OutcomePanel from '../components/institutional/OutcomePanel';
+import CrmExportAction from '../components/portfolio/CrmExportAction';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 
@@ -206,6 +207,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       </div>
                       <p className="mt-phi-2 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale}</p>
                       {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
+                      <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
                     </li>
                   ))}
                 </ul>

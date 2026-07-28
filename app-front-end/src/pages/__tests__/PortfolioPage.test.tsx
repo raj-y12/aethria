@@ -8,6 +8,8 @@ const api = vi.hoisted(() => ({
   fetchOutcomeCoverage: vi.fn(),
   fetchOpportunityByLegacyStartup: vi.fn(),
   fetchOutcomes: vi.fn(),
+  prepareCrmExport: vi.fn(),
+  approveCrmExport: vi.fn(),
 }));
 vi.mock('../../api/portfolio', async (original) => ({
   ...(await original<typeof import('../../api/portfolio')>()),
@@ -21,6 +23,11 @@ vi.mock('../../api/channelsOutcomes', async (original) => ({
 vi.mock('../../api/identity', async (original) => ({
   ...(await original<typeof import('../../api/identity')>()),
   fetchOpportunityByLegacyStartup: api.fetchOpportunityByLegacyStartup,
+}));
+vi.mock('../../api/crmExport', async (original) => ({
+  ...(await original<typeof import('../../api/crmExport')>()),
+  prepareCrmExport: api.prepareCrmExport,
+  approveCrmExport: api.approveCrmExport,
 }));
 
 import PortfolioPage from '../PortfolioPage';
@@ -115,6 +122,13 @@ describe('PortfolioPage', () => {
     renderPage();
     const toggle = await screen.findByRole('button', { name: /record outcome/i });
     expect(toggle).toBeEnabled();
+  });
+
+  it('offers CRM export preparation on a rendered position', async () => {
+    renderPage();
+    const button = await screen.findByRole('button', { name: /prepare crm export/i });
+    expect(button).toBeEnabled();
+    expect(api.prepareCrmExport).not.toHaveBeenCalled();
   });
 
   it('omits outcome recording when the position has no legacy bridge', async () => {
