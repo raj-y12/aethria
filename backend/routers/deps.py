@@ -214,6 +214,7 @@ def get_system_health(
     Mirrors the shape expected by the front-end SystemHealth type.
     budget_status is only populated when cost_budget.enabled for this user.
     """
+    health_errors: List[str] = []
     # Calibration warning from portfolio agent_metrics (Supabase)
     portfolio_store = get_portfolio_store(user_id) if user_id else None
     calibration_warning = None
@@ -233,14 +234,17 @@ def get_system_health(
         unreviewed = storage.count_unreviewed()
     except Exception:
         unreviewed = 0
+        health_errors.append("unreviewed_count_unavailable")
     try:
         undecided = storage.count_undecided()
     except Exception:
         undecided = 0
+        health_errors.append("undecided_count_unavailable")
     try:
         watchlist = len(portfolio_store.get_all_watchlist()) if portfolio_store else 0
     except Exception:
         watchlist = 0
+        health_errors.append("watchlist_count_unavailable")
 
     # Budget status only when cost budget enforcement is enabled for this user
     budget_status: List[Dict[str, Any]] = []
@@ -294,6 +298,8 @@ def get_system_health(
                 )
 
     return {
+        "status": "degraded" if health_errors else "ok",
+        "errors": health_errors,
         "calibration_warning": calibration_warning,
         "pending_escalations": pending_escalations,
         "queue_depths": {

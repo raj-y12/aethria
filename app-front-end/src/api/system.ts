@@ -8,7 +8,7 @@ export interface DurableExecutionStatus {
 }
 
 export interface SystemStatus {
-  status: string;
+  status: 'ok' | 'degraded' | 'unavailable' | string;
   durable_jobs: DurableExecutionStatus;
 }
 

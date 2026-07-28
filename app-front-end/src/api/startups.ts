@@ -30,10 +30,13 @@ export async function fetchStartups(): Promise<Startup[]> {
 
 /** Compatibility shape for existing queue components; source of truth is canonical. */
 export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionView): Startup {
-  const recommendation = opportunity.recommended_state;
-  const partnerRecommendation = recommendation === 'invested' ? 'INVEST' : recommendation === 'pass' ? 'PASS' : 'MONITOR';
+  const recommendation = String(opportunity.recommended_state ?? '').trim().toLowerCase();
+  // Compatibility follows the backend contract: canonical advance is a
+  // recommendation to continue diligence, not an operator investment ruling.
+  const partnerRecommendation = recommendation === 'pass' ? 'PASS' : 'MONITOR';
   return {
     id: opportunity.legacy_startup_id ?? opportunity.opportunity_id,
+    canonical_opportunity_id: opportunity.opportunity_id,
     scout: {
       id: opportunity.opportunity_id,
       scout_type: 'canonical',
@@ -81,7 +84,10 @@ export async function fetchStartupsWithToken(
 }
 
 /** Full record for memo / detail panel (GET /api/startups/:id). */
-export async function fetchStartupDetail(startupId: string): Promise<Startup | null> {
+export async function fetchStartupDetail(
+  startupId: string,
+  canonicalOpportunityId?: string,
+): Promise<Startup | null> {
   if (import.meta.env.VITE_USE_FIXTURES === '1') {
     const { fixtureStartups } = await import('../fixtures/startups');
     return fixtureStartups.find((s) => s.id === startupId) ?? null;
@@ -90,10 +96,27 @@ export async function fetchStartupDetail(startupId: string): Promise<Startup | n
   if (authorityRes.ok) {
     const authority = await authorityRes.json() as { mode?: string; canonical_reads_allowed?: boolean };
     if (authority.mode === 'canonical_read' && authority.canonical_reads_allowed === true) {
-      const canonicalRes = await authedFetch(
-        `${API_BASE}/api/opportunities/${encodeURIComponent(startupId)}/decision-view`,
+      let opportunityId = canonicalOpportunityId?.trim() || startupId;
+      let canonicalRes = await authedFetch(
+        `${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/decision-view`,
         { headers: { Accept: 'application/json' } },
       );
+      if (!canonicalRes.ok && !canonicalOpportunityId) {
+        const linkRes = await authedFetch(
+          `${API_BASE}/api/startups/${encodeURIComponent(startupId)}/opportunity`,
+          { headers: { Accept: 'application/json' } },
+        );
+        if (linkRes.ok) {
+          const link = await linkRes.json() as { opportunity_id?: string };
+          if (typeof link.opportunity_id === 'string' && link.opportunity_id.trim()) {
+            opportunityId = link.opportunity_id.trim();
+            canonicalRes = await authedFetch(
+              `${API_BASE}/api/opportunities/${encodeURIComponent(opportunityId)}/decision-view`,
+              { headers: { Accept: 'application/json' } },
+            );
+          }
+        }
+      }
       if (!canonicalRes.ok) return null;
       return canonicalOpportunityToStartup(await canonicalRes.json() as OpportunityDecisionView);
     }

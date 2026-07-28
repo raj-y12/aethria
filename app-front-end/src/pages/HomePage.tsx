@@ -169,7 +169,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
     requestLogout,
     logoutModalProps,
   } = useAgentLogoutFlow();
-  const { mandatePublished, loading: fundReadinessLoading } = useFundReadiness();
+  const { mandatePublished, unknown: fundReadinessUnknown, loading: fundReadinessLoading } = useFundReadiness();
   const { startups } = data;
 
   // Legacy deep links (/v1?open=…, /v1?queue=…) belong to Flow.
@@ -246,9 +246,10 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
   // First-run: no mandate published yet. Show a quiet editorial prompt.
   // We wait until the readiness check resolves (loading=false) to avoid a
-  // flash for returning users — the hook defaults mandatePublished:true on
-  // error so users are never falsely trapped.
-  const showFirstRun = !fundReadinessLoading && !mandatePublished;
+  // flash for returning users. An unreadable readiness check is not treated
+  // as a missing mandate or a published mandate.
+  const showFirstRun = !fundReadinessLoading && !fundReadinessUnknown && !mandatePublished;
+  const showFundReadinessUnavailable = !fundReadinessLoading && fundReadinessUnknown;
 
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
@@ -281,7 +282,20 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
         {/* ── The framed briefing — the login page's bracket move ── */}
         <div className="focus-frame mt-phi-4 flex w-full max-w-[42rem] flex-col items-center">
-        {showFirstRun ? (
+        {showFundReadinessUnavailable ? (
+          <>
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+                Reading the mandate.
+              </h1>
+            </Reveal>
+            <Reveal delay={0.24} className="mt-phi-5">
+              <p className="type-note text-center text-oxford/60">
+                Aethria could not verify fund readiness. Retry when the control plane is available.
+              </p>
+            </Reveal>
+          </>
+        ) : showFirstRun ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
               <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">

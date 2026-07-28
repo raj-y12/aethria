@@ -64,6 +64,8 @@ export interface SystemData {
   metaEvalSet: MetaEvalSet;
   systemHealth: SystemHealthSnapshot | null;
   systemStatus: SystemStatus | null;
+  /** True once the execution-plane status query has completed at least once. */
+  systemStatusReady: boolean;
   metaInsights: MetaInsightsPayload | null;
   fundThesisRuntime: FundThesisRuntime | null;
   fundThesisRuntimeLoading: boolean;
@@ -100,6 +102,10 @@ export function startupsPollInterval(
 ): number | false {
   if (!tabVisible) return false;
   return streamHealthy ? 30_000 : 15_000;
+}
+
+export function startupQueryReady(query: { isFetched: boolean; isFetching: boolean }): boolean {
+  return query.isFetched && !query.isFetching;
 }
 
 export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
@@ -312,6 +318,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     metaEvalSet: metaEvalSetQuery.data ?? { startup_ids: [], count: 0, max: 50 },
     systemHealth: systemHealthQuery.data ?? null,
     systemStatus: systemStatusQuery.data ?? null,
+    systemStatusReady: systemStatusQuery.isFetched,
     metaInsights: metaInsightsQuery.data ?? null,
     fundThesisRuntime: fundThesisRuntimeQuery.data ?? null,
     fundThesisRuntimeLoading: fundThesisRuntimeQuery.isPending,
@@ -322,7 +329,7 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     canonicalReadActive: authority.isCanonicalRead,
     pendingEscalationCount,
     startupsError: startupsQuery.isError ? 'Could not load startups' : null,
-    startupsReady: !startupsQuery.isPending,
+    startupsReady: startupQueryReady(startupsQuery),
     liveGate,
   };
 }

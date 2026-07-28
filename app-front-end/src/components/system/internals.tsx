@@ -351,6 +351,11 @@ export function AnalyticsTab({ rejection, watchlist, concentration, systemHealth
       </TabSection>
       {systemHealth && (
         <TabSection title="Pipeline" label="Live">
+          {systemHealth.status === 'degraded' ? (
+            <p className="type-status text-escalation">
+              Pipeline telemetry is unavailable — the counts below are not current.
+            </p>
+          ) : null}
           {/* The pipeline as the pipeline: stations joined by flow marks, the
               held states set apart by a rule. Escalations carry the only colour. */}
           <div className="flex flex-wrap items-end gap-x-phi-4 gap-y-phi-4 border-y border-oxford/[0.075] py-phi-5">
