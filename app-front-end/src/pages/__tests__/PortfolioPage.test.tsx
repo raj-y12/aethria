@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,9 +82,13 @@ describe('PortfolioPage', () => {
 
   it('renders holdings from the canonical positions endpoint', async () => {
     renderPage();
-    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
-    expect(screen.getByText('Acme')).toBeInTheDocument();
-    expect(screen.getByText('Fintech')).toBeInTheDocument();
+    const rows = await waitFor(() => {
+      const found = screen.getAllByTestId('position-row');
+      expect(found).toHaveLength(1);
+      return found;
+    });
+    expect(within(rows[0]).getByText('Acme')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('Fintech')).toBeInTheDocument();
     expect(api.fetchPortfolioPositions).toHaveBeenCalled();
   });
 
@@ -131,5 +135,27 @@ describe('PortfolioPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
     expect(screen.queryByRole('button', { name: /record outcome/i })).not.toBeInTheDocument();
+  });
+
+  it('shows outcome coverage as the headline instrument metric', async () => {
+    api.fetchOutcomeCoverage.mockResolvedValue({
+      coverage_ratio: 0.5,
+      limitations: ['Coverage is operator-reported and not causal.'],
+    });
+    renderPage();
+    expect(await screen.findByText('50%')).toBeInTheDocument();
+    expect(screen.getByText(/not causal/i)).toBeInTheDocument();
+  });
+
+  it('computes concentration from the positions on screen', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
+    expect(screen.getByTestId('concentration-row-Fintech')).toHaveTextContent('100%');
+  });
+
+  it('does not show watchlist signals on the portfolio surface', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
+    expect(screen.queryByLabelText('Signals')).not.toBeInTheDocument();
   });
 });

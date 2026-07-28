@@ -5,11 +5,11 @@ import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
-import { buildPositionRows } from './portfolio/positionRows';
+import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
+import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
 import OutcomePanel from '../components/institutional/OutcomePanel';
 import type { SystemData } from '../hooks/useSystemData';
-import type { Startup, SignalItem } from '../types/startup';
-import { formatDateTime } from '../lib/dates';
+import type { Startup } from '../types/startup';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
@@ -81,10 +81,6 @@ function PositionOutcomes({ startupId }: { startupId: string }) {
   );
 }
 
-function signalWhen(sig: SignalItem): string {
-  return formatDateTime(sig.detected_at);
-}
-
 /* Ledger columns (lg+): Company | Sector | Stage | Score | Ruled. Aligned cells
  * make the book comparable down the page; below lg the row falls back to the
  * stacked name + meta line. */
@@ -131,17 +127,14 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     return map;
   }, [data.startups]);
 
-  const sectorRows = useMemo(() => {
-    const entries = Object.entries(data.concentrationAnalytics.by_sector ?? {});
-    return entries
-      .map(([sector, v]) => ({ sector, count: v.count, pct: v.pct_of_total }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [data.concentrationAnalytics]);
-  const maxSectorCount = Math.max(...sectorRows.map((r) => r.count), 1);
+  const coverageQuery = useOutcomeCoverage();
+  const coveragePct = useMemo(() => {
+    const raw = Number(coverageQuery.data?.coverage_ratio ?? coverageQuery.data?.coverage_rate ?? 0);
+    return Math.round(raw <= 1 ? raw * 100 : raw);
+  }, [coverageQuery.data]);
+  const concentration = useMemo(() => sectorConcentration(rows), [rows]);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
-  const recentSignals = (data.signals ?? []).slice(0, 20);
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -216,30 +209,31 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               )}
             </section>
 
-            {/* ── Concentration ── */}
+            {/* ── Concentration — recomputed from the rows above, so it can never disagree with them ── */}
             <section aria-label="Sector concentration">
-              <SectionHead
-                title="Concentration"
-                detail={data.concentrationAnalytics.most_concentrated_sector || undefined}
-              />
-              {sectorRows.length === 0 ? (
-                <QuietEmpty>Appears once deals are decided.</QuietEmpty>
+              <SectionHead title="Concentration" detail={concentration[0]?.sector} />
+              {concentration.length === 0 ? (
+                <QuietEmpty>Appears once you hold a position.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
-                  {sectorRows.map((row, i) => (
-                    <li key={row.sector} className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4">
-                      <span className="type-label-section truncate">{row.sector}</span>
+                  {concentration.map((entry, i) => (
+                    <li
+                      key={entry.sector}
+                      data-testid={`concentration-row-${entry.sector}`}
+                      className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4"
+                    >
+                      <span className="type-label-section truncate">{entry.sector}</span>
                       <span className="relative block h-px bg-oxford/10">
                         <motion.span
                           className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
-                          style={{ width: `${Math.max(2, Math.min(100, (row.count / maxSectorCount) * 100))}%` }}
+                          style={{ width: `${Math.max(2, entry.pct)}%` }}
                           initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
                       <span className="type-data text-right text-oxford/60">
-                        {row.count} · {row.pct.toFixed(0)}%
+                        {entry.count} · {entry.pct}%
                       </span>
                     </li>
                   ))}
@@ -285,53 +279,23 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               )}
             </section>
 
-            <section aria-label="Signals">
-              <SectionHead
-                title="Signals"
-                detail={recentSignals.length ? `Last ${recentSignals.length}` : undefined}
-                count={recentSignals.length || undefined}
-              />
-              {recentSignals.length === 0 ? (
-                <QuietEmpty>No high-priority events detected in the last cycle.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {recentSignals.map((sig, i) => {
-                    const companyName = sig.startup_id ? startupNameById.get(sig.startup_id) : null;
-                    const body = (
-                      <>
-                        <span className="flex items-baseline justify-between gap-phi-3">
-                          <span className="type-label-section min-w-0 truncate">
-                            {companyName ?? sig.signal_type.replace(/_/g, ' ')}
-                          </span>
-                          <span className="type-data shrink-0 text-oxford/60">
-                            {signalWhen(sig)}
-                          </span>
-                        </span>
-                        {sig.description ? (
-                          <span className="mt-phi-1 block type-body-sm leading-relaxed text-oxford/65">
-                            {sig.description}
-                          </span>
-                        ) : null}
-                      </>
-                    );
-                    return (
-                      <li key={sig.id ?? i} className="border-b border-oxford/[0.06]">
-                        {sig.startup_id && startupNameById.has(sig.startup_id) ? (
-                          <button
-                            type="button"
-                            onClick={() => openDeal(sig.startup_id!)}
-                            className="group block w-full py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                          >
-                            {body}
-                          </button>
-                        ) : (
-                          <div className="py-phi-3">{body}</div>
-                        )}
-                      </li>
-                    );
-                  })}
+            <section aria-label="Outcome coverage">
+              <SectionHead title="Outcome coverage" />
+              <div className="mt-phi-4 flex flex-col gap-phi-2">
+                <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
+                  {coverageQuery.isLoading ? '—' : `${coveragePct}%`}
+                </span>
+                <span className="type-body-sm text-oxford/65">
+                  of eligible decisions have a recorded outcome.
+                </span>
+              </div>
+              {(coverageQuery.data?.limitations ?? []).length > 0 ? (
+                <ul className="mt-phi-3 flex flex-col gap-phi-1">
+                  {coverageQuery.data!.limitations!.map((limitation) => (
+                    <li key={limitation} className="type-meta text-oxford/55">{limitation}</li>
+                  ))}
                 </ul>
-              )}
+              ) : null}
             </section>
           </div>
         </div>
