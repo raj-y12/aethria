@@ -933,11 +933,14 @@ class IdentityRepository:
             rows = await conn.fetch(
                 """
                 select o.*, c.canonical_name, c.canonical_domain,
-                       r.recommended_state, r.confidence as recommendation_confidence
+                       r.recommended_state, r.confidence as recommendation_confidence,
+                       hr.decision as current_ruling_decision
                 from public.opportunities o
                 join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
                 left join public.recommendations r
                   on r.user_id=o.user_id and r.recommendation_id=o.current_recommendation_id
+                left join public.human_rulings hr
+                  on hr.user_id=o.user_id and hr.ruling_id=o.current_ruling_id
                 where o.user_id=$1 and o.workflow_state <> 'archived'
                 order by o.updated_at desc limit $2
                 """, uid, bounded,
@@ -955,13 +958,16 @@ class IdentityRepository:
                        r.confidence as recommendation_confidence, r.decision_drivers,
                        r.principal_risks, r.missing_information, r.change_conditions,
                        e.evaluation_id, e.evidence_snapshot_hash, e.policy_version_id,
-                       e.thesis_version_id
+                       e.thesis_version_id,
+                       hr.decision as current_ruling_decision
                 from public.opportunities o
                 join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
                 left join public.recommendations r
                   on r.user_id=o.user_id and r.recommendation_id=o.current_recommendation_id
                 left join public.evaluation_runs e
                   on e.user_id=o.user_id and e.evaluation_id=o.current_evaluation_id
+                left join public.human_rulings hr
+                  on hr.user_id=o.user_id and hr.ruling_id=o.current_ruling_id
                 where o.user_id=$1 and o.opportunity_id=$2
                 """, uid, opportunity_id,
             )

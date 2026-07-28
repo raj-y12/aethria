@@ -25,6 +25,7 @@ export interface Opportunity {
   current_evaluation_id?: string | null;
   current_recommendation_id?: string | null;
   current_ruling_id?: string | null;
+  current_ruling_decision?: string | null;
   created_at: string;
   updated_at: string;
 }

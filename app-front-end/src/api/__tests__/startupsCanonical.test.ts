@@ -64,6 +64,20 @@ describe('canonical startup queue adapter', () => {
     });
   });
 
+  it('uses the authoritative current ruling when the opportunity summary is stale', async () => {
+    authedFetch
+      .mockResolvedValueOnce(response({ mode: 'canonical_read', canonical_reads_allowed: true }))
+      .mockResolvedValueOnce(response({ opportunities: [{
+        opportunity_id: 'opp-passed-stale-summary', company_id: 'co-1', legacy_startup_id: 'startup-passed-stale',
+        canonical_name: 'Passed Co', recommended_state: 'advance', decision_state: 'completed',
+        current_ruling_decision: 'pass', updated_at: '2026-07-28T10:00:00Z',
+      }] }));
+
+    const startups = await fetchStartups();
+
+    expect(startups[0].human_resolution?.decision).toBe('NO');
+  });
+
   it('resolves a legacy queue id before reading its canonical decision view', async () => {
     authedFetch
       .mockResolvedValueOnce(response({ mode: 'canonical_read', canonical_reads_allowed: true }))
