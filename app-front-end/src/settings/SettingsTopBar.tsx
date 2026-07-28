@@ -49,13 +49,17 @@ export default function SettingsTopBar({
 
   return (
     <motion.header
-      className="flex-none border-b border-oxford/[0.16] bg-paper md:fixed md:inset-y-0 md:left-0 md:z-40 md:flex md:w-[clamp(204px,15vw,248px)] md:flex-col md:justify-between md:border-b-0"
+      /* The paper twin of AppSpine: same width (--spine-width) and the same lg
+         breakpoint the oxford spine uses, so the rail appears and disappears in
+         step with it. At md it turned on 256px earlier than the main nav, which
+         left Settings with a side rail on viewports where nothing else had one. */
+      className="flex-none border-b border-oxford/[0.16] bg-paper lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-[var(--spine-width)] lg:flex-col lg:justify-between lg:border-b-0"
       initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}
     >
-      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 md:h-full md:min-h-0 md:flex-col md:items-stretch md:gap-phi-4 md:px-phi-4 md:pb-phi-4 md:pt-phi-5">
-        <div className="flex min-w-0 items-center gap-phi-4 md:block md:shrink-0 md:px-2">
+      <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2 px-phi-4 py-phi-3 lg:h-full lg:min-h-0 lg:flex-col lg:items-stretch lg:gap-phi-4 lg:px-phi-4 lg:pb-phi-4 lg:pt-phi-5">
+        <div className="flex min-w-0 items-center gap-phi-4 lg:block lg:shrink-0 lg:px-2">
           <button
             type="button"
             onClick={onBack}
@@ -66,7 +70,7 @@ export default function SettingsTopBar({
         </div>
 
         {activeSection && onNavigate ? (
-          <nav className="order-3 flex w-full items-center gap-phi-1 overflow-x-auto md:order-none md:flex-col md:items-stretch md:gap-0.5 md:overflow-y-auto" aria-label="Settings areas">
+          <nav className="order-3 flex w-full items-center gap-phi-1 overflow-x-auto lg:order-none lg:flex-col lg:items-stretch lg:gap-0.5 lg:overflow-y-auto" aria-label="Settings areas">
             {SETTINGS_GROUPS.map((group, index) => {
               const sections = SETTINGS_SECTIONS.filter((section) => section.group === group.id);
               const active = sections.some((section) => section.id === activeSection);
@@ -88,7 +92,7 @@ export default function SettingsTopBar({
           </nav>
         ) : null}
 
-        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1 md:mt-auto md:ml-0 md:w-full md:flex-col md:items-stretch md:gap-3 md:px-2">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-x-phi-4 gap-y-phi-1 lg:mt-auto lg:ml-0 lg:w-full lg:flex-col lg:items-stretch lg:gap-3 lg:px-2">
           <span
             className={`type-status inline-flex min-w-0 items-center gap-phi-2 !text-xs ${statusClass}`}
             aria-live="polite"

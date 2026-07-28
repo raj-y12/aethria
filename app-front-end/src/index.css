@@ -88,6 +88,12 @@
   --space-7: 55px;   /* panel gap */
   --space-8: 89px;   /* page bottom padding */
   --space-9: 144px;  /* major layout gap */
+
+  /* The navigation rail's width — the oxford spine on workspace rooms and the
+     paper rail on Settings are the same column, so they read from one value.
+     Previously this literal was typed in three places and would have drifted
+     apart the moment one of them changed. */
+  --spine-width: clamp(204px, 15vw, 248px);
   /* Secondary type rhythm (~10% below canonical body-sm / data; labels stay 11px floor) */
   --type-body-sm-size: 12px;
   --type-data-size: 12px;
@@ -260,12 +266,6 @@
   font-weight: 500;
   letter-spacing: -0.02em;
   line-height: 1;
-}
-.settings-gallery-plate-head .settings-gallery-plate-num {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.24em;
-  color: rgba(var(--color-oxford-rgb), 0.44);
 }
 .settings-gallery-intro {
   max-width: 56ch;

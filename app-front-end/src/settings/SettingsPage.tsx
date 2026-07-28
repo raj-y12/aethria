@@ -293,25 +293,20 @@ function EditorialStatus({
   );
 }
 
-function GroupHeader({ index, title, description }: { index: string; title: string; description: string }) {
+function GroupHeader({ title, description }: { title: string; description: string }) {
   return (
     <div className="group-index pb-phi-5">
-      <div className="flex items-baseline justify-between gap-phi-4">
-        <h2 className="type-display text-[clamp(1.5rem,3vw,2.3rem)] font-medium leading-none tracking-[-0.015em] text-oxford">{title}</h2>
-        <span className="type-status shrink-0 text-[10px] tracking-[0.16em] text-oxford/45">{index} — 04</span>
-      </div>
+      <h2 className="type-display text-[clamp(1.5rem,3vw,2.3rem)] font-medium leading-none tracking-[-0.015em] text-oxford">{title}</h2>
       <p className="mt-phi-2 max-w-[48ch] type-body-sm leading-relaxed text-oxford/70">{description}</p>
     </div>
   );
 }
 
 function SettingsGroup({
-  index,
   title,
   description,
   children,
 }: {
-  index: string;
   title: string;
   description: string;
   children: React.ReactNode;
@@ -319,7 +314,7 @@ function SettingsGroup({
   return (
     <section className="settings-gallery-section">
       <div className="settings-gallery-frame">
-        <GroupHeader index={index} title={title} description={description} />
+        <GroupHeader title={title} description={description} />
         {children}
       </div>
     </section>
@@ -801,7 +796,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden md:pl-[clamp(204px,15vw,248px)]">
+    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden lg:pl-[var(--spine-width)]">
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
@@ -845,11 +840,9 @@ export default function SettingsPage() {
             <div className="settings-gallery-plate">
               <header className="settings-gallery-plate-head">
                 <h1>Settings</h1>
-                <span className="settings-gallery-plate-num">01 — 01</span>
               </header>
               <p className="settings-gallery-intro">Your operating mandate, decision policy, and runtime controls.</p>
                   <SettingsGroup
-                    index="01"
                     title="Fund thesis"
                     description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
                   >
@@ -922,7 +915,6 @@ export default function SettingsPage() {
                   </SettingsGroup>
 
                   <SettingsGroup
-                    index="02"
                     title="Decision policy"
                     description="How evidence is scored, escalated, and routed. Changes stay in draft until you deploy a new policy version."
                   >
@@ -1046,7 +1038,6 @@ export default function SettingsPage() {
                   </SettingsGroup>
 
                   <SettingsGroup
-                    index="03"
                     title="Workspace runtime"
                     description="Operational limits for this workspace. Changes here save immediately and affect the running system."
                   >
@@ -1068,7 +1059,6 @@ export default function SettingsPage() {
                   </SettingsGroup>
 
                   <SettingsGroup
-                    index="04"
                     title="System"
                     description="Read-only readiness and operator diagnostics. Pipeline controls remain in the system rail and save immediately."
                   >

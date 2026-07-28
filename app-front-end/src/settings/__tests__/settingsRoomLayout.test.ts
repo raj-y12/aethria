@@ -9,6 +9,7 @@ import {
   type FundConfiguration,
 } from '../../lib/fundConfiguration';
 import operationsSource from '../OperationsStrip.tsx?raw';
+import spineSource from '../../components/AppSpine.tsx?raw';
 import topBarSource from '../SettingsTopBar.tsx?raw';
 import source from '../SettingsPage.tsx?raw';
 import SettingsPage from '../SettingsPage';
@@ -163,12 +164,23 @@ describe('Settings focused-mode layout contract', () => {
     expect(topBarSource).toContain('Aethria');
   });
 
+  // The paper rail is the oxford spine's twin, so it must match on all three
+  // counts: the same width token, the same breakpoint the spine appears at, and
+  // the same nav button. Hardcoding the measurement here let the two drift.
   it('keeps settings navigation in the system rail geometry', () => {
-    expect(topBarSource).toContain('md:fixed md:inset-y-0 md:left-0');
-    expect(topBarSource).toContain('md:w-[clamp(204px,15vw,248px)]');
-    expect(topBarSource).toContain('md:pb-phi-4 md:pt-phi-5');
+    expect(topBarSource).toContain('lg:fixed lg:inset-y-0 lg:left-0');
+    expect(topBarSource).toContain('lg:w-[var(--spine-width)]');
+    expect(topBarSource).toContain('lg:pb-phi-4 lg:pt-phi-5');
     expect(topBarSource).toContain('SpineNavButton');
-    expect(source).toContain('md:pl-[clamp(204px,15vw,248px)]');
+    expect(source).toContain('lg:pl-[var(--spine-width)]');
+  });
+
+  // AppSpine is `hidden lg:flex`. If the paper rail turned on at a smaller
+  // breakpoint, Settings would carry a side rail on viewports where no other
+  // room has one.
+  it('turns the paper rail on at the same breakpoint as the oxford spine', () => {
+    expect(spineSource).toContain('hidden lg:flex');
+    expect(topBarSource).not.toMatch(/\bmd:/);
   });
 
   it('states the persistence model truthfully', () => {

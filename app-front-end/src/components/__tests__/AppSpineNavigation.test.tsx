@@ -1,6 +1,13 @@
+// Vitest provides Node's filesystem APIs at runtime; the app's browser build has no Node typings.
+// @ts-expect-error Node-only test helper.
+import { readFileSync } from 'node:fs';
+// @ts-expect-error Node-only test helper.
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { SPINE_WIDTH, SPINE_WORKSPACES } from '../AppSpine';
+
+declare const process: { cwd(): string };
 
 describe('AppSpine navigation', () => {
   it('keeps the original single-line workspace configuration', () => {
@@ -12,7 +19,13 @@ describe('AppSpine navigation', () => {
     ]);
   });
 
-  it('keeps the original spine width', () => {
-    expect(SPINE_WIDTH).toBe('clamp(204px, 15vw, 248px)');
+  // The spine and the Settings paper rail read one width. Asserting the literal
+  // here would only prove this file still says it, so check both halves: the
+  // spine defers to the shared token, and the token still resolves to the
+  // original measurement.
+  it('keeps the original spine width, via the shared rail token', () => {
+    expect(SPINE_WIDTH).toBe('var(--spine-width)');
+    const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
+    expect(css).toContain('--spine-width: clamp(204px, 15vw, 248px);');
   });
 });

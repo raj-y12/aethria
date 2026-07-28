@@ -54,7 +54,8 @@ export const SPINE_WORKSPACES: Array<{ href: string; label: string; shortcut: st
   { href: '/v1/fund', label: 'Fund', shortcut: '4' },
 ];
 
-export const SPINE_WIDTH = 'clamp(204px, 15vw, 248px)';
+/** Reads the shared rail width so the Settings paper rail cannot drift from it. */
+export const SPINE_WIDTH = 'var(--spine-width)';
 
 export function isSpineRouteActive(href: string, pathname: string): boolean {
   if (href === '/v1') {
