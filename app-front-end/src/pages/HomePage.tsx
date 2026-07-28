@@ -271,12 +271,16 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
           <p className="type-label-section flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
             <span>{eyebrow}</span>
-            {pipelineStateReady && (
-              <>
-                <span aria-hidden className="text-oxford/20">·</span>
-                <PipelineIndicator state={pipelineState} />
-              </>
-            )}
+            {/* Always laid out, only hidden — the line is centre-justified, so
+                letting the readout appear from nothing re-centred the dateline
+                and shunted it sideways the moment loop status resolved.
+                `invisible` keeps the space and stays out of the a11y tree. */}
+            <span
+              className={`inline-flex items-center gap-x-phi-3 ${pipelineStateReady ? '' : 'invisible'}`}
+            >
+              <span aria-hidden className="text-oxford/20">·</span>
+              <PipelineIndicator state={pipelineState} />
+            </span>
           </p>
         </Reveal>
 

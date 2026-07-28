@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import DecisionBadge from './DecisionBadge';
+import { usePrefersReducedMotion } from '../hooks';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -17,6 +18,7 @@ interface LookupReadyToastProps {
  * analyst kept working, so they're notified without being interrupted.
  */
 export default function LookupReadyToast({ name, recommendation, onOpen, onDismiss }: LookupReadyToastProps) {
+  const reduceMotion = usePrefersReducedMotion();
   const toast = (
     <AnimatePresence>
       {name ? (
@@ -24,10 +26,10 @@ export default function LookupReadyToast({ name, recommendation, onOpen, onDismi
         // so it can't be clobbered by framer-motion writing `transform` for the y slide.
         <motion.div
           key="lookup-ready"
-          initial={{ opacity: 0, y: 16 }}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 16 }}
-          transition={{ duration: 0.28, ease: EASE }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 16 }}
+          transition={{ duration: reduceMotion ? 0.12 : 0.28, ease: EASE }}
           className="pointer-events-none fixed inset-x-0 bottom-phi-5 z-[9998] flex justify-center px-phi-3"
           role="status"
           aria-live="polite"

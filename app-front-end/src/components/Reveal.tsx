@@ -1,4 +1,6 @@
 import { motion } from 'framer-motion';
+import { usePrefersReducedMotion } from '../hooks';
+import { transitionOrReduced } from '../design-system/motion';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -17,11 +19,14 @@ export default function Reveal({
   className?: string;
   children: React.ReactNode;
 }) {
+  const reduceMotion = usePrefersReducedMotion();
   return (
     <motion.div
-      initial={{ opacity: 0, y }}
+      // `initial={false}` starts at the settled state, so reduced motion skips
+      // the travel outright rather than playing it at zero duration.
+      initial={reduceMotion ? false : { opacity: 0, y }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE, delay }}
+      transition={transitionOrReduced(reduceMotion, { duration: 0.5, ease: EASE, delay })}
       className={className}
     >
       {children}
