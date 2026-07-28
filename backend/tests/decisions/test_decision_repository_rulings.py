@@ -350,3 +350,60 @@ async def test_workflow_action_approval_joins_opportunity_for_projection_payload
     payload = json.loads(outbox[2][-1])
     assert payload["legacy_startup_id"] == "5d82d549-205e-4cff-a831-316095c6f6e4"
     assert payload["compatibility_reason"] == "workflow action approved: draft_information_request"
+
+
+class _ExportConnection:
+    def __init__(self, rows):
+        self.fetchrows = list(rows)
+        self.fetchall_rows = []
+        self.calls = []
+
+    def transaction(self):
+        return _Acquire(self)
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append(("fetchrow", sql, args))
+        return self.fetchrows.pop(0)
+
+    async def fetch(self, sql, *args):
+        self.calls.append(("fetch", sql, args))
+        return self.fetchall_rows.pop(0) if self.fetchall_rows else []
+
+    async def execute(self, sql, *args):
+        self.calls.append(("execute", sql, args))
+        return "INSERT 0 1"
+
+
+@pytest.mark.asyncio
+async def test_create_export_action_embeds_the_crm_row_from_canonical_facts():
+    connection = _ExportConnection([
+        {"missing_information": "[]", "legacy_startup_id": "startup-1"},
+        {"canonical_name": "Acme", "canonical_domain": "acme.ai"},
+        {
+            "decision": "invest",
+            "rationale": "Retention held.",
+            "investor_confidence": 0.72,
+            "created_at": "2026-07-20T12:00:00Z",
+            "override_type": None,
+        },
+        None,
+        _workflow_action_row(
+            action_type="export_to_crm",
+            status="pending_approval",
+            generated_content="{}",
+            external_destination="csv",
+        ),
+    ])
+    repository = DecisionRepository(_Pool(connection))
+
+    record = await repository.create_action(
+        user_id="user-a", opportunity_id="opportunity-1",
+        action_type="export_to_crm", external_destination="csv",
+    )
+
+    inserted = next(
+        call for call in connection.calls if "insert into public.workflow_actions" in call[1]
+    )
+    assert '"dedupe_key": "acme.ai"' in inserted[2][7]
+    assert '"decision": "INVEST"' in inserted[2][7]
+    assert record.requires_approval is True
