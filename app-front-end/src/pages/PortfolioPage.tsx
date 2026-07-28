@@ -4,37 +4,24 @@ import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
+import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
+import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
+import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
+import OutcomePanel from '../components/institutional/OutcomePanel';
+import CrmExportAction from '../components/portfolio/CrmExportAction';
 import type { SystemData } from '../hooks/useSystemData';
-import type { Startup, SignalItem } from '../types/startup';
-import { formatDateTime } from '../lib/dates';
+import type { Startup } from '../types/startup';
 
 function recOf(s: Startup): string | null {
   const r = s.partner?.recommendation;
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
-type LedgerState = 'invested' | 'monitoring' | 'passed';
-
-/* The book holds only *decided* deals, grouped by the ruling you actually made.
- * Deals still awaiting a ruling are work, not record — they live in Flow, and
- * the portfolio only points to them (see the pointer below the tabs). */
-const LEDGER_SEGMENTS: { key: LedgerState; label: string; empty: string }[] = [
-  { key: 'invested', label: 'Invested', empty: 'No positions yet. A company becomes a position when you rule it INVEST — a recommendation alone does not.' },
-  { key: 'monitoring', label: 'Monitoring', empty: 'Nothing under monitoring. Deals you rule MONITOR land here.' },
-  { key: 'passed', label: 'Passed', empty: 'Nothing passed yet. Declined deals stay here, searchable.' },
-];
-
-/** Compact ruling date, or an em dash. */
-function ruledWhen(s: Startup): string {
-  const iso = s.human_resolution?.resolved_at;
-  if (!iso) return '—';
-  const t = new Date(iso);
-  return Number.isNaN(t.getTime()) ? '—' : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-/** Instrument readout — a number with its label, no box. Counts up on arrival. */
-function Readout({ label, value, tone }: { label: string; value: number; tone?: 'escalation' }) {
-  const shown = useCountUp(value);
+/** Instrument readout — a number with its label, no box. Counts up on arrival.
+ * `value: null` means "unknown" (loading or failed source) — it renders an
+ * em dash rather than fabricating a number. */
+function Readout({ label, value, tone }: { label: string; value: number | null; tone?: 'escalation' }) {
+  const shown = useCountUp(value ?? 0);
   return (
     <div className="flex flex-col gap-phi-1">
       <span
@@ -42,7 +29,7 @@ function Readout({ label, value, tone }: { label: string; value: number; tone?: 
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
-        {shown.toLocaleString()}
+        {value == null ? '—' : shown.toLocaleString()}
       </span>
       <span className="type-label-section">{label}</span>
     </div>
@@ -72,8 +59,29 @@ function QuietEmpty({ children }: { children: React.ReactNode }) {
   return <p className="mt-phi-4 type-body-sm text-oxford/60">{children}</p>;
 }
 
-function signalWhen(sig: SignalItem): string {
-  return formatDateTime(sig.detected_at);
+/* Outcome recording is per-position and collapsed by default — the book stays
+ * readable; recording is a deliberate act. OutcomePanel resolves the canonical
+ * opportunity itself from the legacy id, so positions without that bridge
+ * simply cannot record yet. */
+function PositionOutcomes({ startupId }: { startupId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-phi-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="type-status text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+      >
+        {open ? 'Hide outcomes' : 'Record outcome'}
+      </button>
+      {open ? (
+        <div className="mt-phi-3">
+          <OutcomePanel startupId={startupId} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /* Ledger columns (lg+): Company | Sector | Stage | Score | Ruled. Aligned cells
@@ -82,37 +90,40 @@ function signalWhen(sig: SignalItem): string {
 const LEDGER_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,0.8fr)_60px_minmax(0,0.9fr)] lg:items-baseline lg:gap-phi-4';
 
 /**
- * Portfolio — the *record*: the book of decided deals grouped by ruling
- * (invested, monitoring, passed), with concentration, watchlist, and signals.
- * Deals awaiting a ruling are *work*, not record — they stay in Flow; the book
- * only points to them. Built from data the pipeline already persists; no
- * fabricated returns.
+ * Portfolio — the *record*: positions held, read from the canonical
+ * `/api/portfolio/positions` endpoint, plus concentration, watchlist, and
+ * signals. Monitoring/Passed are decision history, not holdings — their
+ * counts stay here as facts, but the deals themselves live in Flow. Built
+ * from data the pipeline already persists; no fabricated returns.
  */
 export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const reduceMotion = usePrefersReducedMotion();
-  const [activeState, setActiveState] = useState<LedgerState>('invested');
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
-  const { buckets, awaitingCount } = useMemo(() => {
-    const buckets: Record<LedgerState, Startup[]> = { invested: [], monitoring: [], passed: [] };
-    let awaitingCount = 0;
+  const positionsQuery = usePortfolioPositions();
+  const rows = useMemo(
+    () => buildPositionRows(positionsQuery.data ?? [], data.startups),
+    [positionsQuery.data, data.startups],
+  );
+  /* Unknown must never read as zero — a loading or failed positions request
+   * has no count to show, so "Held" falls back to a dash rather than "0". */
+  const heldUnavailable = positionsQuery.isLoading || positionsQuery.isError;
+
+  /* Decided-but-not-held is history, not holdings. Counts stay because they are
+   * facts; the deals themselves live in Flow. */
+  const decided = useMemo(() => {
+    let monitoring = 0;
+    let passed = 0;
+    let awaiting = 0;
     for (const s of data.startups) {
       const decision = s.human_resolution?.decision;
-      if (decision === 'YES') buckets.invested.push(s);
-      else if (decision === 'MAYBE') buckets.monitoring.push(s);
-      else if (decision === 'NO') buckets.passed.push(s);
-      else if (recOf(s)) awaitingCount += 1;
+      if (decision === 'MAYBE') monitoring += 1;
+      else if (decision === 'NO') passed += 1;
+      else if (recOf(s)) awaiting += 1;
     }
-    const recency = (s: Startup) =>
-      s.human_resolution?.resolved_at ?? s.timestamps?.partnered_at ?? s.timestamps?.reviewed_at ?? '';
-    (Object.keys(buckets) as LedgerState[]).forEach((key) => {
-      buckets[key].sort((a, b) => recency(b).localeCompare(recency(a)));
-    });
-    return { buckets, awaitingCount };
+    return { monitoring, passed, awaiting };
   }, [data.startups]);
-
-  const activeRows = buckets[activeState];
 
   const startupNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -122,17 +133,17 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     return map;
   }, [data.startups]);
 
-  const sectorRows = useMemo(() => {
-    const entries = Object.entries(data.concentrationAnalytics.by_sector ?? {});
-    return entries
-      .map(([sector, v]) => ({ sector, count: v.count, pct: v.pct_of_total }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [data.concentrationAnalytics]);
-  const maxSectorCount = Math.max(...sectorRows.map((r) => r.count), 1);
+  const coverageQuery = useOutcomeCoverage();
+  const coveragePct = useMemo(() => {
+    const raw = Number(coverageQuery.data?.coverage_ratio ?? coverageQuery.data?.coverage_rate ?? 0);
+    return Math.round(raw <= 1 ? raw * 100 : raw);
+  }, [coverageQuery.data]);
+  /* Unknown must never read as zero — a failed or unsettled request has no
+   * number to show, so the readout falls back to a dash rather than fabricating "0%". */
+  const coverageUnavailable = coverageQuery.isLoading || coverageQuery.isError || !coverageQuery.data;
+  const concentration = useMemo(() => sectorConcentration(rows), [rows]);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
-  const recentSignals = (data.signals ?? []).slice(0, 20);
 
   return (
     <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
@@ -144,9 +155,9 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           title="Portfolio"
           readouts={
             <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <Readout label="Invested" value={buckets.invested.length} />
-              <Readout label="Monitoring" value={buckets.monitoring.length} />
-              <Readout label="Passed" value={buckets.passed.length} />
+              <Readout label="Held" value={heldUnavailable ? null : rows.length} />
+              <Readout label="Monitoring" value={decided.monitoring} />
+              <Readout label="Passed" value={decided.passed} />
             </div>
           }
         />
@@ -155,123 +166,84 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           {/* ── Decision ledger (the record) ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
             <section aria-label="Decision ledger">
-              <SectionHead title="The book" detail={`${activeRows.length} shown`} count={activeRows.length} />
-              <div aria-label="Deal state" className="mt-phi-3 flex flex-wrap gap-phi-2">
-                {LEDGER_SEGMENTS.map((seg) => {
-                  const active = seg.key === activeState;
-                  return (
-                    <button
-                      key={seg.key}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setActiveState(seg.key)}
-                      className={`type-status flex items-center gap-phi-2 px-phi-3 py-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-                        active
-                          ? 'bg-oxford/[0.05] text-oxford'
-                          : 'text-oxford/55 hover:bg-oxford/[0.03] hover:text-oxford'
-                      }`}
-                    >
-                      <span>{seg.label}</span>
-                      <span className="type-data tabular-nums text-oxford/45">{buckets[seg.key].length}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              <SectionHead title="Held" detail={`${rows.length} ${rows.length === 1 ? 'position' : 'positions'}`} />
 
               {/* Pointer, not a worklist — ruling happens in Flow, the book only points there. */}
-              {awaitingCount > 0 ? (
+              {decided.awaiting > 0 ? (
                 <button
                   type="button"
                   onClick={() => navigate('/v1/flow')}
                   className="group mt-phi-3 inline-flex items-center gap-phi-2 type-body-sm text-oxford/60 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                 >
-                  <span className="type-data tabular-nums text-oxford">{awaitingCount}</span>
+                  <span className="type-data tabular-nums text-oxford">{decided.awaiting}</span>
                   <span>awaiting your ruling — rule in Flow</span>
                   <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-[2px]">→</span>
                 </button>
               ) : null}
 
-              <motion.div
-                key={activeState}
-                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              >
-              {activeRows.length === 0 ? (
-                <QuietEmpty>{LEDGER_SEGMENTS.find((s) => s.key === activeState)?.empty}</QuietEmpty>
+              {positionsQuery.isLoading ? (
+                <QuietEmpty>Loading positions…</QuietEmpty>
+              ) : positionsQuery.isError ? (
+                <QuietEmpty>Positions unavailable right now. Nothing has been lost — retry shortly.</QuietEmpty>
+              ) : rows.length === 0 ? (
+                <QuietEmpty>
+                  No positions yet. A company becomes a position when you rule it INVEST — a
+                  recommendation alone does not.
+                </QuietEmpty>
               ) : (
-                <>
-                  <div
-                    className={`mt-phi-4 hidden border-b border-oxford/[0.06] pb-phi-2 ${LEDGER_GRID}`}
-                    aria-hidden
-                  >
-                    <span className="type-label-section">Company</span>
-                    <span className="type-label-section">Sector</span>
-                    <span className="type-label-section">Stage</span>
-                    <span className="type-label-section text-right">Score</span>
-                    <span className="type-label-section text-right">Ruled</span>
-                  </div>
-                  <ul className="flex flex-col lg:mt-0 mt-phi-3">
-                    {activeRows.map((s) => (
-                      <li key={s.id} className="border-b border-oxford/[0.06]">
-                        <button
-                          type="button"
-                          onClick={() => openDeal(s.id)}
-                          className={`group -mx-phi-3 flex w-[calc(100%+2*var(--space-3))] items-center gap-phi-4 px-phi-3 py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${LEDGER_GRID}`}
-                        >
-                          <span className="min-w-0 flex-1 transition-transform duration-200 group-hover:translate-x-[2px]">
-                            <span className="block truncate type-body-emphasis text-oxford">{s.scout.name}</span>
-                            <span className="block truncate type-meta text-oxford/60 lg:hidden">
-                              {[s.scout.sector, s.scout.funding_stage, ruledWhen(s)]
-                                .filter(Boolean)
-                                .join(' · ') || '—'}
-                            </span>
+                <ul className="mt-phi-4 flex flex-col">
+                  {rows.map((row) => (
+                    <li key={row.position.position_id} data-testid="position-row" className="border-b border-oxford/[0.06] py-phi-3">
+                      <div className={LEDGER_GRID}>
+                        <span className="min-w-0">
+                          <span className="block truncate type-body-emphasis text-oxford">{row.name}</span>
+                          <span className="block truncate type-meta text-oxford/60 lg:hidden">
+                            {[row.sector, row.stage].filter(Boolean).join(' · ') || '—'}
                           </span>
-                          <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
-                            {s.scout.sector || '—'}
-                          </span>
-                          <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">
-                            {s.scout.funding_stage || '—'}
-                          </span>
-                          <span className="type-data shrink-0 text-right text-oxford/70 transition-colors group-hover:text-oxford">
-                            {s.review?.overall_score != null ? Number(s.review.overall_score).toFixed(1) : '—'}
-                          </span>
-                          <span className="type-meta hidden shrink-0 truncate text-right text-oxford/60 lg:block">
-                            {ruledWhen(s)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
+                        </span>
+                        <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">{row.sector ?? '—'}</span>
+                        <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">{row.stage ?? '—'}</span>
+                        <span className="type-data shrink-0 text-right text-oxford/70">
+                          {row.score == null ? '—' : row.score.toFixed(1)}
+                        </span>
+                        <span className="type-meta hidden shrink-0 truncate text-right text-oxford/60 lg:block">
+                          {new Date(row.position.entered_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      </div>
+                      <p className="mt-phi-2 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale}</p>
+                      {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
+                      <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
+                    </li>
+                  ))}
+                </ul>
               )}
-              </motion.div>
             </section>
 
-            {/* ── Concentration ── */}
+            {/* ── Concentration — recomputed from the rows above, so it can never disagree with them ── */}
             <section aria-label="Sector concentration">
-              <SectionHead
-                title="Concentration"
-                detail={data.concentrationAnalytics.most_concentrated_sector || undefined}
-              />
-              {sectorRows.length === 0 ? (
-                <QuietEmpty>Appears once deals are decided.</QuietEmpty>
+              <SectionHead title="Concentration" detail={concentration[0]?.sector} />
+              {concentration.length === 0 ? (
+                <QuietEmpty>Appears once you hold a position.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col gap-phi-3">
-                  {sectorRows.map((row, i) => (
-                    <li key={row.sector} className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4">
-                      <span className="type-label-section truncate">{row.sector}</span>
+                  {concentration.map((entry, i) => (
+                    <li
+                      key={entry.sector}
+                      data-testid={`concentration-row-${entry.sector}`}
+                      className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4"
+                    >
+                      <span className="type-label-section truncate">{entry.sector}</span>
                       <span className="relative block h-px bg-oxford/10">
                         <motion.span
                           className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
-                          style={{ width: `${Math.max(2, Math.min(100, (row.count / maxSectorCount) * 100))}%` }}
+                          style={{ width: `${Math.max(2, entry.pct)}%` }}
                           initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
                           animate={{ scaleX: 1 }}
                           transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
                       <span className="type-data text-right text-oxford/60">
-                        {row.count} · {row.pct.toFixed(0)}%
+                        {entry.count} · {entry.pct}%
                       </span>
                     </li>
                   ))}
@@ -317,53 +289,25 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               )}
             </section>
 
-            <section aria-label="Signals">
-              <SectionHead
-                title="Signals"
-                detail={recentSignals.length ? `Last ${recentSignals.length}` : undefined}
-                count={recentSignals.length || undefined}
-              />
-              {recentSignals.length === 0 ? (
-                <QuietEmpty>No high-priority events detected in the last cycle.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {recentSignals.map((sig, i) => {
-                    const companyName = sig.startup_id ? startupNameById.get(sig.startup_id) : null;
-                    const body = (
-                      <>
-                        <span className="flex items-baseline justify-between gap-phi-3">
-                          <span className="type-label-section min-w-0 truncate">
-                            {companyName ?? sig.signal_type.replace(/_/g, ' ')}
-                          </span>
-                          <span className="type-data shrink-0 text-oxford/60">
-                            {signalWhen(sig)}
-                          </span>
-                        </span>
-                        {sig.description ? (
-                          <span className="mt-phi-1 block type-body-sm leading-relaxed text-oxford/65">
-                            {sig.description}
-                          </span>
-                        ) : null}
-                      </>
-                    );
-                    return (
-                      <li key={sig.id ?? i} className="border-b border-oxford/[0.06]">
-                        {sig.startup_id && startupNameById.has(sig.startup_id) ? (
-                          <button
-                            type="button"
-                            onClick={() => openDeal(sig.startup_id!)}
-                            className="group block w-full py-phi-3 text-left transition-colors hover:bg-oxford/[0.05] btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                          >
-                            {body}
-                          </button>
-                        ) : (
-                          <div className="py-phi-3">{body}</div>
-                        )}
-                      </li>
-                    );
-                  })}
+            <section aria-label="Outcome coverage">
+              <SectionHead title="Outcome coverage" />
+              <div className="mt-phi-4 flex flex-col gap-phi-2">
+                <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
+                  {coverageUnavailable ? '—' : `${coveragePct}%`}
+                </span>
+                <span className={`type-body-sm ${coverageQuery.isError ? 'text-escalation' : 'text-oxford/65'}`}>
+                  {coverageQuery.isError
+                    ? 'Coverage is unavailable right now — unknown, not zero.'
+                    : 'of eligible decisions have a recorded outcome.'}
+                </span>
+              </div>
+              {(coverageQuery.data?.limitations ?? []).length > 0 ? (
+                <ul className="mt-phi-3 flex flex-col gap-phi-1">
+                  {coverageQuery.data?.limitations?.map((limitation) => (
+                    <li key={limitation} className="type-meta text-oxford/55">{limitation}</li>
+                  ))}
                 </ul>
-              )}
+              ) : null}
             </section>
           </div>
         </div>

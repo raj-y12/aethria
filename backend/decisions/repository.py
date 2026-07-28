@@ -324,8 +324,11 @@ class DecisionRepository:
         missing_evidence: list[str],
         due_at: Optional[datetime],
         external_destination: Optional[str] = None,
+        export_context: Optional[Dict[str, Any]] = None,
     ) -> WorkflowActionRecord:
-        generated = build_workflow_draft(action_type, missing_evidence)
+        generated = build_workflow_draft(
+            action_type, missing_evidence, export_context=export_context
+        )
         requires_approval = bool(generated.get("requires_approval"))
         status = (
             WorkflowActionStatus.PENDING_APPROVAL
@@ -351,6 +354,58 @@ class DecisionRepository:
         payload["approved_content"] = _json(payload.get("approved_content"), None)
         payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])
         return WorkflowActionRecord.model_validate(payload)
+
+    async def _load_export_context(
+        self, conn: Any, *, user_id: str, opportunity_id: str
+    ) -> Dict[str, Any]:
+        """Gather the canonical facts a CRM row needs. Read-only."""
+        company = await conn.fetchrow(
+            """
+            select c.canonical_name, c.canonical_domain, o.current_ruling_id
+            from public.opportunities o
+            join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
+            where o.user_id=$1 and o.opportunity_id=$2
+            """,
+            user_id, opportunity_id,
+        )
+        position = await conn.fetchrow(
+            "select entered_at, ruling_id from public.canonical_portfolio_positions where user_id=$1 and opportunity_id=$2",
+            user_id, opportunity_id,
+        )
+        # Precedence: the ruling the position was actually created from, else
+        # the opportunity's current ruling (covers exporting a non-holding,
+        # e.g. a PASS), else no ruling at all.
+        ruling_id = (
+            position["ruling_id"] if position and position.get("ruling_id")
+            else (company.get("current_ruling_id") if company else None)
+        )
+        ruling = None
+        if ruling_id:
+            ruling = await conn.fetchrow(
+                """
+                select hr.decision, hr.rationale, hr.investor_confidence, hr.created_at, os.override_type
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1 and hr.ruling_id=$2
+                """,
+                user_id, ruling_id,
+            )
+        outcomes = await conn.fetch(
+            """
+            select outcome_type, valence, summary, observed_at
+            from public.outcome_observations
+            where user_id=$1 and opportunity_id=$2
+            order by observed_at
+            """,
+            user_id, opportunity_id,
+        )
+        return {
+            "company": dict(company) if company else {},
+            "ruling": dict(ruling) if ruling else {},
+            "position": dict(position) if position else None,
+            "outcomes": [dict(row) for row in outcomes],
+        }
 
     async def create_action(
         self,
@@ -382,11 +437,17 @@ class DecisionRepository:
                 if recommendation is None:
                     raise LookupError("Opportunity not found for tenant")
                 gaps = _json(recommendation.get("missing_information"), [])
+                export_context = None
+                if action is WorkflowActionType.EXPORT_TO_CRM:
+                    export_context = await self._load_export_context(
+                        conn, user_id=uid, opportunity_id=opportunity_id
+                    )
                 record = await self._insert_action(
                     conn, user_id=uid, opportunity_id=opportunity_id,
                     action_type=action, trigger_type=trigger_type, trigger_id=trigger_id,
                     missing_evidence=gaps, due_at=due_at,
                     external_destination=external_destination,
+                    export_context=export_context,
                 )
                 await self._outbox(
                     conn, user_id=uid, aggregate_type="workflow_action",

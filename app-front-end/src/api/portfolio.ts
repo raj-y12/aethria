@@ -11,6 +11,7 @@ export interface PortfolioPosition {
   entered_at: string;
   canonical_name?: string;
   canonical_domain?: string | null;
+  legacy_startup_id?: string | null;
 }
 
 export async function fetchPortfolioPositions(limit = 100): Promise<PortfolioPosition[]> {

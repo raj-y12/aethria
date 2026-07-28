@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 from decisions.models import (
     HumanRulingDecision,
     OverrideType,
     WorkflowActionType,
 )
+from decisions.crm_export import build_crm_export_payload
 from utils.partner_codes import ruling_aligns_with_recommendation
 
 
@@ -52,7 +53,10 @@ def classify_override(
 
 
 def build_workflow_draft(
-    action_type: WorkflowActionType | str, missing_evidence: Sequence[str]
+    action_type: WorkflowActionType | str,
+    missing_evidence: Sequence[str],
+    *,
+    export_context: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     action = WorkflowActionType(action_type)
     gaps = [str(item).strip() for item in missing_evidence if str(item).strip()][:30]
@@ -70,11 +74,19 @@ def build_workflow_draft(
             "external_write_performed": False,
         }
     if action is WorkflowActionType.EXPORT_TO_CRM:
-        return {
+        draft: Dict[str, Any] = {
             "summary": "CRM export prepared; no external write has occurred.",
             "requires_approval": True,
             "external_write_performed": False,
         }
+        if export_context:
+            draft["crm_row"] = build_crm_export_payload(
+                company=export_context.get("company") or {},
+                ruling=export_context.get("ruling") or {},
+                position=export_context.get("position"),
+                outcomes=export_context.get("outcomes") or [],
+            )
+        return draft
     return {
         "missing_evidence": gaps,
         "requires_approval": action in {
