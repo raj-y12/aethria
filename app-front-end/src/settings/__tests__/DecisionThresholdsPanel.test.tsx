@@ -41,6 +41,15 @@ describe('scoreFromPointer', () => {
 });
 
 describe('DecisionThresholdsPanel ladder', () => {
+  it('renders the decision bands as a dot matrix', () => {
+    render(<ThresholdHarness />);
+
+    expect(screen.getByTestId('threshold-dot-grid')).toBeInTheDocument();
+    expect(screen.getByText(/Pass 0–/)).toBeInTheDocument();
+    expect(screen.getByText(/Monitor \d+–/)).toBeInTheDocument();
+    expect(screen.getByText(/Invest \d+–100/)).toBeInTheDocument();
+  });
+
   it('offers exact numeric entry for each decision boundary with live valid ranges', () => {
     render(<ThresholdHarness />);
     const boundaries = getDecisionThresholdBoundaries(createDefaultFundConfiguration());

@@ -19,6 +19,10 @@ const bandColors = {
   invest: '#8dc2a1',
 };
 
+const DOT_COLUMNS = 101;
+const DOT_ROWS = 7;
+const dotScores = Array.from({ length: DOT_COLUMNS }, (_, score) => score);
+
 export function scoreFromPointer(clientX: number, left: number, width: number): number {
   if (width <= 0) return 0;
   const ratio = (clientX - left) / width;
@@ -114,32 +118,36 @@ function ThresholdBar({
   const barRef = useRef<HTMLDivElement>(null);
   const passMax = boundaries.passMonitorBoundary - 1;
   const monitorMax = boundaries.monitorInvestBoundary - 1;
+  const colorForScore = (score: number) => {
+    if (score < boundaries.passMonitorBoundary) return bandColors.pass;
+    if (score < boundaries.monitorInvestBoundary) return bandColors.monitor;
+    return bandColors.invest;
+  };
 
   return (
     <div className="pt-phi-6">
-      <div ref={barRef} className="relative h-11 w-full">
-        <div className="flex h-full w-full overflow-hidden border border-oxford/[0.1]">
-          <div
-            className="type-status flex items-center justify-center text-xs text-oxford/70"
-            style={{ width: `${boundaries.passMonitorBoundary}%`, backgroundColor: bandColors.pass }}
-          >
-            Pass
-          </div>
-          <div
-            className="type-status flex items-center justify-center text-xs text-oxford/70"
-            style={{
-              width: `${boundaries.monitorInvestBoundary - boundaries.passMonitorBoundary}%`,
-              backgroundColor: bandColors.monitor,
-            }}
-          >
-            Monitor
-          </div>
-          <div
-            className="type-status flex items-center justify-center text-xs text-oxford/70"
-            style={{ width: `${100 - boundaries.monitorInvestBoundary}%`, backgroundColor: bandColors.invest }}
-          >
-            Invest
-          </div>
+      <div ref={barRef} className="relative h-14 w-full">
+        <div
+          data-testid="threshold-dot-grid"
+          className="pointer-events-none absolute inset-x-0 inset-y-1 grid place-items-center border-y border-oxford/[0.08] py-1"
+          style={{
+            gridTemplateColumns: `repeat(${DOT_COLUMNS}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${DOT_ROWS}, minmax(0, 1fr))`,
+          }}
+          aria-hidden
+        >
+          {Array.from({ length: DOT_ROWS }, (_, row) =>
+            dotScores.map((score) => (
+              <span
+                key={`${row}-${score}`}
+                className="h-[2px] w-[2px] rounded-full sm:h-[3px] sm:w-[3px]"
+                style={{
+                  backgroundColor: colorForScore(score),
+                  opacity: row === 0 || row === DOT_ROWS - 1 ? 0.58 : 0.88,
+                }}
+              />
+            )),
+          )}
         </div>
         <ThresholdHandle
           boundaryKey="autoPassCeiling"
@@ -172,9 +180,20 @@ function ThresholdBar({
           onChange={onChange}
         />
       </div>
-      <p className="type-data mt-phi-2 text-oxford/70">
-        0–{passMax} · {boundaries.passMonitorBoundary}–{monitorMax} · {boundaries.monitorInvestBoundary}–100
-      </p>
+      <div className="mt-phi-2 flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70">
+        <span className="inline-flex items-center gap-phi-2">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bandColors.pass }} aria-hidden />
+          Pass 0–{passMax}
+        </span>
+        <span className="inline-flex items-center gap-phi-2">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bandColors.monitor }} aria-hidden />
+          Monitor {boundaries.passMonitorBoundary}–{monitorMax}
+        </span>
+        <span className="inline-flex items-center gap-phi-2">
+          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bandColors.invest }} aria-hidden />
+          Invest {boundaries.monitorInvestBoundary}–100
+        </span>
+      </div>
     </div>
   );
 }
