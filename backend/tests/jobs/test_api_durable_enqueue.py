@@ -70,6 +70,11 @@ class _Repository:
         return await self.tenant_queue_depths(user_id="user_a")
 
 
+class _FailingStatusRepository(_Repository):
+    async def tenant_queue_depths(self, *, user_id):
+        raise RuntimeError("database temporarily unavailable")
+
+
 def _configure_auth(monkeypatch, api):
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(
@@ -325,3 +330,18 @@ def test_system_status_reports_durable_job_and_outbox_counts(monkeypatch):
     assert body["durable_jobs"]["counts"]["company_lookup:retry_wait"] == 3
     assert body["durable_jobs"]["counts"]["company_lookup:dead_letter"] == 1
     assert body["durable_jobs"]["counts"]["outbox:pending"] == 4
+
+
+def test_system_status_is_degraded_when_durable_counts_cannot_be_read(monkeypatch):
+    import api
+
+    _configure_durable(monkeypatch, api, _FailingStatusRepository())
+
+    response = TestClient(api.app).get(
+        "/api/system/status", headers={"Authorization": "Bearer t"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["durable_jobs"]["error"] == "durable_status_read_failed"

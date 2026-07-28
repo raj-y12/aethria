@@ -313,7 +313,7 @@ function SettingsGroup({
 }) {
   return (
     <section className="settings-gallery-section">
-      <div className="settings-gallery-frame">
+      <div className="focus-frame">
         <GroupHeader title={title} description={description} />
         {children}
       </div>
@@ -345,7 +345,7 @@ export default function SettingsPage() {
   const contentScrollRef = useRef<HTMLDivElement | null>(null);
   const hydratedRecoveryKeyRef = useRef<string | null>(null);
 
-  const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings);
+  const { configuration, setConfiguration, save: saveLocalConfiguration } = useFundConfiguration(settings, userId);
   const [draft, setDraft] = useState<FundConfiguration>(configuration);
   const draftRef = useRef(draft);
   draftRef.current = draft;
@@ -381,7 +381,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const incomingSettings = settingsQuery.data;
     if (!incomingSettings) return;
-    const incomingConfiguration = loadFundConfiguration(incomingSettings);
+    const incomingConfiguration = loadFundConfiguration(incomingSettings, userId);
     const incomingSnapshot = serializeDecisionConfig(incomingConfiguration);
     if (!seededRef.current) {
       seededRef.current = true;
@@ -1096,7 +1096,7 @@ export default function SettingsPage() {
                         <EditorialStatus
                           label="Pipeline"
                           value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
-                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.execution_prerequisite_detail ?? agentsStatus.thesis_error ?? 'A required gate is not ready.')}
+                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.execution_prerequisite_detail ?? agentsStatus.thesis_error ?? (agentsStatus.durable_job_error ? 'The durable job store is unreachable.' : null) ?? 'A required gate is not ready.')}
                           tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
                         />
                       </div>

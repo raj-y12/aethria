@@ -146,7 +146,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const memoOpen = !!selectedStartup;
   const startupDetailQuery = useQuery({
     queryKey: ['startup', 'detail', selectedStartup?.id],
-    queryFn: () => fetchStartupDetail(selectedStartup!.id),
+    queryFn: () => fetchStartupDetail(selectedStartup!.id, selectedStartup!.canonical_opportunity_id),
     enabled: Boolean(selectedStartup?.id && memoOpen),
     ...getQueryConfig('STATIC'),
   });

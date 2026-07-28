@@ -5,6 +5,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { fetchAgentsStatus } from '../api/agents';
+import type { AgentsStatus } from '../api/agents';
 
 export interface FundReadiness {
   loading: boolean;
@@ -15,6 +16,17 @@ export interface FundReadiness {
   refetch: () => void;
 }
 
+export function deriveFundReadiness(
+  data: Pick<AgentsStatus, 'mandate_published'> | null,
+  isError: boolean,
+): Pick<FundReadiness, 'mandatePublished' | 'unknown'> {
+  const unknown = isError || data == null;
+  return {
+    mandatePublished: !unknown && data.mandate_published === true,
+    unknown,
+  };
+}
+
 export function useFundReadiness(): FundReadiness {
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['agents-status'],
@@ -23,12 +35,10 @@ export function useFundReadiness(): FundReadiness {
     placeholderData: (prev) => prev ?? undefined,
   });
 
-  // If the status call fails, don't trap the user behind onboarding — let them in.
-  const unknown = isError || data == null;
+  const readiness = deriveFundReadiness(data ?? null, isError);
   return {
     loading: isLoading,
-    mandatePublished: unknown ? true : Boolean(data?.mandate_published),
-    unknown,
+    ...readiness,
     refetch: () => void refetch(),
   };
 }

@@ -2344,6 +2344,8 @@ async def system_status(request: Request):
     """Authenticated execution-plane status without secrets or raw exceptions."""
     user_id = require_authenticated_user(request)
     counts: Dict[str, int]
+    status = "ok"
+    status_error: Optional[str] = None
     if _durable_job_repository is not None:
         try:
             counts = await _durable_job_repository.tenant_queue_depths(user_id=user_id)
@@ -2352,6 +2354,8 @@ async def system_status(request: Request):
                 "Durable system status read failed: %s", type(exc).__name__
             )
             counts = {}
+            status = "degraded"
+            status_error = "durable_status_read_failed"
     else:
         counts = {
             "pipeline_cycle:queued": _agent_queue.qsize() if _agent_queue is not None else 0,
@@ -2359,11 +2363,11 @@ async def system_status(request: Request):
             "outbox:pending": 0,
         }
     return {
-        "status": "ok",
+        "status": status,
         "durable_jobs": {
             "required": _durable_jobs_required(),
             "ready": _durable_job_repository is not None,
-            "error": _durable_job_error if _durable_jobs_required() else None,
+            "error": status_error or (_durable_job_error if _durable_jobs_required() else None),
             "counts": counts,
         },
     }
@@ -2771,6 +2775,7 @@ async def agents_status(request: Request):
         user_agents_enabled,
     ) = await asyncio.to_thread(_agents_status_reads_sync, user_id, supabase_configured)
     durable_counts: Dict[str, int] = {}
+    durable_status_error: Optional[str] = None
     if _durable_job_repository is not None:
         try:
             durable_counts = await _durable_job_repository.tenant_queue_depths(
@@ -2778,6 +2783,7 @@ async def agents_status(request: Request):
             )
         except Exception:
             durable_counts = {}
+            durable_status_error = "durable_status_read_failed"
     worker_ready = (
         _durable_job_repository is not None
         if _durable_jobs_required()
@@ -2789,10 +2795,10 @@ async def agents_status(request: Request):
         else _lookup_queue is not None
     )
     agents_infrastructure_ready = bool(
-        supabase_configured and openai_configured and worker_ready
+        supabase_configured and openai_configured and worker_ready and not durable_status_error
     )
     lookup_infrastructure_ready = bool(
-        supabase_configured and openai_configured and lookup_worker_ready
+        supabase_configured and openai_configured and lookup_worker_ready and not durable_status_error
     )
     execution_prerequisites_ready = False
     published_policy_ready = False
@@ -2852,7 +2858,7 @@ async def agents_status(request: Request):
         ),
         "durable_jobs_required": _durable_jobs_required(),
         "durable_jobs_ready": _durable_job_repository is not None,
-        "durable_job_error": _durable_job_error if _durable_jobs_required() else None,
+        "durable_job_error": durable_status_error or (_durable_job_error if _durable_jobs_required() else None),
         "durable_job_counts": durable_counts,
         "supabase_configured": supabase_configured,
         "openai_configured": openai_configured,

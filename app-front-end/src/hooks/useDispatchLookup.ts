@@ -533,7 +533,10 @@ export function useDispatchLookup({
   // lookup has a decision so the result overview shows real MKT/EXEC/… numbers.
   const lookupDetailQuery = useQuery({
     queryKey: ['startup', 'detail', pendingLookupMatch?.id],
-    queryFn: () => fetchStartupDetail(pendingLookupMatch!.id),
+    queryFn: () => fetchStartupDetail(
+      pendingLookupMatch!.id,
+      pendingLookupMatch!.canonical_opportunity_id,
+    ),
     enabled: Boolean(
       commandBarOpen && pendingLookupMatch?.id && pendingLookupMatch?.partner?.recommendation,
     ),

@@ -3,6 +3,15 @@ import { describe, expect, it } from 'vitest';
 import ExecutionReadinessPanel from '../ExecutionReadinessPanel';
 
 describe('ExecutionReadinessPanel', () => {
+  it('does not call an unreadable durable status healthy', () => {
+    render(<ExecutionReadinessPanel status={{
+      status: 'degraded',
+      durable_jobs: { required: true, ready: true, error: 'durable_status_read_failed', counts: {} },
+    }} />);
+
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+  });
+
   it('separates a blocked execution plane from agent enablement', () => {
     render(<ExecutionReadinessPanel status={{
       status: 'ok',

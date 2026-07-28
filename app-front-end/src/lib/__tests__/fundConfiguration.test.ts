@@ -3,6 +3,8 @@ import {
   DEFAULT_VERDICT_BADGES,
   badgeTextColorForBackground,
   createDefaultFundConfiguration,
+  loadFundConfiguration,
+  saveFundConfiguration,
 } from '../fundConfiguration';
 
 describe('createDefaultFundConfiguration', () => {
@@ -58,5 +60,27 @@ describe('badgeTextColorForBackground', () => {
 
   it('uses light text on dark backgrounds', () => {
     expect(badgeTextColorForBackground('#1a2b48')).toBe('#fffdf7');
+  });
+});
+
+describe('browser draft scoping', () => {
+  it('does not share one fund draft between users', () => {
+    localStorage.clear();
+    const config = createDefaultFundConfiguration();
+    saveFundConfiguration(config, 'user-a');
+
+    expect(loadFundConfiguration(undefined, 'user-a').version).toBe(config.version);
+    expect(loadFundConfiguration(undefined, 'user-b').version).toBe(1);
+    expect(localStorage.getItem('aethria_fund_configuration_v1:user-a')).not.toBeNull();
+  });
+
+  it('carries a pre-scoping draft over to the first user that reads it', () => {
+    localStorage.clear();
+    const config = { ...createDefaultFundConfiguration(), version: 7 };
+    localStorage.setItem('aethria_fund_configuration_v1', JSON.stringify(config));
+
+    expect(loadFundConfiguration(undefined, 'user-a').version).toBe(7);
+    expect(localStorage.getItem('aethria_fund_configuration_v1')).toBeNull();
+    expect(loadFundConfiguration(undefined, 'user-b').version).toBe(1);
   });
 });

@@ -9,6 +9,7 @@ function countStatus(counts: Record<string, number>, status: string): number {
 
 export function deriveExecutionReadiness(status: SystemStatus | null | undefined): ExecutionReadiness {
   if (!status) return 'unavailable';
+  if (status.status !== 'ok') return 'unavailable';
   if (status.durable_jobs.required && !status.durable_jobs.ready) return 'blocked';
   const counts = status.durable_jobs.counts;
   const running = countStatus(counts, 'running');

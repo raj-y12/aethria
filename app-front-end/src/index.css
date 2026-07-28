@@ -218,7 +218,7 @@
 }
 .settings-gallery-content {
   position: relative;
-  padding: clamp(2.5rem, 8vh, 7rem) var(--space-5) var(--space-9);
+  padding: clamp(2rem, 4vh, 3.5rem) var(--space-5) var(--space-9);
 }
 .settings-gallery-plate {
   position: relative;
@@ -226,36 +226,21 @@
   max-width: 860px;
   margin: 0 auto;
 }
+/* Document spacing, not plate spacing. The marketing gallery uses
+   clamp(4rem, 12vh, 11rem) because each plate is a full-viewport scroll stop
+   you look at. These are groups of fields you edit, and at that scale two
+   related controls sat ~350px apart. */
 .settings-gallery-section {
   position: relative;
-  padding-block: clamp(4rem, 12vh, 11rem);
+  padding-block: clamp(2rem, 4.5vh, 3.5rem);
 }
-.settings-gallery-frame {
-  position: relative;
+/* The plate head already opens the document. */
+.settings-gallery-section:first-of-type {
+  padding-top: 0;
 }
-.settings-gallery-frame::before,
-.settings-gallery-frame::after {
-  content: '';
-  position: absolute;
-  top: -14px;
-  bottom: -14px;
-  width: 14px;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
-  pointer-events: none;
-}
-.settings-gallery-frame::before {
-  left: -26px;
-  border-right: 0;
-}
-.settings-gallery-frame::after {
-  right: -26px;
-  border-left: 0;
-}
+/* Single child since the plate numeral went; the flex row it used to need
+   (justify-between against the numeral) would now be inert. */
 .settings-gallery-plate-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
   padding-bottom: var(--space-4);
   margin-bottom: var(--space-7);
 }
@@ -279,8 +264,6 @@
   .settings-gallery-content { padding-top: var(--space-6); }
 }
 @media (max-width: 640px) {
-  .settings-gallery-frame::before,
-  .settings-gallery-frame::after { display: none; }
   .settings-gallery-plate-head { margin-bottom: var(--space-5); }
 }
 

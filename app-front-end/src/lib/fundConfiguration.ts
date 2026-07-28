@@ -286,6 +286,11 @@ export interface BandValidation {
 export const FUND_CONFIG_STORAGE_KEY = 'aethria_fund_configuration_v1';
 export const FUND_CONFIG_EVENT = 'aethria-fund-configuration-updated';
 
+function scopedFundConfigStorageKey(userId?: string | null): string | null {
+  const id = userId?.trim();
+  return id ? `${FUND_CONFIG_STORAGE_KEY}:${encodeURIComponent(id)}` : null;
+}
+
 export function thesisVersionLabel(versionNumber?: number | null): string {
   if (versionNumber == null || versionNumber < 1) return 'Fund Thesis';
   return `Fund Thesis v${versionNumber}`;
@@ -408,13 +413,25 @@ export function createDefaultFundConfiguration(settings?: Settings | null): Fund
   return settings?.fund_config ? mergeFundConfiguration(base, settings.fund_config) : base;
 }
 
-export function loadFundConfiguration(settings?: Settings | null): FundConfiguration {
+export function loadFundConfiguration(settings?: Settings | null, userId?: string | null): FundConfiguration {
   const backendConfig = settings?.fund_config;
   if (backendConfig) return createDefaultFundConfiguration(settings);
   if (typeof window === 'undefined') return createDefaultFundConfiguration(settings);
   const fallback = createDefaultFundConfiguration(settings);
   try {
-    const raw = window.localStorage.getItem(FUND_CONFIG_STORAGE_KEY);
+    const key = scopedFundConfigStorageKey(userId);
+    if (!key) return fallback;
+    let raw = window.localStorage.getItem(key);
+    if (raw === null) {
+      // Carry the pre-tenant-scoped blob over once, then retire the shared key.
+      // ponytail: on a shared browser the first signed-in user claims it — the
+      // same exposure the unscoped key already had, now bounded to one read.
+      raw = window.localStorage.getItem(FUND_CONFIG_STORAGE_KEY);
+      if (raw !== null) {
+        window.localStorage.setItem(key, raw);
+        window.localStorage.removeItem(FUND_CONFIG_STORAGE_KEY);
+      }
+    }
     if (!raw) return fallback;
     return mergeFundConfiguration(fallback, JSON.parse(raw) as Partial<FundConfiguration>);
   } catch {
@@ -422,19 +439,21 @@ export function loadFundConfiguration(settings?: Settings | null): FundConfigura
   }
 }
 
-export function saveFundConfiguration(config: FundConfiguration): FundConfiguration {
+export function saveFundConfiguration(config: FundConfiguration, userId?: string | null): FundConfiguration {
   const next = { ...config, lastSavedAt: new Date().toISOString() };
   if (typeof window !== 'undefined') {
-    window.localStorage.setItem(FUND_CONFIG_STORAGE_KEY, JSON.stringify(next));
+    const key = scopedFundConfigStorageKey(userId);
+    if (key) window.localStorage.setItem(key, JSON.stringify(next));
     window.dispatchEvent(new CustomEvent(FUND_CONFIG_EVENT, { detail: next }));
   }
   return next;
 }
 
-export function clearFundConfiguration(settings?: Settings | null): FundConfiguration {
+export function clearFundConfiguration(settings?: Settings | null, userId?: string | null): FundConfiguration {
   const next = createDefaultFundConfiguration(settings);
   if (typeof window !== 'undefined') {
-    window.localStorage.removeItem(FUND_CONFIG_STORAGE_KEY);
+    const key = scopedFundConfigStorageKey(userId);
+    if (key) window.localStorage.removeItem(key);
     window.dispatchEvent(new CustomEvent(FUND_CONFIG_EVENT, { detail: next }));
   }
   return next;

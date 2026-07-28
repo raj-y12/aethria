@@ -446,6 +446,8 @@ export interface Financials {
 
 export interface Startup {
   id: string;
+  /** Canonical opportunity identity when this row is a compatibility projection. */
+  canonical_opportunity_id?: string;
   scout: Scout;
   review?: Review | null;
   partner?: Partner | null;
@@ -526,6 +528,8 @@ export interface ConcentrationAnalytics {
 
 /** GET /api/analytics/system-health */
 export interface SystemHealthSnapshot {
+  status?: 'ok' | 'degraded' | string;
+  errors?: string[];
   calibration_warning: string | null;
   pending_escalations: number;
   queue_depths: {

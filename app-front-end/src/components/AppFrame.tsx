@@ -201,11 +201,12 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   }, [dispatch.openCommandBar, navigate]);
 
   // ── Telemetry (spine readout) ──────────────────────────────────────────────
-  const { data: agentsStatus } = useQuery({
+  const agentsStatusQuery = useQuery({
     queryKey: ['agents-status'],
     queryFn: () => fetchAgentsStatus().catch(() => null),
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate }),
   });
+  const agentsStatus = agentsStatusQuery.data;
   const { data: loopStatus } = useQuery({
     queryKey: ['agents-loop-status'],
     queryFn: () => fetchLoopStatus().catch(() => null),
@@ -230,12 +231,15 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
       !agentsStatus.agents_will_run ||
       agentsStatus.execution_prerequisites_ready === false
     );
+  const agentStatusUnavailable = agentsStatusQuery.isFetched && agentsStatus == null;
   const pipelineHealthIssue =
     pipelineEnabled &&
     (
+      agentStatusUnavailable ||
       agentRuntimeIssue ||
       executionReadiness === 'blocked' ||
-      executionReadiness === 'degraded'
+      executionReadiness === 'degraded' ||
+      (executionReadiness === 'unavailable' && data.systemStatusReady)
     );
   const pipelineStopping = Boolean(loopStatus?.loop_alive && loopStatus?.agents_enabled === false && !pipelineHealthIssue);
   const pipelineLoopAlive = Boolean(loopStatus?.loop_alive && agentsStatus?.agents_will_run === true && !pipelineHealthIssue);
