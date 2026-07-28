@@ -29,7 +29,7 @@ class AuthorityReconciler:
                 from public.opportunities o
                 left join public.startups s
                   on s.user_id=o.user_id
-                 and s.startup_id=o.legacy_startup_id
+                 and s.startup_id=o.legacy_startup_id::text
                 where o.user_id=$1
                   and o.legacy_startup_id is not null
                   and s.startup_id is null
@@ -40,4 +40,3 @@ class AuthorityReconciler:
             status="green" if missing == 0 else "red",
             missing_legacy_projections=missing,
         )
-
