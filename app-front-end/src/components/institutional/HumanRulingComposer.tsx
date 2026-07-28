@@ -57,7 +57,6 @@ export default function HumanRulingComposer({
         queryClient.invalidateQueries({ queryKey: ['institutional', 'evaluation', opportunityId] }),
         queryClient.invalidateQueries({ queryKey: ['institutional', 'rulings', opportunityId] }),
         queryClient.invalidateQueries({ queryKey: ['institutional', 'actions', opportunityId] }),
-        queryClient.invalidateQueries({ queryKey: ['startups', 'list'] }),
       ]);
       setDecision(null);
       setRationale('');

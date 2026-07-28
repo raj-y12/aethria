@@ -72,20 +72,6 @@ describe('HumanRulingComposer', () => {
     ));
   });
 
-  it('invalidates the shared startup list after recording a ruling', async () => {
-    const queryClient = createQueryClient();
-    queryClient.setQueryData(['startups', 'list'], []);
-    render(composer(initialProps, queryClient));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
-    fireEvent.change(screen.getByLabelText('Ruling rationale'), {
-      target: { value: 'The evidence does not support advancing this company.' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
-
-    await waitFor(() => expect(queryClient.getQueryState(['startups', 'list'])?.isInvalidated).toBe(true));
-  });
-
   it('preselects a recommended Advance ruling', () => {
     renderComposer('advance');
 
