@@ -34,6 +34,14 @@ export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionVi
   // Compatibility follows the backend contract: canonical advance is a
   // recommendation to continue diligence, not an operator investment ruling.
   const partnerRecommendation = recommendation === 'pass' ? 'PASS' : 'MONITOR';
+  const decisionState = String(opportunity.decision_state ?? '').trim().toLowerCase();
+  const humanDecision = decisionState === 'invested'
+    ? 'YES'
+    : decisionState === 'pass'
+      ? 'NO'
+      : decisionState === 'monitor'
+        ? 'MAYBE'
+        : null;
   return {
     id: opportunity.legacy_startup_id ?? opportunity.opportunity_id,
     canonical_opportunity_id: opportunity.opportunity_id,
@@ -54,6 +62,12 @@ export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionVi
       risks: opportunity.principal_risks ?? [],
       human_review_required: true,
     },
+    ...(humanDecision ? {
+      human_resolution: {
+        decision: humanDecision,
+        ...(opportunity.updated_at ? { resolved_at: opportunity.updated_at } : {}),
+      },
+    } : {}),
     queue_reason: opportunity.workflow_state ?? opportunity.decision_state,
     priority_reason: opportunity.attention_priority != null ? `Priority ${opportunity.attention_priority}` : null,
   };
