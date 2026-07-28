@@ -422,6 +422,18 @@
     box-shadow: none;
   }
 
+  /* Native number spinners are chrome we don't draw anywhere else — they overlay
+     the ruled inputs and shift centred figures. Keyboard ↑/↓ still nudges. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   /* iOS: suppress grey tap-highlight flash on every tapped element */
   * {
     -webkit-tap-highlight-color: transparent;
@@ -895,6 +907,67 @@
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   animation-iteration-count: infinite;
   will-change: opacity, transform;
+}
+
+/* Decision ladder matrix: one dot mask on the parent turns every child layer into
+   dots, so the bands are 4 flat divs clipped by clip-path instead of ~2700 spans.
+   clip-path animates natively, so moving a boundary tweens for free. */
+.threshold-matrix {
+  --dot-gap: 6px;
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image:
+    radial-gradient(circle, #000 0 2px, transparent 2.4px),
+    linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+  mask-image:
+    radial-gradient(circle, #000 0 2px, transparent 2.4px),
+    linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
+  -webkit-mask-size: var(--dot-gap) var(--dot-gap), 100% 100%;
+  mask-size: var(--dot-gap) var(--dot-gap), 100% 100%;
+  -webkit-mask-position: 0 0, 0 0;
+  mask-position: 0 0, 0 0;
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  /* Shift the lattice exactly one cell and loop — reads as a live ticker. */
+  animation: threshold-drift 4.5s linear infinite;
+}
+
+@keyframes threshold-drift {
+  to {
+    -webkit-mask-position: var(--dot-gap) 0, 0 0;
+    mask-position: var(--dot-gap) 0, 0 0;
+  }
+}
+
+/* The dots live on the parent mask, so skewing a band shears the colour through a
+   fixed lattice — the band visibly gets shoved rather than just resized. */
+.threshold-band {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 var(--band-right) 0 var(--band-left));
+  transform: skewX(var(--lean, 0deg));
+  /* Overshoots past the new boundary and snaps back. */
+  transition: clip-path 300ms cubic-bezier(0.34, 1.5, 0.5, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Mid-drag the edge tracks the pointer 1:1 — the lean carries the motion instead. */
+.threshold-matrix[data-dragging='true'] .threshold-band {
+  transition: clip-path 80ms linear, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Below the auto-pass ceiling nothing reaches review — wash those dots back out. */
+.threshold-autopass {
+  background: rgba(var(--color-paper-rgb), 0.62);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .threshold-matrix { animation: none; }
+  .threshold-band,
+  .threshold-matrix[data-dragging='true'] .threshold-band {
+    transform: none;
+    transition: none;
+  }
 }
 
 /* Dispatch result plate — the app counterpart to web-front-end's .framed plate. */

@@ -311,6 +311,22 @@ describe('Settings safe draft actions', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Draft changes · 1 pending');
   });
 
+  // Rebalancing is destructive: a per-keystroke commit would redistribute once
+  // per digit and flatten the other weights before the value is even finished.
+  it('rebalances scoring weights only once the edit is committed', async () => {
+    renderPage();
+    const market = await screen.findByLabelText('Market weight');
+    const product = screen.getByLabelText('Product weight') as HTMLInputElement;
+    const productBefore = product.value;
+
+    fireEvent.change(market, { target: { value: '1' } });
+    fireEvent.change(market, { target: { value: '100' } });
+    expect(product.value).toBe(productBefore);
+
+    fireEvent.blur(market);
+    expect(product.value).toBe('0');
+  });
+
   it('keeps a partial policy publish retryable and skips the already-deployed thesis step', async () => {
     const deployedConfiguration = {
       ...liveConfiguration,

@@ -13,18 +13,17 @@ const labelCls = 'type-label-section text-xs text-oxford/70';
 const inputCls =
   'type-data w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 text-oxford outline-none transition-colors focus:border-oxford/45';
 
+// Deep enough to read as dots on the #D9D7D4 paper — pastels disappear at this dot size.
 const bandColors = {
-  pass: '#d6a39d',
-  monitor: '#d7bf72',
-  invest: '#8dc2a1',
+  pass: '#b4635b',
+  monitor: '#a8862b',
+  invest: '#4a8a6c',
 };
 
-const DOT_COLUMNS = 161;
-const DOT_ROWS = 17;
-const dotScores = Array.from({ length: DOT_COLUMNS }, (_, index) => ({
-  index,
-  score: (index / (DOT_COLUMNS - 1)) * 100,
-}));
+/** Clip a full-width layer down to [from, to] on the 0–100 score axis. */
+function bandClip(from: number, to: number): React.CSSProperties {
+  return { '--band-left': `${from}%`, '--band-right': `${100 - to}%` } as React.CSSProperties;
+}
 
 export function scoreFromPointer(clientX: number, left: number, width: number): number {
   if (width <= 0) return 0;
@@ -43,6 +42,7 @@ function ThresholdHandle({
   variant,
   barRef,
   onChange,
+  onDrag,
 }: {
   boundaryKey: BoundaryKey;
   label: string;
@@ -52,11 +52,14 @@ function ThresholdHandle({
   variant: 'tick' | 'divider';
   barRef: React.RefObject<HTMLDivElement | null>;
   onChange: (patch: Partial<DecisionThresholdBoundaries>) => void;
+  onDrag: (delta: number | null) => void;
 }) {
   const setFromPointer = (event: PointerEvent<HTMLButtonElement>) => {
     const rect = barRef.current?.getBoundingClientRect();
     if (!rect) return;
-    onChange({ [boundaryKey]: scoreFromPointer(event.clientX, rect.left, rect.width) });
+    const next = scoreFromPointer(event.clientX, rect.left, rect.width);
+    onDrag(next - value);
+    onChange({ [boundaryKey]: next });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -82,17 +85,23 @@ function ThresholdHandle({
       onKeyDown={handleKeyDown}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
+        onDrag(0);
         setFromPointer(event);
       }}
       onPointerMove={(event) => {
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
         setFromPointer(event);
       }}
+      onLostPointerCapture={() => onDrag(null)}
       className="group absolute top-1/2 z-[2] flex h-full w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/55"
       style={{ left: `${value}%` }}
     >
+      {/* Outside the frame so the divider rule never crosses the digits.
+          Dividers ride above, the auto-pass tick below — they can sit 1 apart. */}
       <span
-        className={`pointer-events-none absolute -top-phi-4 type-data ${variant === 'divider' ? 'text-oxford' : 'text-oxford/70'}`}
+        className={`pointer-events-none absolute type-data leading-none ${
+          variant === 'divider' ? '-top-5 text-oxford' : '-bottom-5 text-oxford/70'
+        }`}
         aria-hidden
       >
         {value}
@@ -100,7 +109,7 @@ function ThresholdHandle({
       {variant === 'divider' ? (
         <>
           <span className="absolute inset-y-1 w-[2px] bg-oxford" aria-hidden />
-          <span className="relative h-3 w-3 bg-oxford ring-2 ring-paper transition-transform group-hover:scale-110 group-focus-visible:ring-2 group-focus-visible:ring-oxford/45" aria-hidden />
+          <span className="relative h-3 w-3 bg-oxford ring-2 ring-paper transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-[1.35] group-focus-visible:ring-2 group-focus-visible:ring-oxford/45" aria-hidden />
         </>
       ) : (
         <span className="flex h-5 w-3 items-end justify-center border-b-2 border-oxford/70" aria-hidden>
@@ -121,36 +130,42 @@ function ThresholdBar({
   const barRef = useRef<HTMLDivElement>(null);
   const passMax = boundaries.passMonitorBoundary - 1;
   const monitorMax = boundaries.monitorInvestBoundary - 1;
-  const colorForScore = (score: number) => {
-    if (score < boundaries.passMonitorBoundary) return bandColors.pass;
-    if (score < boundaries.monitorInvestBoundary) return bandColors.monitor;
-    return bandColors.invest;
+  // null = not dragging. While dragging, the last pointer delta leans the bands
+  // in the direction of travel and relaxes to 0 the moment you hold still.
+  const [drag, setDrag] = useState<number | null>(null);
+  const onDrag = (delta: number | null) => {
+    setDrag(delta == null ? null : Math.max(-10, Math.min(10, delta * 2.5)));
   };
 
   return (
-    <div className="pt-phi-6">
-      <div ref={barRef} className="relative h-20 w-full lg:h-24">
+    <div className="pt-6">
+      <div ref={barRef} className="relative h-24 w-full border-y border-oxford/[0.08] lg:h-28">
         <div
           data-testid="threshold-dot-grid"
-          className="pointer-events-none absolute inset-x-0 inset-y-1 grid place-items-center border-y border-oxford/[0.08] py-0.5"
-          style={{
-            gridTemplateColumns: `repeat(${DOT_COLUMNS}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${DOT_ROWS}, minmax(0, 1fr))`,
-          }}
+          data-dragging={drag != null}
+          className="threshold-matrix pointer-events-none overflow-hidden"
+          style={{ '--lean': `${drag ?? 0}deg` } as React.CSSProperties}
           aria-hidden
         >
-          {Array.from({ length: DOT_ROWS }, (_, row) =>
-            dotScores.map((dot) => (
-              <span
-                key={`${row}-${dot.index}`}
-                className="h-px w-px rounded-full sm:h-[3px] sm:w-[3px] lg:h-1 lg:w-1"
-                style={{
-                  backgroundColor: colorForScore(dot.score),
-                  opacity: row === 0 || row === DOT_ROWS - 1 ? 0.58 : 0.88,
-                }}
-              />
-            )),
-          )}
+          <div
+            className="threshold-band"
+            style={{ ...bandClip(0, boundaries.passMonitorBoundary), backgroundColor: bandColors.pass }}
+          />
+          <div
+            className="threshold-band"
+            style={{
+              ...bandClip(boundaries.passMonitorBoundary, boundaries.monitorInvestBoundary),
+              backgroundColor: bandColors.monitor,
+            }}
+          />
+          <div
+            className="threshold-band"
+            style={{ ...bandClip(boundaries.monitorInvestBoundary, 100), backgroundColor: bandColors.invest }}
+          />
+          <div
+            className="threshold-band threshold-autopass"
+            style={bandClip(0, boundaries.autoPassCeiling)}
+          />
         </div>
         <ThresholdHandle
           boundaryKey="autoPassCeiling"
@@ -161,6 +176,7 @@ function ThresholdBar({
           variant="tick"
           barRef={barRef}
           onChange={onChange}
+          onDrag={onDrag}
         />
         <ThresholdHandle
           boundaryKey="passMonitorBoundary"
@@ -171,6 +187,7 @@ function ThresholdBar({
           variant="divider"
           barRef={barRef}
           onChange={onChange}
+          onDrag={onDrag}
         />
         <ThresholdHandle
           boundaryKey="monitorInvestBoundary"
@@ -181,9 +198,10 @@ function ThresholdBar({
           variant="divider"
           barRef={barRef}
           onChange={onChange}
+          onDrag={onDrag}
         />
       </div>
-      <div className="mt-phi-2 flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70">
+      <div className="mt-7 flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70">
         <span className="inline-flex items-center gap-phi-2">
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bandColors.pass }} aria-hidden />
           Pass 0–{passMax}
@@ -340,38 +358,38 @@ export default function DecisionThresholdsPanel({
         </div>
       )}
 
+      <p className="type-note text-oxford/70">
+        Drag a marker, use arrow keys, or enter an exact score. Auto-pass skips further review below its threshold.
+      </p>
+
       <ThresholdBar boundaries={boundaries} onChange={applyBounds} />
 
-      <div>
-        <p className="type-note text-oxford/70">
-          Drag a marker, use arrow keys, or enter an exact score. Auto-pass skips further review below its threshold; the Pass band covers deals that remain eligible for review.
-        </p>
-        <div className="mt-phi-4 grid gap-phi-5 sm:grid-cols-3">
-          <ScoreInput
-            id="monitor-start"
-            label="Monitor starts at"
-            value={boundaries.passMonitorBoundary}
-            min={2}
-            max={boundaries.monitorInvestBoundary - 1}
-            onCommit={(value) => applyBounds({ passMonitorBoundary: value })}
-          />
-          <ScoreInput
-            id="invest-start"
-            label="Invest starts at"
-            value={boundaries.monitorInvestBoundary}
-            min={boundaries.passMonitorBoundary + 1}
-            max={100}
-            onCommit={(value) => applyBounds({ monitorInvestBoundary: value })}
-          />
-          <ScoreInput
-            id="auto-pass-below"
-            label="Auto-pass threshold"
-            value={boundaries.autoPassCeiling}
-            min={0}
-            max={boundaries.passMonitorBoundary - 1}
-            onCommit={(value) => applyBounds({ autoPassCeiling: value })}
-          />
-        </div>
+      {/* Column order matches the markers left-to-right on the bar. */}
+      <div className="grid gap-phi-5 sm:grid-cols-3">
+        <ScoreInput
+          id="auto-pass-below"
+          label="Auto-pass threshold"
+          value={boundaries.autoPassCeiling}
+          min={0}
+          max={boundaries.passMonitorBoundary - 1}
+          onCommit={(value) => applyBounds({ autoPassCeiling: value })}
+        />
+        <ScoreInput
+          id="monitor-start"
+          label="Monitor starts at"
+          value={boundaries.passMonitorBoundary}
+          min={2}
+          max={boundaries.monitorInvestBoundary - 1}
+          onCommit={(value) => applyBounds({ passMonitorBoundary: value })}
+        />
+        <ScoreInput
+          id="invest-start"
+          label="Invest starts at"
+          value={boundaries.monitorInvestBoundary}
+          min={boundaries.passMonitorBoundary + 1}
+          max={100}
+          onCommit={(value) => applyBounds({ monitorInvestBoundary: value })}
+        />
       </div>
 
       <div className="grid gap-phi-7 pt-phi-5 sm:grid-cols-2">

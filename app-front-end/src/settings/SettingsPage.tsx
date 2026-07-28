@@ -55,6 +55,7 @@ import {
   type MemoStyle,
   type MemoTone,
   type RiskSensitivity,
+  type ScoringDimensionKey,
 } from '../lib/fundConfiguration';
 import {
   clearPolicyPublishRecovery,
@@ -77,7 +78,6 @@ const inputCls =
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
 const labelCls = 'type-label-section text-xs text-oxford/70';
-const sectionLabelCls = 'type-label-section text-xs text-oxford/70';
 const metaCls = 'type-meta text-xs text-oxford/70';
 type SettingsDialogState = 'restore' | 'leave' | null;
 type AttentionSource = 'local' | 'server';
@@ -228,17 +228,85 @@ function ChipGroup({
   );
 }
 
+/**
+ * Commits on blur/Enter, not per keystroke. Rebalancing is destructive — typing
+ * "100" one character at a time would redistribute three times and flatten the
+ * other weights to an even split with no way back.
+ */
+function WeightInput({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  const commit = () => {
+    const parsed = Number.parseInt(text, 10);
+    const next = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : value;
+    setText(String(next));
+    if (next !== value) onCommit(next);
+  };
+
+  return (
+    <input
+      type="number"
+      min={0}
+      max={100}
+      value={text}
+      onChange={(event) => setText(event.target.value.replace(/[^\d]/g, ''))}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+      }}
+      // type-data bakes in font-size: 13px, so the display size needs to force past it
+      className="type-data w-full border-0 bg-transparent p-0 text-center !text-[clamp(1.8rem,3vw,2.6rem)] leading-none text-oxford outline-none focus:ring-0"
+      aria-label={`${label} weight`}
+    />
+  );
+}
+
+/** Replaces the native number spinner, which is unstylable past `appearance: none`. */
+function StepButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      disabled={disabled}
+      onClick={onClick}
+      className="type-data flex h-6 w-6 items-center justify-center leading-none text-oxford/35 transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 disabled:pointer-events-none disabled:text-oxford/15"
+    >
+      {children}
+    </button>
+  );
+}
+
 function RoomSection({
   id,
   title,
-  label,
   description,
   children,
   className,
 }: {
   id: string;
   title: string;
-  label?: string;
   description?: string;
   children: React.ReactNode;
   className?: string;
@@ -247,13 +315,10 @@ function RoomSection({
     <section
       id={id}
       tabIndex={-1}
-       className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
+      className={`flex min-w-0 scroll-mt-16 flex-col gap-phi-4 pb-phi-5 pt-phi-5 outline-none lg:scroll-mt-0 ${className ?? ''}`}
     >
       <div>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-phi-4 gap-y-phi-1">
-          <h2 className={sectionLabelCls}>{title}</h2>
-          {label ? <span className="type-label-section text-xs text-oxford/70">{label}</span> : null}
-        </div>
+        <h2 className={labelCls}>{title}</h2>
         {description ? (
           <p className="mt-phi-2 max-w-[42rem] type-body-sm leading-relaxed text-oxford/70">{description}</p>
         ) : null}
@@ -265,7 +330,7 @@ function RoomSection({
 
 function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-phi-4 py-phi-6 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
+    <div className="grid gap-phi-4 py-phi-5 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
       <p className="type-label-section pt-phi-2 text-xs text-oxford/70">{label}</p>
       <div className="min-w-0">{children}</div>
     </div>
@@ -601,6 +666,12 @@ export default function SettingsPage() {
   const updateMemo = <K extends keyof FundConfiguration['memo']>(key: K, value: FundConfiguration['memo'][K]) =>
     updateDraft((current) => ({ ...current, memo: { ...current.memo, [key]: value } }));
 
+  const setWeight = (key: ScoringDimensionKey, value: number) =>
+    updateDraft((current) => ({
+      ...current,
+      scoringWeights: rebalanceWeights(current.scoringWeights, key, Math.min(100, Math.max(0, value))),
+    }));
+
   // One explicit deployment transaction. Both backend steps are idempotent
   // (thesis sync dedupes on unchanged content; policy publish dedupes by hash),
   // so the whole sequence can run unconditionally and re-running converges.
@@ -829,7 +900,7 @@ export default function SettingsPage() {
       <div className="flex h-full flex-col overflow-hidden bg-paper">
         <main className="flex min-h-0 flex-1 items-center justify-center">
           <div className="max-w-md px-phi-5 text-center">
-            <p className={sectionLabelCls}>Settings unavailable</p>
+            <p className={labelCls}>Settings unavailable</p>
             <p className="mt-phi-2 type-body-sm text-oxford/70">
               Aethria could not load your settings. Retry now, or return to the workspace.
             </p>
@@ -910,8 +981,7 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="thesis"
-                    title="Fund thesis"
-                    label="Fund thesis"
+                    title="Mandate"
                   >
                     <SpecRow label="Identity">
                       <div className="grid gap-phi-5 md:grid-cols-2">
@@ -922,10 +992,7 @@ export default function SettingsPage() {
                     <SpecRow label="Where to invest">
                       <div className="grid gap-phi-5">
                         <ChipGroup label="Preferred stages" options={stageOptions} selected={draft.mandate.preferredStages} onChange={(value) => updateMandate('preferredStages', value)} />
-                        <div className="flex flex-col gap-phi-2">
-                          <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
-                          <p className={metaCls}>UK/Ireland is listed separately from Europe. Global includes all regions.</p>
-                        </div>
+                        <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
                         <TextField id="custom-geography" label="Custom geography" value={draft.mandate.customGeography} onChange={(value) => updateMandate('customGeography', String(value))} />
                       </div>
                     </SpecRow>
@@ -957,7 +1024,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="version"
                     title="Version"
-                    label="Live state"
                   >
                     <SpecRow label="Draft">
                       <p className="type-body-sm text-oxford">{draft.versionLabel}</p>
@@ -967,11 +1033,6 @@ export default function SettingsPage() {
                         {thesisSummary?.active_version_number != null
                           ? `Fund Thesis v${thesisSummary.active_version_number}`
                           : 'Not published'}
-                      </p>
-                    </SpecRow>
-                    <SpecRow label="Storage">
-                      <p className="type-body-sm text-oxford/65">
-                        {storageNotReady ? 'Unavailable' : 'Ready'}
                       </p>
                     </SpecRow>
                   </RoomSection>
@@ -992,8 +1053,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="thresholds"
                     title="Decision thresholds"
-                    label="Thresholds"
-                    description="Set the score boundaries for Pass, Monitor, and Invest, plus the conditions that control review freshness and scout confidence."
                   >
                     <DecisionThresholdsPanel
                       draft={draft}
@@ -1005,7 +1064,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="sensitivity"
                     title="Escalation sensitivity"
-                    label="Risk posture"
                   >
                     <div className="flex flex-col gap-phi-3 py-phi-5">
                       <label htmlFor="risk-sensitivity" className={labelCls}>Sensitivity</label>
@@ -1020,7 +1078,6 @@ export default function SettingsPage() {
                 <RoomSection
                   id="weights"
                   title="Scoring weights"
-                  label="Reviewer mix"
                 >
                   <div className="flex flex-col">
                     <div className="flex flex-wrap items-baseline justify-between gap-phi-4 py-phi-5">
@@ -1028,39 +1085,42 @@ export default function SettingsPage() {
                         <p className={`type-data text-[1.6rem] ${weightValidation.valid ? 'text-oxford' : 'text-escalation/75'}`}>{weightValidation.total}%</p>
                         <p className="type-label-section text-xs text-oxford/70">Total weight</p>
                       </div>
-                      <p className="type-note text-oxford/70">Adjust one — the rest rebalance to 100</p>
+                      <p className="type-note text-oxford/70">Set one — the other four split the remainder in proportion to each other</p>
                     </div>
                     <div className="grid grid-cols-2 gap-phi-3 py-phi-3 sm:grid-cols-5">
                     {draft.scoringWeights.map((item) => (
-                      <div key={item.key} className="flex min-w-0 flex-col items-center gap-phi-2 px-phi-2 py-phi-4 text-center">
+                      <div key={item.key} className="group flex min-w-0 flex-col items-center gap-phi-3 px-phi-2 text-center">
                         <p className="type-label-section text-[10px] leading-tight text-oxford/60">{item.label}</p>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
+                        <WeightInput
+                          label={item.label}
                           value={item.weight}
-                          onChange={(event) => updateDraft((current) => ({
-                            ...current,
-                            scoringWeights: rebalanceWeights(current.scoringWeights, item.key, Number(event.target.value)),
-                          }))}
-                          className="type-display w-full border-0 bg-transparent p-0 text-center text-[clamp(1.8rem,3vw,2.6rem)] leading-none text-oxford outline-none focus:ring-0"
-                          aria-label={`${item.label} weight`}
+                          onCommit={(value) => setWeight(item.key, value)}
                         />
+                        <div className="flex items-center gap-phi-2">
+                          <StepButton
+                            label={`Decrease ${item.label} weight`}
+                            disabled={item.weight <= 0}
+                            onClick={() => setWeight(item.key, item.weight - 1)}
+                          >
+                            −
+                          </StepButton>
+                          <StepButton
+                            label={`Increase ${item.label} weight`}
+                            disabled={item.weight >= 100}
+                            onClick={() => setWeight(item.key, item.weight + 1)}
+                          >
+                            +
+                          </StepButton>
+                        </div>
                       </div>
                     ))}
                     </div>
-                    <p className="pt-phi-4 type-note text-oxford/70">
-                      {draft.activePolicyVersionId
-                        ? `Live policy ${draft.activePolicyVersionId}. Deploying publishes the next version.`
-                        : 'Deploy to publish the first scoring policy.'}
-                    </p>
                   </div>
                 </RoomSection>
 
                   <RoomSection
                     id="memo"
                     title="Memo output"
-                    label="Presentation"
                   >
                     <div className="grid gap-phi-7 py-phi-5 md:grid-cols-2">
                       <div className="flex flex-col gap-phi-2">
@@ -1091,7 +1151,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="workflow"
                     title="Decision review workflow"
-                    label="Governance"
                   >
                     <div className="py-phi-3">
                       <ToggleRow id="risk-ack" checked={draft.risk.requireAcknowledgement} onChange={(value) => updateRisk('requireAcknowledgement', value)} label="Require acknowledgement before ruling" hint="High-risk pending deals need a reviewed-risk step before Commit." />
@@ -1109,7 +1168,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="budget"
                     title="Cost budget"
-                    label="Live limits"
                   >
                     <div className="grid gap-x-phi-8 sm:grid-cols-2">
                       <SpecRow label="Token limit per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
@@ -1117,7 +1175,7 @@ export default function SettingsPage() {
                       <SpecRow label="Daily spend ceiling (USD)"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
                       <SpecRow label="Weekly spend ceiling (USD)"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
                     </div>
-                    <p className="pt-phi-5 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
+                    <p className="pt-phi-5 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the pipeline controls above.</p>
                   </RoomSection>
 
                   </SettingsGroup>
@@ -1130,12 +1188,7 @@ export default function SettingsPage() {
                   <RoomSection
                     id="governance"
                     title="Agent governance"
-                    label="Advanced controls"
                   >
-                    <p className="type-body-sm max-w-2xl pb-phi-4 leading-relaxed text-oxford/65">
-                      Review correction proposals, test prompt drafts, and publish governed changes.
-                      The Fund page keeps the readable learning record; operational controls live here.
-                    </p>
                     {governanceEnabled ? (
                       <MetaCommandTab
                         reports={metaReportsQuery.data ?? []}
@@ -1168,7 +1221,6 @@ export default function SettingsPage() {
                   <RoomSection
                     id="system"
                     title="System state"
-                    label="Run gates"
                     description="Shows whether the services and policies required to run the pipeline are ready."
                   >
                     {agentsStatus ? (
@@ -1204,12 +1256,7 @@ export default function SettingsPage() {
                         />
                       </div>
                     ) : (
-                      <div className="py-phi-5">
-                        <p className="type-body-sm text-oxford">Status unavailable</p>
-                        <p className="mt-phi-2 type-note leading-relaxed text-oxford/70">
-                          Aethria could not read the agent status endpoint. Runtime switch values above still reflect saved settings.
-                        </p>
-                      </div>
+                      <p className="py-phi-5 type-body-sm text-oxford">Status unavailable</p>
                     )}
                     <ExecutionReadinessPanel
                       status={systemStatusQuery.data ?? null}
