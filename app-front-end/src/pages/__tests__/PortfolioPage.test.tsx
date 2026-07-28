@@ -1,0 +1,109 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const api = vi.hoisted(() => ({
+  fetchPortfolioPositions: vi.fn(),
+  fetchOutcomeCoverage: vi.fn(),
+  fetchOpportunityByLegacyStartup: vi.fn(),
+  fetchOutcomes: vi.fn(),
+}));
+vi.mock('../../api/portfolio', async (original) => ({
+  ...(await original<typeof import('../../api/portfolio')>()),
+  fetchPortfolioPositions: api.fetchPortfolioPositions,
+}));
+vi.mock('../../api/channelsOutcomes', async (original) => ({
+  ...(await original<typeof import('../../api/channelsOutcomes')>()),
+  fetchOutcomeCoverage: api.fetchOutcomeCoverage,
+  fetchOutcomes: api.fetchOutcomes,
+}));
+vi.mock('../../api/identity', async (original) => ({
+  ...(await original<typeof import('../../api/identity')>()),
+  fetchOpportunityByLegacyStartup: api.fetchOpportunityByLegacyStartup,
+}));
+
+import PortfolioPage from '../PortfolioPage';
+import type { SystemData } from '../../hooks/useSystemData';
+
+const systemData = {
+  startups: [
+    {
+      id: 'startup-1',
+      scout: { name: 'Acme', sector: 'Fintech', funding_stage: 'Seed' },
+      review: { overall_score: 7.4 },
+      partner: { recommendation: 'MONITOR' },
+      human_resolution: { decision: 'MAYBE', resolved_at: '2026-07-19T12:00:00Z' },
+    },
+    {
+      id: 'startup-2',
+      scout: { name: 'Zeta', sector: 'Health' },
+      partner: { recommendation: 'PASS' },
+      human_resolution: { decision: 'NO', resolved_at: '2026-07-18T12:00:00Z' },
+    },
+  ],
+  signals: [],
+  watchlistAnalytics: { total: 0, stale: 0, avg_days: 0, entries: [] },
+  concentrationAnalytics: { by_sector: {}, most_concentrated_sector: null },
+} as unknown as SystemData;
+
+function renderPage() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <PortfolioPage data={systemData} />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+describe('PortfolioPage', () => {
+  beforeEach(() => {
+    Object.values(api).forEach((mock) => mock.mockReset());
+    api.fetchOutcomeCoverage.mockResolvedValue({ coverage_ratio: 0.5, limitations: [] });
+    api.fetchOpportunityByLegacyStartup.mockResolvedValue({ opportunity_id: 'opportunity-1', company_id: 'company-1' });
+    api.fetchOutcomes.mockResolvedValue([]);
+    api.fetchPortfolioPositions.mockResolvedValue([
+      {
+        position_id: 'position-1',
+        opportunity_id: 'opportunity-1',
+        company_id: 'company-1',
+        ruling_id: 'ruling-1',
+        status: 'active',
+        entry_rationale: 'Retention held through the pricing change.',
+        investor_confidence: 0.72,
+        entered_at: '2026-07-20T12:00:00Z',
+        canonical_name: 'Acme',
+        legacy_startup_id: 'startup-1',
+      },
+    ]);
+  });
+
+  it('renders holdings from the canonical positions endpoint', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
+    expect(screen.getByText('Acme')).toBeInTheDocument();
+    expect(screen.getByText('Fintech')).toBeInTheDocument();
+    expect(api.fetchPortfolioPositions).toHaveBeenCalled();
+  });
+
+  it('does not render decided-but-not-held companies as holdings', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
+    expect(screen.queryByText('Zeta')).not.toBeInTheDocument();
+  });
+
+  it('shows the entry rationale, because why we hold it is the record', async () => {
+    renderPage();
+    await waitFor(() =>
+      expect(screen.getByText('Retention held through the pricing change.')).toBeInTheDocument(),
+    );
+  });
+
+  it('explains the empty state without inventing positions', async () => {
+    api.fetchPortfolioPositions.mockResolvedValue([]);
+    renderPage();
+    await waitFor(() => expect(screen.getByText(/No positions yet/i)).toBeInTheDocument());
+  });
+});
