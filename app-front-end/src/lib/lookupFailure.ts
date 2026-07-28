@@ -25,6 +25,9 @@ export function resolveLookupFailure({
   memoStatus,
   jobStatus,
 }: LookupFailureInputs): string | undefined {
+  if (hasMatchedStartup && memoStatus?.status === 'ready') {
+    return undefined;
+  }
   if (hasMatchedStartup && memoStatus?.status === 'failed') {
     return memoStatus.error?.trim() || 'The lookup pipeline failed after finding the company.';
   }

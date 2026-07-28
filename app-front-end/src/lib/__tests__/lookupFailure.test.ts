@@ -23,6 +23,16 @@ describe('resolveLookupFailure', () => {
     ).toBe('Partner persistence failed.');
   });
 
+  it('keeps a matched review accessible when its memo is ready despite partner failure', () => {
+    expect(
+      resolveLookupFailure({
+        hasMatchedStartup: true,
+        memoStatus: { status: 'ready' },
+        jobStatus: { failed: true, message: 'Partner could not complete.' },
+      }),
+    ).toBeUndefined();
+  });
+
   it.each(['blocked', 'failed_stage'] as const)(
     'does not surface %s as terminal when the attempt is explicitly retryable',
     (status) => {

@@ -39,6 +39,7 @@ class _FakeReviewerEngine:
     use_resource_fund_thesis_fallback = "unset"
     calls = 0
     result = True
+    last_kwargs = None
 
     def __init__(self, *args, **kwargs):
         type(self).active_thesis = kwargs.get("active_thesis", "missing")
@@ -49,6 +50,7 @@ class _FakeReviewerEngine:
 
     async def run_startup(self, *args, **kwargs):
         type(self).calls += 1
+        type(self).last_kwargs = kwargs
         return type(self).result
 
 
@@ -109,6 +111,7 @@ def _wire_common_engines(monkeypatch):
     _FakeScoutEngine.resolution = None
     _FakeReviewerEngine.calls = 0
     _FakeReviewerEngine.result = True
+    _FakeReviewerEngine.last_kwargs = None
     _FakePartnerEngine.calls = 0
     _FakePartnerEngine.result = True
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
@@ -524,6 +527,24 @@ async def test_on_demand_lookup_returns_terminal_failure_when_partner_exhausts_r
     monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
     _FakePartnerEngine.result = False
     states = []
+    patches = []
+    startup = SimpleNamespace(startup_id="startup-1")
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        get_startup=lambda startup_id: startup,
+        update_startup_partial=lambda startup_id, patch: patches.append((startup_id, patch)) or True,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+
+    class _MemoGenerator:
+        def generate_memo(self, current, **kwargs):
+            assert current is startup
+            assert kwargs["for_display"] is True
+            assert kwargs["tenant_user_id"] == "user_123"
+            return "# Review memo\n\nPartner decision pending."
+
+    monkeypatch.setattr("pipeline_runner.MemoGenerator", _MemoGenerator)
     monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
 
     result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-fail")
@@ -534,7 +555,80 @@ async def test_on_demand_lookup_returns_terminal_failure_when_partner_exhausts_r
     assert _FakeReviewerEngine.calls == 1
     assert _FakePartnerEngine.calls == 1
     assert states[-1]["startup_id"] == "startup-1"
-    assert states[-1]["status"] == "failed"
+    assert states[-1]["status"] == "ready"
+    assert patches == [
+        (
+            "startup-1",
+            {"investment_memo_markdown": "# Review memo\n\nPartner decision pending."},
+        )
+    ]
+
+
+@pytest.mark.asyncio
+async def test_retry_reuses_current_review_and_resumes_at_partner(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    prerequisites = _prerequisites()
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    startup = SimpleNamespace(
+        startup_id="startup-1",
+        review_info=SimpleNamespace(
+            structured_scoring={
+                "policy_version_id": "policy-live",
+                "policy_hash": "hash-live",
+            }
+        ),
+    )
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        get_startup=lambda startup_id: startup,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+
+    result = await run_on_demand_lookup(
+        "user_123",
+        "Perplexity AI",
+        lookup_id="lookup-resume-partner",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert _FakeReviewerEngine.calls == 0
+    assert _FakePartnerEngine.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_reruns_stale_review_before_partner(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    prerequisites = _prerequisites()
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    startup = SimpleNamespace(
+        startup_id="startup-1",
+        review_info=SimpleNamespace(
+            structured_scoring={
+                "policy_version_id": "policy-old",
+                "policy_hash": "hash-old",
+            }
+        ),
+    )
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        get_startup=lambda startup_id: startup,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+
+    result = await run_on_demand_lookup(
+        "user_123",
+        "Perplexity AI",
+        lookup_id="lookup-refresh-review",
+        evaluation_prerequisites=prerequisites,
+    )
+
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert _FakeReviewerEngine.calls == 1
+    assert _FakeReviewerEngine.last_kwargs["force_rerun"] is True
+    assert _FakePartnerEngine.calls == 1
 
 
 @pytest.mark.asyncio

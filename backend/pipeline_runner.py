@@ -1116,6 +1116,25 @@ def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
     return text
 
 
+def _review_policy_is_current(
+    review_info: Any,
+    prerequisites: EvaluationPrerequisites,
+) -> bool:
+    """Return whether a saved review was produced by the currently certified policy."""
+    trace = getattr(review_info, "structured_scoring", None)
+    if not isinstance(trace, dict) or not trace:
+        return False
+    policy = prerequisites.compiled_scoring_policy
+    expected_version = str(policy.get("policy_version_id") or "").strip()
+    expected_hash = str(policy.get("policy_hash") or "").strip()
+    return bool(
+        expected_version
+        and expected_hash
+        and str(trace.get("policy_version_id") or "").strip() == expected_version
+        and str(trace.get("policy_hash") or "").strip() == expected_hash
+    )
+
+
 async def _run_on_demand_lookup_inner(
     user_id: str,
     company: str,
@@ -1346,22 +1365,44 @@ async def _run_on_demand_lookup_inner(
                 startup_id=startup_id,
             )
         current_stage = "reviewer"
-        reviewer_stage_started = time.perf_counter()
-        await ensure_owned()
-        reviewed = await reviewer_engine.run_startup(
-            startup_id,
-            ignore_confidence_threshold=True,
-            pipeline_run_id=lookup_run_id,
-            force_rerun=bool(replace_startup_id),
-            bypass_agent_enabled_gate=True,
-            startup=handoff_startup,
+        review_is_current = bool(
+            not replace_startup_id
+            and handoff_startup is not None
+            and _review_policy_is_current(
+                getattr(handoff_startup, "review_info", None),
+                evaluation_prerequisites,
+            )
         )
-        metrics.observe_pipeline_stage(
-            time.perf_counter() - reviewer_stage_started,
-            pipeline="lookup",
-            stage="reviewer",
-            outcome="success" if reviewed else "incomplete",
-        )
+        if review_is_current:
+            reviewed = True
+            logger.info(
+                "[%s] Reusing current review and resuming lookup at Partner: %s",
+                user_id[:12],
+                startup_id,
+            )
+        else:
+            reviewer_stage_started = time.perf_counter()
+            await ensure_owned()
+            reviewed = await reviewer_engine.run_startup(
+                startup_id,
+                ignore_confidence_threshold=True,
+                pipeline_run_id=lookup_run_id,
+                force_rerun=bool(
+                    replace_startup_id
+                    or (
+                        handoff_startup is not None
+                        and getattr(handoff_startup, "review_info", None) is not None
+                    )
+                ),
+                bypass_agent_enabled_gate=True,
+                startup=handoff_startup,
+            )
+            metrics.observe_pipeline_stage(
+                time.perf_counter() - reviewer_stage_started,
+                pipeline="lookup",
+                stage="reviewer",
+                outcome="success" if reviewed else "incomplete",
+            )
         if not reviewed:
             logger.warning("[%s] On-demand lookup not reviewed: %s", user_id[:12], startup_id)
             message = "Lookup found the company, but analyst review could not complete after retrying."
@@ -1404,7 +1445,49 @@ async def _run_on_demand_lookup_inner(
             logger.warning("[%s] On-demand lookup not decided yet: %s", user_id[:12], startup_id)
             message = "Lookup review completed, but the partner decision could not complete after retrying."
             await ensure_owned()
-            await _mark_lookup_pipeline_failed(storage, startup_id, lookup_run_id, message)
+            memo_ready = False
+            try:
+                reviewed_startup = await asyncio.to_thread(
+                    storage.get_startup, startup_id
+                )
+                if reviewed_startup is not None:
+                    review_memo = await asyncio.to_thread(
+                        MemoGenerator().generate_memo,
+                        reviewed_startup,
+                        for_display=True,
+                        tenant_user_id=user_id,
+                        fund_thesis=thesis_ctx,
+                    )
+                    await ensure_owned()
+                    memo_ready = bool(
+                        await asyncio.to_thread(
+                            storage.update_startup_partial,
+                            startup_id,
+                            {"investment_memo_markdown": review_memo},
+                        )
+                    )
+            except Exception as exc:
+                logger.exception(
+                    "[%s] Review-only memo fallback failed for %s: %s",
+                    user_id[:12],
+                    startup_id,
+                    exc,
+                )
+            if memo_ready:
+                await asyncio.to_thread(
+                    upsert_pipeline_state,
+                    getattr(storage, "_client", None),
+                    user_id=user_id,
+                    startup_id=startup_id,
+                    pipeline_run_id=lookup_run_id,
+                    status="ready",
+                    error=message,
+                )
+                _notify_startups_changed(user_id, "lookup_review_memo_ready")
+            else:
+                await _mark_lookup_pipeline_failed(
+                    storage, startup_id, lookup_run_id, message
+                )
             metrics.inc_lookup("error")
             return PipelineExecutionResult.stage_failure(
                 stage="partner",
