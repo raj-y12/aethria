@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
@@ -6,6 +6,7 @@ import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
 import { buildPositionRows } from './portfolio/positionRows';
+import OutcomePanel from '../components/institutional/OutcomePanel';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup, SignalItem } from '../types/startup';
 import { formatDateTime } from '../lib/dates';
@@ -53,6 +54,31 @@ function SectionHead({ title, detail, count }: { title: string; detail?: string;
 
 function QuietEmpty({ children }: { children: React.ReactNode }) {
   return <p className="mt-phi-4 type-body-sm text-oxford/60">{children}</p>;
+}
+
+/* Outcome recording is per-position and collapsed by default — the book stays
+ * readable; recording is a deliberate act. OutcomePanel resolves the canonical
+ * opportunity itself from the legacy id, so positions without that bridge
+ * simply cannot record yet. */
+function PositionOutcomes({ startupId }: { startupId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mt-phi-2">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="type-status text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+      >
+        {open ? 'Hide outcomes' : 'Record outcome'}
+      </button>
+      {open ? (
+        <div className="mt-phi-3">
+          <OutcomePanel startupId={startupId} />
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function signalWhen(sig: SignalItem): string {
@@ -183,6 +209,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                         </span>
                       </div>
                       <p className="mt-phi-2 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale}</p>
+                      {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
                     </li>
                   ))}
                 </ul>

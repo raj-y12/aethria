@@ -106,4 +106,30 @@ describe('PortfolioPage', () => {
     renderPage();
     await waitFor(() => expect(screen.getByText(/No positions yet/i)).toBeInTheDocument());
   });
+
+  it('offers outcome recording on a position that has a legacy bridge', async () => {
+    renderPage();
+    const toggle = await screen.findByRole('button', { name: /record outcome/i });
+    expect(toggle).toBeEnabled();
+  });
+
+  it('omits outcome recording when the position has no legacy bridge', async () => {
+    api.fetchPortfolioPositions.mockResolvedValue([
+      {
+        position_id: 'position-2',
+        opportunity_id: 'opportunity-2',
+        company_id: 'company-2',
+        ruling_id: 'ruling-2',
+        status: 'active',
+        entry_rationale: 'Team quality.',
+        investor_confidence: 0.6,
+        entered_at: '2026-07-21T12:00:00Z',
+        canonical_name: 'Beta',
+        legacy_startup_id: null,
+      },
+    ]);
+    renderPage();
+    await waitFor(() => expect(screen.getAllByTestId('position-row')).toHaveLength(1));
+    expect(screen.queryByRole('button', { name: /record outcome/i })).not.toBeInTheDocument();
+  });
 });
