@@ -210,6 +210,25 @@ class AuthorityProjectionConsumer:
         self.consumer = consumer
         self.authority_service = authority_service
 
+    async def _resolve_legacy_projection_payload(
+        self, *, user_id: str, event_type: str, payload: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
+        if not is_authority_projection_event(event_type):
+            return payload
+        if _optional_text(payload, "legacy_startup_id", "startup_id"):
+            return payload
+        opportunity_id = _optional_text(payload, "opportunity_id")
+        resolver = getattr(self.repository, "resolve_legacy_startup_id", None)
+        if not opportunity_id or not callable(resolver):
+            return payload
+        legacy_startup_id = await resolver(
+            user_id=user_id,
+            opportunity_id=opportunity_id,
+        )
+        if not legacy_startup_id:
+            return payload
+        return {**payload, "legacy_startup_id": legacy_startup_id}
+
     async def apply(
         self,
         *,
@@ -230,7 +249,12 @@ class AuthorityProjectionConsumer:
         embedded_user_id = _optional_text(payload, "user_id")
         if embedded_user_id and embedded_user_id != uid:
             raise ProjectionTenantMismatch("authority event payload tenant mismatch")
-        patch = legacy_patch_for_event(event_type, payload)
+        projection_payload = await self._resolve_legacy_projection_payload(
+            user_id=uid,
+            event_type=event_type,
+            payload=payload,
+        )
+        patch = legacy_patch_for_event(event_type, projection_payload)
         if patch is None:
             if is_authority_projection_event(event_type):
                 raise UnresolvedLegacyProjection(

@@ -67,6 +67,36 @@ class StartupCompatibilityProjectionRepository:
     def _receipt(row: Any) -> ProjectionReceipt:
         return ProjectionReceipt.model_validate(db_row(row))
 
+    async def resolve_legacy_startup_id(
+        self, *, user_id: str, opportunity_id: str
+    ) -> str | None:
+        """Resolve the compatibility row for a tenant-owned opportunity.
+
+        Older authority outbox events may predate ``legacy_startup_id`` being
+        included in their payload.  The canonical opportunity still owns that
+        linkage, so resolve it there rather than dropping the projection.
+        """
+        uid = require_user_id(
+            user_id,
+            context="StartupCompatibilityProjectionRepository.resolve_legacy_startup_id",
+        )
+        opportunity = str(opportunity_id or "").strip()
+        if not opportunity:
+            return None
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select legacy_startup_id
+                from public.opportunities
+                where user_id=$1 and opportunity_id=$2::uuid
+                """,
+                uid,
+                opportunity,
+            )
+        if row is None or row.get("legacy_startup_id") is None:
+            return None
+        return str(row["legacy_startup_id"])
+
     async def get_projection_receipt(self, *, user_id: str, event_id: str, consumer: str):
         uid = require_user_id(user_id, context="StartupCompatibilityProjectionRepository.get_projection_receipt")
         async with self.pool.acquire() as conn:

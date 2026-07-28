@@ -21,6 +21,12 @@ class _LegacyRepository:
         self.patch = {}
         self.canonical_writes = []
         self.events = []
+        self.resolved_legacy_startup_id = None
+
+    async def resolve_legacy_startup_id(self, *, user_id, opportunity_id):
+        assert user_id == "tenant-a"
+        assert opportunity_id
+        return self.resolved_legacy_startup_id
 
     async def get_projection_receipt(self, *, user_id, event_id, consumer):
         return self.receipts.get((user_id, event_id, consumer))
@@ -56,6 +62,35 @@ class _LegacyRepository:
             (event for event in self.events if event.user_id == user_id and event.event_id == event_id),
             None,
         )
+
+
+class _ProjectionConnection:
+    def __init__(self, row):
+        self.row = row
+        self.calls = []
+
+    async def fetchrow(self, sql, *args):
+        self.calls.append((sql, args))
+        return self.row
+
+
+class _ProjectionAcquire:
+    def __init__(self, connection):
+        self.connection = connection
+
+    async def __aenter__(self):
+        return self.connection
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
+class _ProjectionPool:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def acquire(self):
+        return _ProjectionAcquire(self.connection)
 
 
 def event_for(event_type, *, user_id="tenant-a", payload=None, aggregate_type="opportunity"):
@@ -226,6 +261,45 @@ async def test_emitted_evaluation_event_projects_a_valid_legacy_value_and_reason
     assert legacy_repo.patch["review_info"]["canonical_evaluation_reason"] == "Evidence coverage below policy minimum."
     assert legacy_repo.patch["partner_info"]["recommendation"] == "MONITOR"
     assert legacy_repo.patch["partner_info"]["canonical_recommendation_state"] == "insufficient_evidence"
+
+
+@pytest.mark.asyncio
+async def test_projection_resolves_legacy_startup_from_opportunity_when_event_is_old():
+    legacy_repo = _LegacyRepository()
+    legacy_repo.resolved_legacy_startup_id = "startup-a"
+    projector = AuthorityProjectionConsumer(legacy_repo)
+    event = event_for(
+        "human_ruling.created",
+        payload={
+            "legacy_startup_id": None,
+            "decision": "pass",
+            "rationale": "Outside mandate",
+        },
+    )
+    event["payload"].pop("legacy_startup_id")
+
+    receipt = await projector.apply(**event)
+
+    assert receipt is not None
+    assert legacy_repo.patch["human_resolution"]["decision"] == "PASS"
+    assert legacy_repo.patch["human_resolution"]["canonical_opportunity_id"] == event["payload"]["opportunity_id"]
+
+
+@pytest.mark.asyncio
+async def test_compatibility_repository_resolves_linkage_tenant_scoped():
+    from identity.projection import StartupCompatibilityProjectionRepository
+
+    connection = _ProjectionConnection({"legacy_startup_id": "startup-a"})
+    repository = StartupCompatibilityProjectionRepository(_ProjectionPool(connection))
+
+    result = await repository.resolve_legacy_startup_id(
+        user_id="tenant-a", opportunity_id="opportunity-a"
+    )
+
+    assert result == "startup-a"
+    sql, args = connection.calls[0]
+    assert "where user_id=$1 and opportunity_id=$2::uuid" in " ".join(sql.split()).lower()
+    assert args == ("tenant-a", "opportunity-a")
 
 
 @pytest.mark.asyncio
