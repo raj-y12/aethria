@@ -88,14 +88,6 @@ export default function FundPage({ data }: { data: SystemData }) {
               runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
             }`}
             title={fundName}
-            sub={
-              <Link
-                to="/v1/settings"
-                className="type-action inline-block transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-              >
-                Edit mandate →
-              </Link>
-            }
             readouts={
               <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
                 <HeaderReadout label="Mandate match" value={pctNum(stats?.pct_matching_thesis)} suffix="%" />
@@ -105,7 +97,15 @@ export default function FundPage({ data }: { data: SystemData }) {
               </div>
             }
           />
-          <FundFacetNav activeTab={activeTab} onTabChange={changeTab} showRule={false} className="pt-phi-3" />
+          <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 pt-phi-3">
+            <FundFacetNav activeTab={activeTab} onTabChange={changeTab} showRule={false} />
+            <Link
+              to="/v1/settings"
+              className="type-action shrink-0 border-b border-oxford/20 pb-0.5 text-oxford/65 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            >
+              Edit mandate →
+            </Link>
+          </div>
         </div>
       </div>
 
