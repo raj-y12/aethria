@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import RoomHeader from '../components/RoomHeader';
-import Reveal from '../components/Reveal';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
@@ -136,7 +135,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const recentSignals = (data.signals ?? []).slice(0, 20);
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom}`}>
         {/* ── Header: place + book composition in one line of sight ── */}
         <RoomHeader
@@ -152,7 +151,6 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
           }
         />
 
-        <Reveal delay={0.22} y={12}>
         <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
           {/* ── Decision ledger (the record) ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
@@ -369,7 +367,6 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
             </section>
           </div>
         </div>
-        </Reveal>
       </div>
     </div>
   );

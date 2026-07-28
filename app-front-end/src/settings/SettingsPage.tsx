@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
-import { motion } from 'framer-motion';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import LoadingAnimation from '../components/LoadingAnimation';
 import { workspaceLayout } from '../design-system/workspaceLayout';
@@ -34,7 +33,6 @@ import {
   type SectionId,
 } from './settingsModel';
 
-const CONTENT_EASE = [0.16, 1, 0.3, 1] as const;
 import {
   applyThesisVersionMetadata,
   createDefaultFundConfiguration,
@@ -796,7 +794,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden lg:pl-[var(--spine-width)]">
+    <div className="page-transition-enter settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden lg:pl-[var(--spine-width)]">
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
@@ -831,11 +829,10 @@ export default function SettingsPage() {
               onSettingsChange={setSettings}
             />
           </div>
-          <motion.main
+          {/* The room's own arrival is the page transition on the root; a second
+              entrance here just re-faded content that had already arrived. */}
+          <main
             className={`${workspaceLayout.pageBottom} settings-gallery-content mx-auto w-full overflow-y-visible`}
-            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: CONTENT_EASE, delay: 0.16 }}
           >
             <div className="settings-gallery-plate">
               <header className="settings-gallery-plate-head">
@@ -1117,7 +1114,7 @@ export default function SettingsPage() {
                   </RoomSection>
                   </SettingsGroup>
             </div>
-          </motion.main>
+          </main>
         </div>
       </div>
 
