@@ -116,6 +116,8 @@ async def create_action(request: Request, opportunity_id: str, body: ActionBody)
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail="Opportunity not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return with_authority_metadata(record.model_dump(mode="json"), authority)
 
 

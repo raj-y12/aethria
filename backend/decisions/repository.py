@@ -370,10 +370,12 @@ class DecisionRepository:
         )
         ruling = await conn.fetchrow(
             """
-            select decision, rationale, investor_confidence, created_at, override_type
-            from public.human_rulings
-            where user_id=$1 and opportunity_id=$2
-            order by created_at desc limit 1
+            select hr.decision, hr.rationale, hr.investor_confidence, hr.created_at, os.override_type
+            from public.human_rulings hr
+            left join public.override_signals os
+              on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+            where hr.user_id=$1 and hr.opportunity_id=$2
+            order by hr.created_at desc limit 1
             """,
             user_id, opportunity_id,
         )

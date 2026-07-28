@@ -66,3 +66,34 @@ def test_payload_rejects_a_company_with_no_identity():
             company={"canonical_name": "", "canonical_domain": None},
             ruling=RULING, position=None, outcomes=[],
         )
+
+
+def test_payload_rejects_a_company_whose_name_slugs_to_nothing():
+    """A name made entirely of symbols (e.g. '(TM)(C)(R)') normalizes to an
+    empty slug. Without this guard, two unrelated companies with no domain
+    would both get dedupe_key == "" and collapse into one CRM record."""
+    with pytest.raises(ValueError):
+        build_crm_export_payload(
+            company={"canonical_name": "™©®", "canonical_domain": None},
+            ruling=RULING, position=None, outcomes=[],
+        )
+
+
+def test_payload_refuses_to_fabricate_a_decision_when_no_ruling_exists():
+    """An opportunity with no human_rulings row must not silently export as
+    MONITOR with an empty rationale -- that fabricates a considered decision
+    that was never made."""
+    with pytest.raises(ValueError):
+        build_crm_export_payload(company=COMPANY, ruling={}, position=None, outcomes=[])
+
+
+def test_payload_refuses_an_unrecognized_ruling_decision():
+    """A decision string present but outside the known map (e.g. schema
+    drift introducing a new ruling value) is refused rather than silently
+    downgraded to MONITOR, which would misrepresent the actual decision."""
+    with pytest.raises(ValueError):
+        build_crm_export_payload(
+            company=COMPANY,
+            ruling={**RULING, "decision": "escalate"},
+            position=None, outcomes=[],
+        )

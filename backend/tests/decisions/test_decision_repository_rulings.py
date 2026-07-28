@@ -375,6 +375,40 @@ class _ExportConnection:
 
 
 @pytest.mark.asyncio
+async def test_load_export_context_joins_override_signals_for_override_type():
+    """override_type lives on override_signals, not human_rulings (see the
+    rulings_and_actions migration). A mocked connection that returns canned
+    dicts regardless of the SQL text can't catch a broken join, so assert on
+    the SQL string itself -- the same guard list_rulings already relies on."""
+    connection = _ExportConnection([
+        {"canonical_name": "Acme", "canonical_domain": "acme.ai"},
+        {
+            "decision": "invest",
+            "rationale": "Retention held.",
+            "investor_confidence": 0.72,
+            "created_at": "2026-07-20T12:00:00Z",
+            "override_type": None,
+        },
+        None,
+    ])
+    repository = DecisionRepository(_Pool(connection))
+
+    context = await repository._load_export_context(
+        connection, user_id="user-a", opportunity_id="opportunity-1"
+    )
+
+    ruling_call = next(
+        call for call in connection.calls
+        if call[0] == "fetchrow" and "from public.human_rulings" in call[1]
+    )
+    ruling_sql = " ".join(ruling_call[1].split()).lower()
+    assert "left join public.override_signals os" in ruling_sql
+    assert "on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id" in ruling_sql
+    assert "where hr.user_id=$1 and hr.opportunity_id=$2" in ruling_sql
+    assert context["ruling"]["override_type"] is None
+
+
+@pytest.mark.asyncio
 async def test_create_export_action_embeds_the_crm_row_from_canonical_facts():
     connection = _ExportConnection([
         {"missing_information": "[]", "legacy_startup_id": "startup-1"},

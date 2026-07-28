@@ -33,16 +33,27 @@ def build_crm_export_payload(
     """Build a reviewable CRM row without performing I/O."""
     domain = str(company.get("canonical_domain") or "").strip().lower()
     name = str(company.get("canonical_name") or "").strip()
-    if not domain and not name:
-        raise ValueError("CRM export requires a canonical name or domain")
+    slug = _slug(name)
+    if not domain and not slug:
+        raise ValueError(
+            "CRM export requires a canonical domain or a name that identifies the company"
+        )
+
+    decision_raw = str(ruling.get("decision") or "").strip().lower()
+    if not decision_raw:
+        raise ValueError(
+            "CRM export requires a ruling decision; none was found for this opportunity"
+        )
+    if decision_raw not in _DECISION_MAP:
+        raise ValueError(f"CRM export cannot map unrecognized ruling decision '{decision_raw}'")
 
     ordered = sorted(outcomes, key=lambda item: str(item.get("observed_at") or ""))
     latest = ordered[-1] if ordered else None
     payload = {
-        "dedupe_key": domain or _slug(name),
+        "dedupe_key": domain or slug,
         "company_name": name or domain,
         "domain": domain or None,
-        "decision": _DECISION_MAP.get(str(ruling.get("decision") or "").lower(), "MONITOR"),
+        "decision": _DECISION_MAP[decision_raw],
         "rationale": str(ruling.get("rationale") or "").strip(),
         "investor_confidence": float(ruling.get("investor_confidence") or 0.0),
         "ruled_at": str(ruling.get("created_at") or "") or None,
