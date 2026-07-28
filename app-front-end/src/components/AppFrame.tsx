@@ -108,6 +108,33 @@ interface AppFrameProps {
  * Dispatch command surface. Every workspace renders inside this frame so the
  * instrument's identity, telemetry, and ⌘K research are constant.
  */
+type ChromeMode = 'full' | 'bare';
+
+/**
+ * Gates Flow's WorkGrid cascade. WorkGrid renders `initial='hidden'` and only
+ * animates to visible once this is true, so a false value does not delay the
+ * rows — it leaves them at opacity 0. It must therefore resolve true for every
+ * arrival that has no chrome entrance to wait for.
+ *
+ * Only a bare→full move has one: that is the spine animating in from the front
+ * door. Moving between two full-chrome rooms (Portfolio → Flow) keeps the spine
+ * mounted and already settled, so the cascade is released immediately.
+ */
+export function deriveWorkspaceChromeReady({
+  reduceMotion,
+  previousChrome,
+  chrome,
+  chromeEntranceComplete,
+}: {
+  reduceMotion: boolean;
+  previousChrome: ChromeMode;
+  chrome: ChromeMode;
+  chromeEntranceComplete: boolean;
+}): boolean {
+  const enteringFullChrome = previousChrome === 'bare' && chrome === 'full';
+  return reduceMotion || (!enteringFullChrome && chromeEntranceComplete);
+}
+
 export default function AppFrame({ data, startupsError, chrome = 'full', children }: AppFrameProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -116,9 +143,12 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   const reduceMotion = usePrefersReducedMotion();
   const previousChrome = useRef(chrome);
   const [workspaceChromeReady, setWorkspaceChromeReady] = useState(true);
-  const enteringFullChrome = previousChrome.current === 'bare' && chrome === 'full';
-  const resolvedWorkspaceChromeReady =
-    reduceMotion || (!enteringFullChrome && workspaceChromeReady);
+  const resolvedWorkspaceChromeReady = deriveWorkspaceChromeReady({
+    reduceMotion,
+    previousChrome: previousChrome.current,
+    chrome,
+    chromeEntranceComplete: workspaceChromeReady,
+  });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pageOverlayOpen, setPageOverlayOpen] = useState(false);
   const [spineOverride, setSpineOverride] = useState<SpineOverride | null>(null);
