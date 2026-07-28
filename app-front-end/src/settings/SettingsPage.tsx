@@ -902,7 +902,7 @@ export default function SettingsPage() {
               <header className="settings-gallery-plate-head">
                 <h1>Settings</h1>
               </header>
-              <p className="settings-gallery-intro">Your operating mandate, decision policy, and runtime controls.</p>
+              <p className="settings-gallery-intro">Define what you invest in, how deals are scored, and how the pipeline operates.</p>
                   <SettingsGroup
                     title="Fund thesis"
                     description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
@@ -910,7 +910,7 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="thesis"
-                    title="The mandate"
+                    title="Fund thesis"
                     label="Fund thesis"
                   >
                     <SpecRow label="Identity">
@@ -922,7 +922,10 @@ export default function SettingsPage() {
                     <SpecRow label="Where to invest">
                       <div className="grid gap-phi-5">
                         <ChipGroup label="Preferred stages" options={stageOptions} selected={draft.mandate.preferredStages} onChange={(value) => updateMandate('preferredStages', value)} />
-                        <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
+                        <div className="flex flex-col gap-phi-2">
+                          <ChipGroup label="Geographies" options={geographyOptions} selected={draft.mandate.geographies} onChange={(value) => updateMandate('geographies', value)} />
+                          <p className={metaCls}>UK/Ireland is listed separately from Europe. Global includes all regions.</p>
+                        </div>
                         <TextField id="custom-geography" label="Custom geography" value={draft.mandate.customGeography} onChange={(value) => updateMandate('customGeography', String(value))} />
                       </div>
                     </SpecRow>
@@ -938,8 +941,8 @@ export default function SettingsPage() {
                     </SpecRow>
                     <SpecRow label="Economics">
                       <div className="grid gap-phi-5 md:grid-cols-3">
-                        <TextField id="check-min" label="Check size min" type="number" value={draft.mandate.checkSizeMin} onChange={(value) => updateMandate('checkSizeMin', Number(value))} min={0} />
-                        <TextField id="check-max" label="Check size max" type="number" value={draft.mandate.checkSizeMax} onChange={(value) => updateMandate('checkSizeMax', Number(value))} min={0} />
+                        <TextField id="check-min" label="Minimum check size (USD)" type="number" value={draft.mandate.checkSizeMin} onChange={(value) => updateMandate('checkSizeMin', Number(value))} min={0} />
+                        <TextField id="check-max" label="Maximum check size (USD)" type="number" value={draft.mandate.checkSizeMax} onChange={(value) => updateMandate('checkSizeMax', Number(value))} min={0} />
                         <TextField id="ownership" label="Ownership target %" type="number" value={draft.mandate.ownershipTarget} onChange={(value) => updateMandate('ownershipTarget', Number(value))} min={0} max={100} />
                       </div>
                     </SpecRow>
@@ -988,9 +991,9 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="thresholds"
-                    title="Decision mechanics"
+                    title="Decision thresholds"
                     label="Thresholds"
-                    description="Drag the dividers to set where Pass, Monitor, and Invest begin."
+                    description="Set the score boundaries for Pass, Monitor, and Invest, plus the conditions that control review freshness and scout confidence."
                   >
                     <DecisionThresholdsPanel
                       draft={draft}
@@ -1087,7 +1090,7 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="workflow"
-                    title="Ruling workflow"
+                    title="Decision review workflow"
                     label="Governance"
                   >
                     <div className="py-phi-3">
@@ -1109,10 +1112,10 @@ export default function SettingsPage() {
                     label="Live limits"
                   >
                     <div className="grid gap-x-phi-8 sm:grid-cols-2">
-                      <SpecRow label="Per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
-                      <SpecRow label="Cooldown"><p className="type-data text-[1.35rem]">{settings.cost_budget.cooldown_seconds}s</p></SpecRow>
-                      <SpecRow label="Daily"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
-                      <SpecRow label="Weekly"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
+                      <SpecRow label="Token limit per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
+                      <SpecRow label="Cooldown between runs"><p className="type-data text-[1.35rem]">{settings.cost_budget.cooldown_seconds}s</p></SpecRow>
+                      <SpecRow label="Daily spend ceiling (USD)"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
+                      <SpecRow label="Weekly spend ceiling (USD)"><p className="type-data text-[1.35rem]">${settings.cost_budget.weekly_cost_ceiling.toLocaleString()}</p></SpecRow>
                     </div>
                     <p className="pt-phi-5 type-note text-oxford/70">Enforcement is {settings.cost_budget.enabled ? 'on' : 'off'} — toggle it in the rail.</p>
                   </RoomSection>
@@ -1166,34 +1169,35 @@ export default function SettingsPage() {
                     id="system"
                     title="System state"
                     label="Run gates"
+                    description="Shows whether the services and policies required to run the pipeline are ready."
                   >
                     {agentsStatus ? (
                       <div className="border-t border-oxford/[0.06]">
                         <EditorialStatus
-                          label="Storage"
+                          label="Storage access"
                           value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
                           detail={agentsStatus.supabase_configured ? undefined : 'Supabase required to run the pipeline.'}
                           tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
-                          label="OpenAI"
+                          label="AI provider access"
                           value={agentsStatus.openai_configured ? 'Ready' : 'Unavailable'}
                           detail={agentsStatus.openai_configured ? undefined : 'API key required to run the pipeline.'}
                           tone={agentsStatus.openai_configured ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
-                          label="Worker"
+                          label="Pipeline worker"
                           value={agentsStatus.worker_ready ? 'Ready' : 'Not ready'}
                           tone={agentsStatus.worker_ready ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
-                          label="Execution policy"
+                          label="Execution prerequisites"
                           value={agentsStatus.execution_prerequisites_ready ? 'Ready' : 'Blocked'}
                           detail={agentsStatus.execution_prerequisites_ready ? undefined : (agentsStatus.execution_prerequisite_detail ?? 'An active thesis and published policy are required.')}
                           tone={agentsStatus.execution_prerequisites_ready ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
-                          label="Pipeline"
+                          label="Pipeline availability"
                           value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
                           detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.execution_prerequisite_detail ?? agentsStatus.thesis_error ?? (agentsStatus.durable_job_error ? 'The durable job store is unreachable.' : null) ?? 'A required gate is not ready.')}
                           tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}

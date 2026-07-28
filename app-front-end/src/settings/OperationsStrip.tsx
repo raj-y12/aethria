@@ -165,7 +165,11 @@ export default function OperationsStrip({
                     >
                       Saving
                     </p>
-                  ) : null}
+                  ) : (
+                    <p className="mt-0.5 type-status text-xs leading-none text-oxford/70">
+                      {checked ? 'On' : 'Off'}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

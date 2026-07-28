@@ -897,6 +897,47 @@
   will-change: opacity, transform;
 }
 
+/* Dispatch result plate — the app counterpart to web-front-end's .framed plate. */
+.dispatch-result-plate {
+  position: relative;
+  width: 100%;
+}
+
+.dispatch-result-plate::before,
+.dispatch-result-plate::after {
+  content: '';
+  position: absolute;
+  top: -14px;
+  bottom: -14px;
+  width: 14px;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+  pointer-events: none;
+}
+
+.dispatch-result-plate::before {
+  left: -26px;
+  border-right: 0;
+}
+
+.dispatch-result-plate::after {
+  right: -26px;
+  border-left: 0;
+}
+
+.dispatch-result-snapshot {
+  border: 0 !important;
+  background: transparent !important;
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 640px) {
+  .dispatch-result-plate::before,
+  .dispatch-result-plate::after {
+    display: none;
+  }
+
+}
+
 /* ── Aethria Triangle Dot Grid Matrix Loader ───────────────────────────── */
 .aethria-triangle-dot-grid {
   display: flex;

@@ -56,7 +56,7 @@ describe('DecisionThresholdsPanel ladder', () => {
 
     const monitor = screen.getByRole('spinbutton', { name: 'Monitor starts at' });
     const invest = screen.getByRole('spinbutton', { name: 'Invest starts at' });
-    const autoPass = screen.getByRole('spinbutton', { name: 'Auto-pass below' });
+    const autoPass = screen.getByRole('spinbutton', { name: 'Auto-pass threshold' });
 
     expect(monitor).toHaveAttribute('min', '2');
     expect(monitor).toHaveAttribute('max', String(boundaries.monitorInvestBoundary - 1));
@@ -87,7 +87,7 @@ describe('DecisionThresholdsPanel ladder', () => {
   it('explains visual, keyboard, and exact score entry', () => {
     render(<ThresholdHarness />);
 
-    expect(screen.getByText('Drag a marker, use arrow keys, or enter an exact score.')).toBeInTheDocument();
+    expect(screen.getByText(/Drag a marker, use arrow keys, or enter an exact score\./)).toBeInTheDocument();
   });
 
   it('exposes three named sliders with their valid ranges', () => {

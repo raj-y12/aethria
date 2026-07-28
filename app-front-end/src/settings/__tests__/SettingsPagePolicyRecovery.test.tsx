@@ -135,7 +135,7 @@ async function failAfterSettingsPatch(initial: Settings, deployed: Settings) {
 
   fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Recovery Fund' } });
   fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
   await waitFor(() => expect(mocks.publishPolicy).toHaveBeenCalledTimes(1));
   return view;
 }
@@ -308,7 +308,7 @@ describe('SettingsPage durable policy publish recovery', () => {
       target: { value: 'Custom recovery mandate' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Scoring policy publish pending'));
     expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();

@@ -32,9 +32,9 @@ describe('FundThesisConfirmationModal', () => {
   it('uses the Dispatch takeover composition', () => {
     expect(modalSource).toContain('paper-dot-grid');
     expect(modalSource).toContain('items-center justify-center');
-    expect(modalSource).toContain('Fund thesis change');
-    expect(modalSource).toContain('Confirm the new mandate');
-    expect(modalSource).toContain('Confirm update');
+    expect(modalSource).toContain('Policy deployment');
+    expect(modalSource).toContain('Confirm policy changes');
+    expect(modalSource).toContain('Deploy policy changes');
     expect(modalSource).not.toContain('<header');
     expect(modalSource).not.toContain('<footer');
   });
@@ -88,7 +88,7 @@ describe('FundThesisConfirmationModal', () => {
     );
 
     const cancel = screen.getByRole('button', { name: /go back/i });
-    const confirm = screen.getByRole('button', { name: /confirm update/i });
+    const confirm = screen.getByRole('button', { name: /deploy policy changes/i });
     expect(cancel).toHaveClass('min-h-11');
     expect(within(cancel).getByText('Go back')).toHaveClass('border-b', 'border-oxford/10', 'hover:border-oxford/40');
     // The confirm action is the canonical solid primary (36px), matching the
@@ -118,14 +118,14 @@ describe('FundThesisConfirmationModal', () => {
       />,
     );
 
-    expect(screen.getByRole('dialog', { name: /confirm the new mandate/i })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: /confirm policy changes/i })).toBeInTheDocument();
     expect(screen.getAllByText('Currently live')).toHaveLength(2);
     expect(screen.getByText('Fintech')).toBeInTheDocument();
     expect(screen.getAllByText('Proposed')).toHaveLength(2);
     expect(screen.getByText('Climate')).toBeInTheDocument();
     expect(onConfirm).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: /confirm update/i }));
+    fireEvent.click(screen.getByRole('button', { name: /deploy policy changes/i }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
@@ -169,7 +169,7 @@ describe('FundThesisConfirmationModal', () => {
     expect(screen.getByText('No thesis currently deployed')).toBeInTheDocument();
     expect(screen.getByText(/publishing your first fund thesis/i)).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /confirm update/i })).toHaveFocus();
+      expect(screen.getByRole('button', { name: /deploy policy changes/i })).toHaveFocus();
     });
   });
 
@@ -185,7 +185,7 @@ describe('FundThesisConfirmationModal', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: /updating fund thesis/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /deploying policy/i })).toBeDisabled();
     expect(screen.getByRole('button', { name: /go back/i })).toBeDisabled();
   });
 });

@@ -551,8 +551,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                         dispatch.lookupDecided && dispatch.snapshotProps ? (
                           <LookupResultSnapshot
                             {...dispatch.snapshotProps}
+                            size="lg"
                             onOpenMemo={dispatch.openLookupMemo}
-                            className="w-full"
+                            className="dispatch-result-snapshot w-full"
                           />
                         ) : null
                       }

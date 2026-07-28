@@ -344,7 +344,7 @@ export default function DecisionThresholdsPanel({
 
       <div>
         <p className="type-note text-oxford/70">
-          Drag a marker, use arrow keys, or enter an exact score.
+          Drag a marker, use arrow keys, or enter an exact score. Auto-pass skips further review below its threshold; the Pass band covers deals that remain eligible for review.
         </p>
         <div className="mt-phi-4 grid gap-phi-5 sm:grid-cols-3">
           <ScoreInput
@@ -365,7 +365,7 @@ export default function DecisionThresholdsPanel({
           />
           <ScoreInput
             id="auto-pass-below"
-            label="Auto-pass below"
+            label="Auto-pass threshold"
             value={boundaries.autoPassCeiling}
             min={0}
             max={boundaries.passMonitorBoundary - 1}
@@ -385,7 +385,7 @@ export default function DecisionThresholdsPanel({
         />
         <DecimalInput
           id="confidence-floor"
-          label="Min scout confidence"
+          label="Minimum scout confidence (0–1)"
           value={draft.thresholds.confidenceFloor}
           min={0}
           max={1}

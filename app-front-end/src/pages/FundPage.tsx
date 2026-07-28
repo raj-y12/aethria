@@ -84,9 +84,7 @@ export default function FundPage({ data }: { data: SystemData }) {
         <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
           <RoomHeader
             className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
-            eyebrow={`The instrument${
-              runtime?.active_version_number != null ? ` · Mandate v${runtime.active_version_number}` : ''
-            }`}
+            eyebrow="The instrument"
             title={fundName}
             readouts={
               <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">

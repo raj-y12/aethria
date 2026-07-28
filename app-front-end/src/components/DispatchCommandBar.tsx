@@ -521,8 +521,10 @@ export default function DispatchCommandBar({
               ) : null}
             </Reveal>
           ) : view === 'result' ? (
-            <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-2xl flex-col items-center">
-              {result}
+            <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-[860px] flex-col items-center">
+              <div className="dispatch-result-plate w-full">
+                {result}
+              </div>
             </Reveal>
           ) : view === 'failure' ? (
             <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-md flex-col items-center gap-phi-5">

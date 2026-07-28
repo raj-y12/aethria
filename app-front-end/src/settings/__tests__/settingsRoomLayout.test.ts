@@ -208,11 +208,11 @@ describe('Settings focused-mode layout contract', () => {
   });
 
   it('keeps every configuration section in the single column', () => {
-    expect(source).toContain('The mandate');
-    expect(source).toContain('Decision mechanics');
+    expect(source).toContain('Fund thesis');
+    expect(source).toContain('Decision thresholds');
     expect(source).toContain('Scoring weights');
     expect(source).toContain('Memo output');
-    expect(source).toContain('Ruling workflow');
+    expect(source).toContain('Decision review workflow');
     expect(source).toContain('Cost budget');
     expect(source).toContain('System state');
     expect(source).not.toContain('function SettingsSection');
@@ -246,7 +246,7 @@ describe('Settings focused-mode layout contract', () => {
   it('shows exact execution-policy readiness separately from infrastructure', () => {
     expect(source).toContain('agentsStatus.execution_prerequisites_ready');
     expect(source).toContain('agentsStatus.execution_prerequisite_detail');
-    expect(source).toContain('label="Execution policy"');
+    expect(source).toContain('label="Execution prerequisites"');
   });
 });
 
@@ -326,7 +326,7 @@ describe('Settings safe draft actions', () => {
 
     fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Retryable Fund' } });
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
     expect(screen.getByRole('button', { name: 'Retry publish' })).not.toBeDisabled();
@@ -348,7 +348,7 @@ describe('Settings safe draft actions', () => {
 
     fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Rejected Deploy Fund' } });
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
 
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Settings network unavailable'));
     expect(screen.getByRole('button', { name: 'Deploy changes' })).not.toBeDisabled();
@@ -370,7 +370,7 @@ describe('Settings safe draft actions', () => {
 
     fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Checkpoint Fund' } });
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('scoring policy did not publish'));
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Mandate name' }), { target: { value: 'Later draft mandate' } });
@@ -447,7 +447,7 @@ describe('Settings safe draft actions', () => {
       target: { value: 'Validation Route Fund' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Deploy policy changes' }));
 
     const thesisSection = document.getElementById('thesis');
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Fund thesis is required'));
@@ -477,7 +477,7 @@ describe('Settings safe draft actions', () => {
     mocks.publishPolicy.mockResolvedValueOnce({ policy: { policy_version_id: 'policy-corrected' } });
     mocks.fetchSettings.mockResolvedValue(correctedSettings);
     fireEvent.click(screen.getByRole('button', { name: 'Deploy changes' }));
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm the new mandate' })).getByRole('button', { name: 'Confirm update' }));
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Confirm policy changes' })).getByRole('button', { name: 'Deploy policy changes' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: /Fund thesis — Needs attention/ })).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));

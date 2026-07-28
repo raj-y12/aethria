@@ -72,7 +72,7 @@ export default function FundThesisConfirmationModal({
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.08 }}
               className="type-label-section mb-phi-3 text-center"
             >
-              Fund thesis change
+              Policy deployment
             </motion.p>
             <motion.h1
               id="fund-thesis-confirmation-title"
@@ -81,7 +81,7 @@ export default function FundThesisConfirmationModal({
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.14 }}
               className="type-display m-0 max-w-[15ch] text-center text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford"
             >
-              Confirm the new mandate
+              Confirm policy changes
             </motion.h1>
             <motion.p
               id="fund-thesis-confirmation-description"
@@ -91,8 +91,8 @@ export default function FundThesisConfirmationModal({
               className="mt-phi-3 max-w-[48ch] text-center type-body text-oxford/60"
             >
               {firstPublication
-                ? 'You are publishing your first fund thesis. Scouts and Reviewers will use it as soon as deployment completes.'
-                : 'Scouts and Reviewers will use this mandate as soon as deployment completes. Review what changes before continuing.'}
+                ? 'You are publishing your first fund thesis and scoring policy. Scouting, review, and investment recommendations will use them as soon as deployment completes.'
+                : 'This will publish the updated fund thesis and scoring policy. Scouting, review, and investment recommendations will use them as soon as deployment completes.'}
             </motion.p>
             <motion.div
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
@@ -148,7 +148,7 @@ export default function FundThesisConfirmationModal({
                 disabled={busy}
                 className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {busy ? 'Updating fund thesis…' : 'Confirm update'}
+                {busy ? 'Deploying policy…' : 'Deploy policy changes'}
               </button>
               <button
                 type="button"
