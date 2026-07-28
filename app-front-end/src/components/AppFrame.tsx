@@ -24,7 +24,7 @@ import AppSpine, {
 import MobileHeader from './MobileHeader';
 import AgentLogoutModal from './AgentLogoutModal';
 import DispatchCommandBar from './DispatchCommandBar';
-import LookupReadyToast from './LookupReadyToast';
+import LookupReadyNotice from './LookupReadyNotice';
 import IdentityReviewCenter from './identity/IdentityReviewCenter';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import { tokens } from '../design-system/tokens';
@@ -377,13 +377,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
       <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
         <div className="grain" aria-hidden />
         <IdentityReviewCenter />
-        <LookupReadyToast
-          name={dispatch.lookupReady?.scout?.name ?? null}
-          recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
-          onOpen={dispatch.openLookupMemo}
-          onDismiss={dispatch.dismissReady}
-        />
-
         {/* Mobile / tablet top nav — desktop carries identity in the spine */}
         <AnimatePresence initial={false}>
           {showMobileChrome ? (
@@ -501,6 +494,12 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               transition={chromeTransition}
               className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
             >
+              <LookupReadyNotice
+                name={dispatch.lookupReady?.scout?.name ?? null}
+                recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
+                onOpen={dispatch.openLookupMemo}
+                onDismiss={dispatch.dismissReady}
+              />
               {children}
               <AnimatePresence initial={false}>
                 {dispatch.commandBarOpen ? (
