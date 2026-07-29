@@ -235,7 +235,13 @@ def is_megacap_company(name: str) -> bool:
         return False
     if any(w in _MEGACAP_WORDS for w in words):
         return True
-    return " ".join(words) in _MEGACAP_EXACT_ALIASES
+    # Apply the same corporate-suffix normalization to aliases as to the input.
+    # Otherwise entries such as "block inc" and "x corp" can never match because
+    # their suffixes were removed from `words` first.
+    normalized_aliases = {
+        " ".join(_normalized_words(alias)) for alias in _MEGACAP_EXACT_ALIASES
+    }
+    return " ".join(words) in normalized_aliases
 
 
 def validate_references_not_only_incumbent_domains(references: List[str]) -> None:

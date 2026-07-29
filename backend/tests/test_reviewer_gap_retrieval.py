@@ -180,3 +180,4 @@ def test_reviewer_gap_retrieval_runs_for_missing_founders_even_when_other_fields
 
     assert pack is not None
     assert any("founders" in query for query in captured["queries"])
+    assert captured["category"] == "people"

@@ -190,6 +190,15 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
         user_id=uid,
         max_per_query=max(max_per, 3),
         max_total_sources=max(min(max_total, 20), 5),
+        # Keep market/funding gap searches on the general provider. When founder
+        # evidence is the only gap, route the shared pack through the people
+        # category so founder-specific providers are actually used.
+        category=(
+            "people"
+            if not is_missing_tam(scout.get("est_tam"))
+            and not is_weak_funding_stage(scout.get("funding_stage"))
+            else "general"
+        ),
     )
     pack = _restrict_pack_to_lookup_website(pack, scout)
     sources = pack.get("sources") or []

@@ -75,7 +75,14 @@ def test_corporate_suffixes_do_not_hide_an_incumbent(name):
 
 
 @pytest.mark.parametrize(
-    "name", ["Meta Platforms", "Alphabet Inc", "International Business Machines"]
+    "name",
+    [
+        "Meta Platforms",
+        "Alphabet Inc",
+        "International Business Machines",
+        "Block Inc",
+        "X Corp",
+    ],
 )
 def test_multiword_incumbent_aliases_are_rejected(name):
     assert is_megacap_company(name) is True
