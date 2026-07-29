@@ -16,6 +16,7 @@ node_modules/
 dist/
 build/
 .vite/
+*.tsbuildinfo
 
 # Python generated files
 __pycache__/
@@ -42,8 +43,17 @@ app-front-end/.superpowers/
 scripts/
 unused_components/
 
-# Local portfolio JSON fallback store (Supabase is the source of truth in prod)
+# Local JSON fallback store (Supabase is the source of truth in prod).
+# Self-initializing on first run — never commit its contents.
 data/portfolio/
+backend/data/
+
+# Supabase CLI local state
+supabase/.temp/
+
+# Local agent/critique tool output
+.agent/
+.impeccable/critique/
 
 # Checked-in maintenance scripts
 !backend/scripts/

@@ -20,7 +20,7 @@ export interface PlateProps {
  * Bracket-framed plate wrapper with scroll reveal — the primitive every gallery
  * plate (Tasks 8–11) builds on. Classes (.plate/.plate-cap-l/-r/.framed/.plate-head/
  * .plate-title/.plate-num/.reveal) already live in index.css (Task 1).
- * Visual source of truth: _design-explore/J-gallery-instruments.html.
+ * Visual source of truth: docs/design/explorations/J-gallery-instruments.html.
  */
 export default function Plate({
   id,
