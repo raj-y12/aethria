@@ -49,6 +49,47 @@ export interface CompanyResolution {
   retrieval_provider?: string | null;
 }
 
+/** One founder identified by the deterministic Founder Resolver. */
+export interface FounderCandidate {
+  name: string;
+  role?: string | null;
+  linkedin_url?: string | null;
+  x_url?: string | null;
+  github_url?: string | null;
+  previous_employment?: string[];
+  education?: string[];
+  location?: string | null;
+  evidence?: Array<{
+    url: string;
+    title?: string;
+    snippet?: string;
+    source_type?: string;
+    supports?: string;
+  }>;
+  conflicts?: Array<{
+    field: string;
+    values?: string[];
+    source_urls?: string[];
+  }>;
+  /** Per-field confidence in [0,1]; an absent key means the field was not extracted. */
+  field_confidence?: Record<string, number>;
+  confidence?: number;
+}
+
+/** Stage-2 lookup output: founders resolved from the identified company. */
+export interface FounderResolution {
+  company: string;
+  website?: string | null;
+  founders?: FounderCandidate[];
+  /** FOUND | PARTIAL | LOW_CONFIDENCE | NOT_FOUND */
+  resolution_status?: string;
+  confidence?: number;
+  missing_fields?: string[];
+  queries_used?: string[];
+  notes?: string[];
+  retrieval_provider?: string | null;
+}
+
 export interface Scout {
   id: string;
   scout_type: string;
@@ -89,6 +130,8 @@ export interface Scout {
   resolution_status?: ResolutionStatus | string | null;
   /** Full Company Resolver payload (detail view only; stripped from the list projection). */
   company_resolution?: CompanyResolution | null;
+  /** Founder Resolver payload: structured founders plus what could not be found. */
+  founder_resolution?: FounderResolution | null;
   /** Hash of the system prompt used by the Scout when this record was created. */
   prompt_version?: string;
   /** Per-field provenance tags from scout/reviewer enrichment. */

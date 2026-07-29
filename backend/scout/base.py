@@ -34,6 +34,7 @@ from utils.reference_verify import (
     registrable_domain,
 )
 from utils.recency import recency_query, scout_recency_directive
+from utils.source_corroboration import filter_sources_to_anchor
 from utils.scout_discovery_queries import (
     build_discovery_queries,
     build_discovery_recency_query,
@@ -618,23 +619,34 @@ class Scout(ABC):
         company_name: str,
         website_hint: Optional[str],
     ) -> Dict[str, Any]:
-        """Promote a user-provided lookup website into the citable source pack."""
+        """Promote a user-provided lookup website into the citable source pack.
+
+        The website is an identity ANCHOR, not the whole evidence base. Dropping
+        every off-domain source here left a lookup with a single page to reason
+        from — no funding coverage, no team/leadership reporting, no profile
+        pages — which is exactly the evidence a company's own homepage lacks.
+        Corroborating sources that actually name this company (or its domain) are
+        retained; unrelated hosts are still dropped, which is what keeps a
+        same-named company from hijacking the lookup.
+        """
         official_url = self._explicit_website_url(website_hint)
         if not official_url:
             return source_pack
         anchor_host = hostname_from_user_hint(website_hint)
-        sources = []
-        for source in list(source_pack.get("sources") or []):
-            if not isinstance(source, dict):
-                continue
-            if anchor_host:
-                try:
-                    source_host = (urlparse(str(source.get("url") or "")).hostname or "").lower().strip(".")
-                except Exception:
-                    source_host = ""
-                if source_host != anchor_host and not source_host.endswith("." + anchor_host):
-                    continue
-            sources.append(source)
+        raw_sources = [s for s in list(source_pack.get("sources") or []) if isinstance(s, dict)]
+        sources = filter_sources_to_anchor(
+            raw_sources,
+            anchor_host=anchor_host,
+            company_name=company_name,
+        )
+        if anchor_host and len(sources) != len(raw_sources):
+            self.logger.info(
+                "company lookup: anchored pack to %s — kept %d/%d source(s) "
+                "(anchor + corroboration)",
+                anchor_host,
+                len(sources),
+                len(raw_sources),
+            )
         existing = {
             str(source.get("url") or "").strip().lower().rstrip("/")
             for source in sources

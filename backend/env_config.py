@@ -142,6 +142,11 @@ REGISTRY: List[EnvVar] = [
            "The full structured resolution is stored regardless."),
     EnvVar("FOUNDER_RESOLUTION_MAX_NAMES", "int", "8", "Founder resolution",
            "Cap on founder names promoted onto ScoutInfo (ScoutInfo allows at most 8)."),
+    EnvVar("FOUNDER_TEAM_PAGE_EXTRACTION", "bool", "true", "Founder resolution",
+           "Read the company's own team/about pages in full during founder resolution. "
+           "Search snippets truncate these pages, which is why listed founders were missed."),
+    EnvVar("FOUNDER_TEAM_PAGE_MAX", "int", "2", "Founder resolution",
+           "Max company pages fetched per founder resolution (extract accepts at most 3)."),
     EnvVar("REVIEWER_FOUNDER_FALLBACK_RETRIEVAL", "bool", "false", "Founder resolution",
            "Allow reviewer-side founder resolution to run extra searches when the "
            "reviewer gap-retrieval pack names nobody. Off by default so reviews add no retrieval."),

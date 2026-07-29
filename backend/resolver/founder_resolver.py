@@ -19,6 +19,7 @@ routable to a dedicated people-search provider — see `search_providers`.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import Any, Callable, Dict, List, Literal, Optional
 from urllib.parse import urlparse
@@ -562,6 +563,106 @@ def _profile_url_for(name: str, url: str, kind: str) -> bool:
 # --------------------------------------------------------------------------- #
 
 
+_TEAM_PATH_RE = re.compile(
+    r"/(team|teams|about|about-us|aboutus|people|leadership|founders|management|"
+    r"who-we-are|our-team|our-story|company)(/|$)",
+    re.IGNORECASE,
+)
+
+# Paths worth trying when retrieval never surfaced a team page for the domain.
+_TEAM_PATH_GUESSES = ("/team", "/about", "/about-us")
+
+
+def _team_page_extraction_enabled() -> bool:
+    return os.getenv("FOUNDER_TEAM_PAGE_EXTRACTION", "true").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
+
+
+def _max_team_pages() -> int:
+    try:
+        value = int(os.getenv("FOUNDER_TEAM_PAGE_MAX", "2"))
+    except ValueError:
+        value = 2
+    # Tavily's extract endpoint accepts at most 3 URLs per call.
+    return max(0, min(value, 3))
+
+
+def _looks_like_team_page(url: str) -> bool:
+    try:
+        return bool(_TEAM_PATH_RE.search(urlparse(url).path or ""))
+    except Exception:
+        return False
+
+
+def _augment_with_team_pages(
+    evidence: List[FounderEvidence],
+    *,
+    anchor_host: Optional[str],
+    company: str,
+) -> int:
+    """Replace team/about snippets with full page text. Returns pages fetched.
+
+    Best-effort: an unreachable page simply leaves the original snippet in place.
+    """
+    if not anchor_host or not _team_page_extraction_enabled():
+        return 0
+    limit = _max_team_pages()
+    if limit <= 0:
+        return 0
+
+    from utils.tavily_client import tavily_extract
+
+    by_url = {e.url.lower().rstrip("/"): e for e in evidence}
+    targets = [
+        e.url
+        for e in evidence
+        if _host_of(e.url)
+        and (
+            _host_of(e.url) == anchor_host or _host_of(e.url).endswith("." + anchor_host)
+        )
+        and _looks_like_team_page(e.url)
+    ][:limit]
+
+    # Retrieval never surfaced a team page — try the conventional paths.
+    guessed: List[str] = []
+    if not targets:
+        guessed = [f"https://{anchor_host}{path}" for path in _TEAM_PATH_GUESSES][:limit]
+        targets = guessed
+
+    if not targets:
+        return 0
+    try:
+        pages = tavily_extract(targets)
+    except Exception as exc:
+        logger.warning("founder team-page extraction failed company=%s: %s", company, exc)
+        return 0
+
+    fetched = 0
+    for page in pages:
+        url = str(page.get("url") or "").strip()
+        content = str(page.get("content") or "").strip()
+        if not url or not content:
+            continue
+        existing = by_url.get(url.lower().rstrip("/"))
+        if existing is not None:
+            existing.snippet = content[:12000]
+        else:
+            evidence.append(
+                FounderEvidence(
+                    url=url,
+                    title=f"{company} team page",
+                    snippet=content[:12000],
+                    source_type="official_site",
+                    supports="Founder or team evidence",
+                )
+            )
+        fetched += 1
+    return fetched
+
+
 def build_founder_queries(
     company: str,
     *,
@@ -1070,6 +1171,24 @@ def resolve_founders(
         decision="continue",
         reason=f"provider={resolution.retrieval_provider or 'none'}",
     )
+
+    # A company's own /team or /about page usually lists the founders outright,
+    # but a search snippet truncates it to a sentence or two — which is why
+    # "readily available" team details were being missed. Read those pages in
+    # full before extracting.
+    extracted_pages = _augment_with_team_pages(
+        evidence, anchor_host=anchor_host, company=company
+    )
+    if extracted_pages:
+        _log_stage(
+            resolution,
+            stage="team_pages",
+            queries=[],
+            sources_found=extracted_pages,
+            candidates=0,
+            decision="continue",
+            reason=f"Read {extracted_pages} company team/about page(s) in full.",
+        )
 
     founders = extract_founder_candidates(evidence, seed_names=known_founder_names)
     resolution.founders = founders

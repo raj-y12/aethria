@@ -28,6 +28,11 @@ import {
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
 import { getNextStepText, parseNextStepItems } from '../lib/memoText';
+import {
+  buildFounderSectionModel,
+  formatFounderBackground,
+  formatMissingFounderFields,
+} from '../lib/founderMemo';
 import { formatDate } from '../lib/dates';
 import OpportunityIntelligence from './institutional/OpportunityIntelligence';
 const MEMO_POLL_INITIAL_MS = 2000;
@@ -349,10 +354,20 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [displayStartup]
   );
   const companyResolution = displayStartup?.scout.company_resolution ?? null;
-  const founderNames =
-    (companyResolution?.founder_names?.length ? companyResolution.founder_names : null) ??
-    displayStartup?.scout.founder_names ??
-    [];
+  const {
+    candidates: founderCandidates,
+    names: founderNames,
+    missing: founderMissing,
+    emptyMessage: founderEmptyMessage,
+  } = useMemo(
+    () =>
+      buildFounderSectionModel({
+        founderResolution: displayStartup?.scout.founder_resolution ?? null,
+        companyResolution,
+        scoutFounderNames: displayStartup?.scout.founder_names ?? null,
+      }),
+    [displayStartup, companyResolution],
+  );
   const founderTeamItems = (displayStartup?.review?.team_analysis ?? []).filter(
     (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
   );
@@ -695,12 +710,55 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </motion.section>
             )}
 
-            {/* ── Founder ── */}
-            {(founderNames.length > 0 || founderTeamItems.length > 0 || founderSignal || founderQuote) && (
-              <motion.section {...sectionReveal} className="memoDocSection memoFounderSection" aria-labelledby="memo-founder">
+            {/* ── Founder ──
+                Always rendered. A memo that silently omits the founder section
+                reads as "no team risk" when it actually means "we did not look"
+                or "we could not find them" — so the empty state is explicit. */}
+            <motion.section {...sectionReveal} className="memoDocSection memoFounderSection" aria-labelledby="memo-founder">
                 <MemoSectionTitle number="02" id="memo-founder">Founder</MemoSectionTitle>
-                {founderNames.length > 0 ? (
+                {founderCandidates.length > 0 ? (
+                  <ul className="memoFounderList">
+                    {founderCandidates.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="memoFounderItem">
+                        <p className="memoDocSubhead">
+                          {f.name}
+                          {f.role ? <span className="memoFounderRole">{f.role}</span> : null}
+                        </p>
+                        {formatFounderBackground(f) ? (
+                          <p className="memoDocProse memoFounderBackground">
+                            {formatFounderBackground(f)}
+                          </p>
+                        ) : null}
+                        {(f.linkedin_url || f.x_url || f.github_url) ? (
+                          <p className="memoFounderLinks">
+                            {f.linkedin_url ? (
+                              <a href={f.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                            ) : null}
+                            {f.x_url ? (
+                              <a href={f.x_url} target="_blank" rel="noopener noreferrer">X</a>
+                            ) : null}
+                            {f.github_url ? (
+                              <a href={f.github_url} target="_blank" rel="noopener noreferrer">GitHub</a>
+                            ) : null}
+                          </p>
+                        ) : null}
+                        {f.conflicts?.length ? (
+                          <p className="memoFounderConflict">
+                            Sources disagree on {f.conflicts.map((c) => c.field).join(', ')} — verify before relying on this.
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : founderNames.length > 0 ? (
                   <p className="memoDocSubhead">{founderNames.join(', ')}</p>
+                ) : (
+                  <p className="memoDocProse memoFounderEmpty">{founderEmptyMessage}</p>
+                )}
+                {founderNames.length > 0 && founderMissing.length > 0 ? (
+                  <p className="memoDocProse memoFounderEmpty">
+                    Not confirmed: {formatMissingFounderFields(founderMissing)}.
+                  </p>
                 ) : null}
                 {founderSignal ? (
                   <div className="memoDocSubsection">
@@ -729,8 +787,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     />
                   </div>
                 ) : null}
-              </motion.section>
-            )}
+            </motion.section>
 
             {/* ── Investment case ── */}
             {investmentCasePoints.length > 0 && (

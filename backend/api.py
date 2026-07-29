@@ -1700,6 +1700,9 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "company_resolution": scout.get("company_resolution")
             if isinstance(scout.get("company_resolution"), dict)
             else None,
+            "founder_resolution": scout.get("founder_resolution")
+            if isinstance(scout.get("founder_resolution"), dict)
+            else None,
             "field_provenance": scout.get("field_provenance")
             if isinstance(scout.get("field_provenance"), dict)
             else None,

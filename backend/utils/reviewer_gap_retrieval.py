@@ -9,32 +9,14 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List
-from urllib.parse import urlparse
 
-from utils.reference_verify import hostname_from_user_hint, registrable_domain
+
+from utils.reference_verify import hostname_from_user_hint
+from utils.source_corroboration import filter_sources_to_anchor
 from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
 
-_TRUSTED_CORROBORATION_DOMAINS = frozenset(
-    {
-        "linkedin.com",
-        "crunchbase.com",
-        "dealroom.co",
-        "ycombinator.com",
-        "pitchbook.com",
-        "techcrunch.com",
-        "businesswire.com",
-        "prnewswire.com",
-        "reuters.com",
-        "venturebeat.com",
-        "sifted.eu",
-        "tech.eu",
-        "forbes.com",
-        "bloomberg.com",
-        "theinformation.com",
-    }
-)
 
 
 def _truthy(key: str, default: str = "true") -> bool:
@@ -107,21 +89,13 @@ def _restrict_pack_to_lookup_website(pack: Dict[str, Any], scout: Dict[str, Any]
     anchor_host = hostname_from_user_hint(website)
     if not official_url or not anchor_host:
         return pack
-    sources: List[Dict[str, Any]] = []
-    for source in list(pack.get("sources") or []):
-        if not isinstance(source, dict):
-            continue
-        try:
-            source_host = (urlparse(str(source.get("url") or "")).hostname or "").lower().strip(".")
-        except Exception:
-            source_host = ""
-        source_reg = registrable_domain(source_host)
-        if (
-            source_host == anchor_host
-            or source_host.endswith("." + anchor_host)
-            or source_reg in _TRUSTED_CORROBORATION_DOMAINS
-        ):
-            sources.append(source)
+    # Shared anchor policy with the scout lookup path, so the two cannot drift:
+    # anchor host first, then corroborating sources that name this company.
+    sources: List[Dict[str, Any]] = filter_sources_to_anchor(
+        [s for s in list(pack.get("sources") or []) if isinstance(s, dict)],
+        anchor_host=anchor_host,
+        company_name=str(scout.get("name") or "") or None,
+    )
     existing = {
         str(source.get("url") or "").strip().lower().rstrip("/")
         for source in sources

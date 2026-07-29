@@ -2080,3 +2080,75 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Founder section ──
+   The section always renders, so it needs an explicit empty/uncertain voice
+   alongside the populated founder list. */
+.memoFounderList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memoFounderItem + .memoFounderItem {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--memo-rule);
+}
+
+.memoFounderItem .memoDocSubhead {
+  margin-bottom: 6px;
+  color: var(--memo-ink-body);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-family: inherit;
+  font-size: var(--memo-body-size);
+}
+
+.memoFounderRole {
+  margin-left: 10px;
+  color: var(--memo-ink-faint);
+  font-family: var(--memo-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.memoFounderBackground {
+  margin: 0 0 6px;
+  color: var(--memo-ink-faint);
+}
+
+.memoFounderLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  font-family: var(--memo-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.memoFounderLinks a {
+  color: var(--memo-ink-faint);
+  text-decoration: none;
+  border-bottom: 1px solid var(--memo-rule-strong);
+}
+
+.memoFounderLinks a:hover,
+.memoFounderLinks a:focus-visible {
+  color: var(--memo-ink-body);
+}
+
+.memoFounderConflict,
+.memoFounderEmpty {
+  margin: 8px 0 0;
+  color: var(--memo-ink-faint);
+  font-size: var(--memo-body-size);
+  line-height: var(--memo-body-leading);
+}
+
+.memoFounderConflict {
+  color: var(--memo-accent);
+}
