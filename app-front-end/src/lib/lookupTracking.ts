@@ -6,14 +6,27 @@ interface FindTrackedLookupInputs {
   lookupId: string;
   outcomeStartupId?: string;
   isRerun: boolean;
+  /** The existing row a re-review targets, recorded when it was dispatched. */
+  targetStartupId?: string;
 }
 
-/** Resolve a dispatch either by its scout correlation id or by the terminal
- * existing-startup id returned when the company was already in deal flow. */
+/** Resolve a dispatch to its startup row.
+ *
+ * Order matters. A re-review's target is known the moment it is dispatched, so
+ * it resolves immediately and stays resolvable even if the backend never stamps
+ * the new correlation id onto that row. Matching on the correlation id alone
+ * left re-reviews unresolved — and an unresolved dispatch never polls its memo
+ * status, so it could never be marked done, cleared, or opened.
+ */
 export function findTrackedLookupStartup(
   startups: Startup[],
-  { lookupId, outcomeStartupId, isRerun }: FindTrackedLookupInputs,
+  { lookupId, outcomeStartupId, isRerun, targetStartupId }: FindTrackedLookupInputs,
 ): Startup | null {
+  const target = targetStartupId?.trim();
+  if (target) {
+    const existing = startups.find((startup) => startup.id === target);
+    if (existing) return existing;
+  }
   const persistedId = outcomeStartupId?.trim();
   if (persistedId) {
     const existing = startups.find((startup) => startup.id === persistedId);
@@ -29,25 +42,56 @@ export function findTrackedLookupStartup(
   }) ?? null;
 }
 
+interface RerunSettledInputs {
+  startup: Startup | null;
+  /** When the re-review was accepted by the backend. */
+  acceptedAt?: string;
+}
+
+/** Whether a re-review has produced fresh downstream output.
+ *
+ * A re-review keeps its previous review/partner while replacements generate, so
+ * their mere presence proves nothing — only a timestamp newer than the dispatch
+ * does. Without an accepted-at there is no way to tell old output from new, so
+ * this reports false rather than guessing.
+ */
+export function rerunHasSettled({ startup, acceptedAt }: RerunSettledInputs): boolean {
+  if (!startup || !acceptedAt) return false;
+  const dispatchedAt = Date.parse(acceptedAt);
+  if (!Number.isFinite(dispatchedAt)) return false;
+  return [startup.timestamps?.partnered_at, startup.timestamps?.reviewed_at].some((value) => {
+    if (!value) return false;
+    const at = Date.parse(value);
+    return Number.isFinite(at) && at >= dispatchedAt;
+  });
+}
+
 interface LookupChipStatusInputs {
   isRerun: boolean;
   isActive: boolean;
   lookupDecided: boolean;
   hasPartner: boolean;
   hasReview: boolean;
+  /** For a backgrounded re-review, whether fresh output has landed. */
+  rerunSettled?: boolean;
 }
 
 /** A rerun preserves its old review/partner while replacements are generated,
- * so only the live rerun status can call it decided. */
+ * so only live status (active) or a post-dispatch timestamp (backgrounded) can
+ * call it decided. */
 export function lookupChipStatus({
   isRerun,
   isActive,
   lookupDecided,
   hasPartner,
   hasReview,
+  rerunSettled = false,
 }: LookupChipStatusInputs): LookupChipStatus {
   if (isRerun) {
-    return isActive && lookupDecided ? 'decided' : 'reviewing';
+    if (isActive) return lookupDecided ? 'decided' : 'reviewing';
+    // A backgrounded re-review has no live poll behind it. Without this it could
+    // never leave 'reviewing' and sat on the rail as a permanently in-flight chip.
+    return rerunSettled ? 'decided' : 'reviewing';
   }
   if (hasPartner) return 'decided';
   if (hasReview) return 'reviewing';

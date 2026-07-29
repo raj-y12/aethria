@@ -16,7 +16,7 @@ import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
 import { supersedeLookupRetryQueries } from '../lib/lookupRetrySupersession';
-import { findTrackedLookupStartup, lookupChipStatus } from '../lib/lookupTracking';
+import { findTrackedLookupStartup, lookupChipStatus, rerunHasSettled } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -275,6 +275,9 @@ export function useDispatchLookup({
           queryLabel: target.scout.name,
           autoOpened: false,
           isRerun: true,
+          // The row being re-reviewed is known now; without it the dispatch can
+          // only be recognised once the backend stamps the new correlation id.
+          targetStartupId: target.id,
           ...(queued.jobId ? { jobId: queued.jobId } : {}),
           ...(queued.acceptedAt ? { acceptedAt: queued.acceptedAt } : {}),
           ...(queued.pipelineRunId ? { pipelineRunId: queued.pipelineRunId } : {}),
@@ -395,6 +398,9 @@ export function useDispatchLookup({
       lookupId: pendingLookup.lookupId,
       outcomeStartupId: lookupFailureQuery.data?.startup_id,
       isRerun: pendingLookup.isRerun,
+      ...(pendingLookup.targetStartupId
+        ? { targetStartupId: pendingLookup.targetStartupId }
+        : {}),
     });
   }, [startups, pendingLookup, lookupFailureQuery.data?.startup_id]);
 
@@ -647,29 +653,39 @@ export function useDispatchLookup({
 
   // Resolve a tracked lookup's startup row (status from the live list).
   const findLookupMatch = useCallback(
-    (id: string) => findTrackedLookupStartup(startups, {
-      lookupId: id,
+    (lookup: TrackedLookup) => findTrackedLookupStartup(startups, {
+      lookupId: lookup.lookupId,
       outcomeStartupId:
-        id === pendingLookup?.lookupId ? lookupFailureQuery.data?.startup_id : undefined,
-      isRerun: Boolean(pendingLookup?.isRerun),
+        lookup.lookupId === pendingLookup?.lookupId
+          ? lookupFailureQuery.data?.startup_id
+          : undefined,
+      // Each tracked lookup carries its own rerun flag; using the active
+      // lookup's flag mis-classified backgrounded dispatches.
+      isRerun: lookup.isRerun,
+      ...(lookup.targetStartupId ? { targetStartupId: lookup.targetStartupId } : {}),
     }),
-    [lookupFailureQuery.data?.startup_id, pendingLookup, startups],
+    [lookupFailureQuery.data?.startup_id, pendingLookup?.lookupId, startups],
   );
 
   // Chips for the takeover: active lookup first, then backgrounded ones.
   const chips = useMemo((): LookupChip[] => {
     const all = [pendingLookup, ...backgroundLookups].filter(Boolean) as TrackedLookup[];
     return all.map((l) => {
-      const m = findLookupMatch(l.lookupId);
+      const m = findLookupMatch(l);
       const isActive = l.lookupId === pendingLookup?.lookupId;
       const hasPartner = Boolean(m?.partner?.recommendation);
       const hasReview = Boolean(m?.review);
+      const settled = rerunHasSettled({
+        startup: m,
+        ...(l.acceptedAt ? { acceptedAt: l.acceptedAt } : {}),
+      });
       const status = lookupChipStatus({
         isRerun: l.isRerun,
         isActive,
         lookupDecided: isActive && lookupDecided,
         hasPartner,
         hasReview,
+        rerunSettled: settled,
       });
       const stage = isActive
         ? l.isRerun
@@ -686,8 +702,8 @@ export function useDispatchLookup({
                 ? 'Review'
                 : 'Decide'
         : l.isRerun
-          ? hasReview
-            ? 'Decide'
+          ? settled
+            ? 'Memo'
             : 'Review'
           : hasPartner
             ? 'Decide'
@@ -715,7 +731,15 @@ export function useDispatchLookup({
   // Focus a backgrounded lookup: swap it into active, demote the current one.
   const focusChip = useCallback(
     (id: string) => {
-      if (id === pendingLookup?.lookupId) return;
+      if (id === pendingLookup?.lookupId) {
+        // Clicking the chip that is already active was a no-op, so a dispatch
+        // whose takeover had nothing left to show felt unclickable. If its work
+        // is finished, the natural destination is the memo.
+        if (pendingLookupMatch && (lookupDecided || pendingLookupMatch.partner?.recommendation)) {
+          openLookupMemo();
+        }
+        return;
+      }
       const target = backgroundLookups.find((l) => l.lookupId === id);
       if (!target) return;
       setFailure(null);
@@ -727,7 +751,7 @@ export function useDispatchLookup({
       });
       setPendingLookup(target);
     },
-    [pendingLookup, backgroundLookups],
+    [pendingLookup, pendingLookupMatch, backgroundLookups, lookupDecided, openLookupMemo],
   );
 
   // Plain ⌘K dispatch always lands on the normal surface, never a stale re-review.

@@ -19,6 +19,16 @@ export type PersistedDispatchLookup = {
    * Required in the normalized shape; legacy stored payloads without it load as false.
    */
   isRerun: boolean;
+  /**
+   * The existing startup a re-review targets, known at dispatch time.
+   *
+   * A normal lookup creates a new row that carries its own lookup_id, so it can
+   * always find itself in the list. A re-review reuses an existing row, so
+   * without this the UI can only recognise it once the backend has stamped the
+   * new correlation id onto that row — and if that never lands, the dispatch
+   * sits on the rail forever with nothing to open.
+   */
+  targetStartupId?: string;
   /** Durable execution identity. Lookup and job IDs intentionally remain distinct. */
   jobId?: string;
   acceptedAt?: string;
@@ -62,11 +72,16 @@ function normalizeLookup(value: unknown): PersistedDispatchLookup | null {
   const durableStatus = typeof value.durableStatus === 'string' && JOB_STATUSES.has(value.durableStatus as JobStatus)
     ? value.durableStatus as JobStatus
     : undefined;
+  // Optional: payloads stored before re-reviews tracked their target simply omit it.
+  const targetStartupId = typeof value.targetStartupId === 'string' && value.targetStartupId.trim()
+    ? value.targetStartupId.trim()
+    : undefined;
   return {
     lookupId,
     queryLabel,
     autoOpened: Boolean(value.autoOpened),
     isRerun: Boolean(value.isRerun),
+    ...(targetStartupId ? { targetStartupId } : {}),
     ...(jobId ? { jobId } : {}),
     ...(acceptedAt ? { acceptedAt } : {}),
     ...(pipelineRunId ? { pipelineRunId } : {}),
