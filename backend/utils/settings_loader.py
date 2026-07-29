@@ -125,9 +125,15 @@ DEFAULT_SETTINGS = {
         "confidence_threshold": 0.2,
         "scout_region": "europe",
         "scout_grounded_citations_enabled": True,
-        # Default fail-open to preserve pipeline throughput when retrieval providers
-        # are flaky; strict mode can be re-enabled per user in settings.
-        "scout_fail_closed_on_empty_retrieval": False,
+        # Two INDEPENDENT gates (they used to be one flag, which meant citation
+        # grounding silently rode on an empty-retrieval setting):
+        #   scout_citation_allowlist_enforced — when retrieval returned sources,
+        #     the model may only cite those sources. Fail-closed by default: a
+        #     payload whose citations all fall outside the retrieved set is rejected.
+        #   scout_fail_closed_on_empty_retrieval — when retrieval returns NOTHING,
+        #     skip generation instead of letting the model write ungrounded prose.
+        "scout_citation_allowlist_enforced": True,
+        "scout_fail_closed_on_empty_retrieval": True,
     },
     "portfolio": {
         "auto_watchlist": True,
@@ -179,13 +185,19 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
                 for k, v in data[section].items():
                     if k in out.get(section, {}):
                         out[section][k] = v
-    # Migration 1: scout_fail_closed_on_empty_retrieval default changed from True
-    # to False; stored settings auto-saved with the old default must be reset.
+    # Migration 1: scout_fail_closed_on_empty_retrieval no longer controls citation
+    # allowlist enforcement — that is now scout_citation_allowlist_enforced. Any
+    # stored value was written under the old, coupled semantics (where it meant
+    # "enforce the allowlist"), so it cannot be carried over to the new meaning.
+    # Reset it to the default and let the dedicated flag govern citations.
     ac = out.get("agent_config")
-    if isinstance(ac, dict) and ac.get("scout_fail_closed_on_empty_retrieval") is True:
+    if isinstance(ac, dict):
         stored_ac = data.get("agent_config") if isinstance(data, dict) else None
         if isinstance(stored_ac, dict) and "scout_fail_closed_on_empty_retrieval" in stored_ac:
-            ac["scout_fail_closed_on_empty_retrieval"] = DEFAULT_SETTINGS["agent_config"]["scout_fail_closed_on_empty_retrieval"]
+            if "scout_citation_allowlist_enforced" not in stored_ac:
+                ac["scout_fail_closed_on_empty_retrieval"] = DEFAULT_SETTINGS[
+                    "agent_config"
+                ]["scout_fail_closed_on_empty_retrieval"]
     # Migration 2: confidence_threshold default changed from 0.5 to 0.2 to improve
     # reviewer throughput; only rewrite explicit legacy-default values.
     if isinstance(ac, dict):
@@ -481,8 +493,29 @@ def is_scout_grounded_citations_enabled(user_id: Optional[str] = None) -> bool:
 
 
 def is_scout_fail_closed_on_empty_retrieval(user_id: Optional[str] = None) -> bool:
+    """Whether generation is skipped when retrieval returns no sources at all.
+
+    Independent of citation allowlist enforcement — see
+    `is_scout_citation_allowlist_enforced`.
+    """
     return bool(
-        load_settings(user_id).get("agent_config", {}).get("scout_fail_closed_on_empty_retrieval", False)
+        load_settings(user_id)
+        .get("agent_config", {})
+        .get("scout_fail_closed_on_empty_retrieval", True)
+    )
+
+
+def is_scout_citation_allowlist_enforced(user_id: Optional[str] = None) -> bool:
+    """Whether cited URLs must come from the retrieved source pack.
+
+    Fail-closed by default and independent of whether generation is permitted
+    when retrieval is empty: if sources WERE retrieved, the model does not get to
+    cite anything else.
+    """
+    return bool(
+        load_settings(user_id)
+        .get("agent_config", {})
+        .get("scout_citation_allowlist_enforced", True)
     )
 
 

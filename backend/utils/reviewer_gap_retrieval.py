@@ -246,4 +246,9 @@ def enrich_scout_for_reviewer_llm(scout_output: Dict[str, Any], user_id: str) ->
     allow = pack.get("url_allowlist")
     if allow:
         out["_reviewer_gap_reference_urls"] = list(allow)
+    # Retain the retrieved rows (not just their URLs) so downstream enrichment —
+    # notably founder resolution — can reuse retrieval the pipeline already paid
+    # for instead of discarding it once the reviewer prompt is rendered.
+    out["_reviewer_gap_sources"] = sources
+    out["_reviewer_gap_provider"] = pack.get("provider")
     return out

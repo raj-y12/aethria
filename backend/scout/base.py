@@ -34,6 +34,11 @@ from utils.reference_verify import (
     registrable_domain,
 )
 from utils.recency import recency_query, scout_recency_directive
+from utils.scout_discovery_queries import (
+    build_discovery_queries,
+    build_discovery_recency_query,
+    thesis_terms,
+)
 from utils.retrieval_grounding import (
     log_pre_filter_cited_urls,
     render_sources_for_prompt,
@@ -41,6 +46,7 @@ from utils.retrieval_grounding import (
 )
 from utils.settings_loader import (
     get_canonical_website_hostname,
+    is_scout_citation_allowlist_enforced,
     is_scout_fail_closed_on_empty_retrieval,
     is_scout_grounded_citations_enabled,
 )
@@ -390,11 +396,16 @@ class Scout(ABC):
         source_pack: Dict[str, Any],
         *,
         grounded_enabled: bool,
-        fail_closed: bool,
+        enforce_citation_allowlist: bool,
         explicit_website: Optional[str] = None,
         for_lookup: bool = False,
     ) -> Optional[Dict[str, Any]]:
-        """Allowlist filter + reference finalize. Returns None if fail-closed with no references."""
+        """Allowlist filter + reference finalize.
+
+        Returns None when citation enforcement is on and no cited URL came from
+        the retrieved source pack. This gate is independent of the empty-retrieval
+        gate: it only applies when there is an allowlist to enforce against.
+        """
         out = dict(data)
         if not out.get("founder_names"):
             # Keep founder extraction deterministic even when the model omits the
@@ -446,7 +457,19 @@ class Scout(ABC):
             allowlist_urls.add(normalized_site)
         if grounded_enabled:
             log_pre_filter_cited_urls(out.get("references"))
-            if fail_closed:
+            if not enforce_citation_allowlist:
+                self.logger.info(
+                    "grounded_citations: allowlist enforcement disabled in settings"
+                )
+            elif not allowlist_urls:
+                # Nothing was retrieved to enforce against. Dropping every citation
+                # here would conflate "we retrieved nothing" with "the model cited
+                # something we did not retrieve" — the empty-retrieval gate owns
+                # that case, upstream of generation.
+                self.logger.info(
+                    "grounded_citations: no allowlist available; skipping citation enforcement"
+                )
+            else:
                 out = self._apply_allowlist(out, allowlist_urls)
                 if not out.get("references"):
                     self.logger.warning(
@@ -454,10 +477,6 @@ class Scout(ABC):
                         bool(explicit_website and str(explicit_website).strip()),
                     )
                     return None
-            else:
-                self.logger.info(
-                    "grounded_citations: fail-open mode; skipping strict allowlist enforcement"
-                )
         # On-demand lookups are user-intentional: do NOT apply the parallel-slug
         # impersonation anchor (and never the fund's own canonical site as anchor).
         # It wrongly drops a same-named company's real references — e.g. looking up
@@ -802,7 +821,7 @@ class Scout(ABC):
         source_pack: Dict[str, Any],
         *,
         grounded_enabled: bool,
-        fail_closed: bool,
+        enforce_citation_allowlist: bool,
         explicit_website: Optional[str] = None,
         context_note: str = "",
         for_lookup: bool = False,
@@ -817,7 +836,7 @@ class Scout(ABC):
             d,
             source_pack,
             grounded_enabled=grounded_enabled,
-            fail_closed=fail_closed,
+            enforce_citation_allowlist=enforce_citation_allowlist,
             explicit_website=explicit_website,
             for_lookup=for_lookup,
         )
@@ -853,7 +872,7 @@ class Scout(ABC):
                 d2,
                 source_pack,
                 grounded_enabled=grounded_enabled,
-                fail_closed=fail_closed,
+                enforce_citation_allowlist=enforce_citation_allowlist,
                 explicit_website=explicit_website,
                 for_lookup=for_lookup,
             )
@@ -874,23 +893,37 @@ class Scout(ABC):
             self._last_token_usage = 0
             self.last_discovery_diagnostic = None
             grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
-            fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            # Two independent gates: one decides whether an EMPTY retrieval may
+            # still produce a payload, the other decides whether cited URLs must
+            # come from the retrieved sources.
+            fail_closed_on_empty = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            enforce_citation_allowlist = is_scout_citation_allowlist_enforced(self._tenant_user_id)
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 lens = self.scout_type.replace("_", " ")
+                # Retrieval is steered by the active mandate, not just the persona:
+                # searching generic phrases and hoping a thesis fit turns up is the
+                # main reason open discovery drifts off-mandate and repeats itself.
+                thesis_ctx = getattr(self, "_fund_thesis_ctx", None)
+                queries = build_discovery_queries(lens, thesis_ctx=thesis_ctx)
+                self.logger.info(
+                    "scout discovery queries scout_type=%s thesis_scoped=%s queries=%s",
+                    self.scout_type,
+                    bool(thesis_terms(thesis_ctx)),
+                    queries,
+                )
                 source_pack = retrieve_source_pack_merged(
-                    queries=[
-                        f"{lens} early-stage startup VC funding seed series traction news",
-                        f"{lens} startup customers pilots revenue growth founders team",
-                    ],
-                    recency_query=recency_query(f"{lens} startup"),
+                    queries=queries,
+                    recency_query=build_discovery_recency_query(
+                        lens, thesis_ctx=thesis_ctx
+                    ),
                     user_id=self._tenant_user_id,
                 )
-                # Open discovery must never ask the model to invent a company when
+                # Open discovery should not ask the model to invent a company when
                 # retrieval is dark. Reference validation happens after generation,
                 # but that is too late: it still burns tokens and can produce noisy
                 # repair/dead-letter traffic during provider outages.
-                if not source_pack["sources"]:
+                if not source_pack["sources"] and fail_closed_on_empty:
                     self.last_discovery_diagnostic = {
                         "kind": "retrieval_no_results",
                         "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
@@ -902,6 +935,11 @@ class Scout(ABC):
                         source_pack.get("provider_diagnostics", []),
                     )
                     return None
+                if not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: no retrieval sources but fail-open on empty "
+                        "retrieval is configured; generating without an allowlist"
+                    )
 
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -1000,7 +1038,7 @@ class Scout(ABC):
                 data,
                 source_pack,
                 grounded_enabled=grounded_enabled,
-                fail_closed=fail_closed,
+                enforce_citation_allowlist=enforce_citation_allowlist,
                 explicit_website=None,
                 context_note="open discovery",
             )
@@ -1050,7 +1088,11 @@ class Scout(ABC):
         try:
             self._last_token_usage = 0
             grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
-            fail_closed = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            # Two independent gates: one decides whether an EMPTY retrieval may
+            # still produce a payload, the other decides whether cited URLs must
+            # come from the retrieved sources.
+            fail_closed_on_empty = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
+            enforce_citation_allowlist = is_scout_citation_allowlist_enforced(self._tenant_user_id)
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 nq = company
@@ -1068,6 +1110,7 @@ class Scout(ABC):
                     ],
                     recency_query=recency_query(nq),
                     user_id=self._tenant_user_id,
+                    category="company",
                 )
                 source_pack["sources"] = self._rank_company_lookup_sources(
                     list(source_pack.get("sources") or []),
@@ -1082,7 +1125,7 @@ class Scout(ABC):
                 # Resolver evidence is merged AFTER the anchor-host filter so identity
                 # evidence (LinkedIn/Crunchbase/news) stays citable even with a website hint.
                 source_pack = self._merge_resolution_sources(source_pack, resolution)
-                if not source_pack["sources"]:
+                if not source_pack["sources"] and fail_closed_on_empty:
                     self.last_discovery_diagnostic = {
                         "kind": "retrieval_no_results",
                         "retrieval_outcome": source_pack.get("retrieval_outcome", "no_results"),
@@ -1094,6 +1137,12 @@ class Scout(ABC):
                         source_pack.get("provider_diagnostics", []),
                     )
                     return None
+                if not source_pack["sources"]:
+                    self.logger.warning(
+                        "grounded_citations: company=%s has no retrieval sources but fail-open "
+                        "on empty retrieval is configured; generating without an allowlist",
+                        company,
+                    )
             else:
                 # Even without grounded citations, resolver evidence should back the
                 # payload's references and financial grounding.
@@ -1158,9 +1207,17 @@ class Scout(ABC):
                 '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
                 '  "est_tam": "string" | null,\n'
                 '  "location": "string" | null,\n'
+                '  "financials": {  // OPTIONAL, GROUNDED ONLY. Fill a sub-field ONLY if a retrieved source explicitly states the figure; otherwise null. NEVER estimate or infer.\n'
+                '    "funding_history": {"value": "e.g. $5M Series A (2024)", "quote": "exact sentence copied verbatim from the cited source", "source_url": "that source URL"} | null,\n'
+                '    "valuation_est": {"value": "e.g. $20M post-money", "quote": "verbatim source sentence", "source_url": "that source URL"} | null,\n'
+                '    "traction_metrics": {"value": "e.g. $2M ARR, 50 customers", "quote": "verbatim source sentence", "source_url": "that source URL"} | null,\n'
+                '    "ip_status": {"value": "e.g. 2 patents granted", "quote": "verbatim source sentence", "source_url": "that source URL"} | null\n'
+                '  },\n'
                 '  "references": ["string", ...]\n'
                 "}\n\n"
                 "Include a founder_names array containing every explicitly named founder or co-founder in the retrieved evidence; use [] only when no names are supported. "
+                "financials: fill a sub-field ONLY when a retrieved source explicitly states the exact figure — copy the figure into value, the source's exact sentence into quote, and that source's URL into source_url. "
+                "If a figure is not present verbatim in your sources, use null. Never estimate, round, or infer funding, valuation, revenue, or IP numbers; unverifiable financials MUST be null. "
                 "CRITICAL: references must contain verifiable sources proving this company exists. "
                 "Prefer primary sources first: official company domain, official docs/blog, product pages, or company-owned GitHub/LinkedIn profile. "
                 "Do not rely only on directory/paywalled sources (PitchBook/Crunchbase/Tracxn/CBInsights) if primary sources are available. "
@@ -1206,7 +1263,7 @@ class Scout(ABC):
                 data,
                 source_pack,
                 grounded_enabled=grounded_enabled,
-                fail_closed=fail_closed,
+                enforce_citation_allowlist=enforce_citation_allowlist,
                 explicit_website=site or None,
                 context_note=f'company lookup: "{company}"',
                 for_lookup=True,

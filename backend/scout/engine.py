@@ -14,6 +14,7 @@ from resolver.company_resolver import (
     build_fallback_scout_payload,
     resolve_company,
 )
+from resolver.founder_resolver import FounderResolution, resolve_founders
 from scout.scouts import (
     MarketDrivenScout,
     BuilderTechnicalScout,
@@ -22,6 +23,10 @@ from scout.scouts import (
 )
 from scout.base import Scout
 from scout.schema import ScoutOutput
+from utils.founder_enrichment import (
+    apply_founder_resolution_to_payload,
+    is_founder_resolution_enabled,
+)
 from utils.storage import Storage
 from tenant_context import require_user_id
 from utils.settings_loader import get_runtime_limits, is_scouts_enabled
@@ -453,6 +458,45 @@ class ScoutEngine:
             diagnostics=diagnostics,
         )
 
+    async def _resolve_founders_for_lookup(
+        self,
+        company: str,
+        *,
+        resolution: Optional[CompanyResolution],
+        website: Optional[str],
+    ) -> Optional[FounderResolution]:
+        """Run the deterministic founder stage; never fail the lookup because of it."""
+        if not is_founder_resolution_enabled():
+            return None
+        aliases: List[str] = []
+        known: List[str] = []
+        if resolution is not None:
+            for alias in (resolution.canonical_name, resolution.query):
+                if alias and alias not in aliases:
+                    aliases.append(alias)
+            known = list(resolution.founder_names)
+        try:
+            founder_resolution = await asyncio.to_thread(
+                resolve_founders,
+                company,
+                user_id=self.tenant_user_id,
+                website=website,
+                aliases=aliases,
+                # Location is not known before the scout stage produces it; the
+                # reviewer-side path passes the stored value when re-resolving.
+                location=None,
+                known_founder_names=known,
+            )
+        except Exception as e:
+            self.logger.warning("Founder resolver failed for %s: %s", company, e)
+            return None
+        self.logger.info(
+            "[lookup] founder resolver company=%s %s",
+            company,
+            founder_resolution.summary_line(),
+        )
+        return founder_resolution
+
     async def run_named_lookup(
         self,
         company_name: str,
@@ -468,8 +512,9 @@ class ScoutEngine:
         """
         On-demand lookup, staged:
           1. Resolve company identity (Company Resolver — deterministic, layered searches)
-          2. Scout/enrich the resolved company (LLM, seeded with resolver evidence)
-          3. Persist (review + scoring happen later and never delete the row)
+          2. Resolve founders (Founder Resolver — deterministic, seeded with stage 1 identity)
+          3. Scout/enrich the resolved company (LLM, seeded with resolver evidence)
+          4. Persist (review + scoring happen later and never delete the row)
         Weak evidence is persisted as PARTIAL/LOW_CONFIDENCE/NEEDS_REVIEW; only a lookup
         with genuinely no credible evidence anywhere returns None (status NOT_FOUND),
         and even then last_lookup_outcome explains what was searched and missing.
@@ -537,7 +582,12 @@ class ScoutEngine:
         ):
             effective_website = resolution.website
 
-        # ── Stage 2: enrich via scout LLM (seeded with resolver evidence) ────
+        # ── Stage 2: resolve founders (deterministic, anchored on stage 1) ───
+        founder_resolution = await self._resolve_founders_for_lookup(
+            company, resolution=resolution, website=effective_website
+        )
+
+        # ── Stage 3: enrich via scout LLM (seeded with resolver evidence) ────
         result = await selected.discover_company(
             company,
             website=effective_website,
@@ -573,6 +623,7 @@ class ScoutEngine:
             if resolution is not None and not payload.get("company_resolution"):
                 payload["resolution_status"] = resolution.resolution_status
                 payload["company_resolution"] = resolution.model_dump(mode="json")
+            payload = apply_founder_resolution_to_payload(payload, founder_resolution)
             payload["prompt_version"] = hash_prompt(getattr(selected, "system_prompt", ""))
             payload["origin_type"] = "on_demand_lookup"
             payload["lookup_query"] = (lookup_query or company).strip()

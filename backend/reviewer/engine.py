@@ -23,6 +23,7 @@ from services.scoring import DeterministicScoringEngine
 from services.scoring.policy_store import load_active_policy
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
+from utils.founder_enrichment import founder_resolution_for_review
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from evaluation_v2.governed_scoring import (
@@ -1058,6 +1059,9 @@ class ReviewerEngine:
                     for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
                     if isinstance(u, str) and str(u).strip()
                 ]
+                founder_resolution = founder_resolution_for_review(
+                    scout_output, scout_for_llm, self.tenant_user_id
+                )
                 success = await asyncio.to_thread(
                     self.storage.add_review,
                     entry_id,
@@ -1065,6 +1069,7 @@ class ReviewerEngine:
                     pipeline_run_id=pipeline_run_id,
                     enrichment_review_output=review_output,
                     enrichment_gap_reference_urls=gap_urls or None,
+                    enrichment_founder_resolution=founder_resolution,
                 )
                 
                 if success:
@@ -1311,6 +1316,9 @@ class ReviewerEngine:
                 for u in (scout_for_llm.get("_reviewer_gap_reference_urls") or [])
                 if isinstance(u, str) and str(u).strip()
             ]
+            founder_resolution = founder_resolution_for_review(
+                scout_output, scout_for_llm, self.tenant_user_id
+            )
             saved = bool(
                 await asyncio.to_thread(
                     self.storage.add_review,
@@ -1319,6 +1327,7 @@ class ReviewerEngine:
                     pipeline_run_id=pipeline_run_id,
                     enrichment_review_output=review_output,
                     enrichment_gap_reference_urls=gap_urls or None,
+                    enrichment_founder_resolution=founder_resolution,
                 )
             )
             if saved:
