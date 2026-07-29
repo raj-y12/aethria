@@ -5,7 +5,7 @@ import { bureauTimes, editionNo } from '../lib/clocks';
 
 /**
  * Fixed marginal furniture (Obys/Izanami-style gallery frame) + film-grain overlay.
- * Visual source of truth: _design-explore/J-gallery-instruments.html (.frame.tl/.tr/.bl/.br, .wordmark, .grain).
+ * Visual source of truth: docs/design/explorations/J-gallery-instruments.html (.frame.tl/.tr/.bl/.br, .wordmark, .grain).
  * Classes are already defined in index.css (Task 1) — this just supplies markup + live clock/edition state.
  */
 export default function GalleryFrame({ enter = true }: { enter?: boolean }) {
