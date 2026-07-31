@@ -198,15 +198,26 @@ REGISTRY: List[EnvVar] = [
     # Each retrieval category resolves its provider independently, so founder
     # (people) lookups can be routed to a specialised backend without affecting
     # company/news/general retrieval. Values are registered provider names;
-    # every category defaults to Tavily.
+    # every category defaults to the configured retrieval chain.
     EnvVar("SEARCH_PROVIDER_GENERAL", "str", "", "Search providers",
-           "Provider name for general search (default: tavily)."),
+           "Provider name for general search (default: configured retrieval chain)."),
     EnvVar("SEARCH_PROVIDER_NEWS", "str", "", "Search providers",
-           "Provider name for recency/news search (default: tavily)."),
+           "Provider name for recency/news search (default: configured retrieval chain)."),
     EnvVar("SEARCH_PROVIDER_COMPANY", "str", "", "Search providers",
-           "Provider name for company identity search (default: tavily)."),
+           "Provider name for company identity search (default: configured retrieval chain)."),
     EnvVar("SEARCH_PROVIDER_PEOPLE", "str", "", "Search providers",
-           "Provider name for founder/people search (default: tavily)."),
+           "Provider name for founder/people search (default: configured retrieval chain)."),
+
+    # --- Retrieval providers -------------------------------------------------
+    EnvVar("RETRIEVAL_PRIMARY_PROVIDER", "str", "firecrawl", "Search providers",
+           "Primary provider in the Firecrawl/Tavily retrieval chain (firecrawl|tavily)."),
+    EnvVar("FIRECRAWL_API_KEY", "secret", "", "Firecrawl", "Firecrawl v2 API key for retrieval."),
+    EnvVar("FIRECRAWL_TIMEOUT", "float", "20.0", "Firecrawl", "Firecrawl request timeout (s)."),
+    EnvVar("FIRECRAWL_MAX_RESULTS_CAP", "int", "15", "Firecrawl", "Cap on Firecrawl results per query."),
+    EnvVar("FIRECRAWL_MAX_RETRIES", "int", "2", "Firecrawl", "Retries for Firecrawl 429 and 5xx responses."),
+    EnvVar("FIRECRAWL_INCLUDE_MARKDOWN", "bool", "1", "Firecrawl", "Request markdown in Firecrawl search results."),
+    EnvVar("FIRECRAWL_MARKDOWN_MAX_CHARS", "int", "4500", "Firecrawl", "Max Firecrawl markdown chars kept per result."),
+    EnvVar("FIRECRAWL_SCRAPE_MAX_URLS", "int", "3", "Firecrawl", "Max URLs sent to Firecrawl scrape."),
 
     # --- Tavily (web search) -------------------------------------------------
     EnvVar("TAVILY_API_KEY", "secret", "", "Tavily", "Tavily web-search API key (scout/reviewer retrieval)."),

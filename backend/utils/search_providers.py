@@ -25,8 +25,11 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Any, Dict, List, Literal, Optional, Protocol, Sequence, runtime_checkable
 
+import metrics
+from utils.firecrawl_client import firecrawl_search
 from utils.tavily_client import ProviderSearchResults, tavily_search
 
 logger = logging.getLogger("search_providers")
@@ -84,22 +87,95 @@ class TavilySearchProvider:
         days: Optional[int] = None,
     ) -> List[Dict[str, str]]:
         topic = "news" if category == "news" else "general"
-        return tavily_search(
-            query=query,
-            max_results=max_results,
-            time_range=time_range,
-            topic=topic,
-            days=days if topic == "news" else None,
-        )
+        started = time.monotonic()
+        try:
+            rows = tavily_search(
+                query=query,
+                max_results=max_results,
+                time_range=time_range,
+                topic=topic,
+                days=days if topic == "news" else None,
+            )
+            diagnostic = getattr(rows, "diagnostics", {})
+            metrics.observe_retrieval_provider(
+                provider="tavily",
+                outcome=str(diagnostic.get("outcome", "success" if rows else "empty")),
+                result_count=len(rows),
+                extraction_ok=bool(rows),
+                latency_seconds=time.monotonic() - started,
+                credits=None,
+            )
+            return rows
+        except Exception:
+            metrics.observe_retrieval_provider(
+                provider="tavily", outcome="error", result_count=0, extraction_ok=False,
+                latency_seconds=time.monotonic() - started, credits=None,
+            )
+            raise
 
 
-_DEFAULT_PROVIDER = TavilySearchProvider()
+class FirecrawlSearchProvider:
+    """Firecrawl v2-backed provider. Supports every retrieval category."""
+
+    name = "firecrawl"
+    supported_categories = frozenset(SEARCH_CATEGORIES)
+
+    def search(self, query: str, *, max_results: int, category: SearchCategory = DEFAULT_CATEGORY,
+               time_range: Optional[str] = None, days: Optional[int] = None) -> List[Dict[str, str]]:
+        topic = "news" if category == "news" else "general"
+        return firecrawl_search(query=query, max_results=max_results, time_range=time_range,
+                                topic=topic, days=days if topic == "news" else None)
+
+
+class ChainedSearchProvider:
+    """Try the configured primary provider, then the other retrieval tier."""
+
+    supported_categories = frozenset(SEARCH_CATEGORIES)
+
+    def __init__(self, firecrawl: FirecrawlSearchProvider, tavily: TavilySearchProvider):
+        self._providers = {"firecrawl": firecrawl, "tavily": tavily}
+
+    @property
+    def name(self) -> str:
+        configured = os.getenv("RETRIEVAL_PRIMARY_PROVIDER", "firecrawl").strip().lower()
+        return configured if configured in self._providers else "firecrawl"
+
+    def search(self, query: str, *, max_results: int, category: SearchCategory = DEFAULT_CATEGORY,
+               time_range: Optional[str] = None, days: Optional[int] = None) -> ProviderSearchResults:
+        primary = self.name
+        tiers = (primary, "tavily" if primary == "firecrawl" else "firecrawl")
+        diagnostics: List[Dict[str, Any]] = []
+        for tier in tiers:
+            rows = self._providers[tier].search(query, max_results=max_results, category=category,
+                                                time_range=time_range, days=days)
+            diagnostic = getattr(rows, "diagnostics", None)
+            if not isinstance(diagnostic, dict):
+                diagnostic = {"provider": tier, "outcome": "success" if rows else "empty",
+                              "reason": None if rows else "no_usable_results", "result_count": len(rows)}
+            diagnostics.append(dict(diagnostic))
+            if rows:
+                combined = dict(diagnostic)
+                combined["provider"] = tier
+                combined["tiers"] = diagnostics
+                return ProviderSearchResults(list(rows), combined)
+        return ProviderSearchResults([], {"provider": tiers[-1], "outcome": "empty",
+                                          "reason": "no_usable_results", "result_count": 0,
+                                          "tiers": diagnostics})
+
+
+_FIRECRAWL_PROVIDER = FirecrawlSearchProvider()
+_TAVILY_PROVIDER = TavilySearchProvider()
+_DEFAULT_PROVIDER = ChainedSearchProvider(_FIRECRAWL_PROVIDER, _TAVILY_PROVIDER)
 
 # category -> provider. Every category starts on Tavily.
 _REGISTRY: Dict[str, Any] = {category: _DEFAULT_PROVIDER for category in SEARCH_CATEGORIES}
 
 # name -> provider, for env-based routing by provider name.
-_BY_NAME: Dict[str, Any] = {_DEFAULT_PROVIDER.name: _DEFAULT_PROVIDER}
+_BY_NAME: Dict[str, Any] = {
+    _DEFAULT_PROVIDER.name: _DEFAULT_PROVIDER,
+    _FIRECRAWL_PROVIDER.name: _FIRECRAWL_PROVIDER,
+    _TAVILY_PROVIDER.name: _TAVILY_PROVIDER,
+}
 
 
 def normalize_category(category: Optional[str]) -> SearchCategory:
@@ -144,11 +220,13 @@ def register_provider(
 
 
 def reset_providers() -> None:
-    """Restore the default (Tavily-everywhere) routing. Intended for tests."""
+    """Restore the default chained routing. Intended for tests."""
     for category in SEARCH_CATEGORIES:
         _REGISTRY[category] = _DEFAULT_PROVIDER
     _BY_NAME.clear()
     _BY_NAME[_DEFAULT_PROVIDER.name] = _DEFAULT_PROVIDER
+    _BY_NAME[_FIRECRAWL_PROVIDER.name] = _FIRECRAWL_PROVIDER
+    _BY_NAME[_TAVILY_PROVIDER.name] = _TAVILY_PROVIDER
 
 
 def _env_override(category: SearchCategory) -> Optional[Any]:
@@ -215,6 +293,48 @@ def provider_search(
                 "result_count": 0,
             },
         )
+
+
+def extract_pages(urls: List[str], timeout: Optional[float] = None) -> List[Dict[str, str]]:
+    """Fetch page content for explicit URLs, provider-neutral.
+
+    Mirrors the search chain: the configured primary tier runs first and the other
+    tier backfills only the URLs it did not return. The contract is unchanged from
+    `tavily_extract` — `[{url, content}]`, best-effort, failures dropped — so call
+    sites need no other change.
+    """
+    from utils.firecrawl_client import firecrawl_scrape
+    from utils.tavily_client import tavily_extract
+
+    clean = [u.strip() for u in urls if isinstance(u, str) and u.strip().startswith("http")]
+    if not clean:
+        return []
+
+    primary = os.getenv("RETRIEVAL_PRIMARY_PROVIDER", "firecrawl").strip().lower()
+    tiers = (
+        (tavily_extract, firecrawl_scrape)
+        if primary == "tavily"
+        else (firecrawl_scrape, tavily_extract)
+    )
+
+    collected: List[Dict[str, str]] = []
+    seen: set = set()
+    for tier in tiers:
+        pending = [u for u in clean if u not in seen]
+        if not pending:
+            break
+        try:
+            pages = tier(pending, timeout) or []
+        except Exception as exc:  # one tier's outage must not sink extraction
+            logger.warning("extract tier %s failed: %s", getattr(tier, "__name__", "?"), exc)
+            continue
+        for page in pages:
+            url = str((page or {}).get("url") or "").strip()
+            content = str((page or {}).get("content") or "").strip()
+            if url and content and url not in seen:
+                seen.add(url)
+                collected.append({"url": url, "content": content})
+    return collected
 
 
 def search_source_pack(

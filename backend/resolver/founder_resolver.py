@@ -613,7 +613,7 @@ def _augment_with_team_pages(
     if limit <= 0:
         return 0
 
-    from utils.tavily_client import tavily_extract
+    from utils.search_providers import extract_pages
 
     by_url = {e.url.lower().rstrip("/"): e for e in evidence}
     targets = [
@@ -635,7 +635,7 @@ def _augment_with_team_pages(
     if not targets:
         return 0
     try:
-        pages = tavily_extract(targets)
+        pages = extract_pages(targets)
     except Exception as exc:
         logger.warning("founder team-page extraction failed company=%s: %s", company, exc)
         return 0

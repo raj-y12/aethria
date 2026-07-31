@@ -9,7 +9,7 @@ def test_retrieve_source_pack_uses_tavily(monkeypatch):
         ],
     )
     pack = retrieve_source_pack(query="hivery startup", user_id="u1", max_results=3)
-    assert pack["provider"] == "tavily"
+    assert pack["provider"] == "firecrawl"
     assert len(pack["sources"]) == 1
     assert "https://hivery.com" in pack["url_allowlist"]
 
@@ -99,7 +99,7 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
         queries=["first", "second"], user_id="u1", max_per_query=3, max_total_sources=5
     )
     assert pack["provider"] == "mixed"
-    assert pack["providers"] == ["duckduckgo_html_fallback", "tavily"]
+    assert pack["providers"] == ["duckduckgo_html_fallback", "firecrawl"]
 
 
 def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch):

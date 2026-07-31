@@ -81,6 +81,34 @@ if ENABLED:
         ["stage", "model", "provider"],
         registry=REGISTRY,
     )
+    # TEMPORARY: compare retrieval providers before choosing a long-term default.
+    RETRIEVAL_PROVIDER_REQUESTS = Counter(
+        "aethria_retrieval_provider_requests_total",
+        "Temporary retrieval-provider comparison requests.",
+        ["provider", "outcome", "extraction_ok"],
+        registry=REGISTRY,
+    )
+    RETRIEVAL_PROVIDER_RESULTS = Histogram(
+        "aethria_retrieval_provider_results",
+        "Temporary retrieval-provider comparison result counts.",
+        ["provider", "outcome", "extraction_ok"],
+        buckets=(0, 1, 2, 3, 5, 10, 15, 25, 50, 100),
+        registry=REGISTRY,
+    )
+    RETRIEVAL_PROVIDER_LATENCY = Histogram(
+        "aethria_retrieval_provider_latency_seconds",
+        "Temporary retrieval-provider comparison latency.",
+        ["provider", "outcome", "extraction_ok"],
+        buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 30, 60, 120),
+        registry=REGISTRY,
+    )
+    RETRIEVAL_PROVIDER_CREDITS = Histogram(
+        "aethria_retrieval_provider_credits",
+        "Temporary retrieval-provider comparison reported credits.",
+        ["provider", "outcome", "extraction_ok"],
+        buckets=(0, 1, 2, 5, 10, 25, 50, 100),
+        registry=REGISTRY,
+    )
     EVALUATION_MANIFESTS = Counter(
         "aethria_evaluation_manifest_total",
         "Evaluation manifest writes by path and outcome.",
@@ -278,6 +306,29 @@ def observe_model_provider_usage(
         ).inc(max(0, int(tokens)))
     except Exception as e:  # pragma: no cover
         logger.debug("observe_model_provider_usage failed: %s", e)
+
+
+def observe_retrieval_provider(
+    *, provider: str, outcome: str, result_count: int, extraction_ok: bool,
+    latency_seconds: float, credits: int | None,
+) -> None:
+    """TEMPORARY: record bounded A/B retrieval-provider comparison metrics."""
+    if not ENABLED:
+        return
+    try:
+        provider_label = _allowlisted(
+            provider, {"firecrawl", "tavily", "duckduckgo_html_fallback", "unknown"}
+        )
+        outcome_label = _allowlisted(outcome, {"success", "empty", "error", "disabled"})
+        extraction_label = "true" if extraction_ok else "false"
+        labels = {"provider": provider_label, "outcome": outcome_label, "extraction_ok": extraction_label}
+        RETRIEVAL_PROVIDER_REQUESTS.labels(**labels).inc()
+        RETRIEVAL_PROVIDER_RESULTS.labels(**labels).observe(max(0, int(result_count)))
+        RETRIEVAL_PROVIDER_LATENCY.labels(**labels).observe(max(0.0, float(latency_seconds)))
+        if credits is not None:
+            RETRIEVAL_PROVIDER_CREDITS.labels(**labels).observe(max(0, int(credits)))
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_retrieval_provider failed: %s", e)
 
 
 def inc_evaluation_manifest(*, path: str, outcome: str) -> None:

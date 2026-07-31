@@ -194,7 +194,7 @@ def test_provider_diagnostics_are_collected_from_every_query(monkeypatch, provid
         queries=_queries(3), user_id="u1", max_total_sources=20
     )
     assert len(pack["provider_diagnostics"]) == 3
-    assert pack["provider"] == "tavily"
+    assert pack["provider"] == "firecrawl"
 
 
 def test_a_failing_query_does_not_sink_the_wave(monkeypatch):

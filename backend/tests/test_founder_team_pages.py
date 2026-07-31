@@ -39,7 +39,7 @@ def extract(monkeypatch):
         state["urls"].extend(urls)
         return state["pages"]
 
-    monkeypatch.setattr("utils.tavily_client.tavily_extract", fake_extract)
+    monkeypatch.setattr("utils.search_providers.extract_pages", fake_extract)
     return state
 
 
@@ -147,7 +147,7 @@ def test_extraction_failure_is_non_fatal(monkeypatch):
     def boom(urls, timeout=None):
         raise RuntimeError("extract down")
 
-    monkeypatch.setattr("utils.tavily_client.tavily_extract", boom)
+    monkeypatch.setattr("utils.search_providers.extract_pages", boom)
     sources = [
         {
             "title": "Acme — Team",

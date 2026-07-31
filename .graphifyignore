@@ -1,0 +1,16 @@
+node_modules/
+graphify-out/
+__pycache__/
+*.pyc
+
+.git/
+.next/
+dist/
+build/
+coverage/
+.cache/
+
+# Temporary visual-review screenshots in the repository root
+/*.jpg
+/*.jpeg
+/*.png

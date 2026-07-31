@@ -28,7 +28,7 @@ from pydantic import BaseModel, Field
 from tenant_context import require_user_id
 from utils.reference_verify import hostname_from_user_hint, registrable_domain
 from utils.retrieval_grounding import retrieve_source_pack_merged
-from utils.tavily_client import tavily_extract
+from utils.search_providers import extract_pages
 
 logger = logging.getLogger("resolver.company")
 
@@ -436,7 +436,7 @@ def _extract_attached_profile(
     if attached is None:
         return
     try:
-        extracted = tavily_extract([url])
+        extracted = extract_pages([url])
     except Exception as exc:
         logger.warning("resolver profile extraction failed url=%s: %s", url, exc)
         return

@@ -121,7 +121,7 @@ def test_attached_yc_profile_is_extracted_for_founders(monkeypatch):
         ]
 
     monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
-    monkeypatch.setattr(cr, "tavily_extract", fake_extract)
+    monkeypatch.setattr(cr, "extract_pages", fake_extract)
 
     res = resolve_company("Acme Robotics", user_id=USER)
 
