@@ -86,7 +86,7 @@ def test_category_normalization_is_case_insensitive():
 
 def test_retrieval_chain_is_the_default_for_every_category():
     for category in SEARCH_CATEGORIES:
-        assert provider_name(category) == "firecrawl"
+        assert provider_name(category) == "exa"
         assert isinstance(get_provider(category), ChainedSearchProvider)
 
 
@@ -128,7 +128,7 @@ def test_people_search_is_independently_routable():
     assert provider_name("people") == "people-co"
     # Every other category is untouched.
     for category in ("general", "news", "company"):
-        assert provider_name(category) == "firecrawl"
+        assert provider_name(category) == "exa"
 
 
 def test_routed_provider_receives_the_category():
@@ -182,13 +182,13 @@ def test_env_override_routes_a_category_to_a_registered_provider(monkeypatch):
 
 def test_unknown_env_override_falls_back_to_the_registry(monkeypatch):
     monkeypatch.setenv("SEARCH_PROVIDER_PEOPLE", "does-not-exist")
-    assert provider_name("people") == "firecrawl"
+    assert provider_name("people") == "exa"
 
 
 def test_reset_restores_defaults():
     register_provider(_RecordingProvider("everything"))
     reset_providers()
-    assert provider_name("people") == "firecrawl"
+    assert provider_name("people") == "exa"
 
 
 # --------------------------------------------------------------------------- #

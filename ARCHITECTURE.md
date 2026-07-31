@@ -22,9 +22,10 @@ Three deployable units and one shared database:
                           ▼
                  ┌──────────────────┐        ┌────────────────────────┐
                  │     backend      │───────▶│ OpenAI (chat + embed)  │
-                 │  FastAPI (api.py)│───────▶│ Tavily (web retrieval) │
-                 │  + agent pipeline│        └────────────────────────┘
-                 └────────┬─────────┘
+                 │  FastAPI (api.py)│───────▶│ Exa → Firecrawl →      │
+                 │  + agent pipeline│        │ Tavily → DuckDuckGo    │
+                 └────────┬─────────┘        │ (web retrieval chain)  │
+                          │                  └────────────────────────┘
                           │ service-role client / direct DSN
                           ▼
                  ┌──────────────────────────────────┐
@@ -72,7 +73,7 @@ and gated on the active fund thesis.
 
 | Stage | Module | Responsibility |
 |---|---|---|
-| **Scout** | `backend/scout/` | Discover *real* companies via Tavily web retrieval + OpenAI structuring. Four personas: `market_driven`, `builder_technical`, `pain_point`, `contrarian`. Persona selection is weighted by the MetaAgent; backpressure throttles discovery when the review backlog builds, and ramp waves accelerate it when the backlog drains. |
+| **Scout** | `backend/scout/` | Discover *real* companies via the retrieval chain (Exa semantic search finds candidate companies, Firecrawl reads their pages) + OpenAI structuring. Four personas: `market_driven`, `builder_technical`, `pain_point`, `contrarian`. Persona selection is weighted by the MetaAgent; backpressure throttles discovery when the review backlog builds, and ramp waves accelerate it when the backlog drains. |
 | **Reviewer** | `backend/reviewer/` | Three personas — Default, Skeptical, Opportunist — score five dimensions (market, product, technical, execution, defensibility) 1–10 in parallel, then blend into a consensus with variance and confidence discounting. Gap retrieval fills missing evidence before scoring. |
 | **Partner** | `backend/partner/` | Produces INVEST / PASS / MONITOR. **Rule-based by default** against versioned thresholds; the LLM is only invoked for the edge-case triggers declared in the active partner-rules file. Escalates to human review when evidence is weak or reviewers disagree. |
 | **Portfolio** | `backend/portfolio/` | Tracks accepted companies: execution checkpoints, external signals, feedback loops, and health checks, each on its own interval. Also owns rejection analysis and concentration clustering. |
