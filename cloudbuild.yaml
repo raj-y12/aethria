@@ -18,7 +18,7 @@ steps:
       - europe-west1-docker.pkg.dev/$PROJECT_ID/aethria-backend/backend:$COMMIT_SHA
 
   - id: deploy-cloud-run
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
     args:
       - run
@@ -28,6 +28,8 @@ steps:
       - --region=europe-west1
       - --platform=managed
       - --service-account=cloud-run-backend@$PROJECT_ID.iam.gserviceaccount.com
+      - --env-vars-file=cloudrun.env.yaml
+      - --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,FIRECRAWL_API_KEY=FIRECRAWL_API_KEY:latest,TAVILY_API_KEY=TAVILY_API_KEY:latest,EXA_API_KEY=EXA_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,DATABASE_URL=DATABASE_URL:latest
       - --allow-unauthenticated
       - --ingress=all
       - --min=1
@@ -44,3 +46,4 @@ images:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  substitutionOption: ALLOW_LOOSE
