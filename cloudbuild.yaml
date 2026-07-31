@@ -30,7 +30,7 @@ steps:
       - --service-account=cloud-run-backend@$PROJECT_ID.iam.gserviceaccount.com
       - --env-vars-file=cloudrun.env.yaml
       - --set-secrets=OPENAI_API_KEY=OPENAI_API_KEY:latest,FIRECRAWL_API_KEY=FIRECRAWL_API_KEY:latest,EXA_API_KEY=EXA_API_KEY:latest,SUPABASE_SERVICE_ROLE_KEY=SUPABASE_SERVICE_ROLE_KEY:latest,DATABASE_URL=DATABASE_URL:latest
-      - --allow-unauthenticated
+      - --no-invoker-iam-check
       - --ingress=all
       - --min=1
       - --max=1
