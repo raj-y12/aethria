@@ -295,7 +295,11 @@ def retrieve_source_pack(
         if raw:
             used_provider = "duckduckgo_html_fallback"
     else:
-        used_provider = primary_provider
+        # Report the tier that actually answered, not the head of the chain.
+        # `provider_name()` names the configured primary, so with a multi-tier
+        # chain the coarse label claimed the primary even when a lower tier
+        # served the results. The diagnostic carries the truth.
+        used_provider = str(provider_diagnostics[0].get("provider") or primary_provider)
 
     sources = _normalize_sources(raw)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}

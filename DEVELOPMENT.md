@@ -15,7 +15,11 @@ change works.
 | Docker | any recent | Optional — containerised backend |
 
 Accounts/keys you will need for the full product: **OpenAI**, **Supabase**,
-**Clerk**, and **Tavily** (web retrieval for the scouts).
+**Clerk**, and at least one retrieval provider. The chain is
+`Exa → Firecrawl → Tavily`, with DuckDuckGo as a keyless last resort: **Exa**
+finds candidate companies semantically, **Firecrawl** reads their pages. Set
+`EXA_API_KEY` and `FIRECRAWL_API_KEY` for the intended path; `TAVILY_API_KEY` is
+optional and only serves the third tier.
 
 ---
 

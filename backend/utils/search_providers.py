@@ -17,9 +17,11 @@ touching extraction logic or any other category:
 
     register_provider(MyPeopleProvider(), categories=["people"])
 
-Tavily remains the initial (and default) implementation for every category.
-Routing can also be overridden per category from the environment, e.g.
-`SEARCH_PROVIDER_PEOPLE=tavily`.
+Every category defaults to the full retrieval chain — `exa → firecrawl → tavily`,
+with DuckDuckGo as the keyless last resort one level up in `retrieval_grounding`.
+Routing can be overridden per category from the environment, e.g.
+`SEARCH_PROVIDER_PEOPLE=tavily`, and the chain order itself with
+`RETRIEVAL_PROVIDER_ORDER`.
 """
 from __future__ import annotations
 
@@ -29,7 +31,8 @@ import time
 from typing import Any, Dict, List, Literal, Optional, Protocol, Sequence, runtime_checkable
 
 import metrics
-from utils.firecrawl_client import firecrawl_search
+from utils.exa_client import exa_search, is_company_domain
+from utils.firecrawl_client import firecrawl_scrape, firecrawl_search
 from utils.tavily_client import ProviderSearchResults, tavily_search
 
 logger = logging.getLogger("search_providers")
@@ -39,6 +42,10 @@ SearchCategory = Literal["general", "news", "company", "people"]
 SEARCH_CATEGORIES: tuple[str, ...] = ("general", "news", "company", "people")
 
 DEFAULT_CATEGORY: SearchCategory = "general"
+
+# Retrieval tiers, best-first. DuckDuckGo is deliberately absent: it lives in
+# `retrieval_grounding` as the keyless last resort after this whole chain fails.
+DEFAULT_PROVIDER_ORDER: tuple[str, ...] = ("exa", "firecrawl", "tavily")
 
 
 @runtime_checkable
@@ -127,27 +134,151 @@ class FirecrawlSearchProvider:
                                 topic=topic, days=days if topic == "news" else None)
 
 
-class ChainedSearchProvider:
-    """Try the configured primary provider, then the other retrieval tier."""
+def _enrich_with_firecrawl(rows: List[Dict[str, Any]]) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Replace Exa highlights with Firecrawl page content where possible.
 
+    Firecrawl is the canonical content layer, so the top-ranked Exa URLs are
+    scraped and their markdown becomes the snippet. A URL Firecrawl could not
+    fetch keeps its Exa highlight, tagged `content_provider="exa_highlight"` so a
+    reader can always tell which layer produced the text.
+
+    Note the scrape budget is bounded twice: by `EXA_ENRICH_MAX_URLS` here and by
+    `FIRECRAWL_SCRAPE_MAX_URLS` inside the Firecrawl client, whichever is lower.
+    """
+    enabled = os.getenv("EXA_ENRICH_WITH_FIRECRAWL", "1").strip().lower() in ("1", "true", "yes")
+    limit = max(0, min(int(os.getenv("EXA_ENRICH_MAX_URLS", "3")), 10))
+    targets = [str(row.get("url") or "") for row in rows[:limit]] if enabled else []
+
+    pages: Dict[str, str] = {}
+    scrape_failed = False
+    if targets:
+        try:
+            pages = {
+                str(page.get("url")): str(page.get("content"))
+                for page in (firecrawl_scrape(targets) or [])
+                if page.get("url") and page.get("content")
+            }
+        except Exception as exc:  # a content-layer outage must not lose the URLs
+            scrape_failed = True
+            logger.warning("Exa->Firecrawl enrichment failed: %s", exc)
+
+    enriched: List[Dict[str, Any]] = []
+    for row in rows:
+        url = str(row.get("url") or "")
+        content = pages.get(url)
+        highlight = str(row.get("highlight") or "")
+        if content:
+            snippet, content_provider = content, "firecrawl"
+        elif highlight:
+            snippet, content_provider = highlight, "exa_highlight"
+        else:
+            snippet, content_provider = "", "none"
+        enriched.append({
+            "title": str(row.get("title") or ""),
+            "url": url,
+            "snippet": snippet,
+            "content_provider": content_provider,
+            "published_date": row.get("published_date"),
+            "author": row.get("author"),
+            "score": row.get("score"),
+        })
+
+    domains = {u.split("/")[2] for u in (str(r.get("url") or "") for r in rows) if u.count("/") >= 2}
+    company_hits = sum(1 for row in rows if is_company_domain(str(row.get("url") or "")))
+    stats = {
+        "unique_domains": len(domains),
+        "company_domain_rate": round(company_hits / len(rows), 3) if rows else 0.0,
+        "firecrawl_success_rate": round(len(pages) / len(targets), 3) if targets else 0.0,
+        "firecrawl_attempted": len(targets),
+        "content_fallback": "firecrawl_error" if scrape_failed else (
+            "exa_highlight" if targets and len(pages) < len(targets) else None
+        ),
+    }
+    return enriched, stats
+
+
+class ExaSearchProvider:
+    """Exa-backed semantic discovery, with Firecrawl supplying page content.
+
+    Exa answers "which companies match this?" far better than a keyword index,
+    but it returns links rather than text. This provider therefore does the two
+    halves of the brief in one place: semantic search for the URLs, Firecrawl for
+    what is on them. It never synthesises, ranks investments, or draws
+    conclusions — ranking here only decides which pages are worth scraping.
+    """
+
+    name = "exa"
     supported_categories = frozenset(SEARCH_CATEGORIES)
-
-    def __init__(self, firecrawl: FirecrawlSearchProvider, tavily: TavilySearchProvider):
-        self._providers = {"firecrawl": firecrawl, "tavily": tavily}
-
-    @property
-    def name(self) -> str:
-        configured = os.getenv("RETRIEVAL_PRIMARY_PROVIDER", "firecrawl").strip().lower()
-        return configured if configured in self._providers else "firecrawl"
 
     def search(self, query: str, *, max_results: int, category: SearchCategory = DEFAULT_CATEGORY,
                time_range: Optional[str] = None, days: Optional[int] = None) -> ProviderSearchResults:
-        primary = self.name
-        tiers = (primary, "tavily" if primary == "firecrawl" else "firecrawl")
+        rows = exa_search(
+            query, max_results=max_results, time_range=time_range, days=days, category=category
+        )
+        diagnostics = dict(getattr(rows, "diagnostics", None) or {})
+        if not rows:
+            return ProviderSearchResults([], diagnostics)
+
+        enriched, stats = _enrich_with_firecrawl(list(rows))
+        diagnostics.update(stats)
+        metrics.observe_exa_discovery(
+            query_type=str(diagnostics.get("query_type") or "unknown"),
+            outcome=str(diagnostics.get("outcome") or "success"),
+            fallback_reason=stats["content_fallback"],
+            unique_domains=stats["unique_domains"],
+            company_domain_rate=stats["company_domain_rate"],
+            firecrawl_success_rate=stats["firecrawl_success_rate"],
+            cost_usd=diagnostics.get("cost_usd"),
+        )
+        return ProviderSearchResults(enriched, diagnostics)
+
+
+class ChainedSearchProvider:
+    """Try each retrieval tier in order until one returns usable results.
+
+    Order is `exa → firecrawl → tavily` by default; DuckDuckGo remains the final
+    fallback and stays in `retrieval_grounding`, one level up, so a total chain
+    failure still degrades to a keyless search rather than to nothing.
+    """
+
+    supported_categories = frozenset(SEARCH_CATEGORIES)
+
+    def __init__(self, providers: Dict[str, Any]):
+        self._providers = dict(providers)
+
+    def _order(self) -> tuple[str, ...]:
+        configured = [
+            name
+            for name in (part.strip().lower() for part in os.getenv("RETRIEVAL_PROVIDER_ORDER", "").split(","))
+            if name in self._providers
+        ]
+        order = tuple(configured) or DEFAULT_PROVIDER_ORDER
+        # A single-provider override is the rollback lever: it moves that tier to
+        # the head without discarding the ones behind it.
+        primary = os.getenv("RETRIEVAL_PRIMARY_PROVIDER", "").strip().lower()
+        if primary in self._providers:
+            order = (primary,) + tuple(name for name in order if name != primary)
+        return order + tuple(name for name in DEFAULT_PROVIDER_ORDER if name not in order)
+
+    @property
+    def name(self) -> str:
+        return self._order()[0]
+
+    def search(self, query: str, *, max_results: int, category: SearchCategory = DEFAULT_CATEGORY,
+               time_range: Optional[str] = None, days: Optional[int] = None) -> ProviderSearchResults:
+        tiers = self._order()
         diagnostics: List[Dict[str, Any]] = []
         for tier in tiers:
-            rows = self._providers[tier].search(query, max_results=max_results, category=category,
-                                                time_range=time_range, days=days)
+            # One tier raising must not sink the ones behind it — with three tiers
+            # an Exa outage would otherwise take Firecrawl and Tavily down with it.
+            try:
+                rows = self._providers[tier].search(query, max_results=max_results, category=category,
+                                                    time_range=time_range, days=days)
+            except Exception as exc:
+                logger.warning("retrieval tier %s raised: %s", tier, exc)
+                diagnostics.append({"provider": tier, "outcome": "error",
+                                    "reason": "provider_error", "result_count": 0})
+                continue
             diagnostic = getattr(rows, "diagnostics", None)
             if not isinstance(diagnostic, dict):
                 diagnostic = {"provider": tier, "outcome": "success" if rows else "empty",
@@ -163,19 +294,31 @@ class ChainedSearchProvider:
                                           "tiers": diagnostics})
 
 
+_EXA_PROVIDER = ExaSearchProvider()
 _FIRECRAWL_PROVIDER = FirecrawlSearchProvider()
 _TAVILY_PROVIDER = TavilySearchProvider()
-_DEFAULT_PROVIDER = ChainedSearchProvider(_FIRECRAWL_PROVIDER, _TAVILY_PROVIDER)
-
-# category -> provider. Every category starts on Tavily.
-_REGISTRY: Dict[str, Any] = {category: _DEFAULT_PROVIDER for category in SEARCH_CATEGORIES}
-
-# name -> provider, for env-based routing by provider name.
-_BY_NAME: Dict[str, Any] = {
-    _DEFAULT_PROVIDER.name: _DEFAULT_PROVIDER,
+_TIER_PROVIDERS = {
+    _EXA_PROVIDER.name: _EXA_PROVIDER,
     _FIRECRAWL_PROVIDER.name: _FIRECRAWL_PROVIDER,
     _TAVILY_PROVIDER.name: _TAVILY_PROVIDER,
 }
+_DEFAULT_PROVIDER = ChainedSearchProvider(_TIER_PROVIDERS)
+
+# category -> provider. Every category starts on the full chain.
+_REGISTRY: Dict[str, Any] = {category: _DEFAULT_PROVIDER for category in SEARCH_CATEGORIES}
+
+
+def _default_by_name() -> Dict[str, Any]:
+    """name -> provider, for env-based routing by provider name.
+
+    The chain is registered under the fixed key `chain` because its `name` is
+    the *current head tier*, which moves with configuration — routing a category
+    to `exa` must reach the single provider, not the whole chain.
+    """
+    return {"chain": _DEFAULT_PROVIDER, **_TIER_PROVIDERS}
+
+
+_BY_NAME: Dict[str, Any] = _default_by_name()
 
 
 def normalize_category(category: Optional[str]) -> SearchCategory:
@@ -224,9 +367,7 @@ def reset_providers() -> None:
     for category in SEARCH_CATEGORIES:
         _REGISTRY[category] = _DEFAULT_PROVIDER
     _BY_NAME.clear()
-    _BY_NAME[_DEFAULT_PROVIDER.name] = _DEFAULT_PROVIDER
-    _BY_NAME[_FIRECRAWL_PROVIDER.name] = _FIRECRAWL_PROVIDER
-    _BY_NAME[_TAVILY_PROVIDER.name] = _TAVILY_PROVIDER
+    _BY_NAME.update(_default_by_name())
 
 
 def _env_override(category: SearchCategory) -> Optional[Any]:

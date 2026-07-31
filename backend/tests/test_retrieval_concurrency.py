@@ -194,7 +194,9 @@ def test_provider_diagnostics_are_collected_from_every_query(monkeypatch, provid
         queries=_queries(3), user_id="u1", max_total_sources=20
     )
     assert len(pack["provider_diagnostics"]) == 3
-    assert pack["provider"] == "firecrawl"
+    # The pack names the tier that answered, which is what the recorder reports —
+    # not the head of the configured chain.
+    assert pack["provider"] == "tavily"
 
 
 def test_a_failing_query_does_not_sink_the_wave(monkeypatch):

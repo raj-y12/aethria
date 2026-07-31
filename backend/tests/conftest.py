@@ -14,16 +14,26 @@ Blanking the keys by default makes the unpatched path fail closed (the providers
 return `disabled`/`missing_api_key`) instead of silently going to the network. A
 test that genuinely wants a key sets it explicitly with `monkeypatch.setenv`,
 which still wins.
+
+Blanking keys is not enough on its own. The DuckDuckGo fallback in
+`retrieval_grounding` needs **no** key, so it is exactly the tier that key
+blanking cannot reach: with every keyed provider disabled, an unpatched
+retrieval test falls all the way through and makes a real DDG request. That costs
+two 8s endpoint timeouts — 16s per test — whenever DDG happens to be rate-limiting
+the runner, which is why a handful of tests could swing the whole suite from ~12s
+to ~60s with no code change. `RETRIEVAL_FALLBACK_ENABLED=0` closes that last
+hole; a test wanting the fallback re-enables it explicitly.
 """
 from __future__ import annotations
 
 import pytest
 
-_PROVIDER_KEYS = ("FIRECRAWL_API_KEY", "TAVILY_API_KEY", "OPENAI_API_KEY")
+_PROVIDER_KEYS = ("EXA_API_KEY", "FIRECRAWL_API_KEY", "TAVILY_API_KEY", "OPENAI_API_KEY")
 
 
 @pytest.fixture(autouse=True)
 def _no_live_provider_calls(monkeypatch):
     for name in _PROVIDER_KEYS:
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("RETRIEVAL_FALLBACK_ENABLED", "0")
     yield

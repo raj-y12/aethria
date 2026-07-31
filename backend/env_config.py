@@ -209,8 +209,27 @@ REGISTRY: List[EnvVar] = [
            "Provider name for founder/people search (default: configured retrieval chain)."),
 
     # --- Retrieval providers -------------------------------------------------
-    EnvVar("RETRIEVAL_PRIMARY_PROVIDER", "str", "firecrawl", "Search providers",
-           "Primary provider in the Firecrawl/Tavily retrieval chain (firecrawl|tavily)."),
+    EnvVar("RETRIEVAL_PROVIDER_ORDER", "str", "exa,firecrawl,tavily", "Search providers",
+           "Retrieval chain order, best-first. DuckDuckGo is always the final keyless fallback."),
+    EnvVar("RETRIEVAL_PRIMARY_PROVIDER", "str", "", "Search providers",
+           "Rollback lever: moves one provider (exa|firecrawl|tavily) to the head of the chain."),
+
+    # --- Exa (semantic search / company discovery) ---------------------------
+    # Exa finds the companies; Firecrawl reads their pages. Full Exa page text is
+    # never requested — highlights only, and only as a Firecrawl-failure fallback.
+    EnvVar("EXA_API_KEY", "secret", "", "Exa", "Exa API key for semantic search and company discovery."),
+    EnvVar("EXA_TIMEOUT", "float", "20.0", "Exa", "Exa request timeout (s)."),
+    EnvVar("EXA_MAX_RESULTS_CAP", "int", "15", "Exa", "Cap on Exa results per query."),
+    EnvVar("EXA_MAX_RETRIES", "int", "2", "Exa", "Retries for Exa 429 and 5xx responses."),
+    EnvVar("EXA_SEARCH_TYPE", "str", "auto", "Exa",
+           "Exa search mode (auto|fast|instant). Research/agent modes are deliberately not allowed."),
+    EnvVar("EXA_HIGHLIGHT_MAX_CHARS", "int", "1200", "Exa", "Max Exa highlight chars kept per result."),
+    EnvVar("EXA_ENRICH_WITH_FIRECRAWL", "bool", "1", "Exa", "Scrape top Exa URLs through Firecrawl for page content."),
+    EnvVar("EXA_ENRICH_MAX_URLS", "int", "3", "Exa",
+           "Max Exa URLs sent to Firecrawl per query (also bounded by FIRECRAWL_SCRAPE_MAX_URLS)."),
+    EnvVar("EXA_INCLUDE_DOMAINS", "str", "", "Exa", "Comma-separated domain allowlist for Exa results."),
+    EnvVar("EXA_EXCLUDE_DOMAINS", "str", "", "Exa",
+           "Comma-separated domain denylist for Exa results (ignored for company/people categories)."),
     EnvVar("FIRECRAWL_API_KEY", "secret", "", "Firecrawl", "Firecrawl v2 API key for retrieval."),
     EnvVar("FIRECRAWL_TIMEOUT", "float", "20.0", "Firecrawl", "Firecrawl request timeout (s)."),
     EnvVar("FIRECRAWL_MAX_RESULTS_CAP", "int", "15", "Firecrawl", "Cap on Firecrawl results per query."),
