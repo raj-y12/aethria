@@ -1103,13 +1103,13 @@ def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
     content of any links it names (max 3, best-effort — a dead or unreachable link
     simply contributes nothing). Runs blocking HTTP; call via asyncio.to_thread.
     """
-    from utils.tavily_client import tavily_extract
+    from utils.search_providers import extract_pages
 
     text = (additional_context or "").strip()
     urls = _OPERATOR_URL_RE.findall(text)[:3]
     if not urls:
         return text
-    for page in tavily_extract(urls):
+    for page in extract_pages(urls):
         text += (
             f"\n\n[Content of operator-provided link {page['url']}]\n{page['content']}"
         )

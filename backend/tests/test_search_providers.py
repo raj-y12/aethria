@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 
 from utils.search_providers import (
+    ChainedSearchProvider,
     SEARCH_CATEGORIES,
     TavilySearchProvider,
     get_provider,
@@ -79,14 +80,14 @@ def test_category_normalization_is_case_insensitive():
 
 
 # --------------------------------------------------------------------------- #
-# Tavily stays the default for every category
+# The Firecrawl/Tavily chain is the default for every category
 # --------------------------------------------------------------------------- #
 
 
-def test_tavily_is_the_default_for_every_category():
+def test_retrieval_chain_is_the_default_for_every_category():
     for category in SEARCH_CATEGORIES:
-        assert provider_name(category) == "tavily"
-        assert isinstance(get_provider(category), TavilySearchProvider)
+        assert provider_name(category) == "firecrawl"
+        assert isinstance(get_provider(category), ChainedSearchProvider)
 
 
 def test_tavily_maps_news_category_to_the_news_topic(monkeypatch):
@@ -127,7 +128,7 @@ def test_people_search_is_independently_routable():
     assert provider_name("people") == "people-co"
     # Every other category is untouched.
     for category in ("general", "news", "company"):
-        assert provider_name(category) == "tavily"
+        assert provider_name(category) == "firecrawl"
 
 
 def test_routed_provider_receives_the_category():
@@ -181,13 +182,13 @@ def test_env_override_routes_a_category_to_a_registered_provider(monkeypatch):
 
 def test_unknown_env_override_falls_back_to_the_registry(monkeypatch):
     monkeypatch.setenv("SEARCH_PROVIDER_PEOPLE", "does-not-exist")
-    assert provider_name("people") == "tavily"
+    assert provider_name("people") == "firecrawl"
 
 
 def test_reset_restores_defaults():
     register_provider(_RecordingProvider("everything"))
     reset_providers()
-    assert provider_name("people") == "tavily"
+    assert provider_name("people") == "firecrawl"
 
 
 # --------------------------------------------------------------------------- #
