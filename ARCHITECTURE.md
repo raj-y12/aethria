@@ -23,7 +23,7 @@ Three deployable units and one shared database:
                  ┌──────────────────┐        ┌────────────────────────┐
                  │     backend      │───────▶│ OpenAI (chat + embed)  │
                  │  FastAPI (api.py)│───────▶│ Exa → Firecrawl →      │
-                 │  + agent pipeline│        │ Tavily → DuckDuckGo    │
+                 │  + agent pipeline│        │ DuckDuckGo             │
                  └────────┬─────────┘        │ (web retrieval chain)  │
                           │                  └────────────────────────┘
                           │ service-role client / direct DSN

@@ -1,7 +1,7 @@
 """Provider-neutral search interface for retrieval grounding.
 
-Retrieval used to call Tavily directly from `retrieval_grounding`, which made the
-provider choice global: founder/people lookups could not be routed to a
+Retrieval used to call one provider directly from `retrieval_grounding`, which
+made the provider choice global: founder/people lookups could not be routed to a
 specialised provider without changing every call site.
 
 This module introduces a small interface with explicit categories:
@@ -17,23 +17,22 @@ touching extraction logic or any other category:
 
     register_provider(MyPeopleProvider(), categories=["people"])
 
-Every category defaults to the full retrieval chain — `exa → firecrawl → tavily`,
-with DuckDuckGo as the keyless last resort one level up in `retrieval_grounding`.
+Every category defaults to the full retrieval chain — `exa → firecrawl`, with
+DuckDuckGo as the keyless last resort one level up in `retrieval_grounding`.
 Routing can be overridden per category from the environment, e.g.
-`SEARCH_PROVIDER_PEOPLE=tavily`, and the chain order itself with
+`SEARCH_PROVIDER_PEOPLE=firecrawl`, and the chain order itself with
 `RETRIEVAL_PROVIDER_ORDER`.
 """
 from __future__ import annotations
 
 import logging
 import os
-import time
 from typing import Any, Dict, List, Literal, Optional, Protocol, Sequence, runtime_checkable
 
 import metrics
 from utils.exa_client import exa_search, is_company_domain
 from utils.firecrawl_client import firecrawl_scrape, firecrawl_search
-from utils.tavily_client import ProviderSearchResults, tavily_search
+from utils.search_results import ProviderSearchResults
 
 logger = logging.getLogger("search_providers")
 
@@ -45,7 +44,7 @@ DEFAULT_CATEGORY: SearchCategory = "general"
 
 # Retrieval tiers, best-first. DuckDuckGo is deliberately absent: it lives in
 # `retrieval_grounding` as the keyless last resort after this whole chain fails.
-DEFAULT_PROVIDER_ORDER: tuple[str, ...] = ("exa", "firecrawl", "tavily")
+DEFAULT_PROVIDER_ORDER: tuple[str, ...] = ("exa", "firecrawl")
 
 
 @runtime_checkable
@@ -70,55 +69,6 @@ class SearchProvider(Protocol):
         days: Optional[int] = None,
     ) -> List[Dict[str, str]]:
         ...
-
-
-class TavilySearchProvider:
-    """Tavily-backed provider. Supports every category.
-
-    Category only affects the request shape, never the returned row shape:
-    `news` maps to Tavily's recency-ranked news topic; the rest use the general
-    topic. People/company searches are ordinary web searches today — the point of
-    the category is that they are *routable* elsewhere.
-    """
-
-    name = "tavily"
-    supported_categories = frozenset(SEARCH_CATEGORIES)
-
-    def search(
-        self,
-        query: str,
-        *,
-        max_results: int,
-        category: SearchCategory = DEFAULT_CATEGORY,
-        time_range: Optional[str] = None,
-        days: Optional[int] = None,
-    ) -> List[Dict[str, str]]:
-        topic = "news" if category == "news" else "general"
-        started = time.monotonic()
-        try:
-            rows = tavily_search(
-                query=query,
-                max_results=max_results,
-                time_range=time_range,
-                topic=topic,
-                days=days if topic == "news" else None,
-            )
-            diagnostic = getattr(rows, "diagnostics", {})
-            metrics.observe_retrieval_provider(
-                provider="tavily",
-                outcome=str(diagnostic.get("outcome", "success" if rows else "empty")),
-                result_count=len(rows),
-                extraction_ok=bool(rows),
-                latency_seconds=time.monotonic() - started,
-                credits=None,
-            )
-            return rows
-        except Exception:
-            metrics.observe_retrieval_provider(
-                provider="tavily", outcome="error", result_count=0, extraction_ok=False,
-                latency_seconds=time.monotonic() - started, credits=None,
-            )
-            raise
 
 
 class FirecrawlSearchProvider:
@@ -236,7 +186,7 @@ class ExaSearchProvider:
 class ChainedSearchProvider:
     """Try each retrieval tier in order until one returns usable results.
 
-    Order is `exa → firecrawl → tavily` by default; DuckDuckGo remains the final
+    Order is `exa → firecrawl` by default; DuckDuckGo remains the final
     fallback and stays in `retrieval_grounding`, one level up, so a total chain
     failure still degrades to a keyless search rather than to nothing.
     """
@@ -270,7 +220,7 @@ class ChainedSearchProvider:
         diagnostics: List[Dict[str, Any]] = []
         for tier in tiers:
             # One tier raising must not sink the ones behind it — with three tiers
-            # an Exa outage would otherwise take Firecrawl and Tavily down with it.
+            # an Exa outage would otherwise take Firecrawl down with it.
             try:
                 rows = self._providers[tier].search(query, max_results=max_results, category=category,
                                                     time_range=time_range, days=days)
@@ -296,11 +246,9 @@ class ChainedSearchProvider:
 
 _EXA_PROVIDER = ExaSearchProvider()
 _FIRECRAWL_PROVIDER = FirecrawlSearchProvider()
-_TAVILY_PROVIDER = TavilySearchProvider()
 _TIER_PROVIDERS = {
     _EXA_PROVIDER.name: _EXA_PROVIDER,
     _FIRECRAWL_PROVIDER.name: _FIRECRAWL_PROVIDER,
-    _TAVILY_PROVIDER.name: _TAVILY_PROVIDER,
 }
 _DEFAULT_PROVIDER = ChainedSearchProvider(_TIER_PROVIDERS)
 
@@ -437,44 +385,34 @@ def provider_search(
 
 
 def extract_pages(urls: List[str], timeout: Optional[float] = None) -> List[Dict[str, str]]:
-    """Fetch page content for explicit URLs, provider-neutral.
+    """Fetch page content for explicit URLs.
 
-    Mirrors the search chain: the configured primary tier runs first and the other
-    tier backfills only the URLs it did not return. The contract is unchanged from
-    `tavily_extract` — `[{url, content}]`, best-effort, failures dropped — so call
-    sites need no other change.
+    Firecrawl is the only extraction layer now that Tavily is gone; the function
+    keeps its provider-neutral name and `[{url, content}]` contract so the three
+    call sites (`pipeline_runner`, `company_resolver`, `founder_resolver`) stay
+    unaware of which provider reads a page.
+
+    Best-effort by contract: an outage yields fewer pages, never an exception —
+    founder and company resolution degrade to search snippets rather than failing.
     """
-    from utils.firecrawl_client import firecrawl_scrape
-    from utils.tavily_client import tavily_extract
-
     clean = [u.strip() for u in urls if isinstance(u, str) and u.strip().startswith("http")]
     if not clean:
         return []
 
-    primary = os.getenv("RETRIEVAL_PRIMARY_PROVIDER", "firecrawl").strip().lower()
-    tiers = (
-        (tavily_extract, firecrawl_scrape)
-        if primary == "tavily"
-        else (firecrawl_scrape, tavily_extract)
-    )
+    try:
+        pages = firecrawl_scrape(clean, timeout) or []
+    except Exception as exc:
+        logger.warning("extract_pages: firecrawl scrape failed: %s", exc)
+        return []
 
     collected: List[Dict[str, str]] = []
     seen: set = set()
-    for tier in tiers:
-        pending = [u for u in clean if u not in seen]
-        if not pending:
-            break
-        try:
-            pages = tier(pending, timeout) or []
-        except Exception as exc:  # one tier's outage must not sink extraction
-            logger.warning("extract tier %s failed: %s", getattr(tier, "__name__", "?"), exc)
-            continue
-        for page in pages:
-            url = str((page or {}).get("url") or "").strip()
-            content = str((page or {}).get("content") or "").strip()
-            if url and content and url not in seen:
-                seen.add(url)
-                collected.append({"url": url, "content": content})
+    for page in pages:
+        url = str((page or {}).get("url") or "").strip()
+        content = str((page or {}).get("content") or "").strip()
+        if url and content and url not in seen:
+            seen.add(url)
+            collected.append({"url": url, "content": content})
     return collected
 
 

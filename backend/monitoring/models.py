@@ -40,7 +40,9 @@ class RefreshEnvelope(BaseModel):
     max_artifacts: int = Field(default=5, ge=1, le=100)
     max_model_tokens: int = Field(default=12000, ge=0, le=1_000_000)
     estimated_cost_usd: float = Field(default=0.25, ge=0, le=10_000)
-    providers: List[str] = Field(default_factory=lambda: ["tavily", "openai"])
+    # Default for NEW envelopes only. Existing rows still carry "tavily"; the
+    # field is an unconstrained list, so they keep deserialising unchanged.
+    providers: List[str] = Field(default_factory=lambda: ["exa", "openai"])
     deadline_at: Optional[datetime] = None
 
     @field_validator("providers")

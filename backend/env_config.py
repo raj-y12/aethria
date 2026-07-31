@@ -209,10 +209,15 @@ REGISTRY: List[EnvVar] = [
            "Provider name for founder/people search (default: configured retrieval chain)."),
 
     # --- Retrieval providers -------------------------------------------------
-    EnvVar("RETRIEVAL_PROVIDER_ORDER", "str", "exa,firecrawl,tavily", "Search providers",
+    EnvVar("RETRIEVAL_PROVIDER_ORDER", "str", "exa,firecrawl", "Search providers",
            "Retrieval chain order, best-first. DuckDuckGo is always the final keyless fallback."),
     EnvVar("RETRIEVAL_PRIMARY_PROVIDER", "str", "", "Search providers",
-           "Rollback lever: moves one provider (exa|firecrawl|tavily) to the head of the chain."),
+           "Rollback lever: moves one provider (exa|firecrawl) to the head of the chain."),
+    EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Search providers",
+           "Use the keyless DuckDuckGo retrieval when the whole provider chain returns nothing."),
+    EnvVar("RETRIEVAL_QUERY_CONCURRENCY", "int", "4", "Search providers",
+           "Retrieval queries in flight at once within one merged pack (1 = sequential). "
+           "Merge order stays deterministic regardless of this value."),
 
     # --- Exa (semantic search / company discovery) ---------------------------
     # Exa finds the companies; Firecrawl reads their pages. Full Exa page text is
@@ -238,17 +243,6 @@ REGISTRY: List[EnvVar] = [
     EnvVar("FIRECRAWL_MARKDOWN_MAX_CHARS", "int", "4500", "Firecrawl", "Max Firecrawl markdown chars kept per result."),
     EnvVar("FIRECRAWL_SCRAPE_MAX_URLS", "int", "3", "Firecrawl", "Max URLs sent to Firecrawl scrape."),
 
-    # --- Tavily (web search) -------------------------------------------------
-    EnvVar("TAVILY_API_KEY", "secret", "", "Tavily", "Tavily web-search API key (scout/reviewer retrieval)."),
-    EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Tavily", "Use DuckDuckGo retrieval when Tavily is unavailable."),
-    EnvVar("RETRIEVAL_QUERY_CONCURRENCY", "int", "4", "Tavily",
-           "Retrieval queries in flight at once within one merged pack (1 = sequential). "
-           "Merge order stays deterministic regardless of this value."),
-    EnvVar("TAVILY_SEARCH_DEPTH", "str", "advanced", "Tavily", "Tavily search depth (basic|advanced)."),
-    EnvVar("TAVILY_MAX_RESULTS_CAP", "int", "15", "Tavily", "Cap on Tavily results per query."),
-    EnvVar("TAVILY_TIMEOUT", "float", "12.0", "Tavily", "Tavily request timeout (s)."),
-    EnvVar("TAVILY_INCLUDE_RAW_CONTENT", "bool", "1", "Tavily", "Request raw page content from Tavily."),
-    EnvVar("TAVILY_RAW_CONTENT_MAX_CHARS", "int", "4500", "Tavily", "Max raw content chars kept per result."),
 
     # --- Supabase client / pool ---------------------------------------------
     EnvVar("SUPABASE_URL", "str", None, "Supabase", "Supabase project URL.", required=True,

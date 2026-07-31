@@ -586,7 +586,7 @@ def _max_team_pages() -> int:
         value = int(os.getenv("FOUNDER_TEAM_PAGE_MAX", "2"))
     except ValueError:
         value = 2
-    # Tavily's extract endpoint accepts at most 3 URLs per call.
+    # The extraction layer accepts at most 3 URLs per call.
     return max(0, min(value, 3))
 
 

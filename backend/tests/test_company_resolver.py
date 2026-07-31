@@ -22,7 +22,7 @@ from resolver.company_resolver import (
 USER = "user_2test_resolver"
 
 
-def _pack(sources: List[Dict[str, str]], provider: str = "tavily") -> Dict[str, Any]:
+def _pack(sources: List[Dict[str, str]], provider: str = "exa") -> Dict[str, Any]:
     return {
         "provider": provider,
         "query": "q",

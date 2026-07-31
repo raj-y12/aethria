@@ -95,7 +95,7 @@ def test_call_llm_records_retrieval_no_results_separately_from_model_failure(mon
             "provider": "none",
             "retrieval_outcome": "no_results",
             "provider_diagnostics": [
-                {"provider": "tavily", "outcome": "disabled", "reason": "missing_api_key"},
+                {"provider": "exa", "outcome": "disabled", "reason": "missing_api_key"},
                 {"provider": "duckduckgo_html_fallback", "outcome": "empty", "reason": "no_usable_results"},
             ],
             "sources": [],
@@ -108,7 +108,7 @@ def test_call_llm_records_retrieval_no_results_separately_from_model_failure(mon
         "kind": "retrieval_no_results",
         "retrieval_outcome": "no_results",
         "provider_diagnostics": [
-            {"provider": "tavily", "outcome": "disabled", "reason": "missing_api_key"},
+            {"provider": "exa", "outcome": "disabled", "reason": "missing_api_key"},
             {"provider": "duckduckgo_html_fallback", "outcome": "empty", "reason": "no_usable_results"},
         ],
     }
@@ -197,10 +197,10 @@ def test_call_llm_records_validation_failure_when_retrieval_succeeded(monkeypatc
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
-            "provider": "tavily",
+            "provider": "exa",
             "retrieval_outcome": "sources_found",
             "provider_diagnostics": [
-                {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
+                {"provider": "exa", "outcome": "success", "reason": None, "result_count": 1},
             ],
             "sources": [
                 {
@@ -371,7 +371,7 @@ def test_company_lookup_includes_explicit_website_in_citable_sources(monkeypatch
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
-            "provider": "tavily",
+            "provider": "exa",
             "sources": [
                 {
                     "source_id": "S1",
@@ -408,7 +408,7 @@ def test_explicit_website_source_pack_discards_non_anchor_sources():
 
     out = scout._add_explicit_website_source(
         {
-            "provider": "tavily",
+            "provider": "exa",
             "sources": [
                 {
                     "source_id": "S1",

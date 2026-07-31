@@ -33,22 +33,22 @@ def recency_window_months() -> int:
     return max(1, min(n, 36))
 
 
-def tavily_time_range() -> str:
-    """Coarse Tavily `time_range` matching the recency window.
+def coarse_time_range() -> str:
+    """Coarse `time_range` matching the recency window.
 
-    Tavily only offers day/week/month/year granularity, so the window is mapped
-    to the nearest range that won't exclude in-window results: <=1mo -> month,
-    otherwise year. This biases the recency query toward fresh pages without
-    hard-dropping anything the prompt-level window still allows.
+    Every provider offers only day/week/month/year granularity, so the window is
+    mapped to the nearest range that won't exclude in-window results: <=1mo ->
+    month, otherwise year. This biases the recency query toward fresh pages
+    without hard-dropping anything the prompt-level window still allows.
     """
     return "month" if recency_window_months() <= 1 else "year"
 
 
 def recency_window_days() -> int:
-    """Recency window expressed in days for Tavily's news `days` parameter.
+    """Recency window expressed in days for the news-category `days` parameter.
 
     Capped at 365 — news older than a year is not "recent" for our purposes and
-    Tavily's news topic is tuned for recent coverage.
+    the providers' news modes are tuned for recent coverage.
     """
     return max(7, min(recency_window_months() * 31, 365))
 
@@ -89,7 +89,7 @@ def reviewer_recency_directive() -> str:
 def recency_query(label: str) -> str:
     """A dated recent-events retrieval query for a company / lens label.
 
-    Recency is expressed with query *terms* (year + event keywords) so Tavily
+    Recency is expressed with query *terms* (year + event keywords) so the provider
     surfaces fresh results without a provider-specific time filter.
     """
     label = (label or "").strip()

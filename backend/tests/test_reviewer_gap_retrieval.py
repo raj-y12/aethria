@@ -81,7 +81,7 @@ def test_enrich_skips_when_disabled(monkeypatch):
 
 def test_enrich_skips_broad_gap_search_when_operator_context_is_present(monkeypatch):
     """Add-context already supplies the deliberate evidence delta; do not add
-    several unrelated Tavily searches before the re-review."""
+    several unrelated retrieval searches before the re-review."""
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
 
     def unexpected_pack(*args, **kwargs):
@@ -108,7 +108,7 @@ def test_reviewer_gap_retrieval_keeps_trusted_external_corroboration(monkeypatch
 
     def fake_retrieve(**kwargs):
         return {
-            "provider": "tavily",
+            "provider": "exa",
             "sources": [
                 {
                     "source_id": "S1",
@@ -164,7 +164,7 @@ def test_reviewer_gap_retrieval_runs_for_missing_founders_even_when_other_fields
 
     def fake_retrieve(**kwargs):
         captured.update(kwargs)
-        return {"provider": "tavily", "sources": [{"url": "https://techcrunch.com/aethria"}]}
+        return {"provider": "exa", "sources": [{"url": "https://techcrunch.com/aethria"}]}
 
     monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
     pack = fetch_reviewer_gap_pack(

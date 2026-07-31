@@ -90,7 +90,7 @@ def scout(monkeypatch):
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
-            "provider": "tavily",
+            "provider": "exa",
             "retrieval_outcome": "sources_found",
             "provider_diagnostics": [],
             "sources": [dict(_SOURCE)],

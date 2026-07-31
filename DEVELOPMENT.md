@@ -16,10 +16,9 @@ change works.
 
 Accounts/keys you will need for the full product: **OpenAI**, **Supabase**,
 **Clerk**, and at least one retrieval provider. The chain is
-`Exa → Firecrawl → Tavily`, with DuckDuckGo as a keyless last resort: **Exa**
-finds candidate companies semantically, **Firecrawl** reads their pages. Set
-`EXA_API_KEY` and `FIRECRAWL_API_KEY` for the intended path; `TAVILY_API_KEY` is
-optional and only serves the third tier.
+`Exa → Firecrawl`, with DuckDuckGo as a keyless last resort: **Exa** finds
+candidate companies semantically, **Firecrawl** reads their pages. Set both
+`EXA_API_KEY` and `FIRECRAWL_API_KEY`.
 
 ---
 
@@ -49,7 +48,8 @@ USE_SUPABASE_STORAGE=1
 SUPABASE_URL=https://<project>.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=...
 CLERK_JWKS_URL=https://<app>.clerk.accounts.dev/.well-known/jwks.json
-TAVILY_API_KEY=...
+EXA_API_KEY=...
+FIRECRAWL_API_KEY=...
 ```
 
 Behaviour when these are missing is deliberate and explicit, never silent:

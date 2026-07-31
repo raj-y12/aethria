@@ -16,7 +16,7 @@ from urllib.request import Request, urlopen
 import certifi
 
 import metrics
-from utils.tavily_client import ProviderSearchResults
+from utils.search_results import ProviderSearchResults
 
 logger = logging.getLogger("firecrawl")
 
