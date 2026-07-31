@@ -333,7 +333,7 @@ def observe_model_provider_usage(
         return
     try:
         stage_label = _allowlisted(stage, {"scout", "reviewer", "partner"})
-        provider_label = _allowlisted(provider, {"openai", "tavily", "unknown"})
+        provider_label = _allowlisted(provider, {"openai", "unknown"})
         model_label = str(model or "unknown").strip()[:80] or "unknown"
         MODEL_PROVIDER_TOKENS.labels(
             stage=stage_label,
@@ -353,7 +353,7 @@ def observe_retrieval_provider(
         return
     try:
         provider_label = _allowlisted(
-            provider, {"exa", "firecrawl", "tavily", "duckduckgo_html_fallback", "unknown"}
+            provider, {"exa", "firecrawl", "duckduckgo_html_fallback", "unknown"}
         )
         outcome_label = _allowlisted(outcome, {"success", "empty", "error", "disabled"})
         extraction_label = "true" if extraction_ok else "false"

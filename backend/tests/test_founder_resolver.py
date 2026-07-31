@@ -14,7 +14,7 @@ from resolver.founder_resolver import (
 )
 
 
-def _search(sources: List[Dict[str, str]], *, provider: str = "tavily"):
+def _search(sources: List[Dict[str, str]], *, provider: str = "exa"):
     captured: Dict[str, Any] = {}
 
     def fake(*, queries, user_id, **kwargs):
@@ -328,11 +328,11 @@ def test_missing_tenant_is_rejected():
 
 
 def test_stage_log_records_queries_and_provider():
-    search = _search(_COMPANY_SOURCES, provider="tavily")
+    search = _search(_COMPANY_SOURCES, provider="exa")
     resolution = resolve_founders(
         "Aethria", user_id="u1", website="aethria.co", search=search
     )
-    assert resolution.retrieval_provider == "tavily"
+    assert resolution.retrieval_provider == "exa"
     assert resolution.queries_used
     stages = [s.stage for s in resolution.stage_log]
     assert stages == ["search", "resolve"]

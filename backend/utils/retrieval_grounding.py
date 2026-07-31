@@ -17,7 +17,7 @@ import certifi
 
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
 from utils.search_providers import normalize_category, provider_name, provider_search
-from utils.tavily_client import ProviderSearchResults
+from utils.search_results import ProviderSearchResults
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
@@ -421,9 +421,9 @@ def retrieve_source_pack_merged(
     # the cap. The recency query runs against the news category (recency-ranked),
     # with a general-search fallback if news returns nothing.
     if rq:
-        from utils.recency import recency_window_days, tavily_time_range
+        from utils.recency import coarse_time_range, recency_window_days
 
-        tr = recency_time_range or tavily_time_range()
+        tr = recency_time_range or coarse_time_range()
         reserved = int(os.getenv("SCOUT_RECENCY_RESERVED_SLOTS", "5"))
         reserved = max(2, min(reserved, max_total_sources - 1))
         news = retrieve_source_pack(

@@ -5,8 +5,8 @@ import pytest
 
 from utils.search_providers import (
     ChainedSearchProvider,
+    FirecrawlSearchProvider,
     SEARCH_CATEGORIES,
-    TavilySearchProvider,
     get_provider,
     normalize_category,
     provider_name,
@@ -18,7 +18,7 @@ from utils.search_providers import (
 
 @pytest.fixture(autouse=True)
 def _restore_registry(monkeypatch):
-    """Every test starts from the default Tavily-everywhere routing."""
+    """Every test starts from the default chain-everywhere routing."""
     for category in SEARCH_CATEGORIES:
         monkeypatch.delenv(f"SEARCH_PROVIDER_{category.upper()}", raising=False)
     reset_providers()
@@ -80,7 +80,7 @@ def test_category_normalization_is_case_insensitive():
 
 
 # --------------------------------------------------------------------------- #
-# The Firecrawl/Tavily chain is the default for every category
+# The retrieval chain is the default for every category
 # --------------------------------------------------------------------------- #
 
 
@@ -90,28 +90,28 @@ def test_retrieval_chain_is_the_default_for_every_category():
         assert isinstance(get_provider(category), ChainedSearchProvider)
 
 
-def test_tavily_maps_news_category_to_the_news_topic(monkeypatch):
+def test_firecrawl_maps_news_category_to_the_news_topic(monkeypatch):
     seen: Dict[str, Any] = {}
 
-    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+    def fake_firecrawl(query, max_results, time_range=None, topic=None, days=None):
         seen.update({"topic": topic, "days": days})
         return []
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
-    TavilySearchProvider().search("q", max_results=5, category="news", days=30)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    FirecrawlSearchProvider().search("q", max_results=5, category="news", days=30)
     assert seen == {"topic": "news", "days": 30}
 
 
 @pytest.mark.parametrize("category", ["general", "company", "people"])
-def test_tavily_maps_non_news_categories_to_the_general_topic(monkeypatch, category):
+def test_firecrawl_maps_non_news_categories_to_the_general_topic(monkeypatch, category):
     seen: Dict[str, Any] = {}
 
-    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+    def fake_firecrawl(query, max_results, time_range=None, topic=None, days=None):
         seen.update({"topic": topic, "days": days})
         return []
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
-    TavilySearchProvider().search("q", max_results=5, category=category, days=30)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    FirecrawlSearchProvider().search("q", max_results=5, category=category, days=30)
     # `days` is a news-only control and must not leak into other categories.
     assert seen == {"topic": "general", "days": None}
 

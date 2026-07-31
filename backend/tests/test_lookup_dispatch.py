@@ -99,7 +99,7 @@ def _resolve_test_client(monkeypatch, sources):
     )
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(
-        cr, "retrieve_source_pack_merged", lambda **kw: {"provider": "tavily", "sources": sources}
+        cr, "retrieve_source_pack_merged", lambda **kw: {"provider": "exa", "sources": sources}
     )
     return TestClient(api.app)
 

@@ -187,12 +187,12 @@ def test_gap_pack_is_reused_without_any_extra_retrieval(monkeypatch):
     resolution = founder_resolution_from_gap_pack(
         {"name": "Acme"},
         user_id="u1",
-        pack={"provider": "tavily", "sources": [_TEAM_SOURCE]},
+        pack={"provider": "exa", "sources": [_TEAM_SOURCE]},
     )
     assert resolution.founder_names() == ["Ada Byron"]
     assert resolution.founders[0].previous_employment == ["Stripe"]
     assert resolution.stage_log[0].stage == "reviewer_gap_pack"
-    assert resolution.retrieval_provider == "tavily"
+    assert resolution.retrieval_provider == "exa"
 
 
 def test_gap_pack_without_founders_can_fall_back_to_retrieval():
@@ -237,7 +237,7 @@ def test_gap_pack_without_founders_returns_none_when_fallback_is_off():
 def test_review_resolves_founders_from_the_retained_gap_sources():
     resolution = founder_resolution_for_review(
         {"name": "Acme"},
-        {"_reviewer_gap_sources": [_TEAM_SOURCE], "_reviewer_gap_provider": "tavily"},
+        {"_reviewer_gap_sources": [_TEAM_SOURCE], "_reviewer_gap_provider": "exa"},
         "u1",
     )
     assert resolution.founder_names() == ["Ada Byron"]
@@ -310,7 +310,7 @@ def test_gap_retrieval_retains_sources_for_reuse(monkeypatch):
         reviewer_gap_retrieval,
         "fetch_reviewer_gap_pack",
         lambda scout, user_id: {
-            "provider": "tavily",
+            "provider": "exa",
             "sources": [_TEAM_SOURCE],
             "url_allowlist": {_TEAM_SOURCE["url"]},
         },
@@ -318,7 +318,7 @@ def test_gap_retrieval_retains_sources_for_reuse(monkeypatch):
     out = reviewer_gap_retrieval.enrich_scout_for_reviewer_llm({"name": "Acme"}, "u1")
     # Previously only the rendered prompt block and URLs survived.
     assert out["_reviewer_gap_sources"] == [_TEAM_SOURCE]
-    assert out["_reviewer_gap_provider"] == "tavily"
+    assert out["_reviewer_gap_provider"] == "exa"
     assert out["_reviewer_web_supplement"]
     assert out["_reviewer_gap_reference_urls"] == [_TEAM_SOURCE["url"]]
 

@@ -6,7 +6,8 @@ That difference drives two decisions here:
 
 1. **Queries are rewritten into natural language.** The existing discovery
    queries use keyword/boolean phrasing (`"fintech" OR "payments" startup seed
-   funding round raised`), which is what Tavily and Firecrawl want. Feeding that
+   funding round raised`), which is what a keyword index like Firecrawl wants.
+   Feeding that
    to a semantic index degrades it, so `semantic_query()` unpicks the boolean
    scaffolding into a sentence describing the *company* being looked for.
 
@@ -37,7 +38,7 @@ import certifi
 
 import metrics
 from utils.reference_verify import normalize_url_for_match
-from utils.tavily_client import ProviderSearchResults
+from utils.search_results import ProviderSearchResults
 
 logger = logging.getLogger("exa")
 

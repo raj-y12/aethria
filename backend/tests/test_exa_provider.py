@@ -17,7 +17,7 @@ import pytest
 
 from utils.exa_client import exa_search, query_intent, semantic_query
 from utils.search_providers import provider_search, reset_providers
-from utils.tavily_client import ProviderSearchResults
+from utils.search_results import ProviderSearchResults
 
 
 class _Response:
@@ -45,7 +45,7 @@ def _result(url, title="Acme", **extra):
 @pytest.fixture(autouse=True)
 def _provider_environment(monkeypatch):
     for name in (
-        "EXA_API_KEY", "FIRECRAWL_API_KEY", "TAVILY_API_KEY",
+        "EXA_API_KEY", "FIRECRAWL_API_KEY",
         "RETRIEVAL_PRIMARY_PROVIDER", "RETRIEVAL_PROVIDER_ORDER",
         "EXA_INCLUDE_DOMAINS", "EXA_EXCLUDE_DOMAINS", "EXA_ENRICH_WITH_FIRECRAWL",
     ):
@@ -428,16 +428,10 @@ def test_primary_provider_override_moves_a_tier_to_the_head(monkeypatch):
             [], {"provider": "exa", "outcome": "empty", "reason": "no_usable_results", "result_count": 0}
         ),
     )
-    monkeypatch.setattr(
-        "utils.search_providers.tavily_search",
-        lambda *a, **k: ProviderSearchResults(
-            [], {"provider": "tavily", "outcome": "empty", "reason": "no_usable_results", "result_count": 0}
-        ),
-    )
 
     rows = provider_search("acme", max_results=5)
 
-    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["firecrawl", "exa", "tavily"]
+    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["firecrawl", "exa"]
 
 
 def test_one_tier_raising_does_not_sink_the_tiers_behind_it(monkeypatch):
@@ -445,28 +439,22 @@ def test_one_tier_raising_does_not_sink_the_tiers_behind_it(monkeypatch):
         raise RuntimeError("exa down")
 
     monkeypatch.setattr("utils.search_providers.exa_search", boom)
-    tavily_rows = ProviderSearchResults(
-        [{"title": "TV", "url": "https://tv.example", "snippet": "answer"}],
-        {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
+    firecrawl_rows = ProviderSearchResults(
+        [{"title": "FC", "url": "https://fc.example", "snippet": "answer"}],
+        {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": 1},
     )
-    monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
-        lambda *a, **k: ProviderSearchResults(
-            [], {"provider": "firecrawl", "outcome": "error", "reason": "http_error", "result_count": 0}
-        ),
-    )
-    monkeypatch.setattr("utils.search_providers.tavily_search", lambda *a, **k: tavily_rows)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", lambda *a, **k: firecrawl_rows)
 
     rows = provider_search("acme", max_results=5)
 
-    assert rows.diagnostics["provider"] == "tavily"
-    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["exa", "firecrawl", "tavily"]
+    assert rows.diagnostics["provider"] == "firecrawl"
+    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["exa", "firecrawl"]
     assert rows.diagnostics["tiers"][0]["reason"] == "provider_error"
 
 
 def test_complete_chain_failure_returns_empty_with_every_tier_recorded(monkeypatch):
     for target, provider in (
-        ("exa_search", "exa"), ("firecrawl_search", "firecrawl"), ("tavily_search", "tavily")
+        ("exa_search", "exa"), ("firecrawl_search", "firecrawl")
     ):
         monkeypatch.setattr(
             f"utils.search_providers.{target}",
@@ -478,7 +466,7 @@ def test_complete_chain_failure_returns_empty_with_every_tier_recorded(monkeypat
     rows = provider_search("acme", max_results=5)
 
     assert rows == []
-    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["exa", "firecrawl", "tavily"]
+    assert [tier["provider"] for tier in rows.diagnostics["tiers"]] == ["exa", "firecrawl"]
     assert rows.diagnostics["outcome"] == "empty"
 
 
@@ -487,7 +475,7 @@ def test_chain_failure_degrades_to_duckduckgo_not_to_nothing(monkeypatch):
     from utils.retrieval_grounding import retrieve_source_pack
 
     for target, provider in (
-        ("exa_search", "exa"), ("firecrawl_search", "firecrawl"), ("tavily_search", "tavily")
+        ("exa_search", "exa"), ("firecrawl_search", "firecrawl")
     ):
         monkeypatch.setattr(
             f"utils.search_providers.{target}",

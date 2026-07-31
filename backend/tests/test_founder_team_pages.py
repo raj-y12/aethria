@@ -22,7 +22,7 @@ _TRUNCATED_SNIPPET = "Meet the team behind Acme. We are a small team of..."
 def _search(sources: List[Dict[str, str]]):
     def fake(*, queries, user_id, **kwargs):
         return {
-            "provider": "tavily",
+            "provider": "exa",
             "sources": sources,
             "url_allowlist": {s["url"] for s in sources},
         }
@@ -32,7 +32,7 @@ def _search(sources: List[Dict[str, str]]):
 
 @pytest.fixture
 def extract(monkeypatch):
-    """Stub Tavily extract; records requested URLs."""
+    """Stub page extraction; records requested URLs."""
     state: Dict[str, Any] = {"urls": [], "pages": []}
 
     def fake_extract(urls, timeout=None):

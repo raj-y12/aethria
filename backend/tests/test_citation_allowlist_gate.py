@@ -148,7 +148,7 @@ def _patch_pack(monkeypatch, sources):
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
-            "provider": "tavily" if sources else "none",
+            "provider": "exa" if sources else "none",
             "retrieval_outcome": "sources_found" if sources else "no_results",
             "provider_diagnostics": [],
             "sources": list(sources),

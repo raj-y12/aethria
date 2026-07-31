@@ -59,8 +59,8 @@ those exact paths. See [ADR-0007](docs/adr/0007-frozen-deploy-roots.md).
                     ┌──────────────── active FundThesis (hard gate) ────────────────┐
                     │                                                               │
   web search  →  ScoutEngine  →  ReviewerEngine  →  PartnerEngine  →  PortfolioEngine  →  MetaAgent
-  (Tavily)       4 personas      3 personas         versioned rules     signals/health     self-tuning
-  + OpenAI       discovers       score 5 dims       INVEST/PASS/         watchlist         prompts,
+  (Exa +         4 personas      3 personas         versioned rules     signals/health     self-tuning
+   Firecrawl)    discovers       score 5 dims       INVEST/PASS/         watchlist         prompts,
                  real            + consensus        MONITOR              concentration     weights,
                  companies                          + escalation                           calibration
 ```

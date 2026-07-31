@@ -10,7 +10,7 @@ import time
 import pytest
 
 from utils.retrieval_grounding import retrieve_source_pack_merged
-from utils.tavily_client import ProviderSearchResults
+from utils.search_results import ProviderSearchResults
 
 
 class _Recorder:
@@ -39,7 +39,7 @@ class _Recorder:
             return ProviderSearchResults(
                 rows,
                 {
-                    "provider": "tavily",
+                    "provider": "firecrawl",
                     "outcome": "success",
                     "reason": None,
                     "result_count": len(rows),
@@ -53,7 +53,7 @@ class _Recorder:
 @pytest.fixture
 def provider(monkeypatch):
     recorder = _Recorder()
-    monkeypatch.setattr("utils.search_providers.tavily_search", recorder)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", recorder)
     return recorder
 
 
@@ -97,10 +97,10 @@ def test_duplicate_urls_are_still_deduped(monkeypatch):
     def same_url(query, max_results, time_range=None, topic=None, days=None):
         return ProviderSearchResults(
             [{"title": "dup", "url": "https://same.example/a", "snippet": "s"}],
-            {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
+            {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": 1},
         )
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", same_url)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", same_url)
     monkeypatch.setenv("RETRIEVAL_QUERY_CONCURRENCY", "4")
     pack = retrieve_source_pack_merged(queries=_queries(5), user_id="u1")
     assert len(pack["sources"]) == 1
@@ -113,7 +113,7 @@ def test_duplicate_urls_are_still_deduped(monkeypatch):
 
 def test_queries_overlap_when_concurrency_is_enabled(monkeypatch):
     recorder = _Recorder(delay=0.05)
-    monkeypatch.setattr("utils.search_providers.tavily_search", recorder)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", recorder)
     monkeypatch.setenv("RETRIEVAL_QUERY_CONCURRENCY", "4")
     retrieve_source_pack_merged(queries=_queries(4), user_id="u1", max_total_sources=20)
     assert recorder.max_in_flight > 1
@@ -121,7 +121,7 @@ def test_queries_overlap_when_concurrency_is_enabled(monkeypatch):
 
 def test_concurrency_one_stays_sequential(monkeypatch):
     recorder = _Recorder(delay=0.02)
-    monkeypatch.setattr("utils.search_providers.tavily_search", recorder)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", recorder)
     monkeypatch.setenv("RETRIEVAL_QUERY_CONCURRENCY", "1")
     retrieve_source_pack_merged(queries=_queries(4), user_id="u1", max_total_sources=20)
     assert recorder.max_in_flight == 1
@@ -163,10 +163,10 @@ def test_recency_survives_a_cap_the_general_queries_would_fill(monkeypatch):
             ]
         return ProviderSearchResults(
             rows,
-            {"provider": "tavily", "outcome": "success", "reason": None, "result_count": len(rows)},
+            {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": len(rows)},
         )
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", flood)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", flood)
     monkeypatch.setenv("RETRIEVAL_QUERY_CONCURRENCY", "4")
     pack = retrieve_source_pack_merged(
         queries=_queries(3),
@@ -196,7 +196,7 @@ def test_provider_diagnostics_are_collected_from_every_query(monkeypatch, provid
     assert len(pack["provider_diagnostics"]) == 3
     # The pack names the tier that answered, which is what the recorder reports —
     # not the head of the configured chain.
-    assert pack["provider"] == "tavily"
+    assert pack["provider"] == "firecrawl"
 
 
 def test_a_failing_query_does_not_sink_the_wave(monkeypatch):
@@ -206,10 +206,10 @@ def test_a_failing_query_does_not_sink_the_wave(monkeypatch):
         tag = query.split("#")[-1]
         return ProviderSearchResults(
             [{"title": f"t{tag}", "url": f"https://ex{tag}.com", "snippet": "s"}],
-            {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
+            {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": 1},
         )
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", flaky)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", flaky)
     monkeypatch.setenv("RETRIEVAL_QUERY_CONCURRENCY", "4")
     monkeypatch.setenv("RETRIEVAL_FALLBACK_ENABLED", "0")
     pack = retrieve_source_pack_merged(

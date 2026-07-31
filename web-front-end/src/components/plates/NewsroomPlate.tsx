@@ -32,19 +32,19 @@ export default function NewsroomPlate() {
           <h4>Scouts — source the field</h4>
           <div className="row">
             <span>Market-Driven</span>
-            <span className="role">web + tavily</span>
+            <span className="role">web + exa</span>
           </div>
           <div className="row">
             <span>Builder / Technical</span>
-            <span className="role">web + tavily</span>
+            <span className="role">web + exa</span>
           </div>
           <div className="row">
             <span>Pain-Point</span>
-            <span className="role">web + tavily</span>
+            <span className="role">web + exa</span>
           </div>
           <div className="row">
             <span>Contrarian</span>
-            <span className="role">web + tavily</span>
+            <span className="role">web + exa</span>
           </div>
         </div>
         <div className="col">

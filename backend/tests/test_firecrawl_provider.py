@@ -8,8 +8,8 @@ from urllib.error import HTTPError
 import pytest
 
 from utils.firecrawl_client import firecrawl_search
-from utils.search_providers import provider_search, reset_providers
-from utils.tavily_client import ProviderSearchResults
+from utils.search_providers import reset_providers
+from utils.search_results import ProviderSearchResults
 
 
 class _Response:
@@ -28,7 +28,7 @@ class _Response:
 
 @pytest.fixture(autouse=True)
 def _provider_environment(monkeypatch):
-    for name in ("FIRECRAWL_API_KEY", "TAVILY_API_KEY", "RETRIEVAL_PRIMARY_PROVIDER"):
+    for name in ("EXA_API_KEY", "FIRECRAWL_API_KEY", "RETRIEVAL_PRIMARY_PROVIDER"):
         monkeypatch.delenv(name, raising=False)
     reset_providers()
     yield
@@ -52,26 +52,6 @@ def test_success_normalizes_markdown_and_deduplicates_urls(monkeypatch):
 
     assert result == [{"title": "Acme", "url": "https://example.com/a", "snippet": "markdown wins"}]
     assert result.diagnostics["outcome"] == "success"
-
-
-def test_firecrawl_error_falls_back_to_tavily_and_keeps_tier_diagnostics(monkeypatch):
-    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-key")
-    monkeypatch.setenv("TAVILY_API_KEY", "tv-key")
-    monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
-        lambda *args, **kwargs: ProviderSearchResults([], {"provider": "firecrawl", "outcome": "error", "reason": "http_error", "result_count": 0}),
-    )
-    tavily_rows = ProviderSearchResults(
-        [{"title": "Tavily", "url": "https://tavily.example", "snippet": "answer"}],
-        {"provider": "tavily", "outcome": "success", "reason": None, "result_count": 1},
-    )
-    monkeypatch.setattr("utils.search_providers.tavily_search", lambda *args, **kwargs: tavily_rows)
-
-    result = provider_search("acme", max_results=5)
-
-    assert list(result) == list(tavily_rows)
-    assert result.diagnostics["provider"] == "tavily"
-    assert [tier["provider"] for tier in result.diagnostics["tiers"]] == ["exa", "firecrawl", "tavily"]
 
 
 @pytest.mark.parametrize("payload", [

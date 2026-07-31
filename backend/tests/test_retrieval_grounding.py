@@ -1,15 +1,15 @@
 from utils.retrieval_grounding import retrieve_source_pack, retrieve_source_pack_merged
 
 
-def test_retrieve_source_pack_uses_tavily(monkeypatch):
+def test_retrieve_source_pack_uses_the_chain(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.tavily_search",
+        "utils.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [
             {"title": "Hivery", "url": "https://hivery.com", "snippet": "profile"}
         ],
     )
     pack = retrieve_source_pack(query="hivery startup", user_id="u1", max_results=3)
-    assert pack["provider"] == "tavily"
+    assert pack["provider"] == "firecrawl"
     assert len(pack["sources"]) == 1
     assert "https://hivery.com" in pack["url_allowlist"]
 
@@ -17,7 +17,7 @@ def test_retrieve_source_pack_uses_tavily(monkeypatch):
 def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
     calls: list[str] = []
 
-    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+    def fake_firecrawl(query, max_results, time_range=None, topic=None, days=None):
         calls.append(query)
         if "funding" in query:
             return [
@@ -29,7 +29,7 @@ def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
             {"title": "C", "url": "https://c.com", "snippet": "third"},
         ]
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
     pack = retrieve_source_pack_merged(
         queries=["Acme startup funding", "Acme traction customers"],
         user_id="u1",
@@ -43,18 +43,18 @@ def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
 
 
 def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
-    """The recency query must use Tavily's news topic AND land in the pack even when
+    """The recency query must use the news category AND land in the pack even when
     the general queries alone would fill the cap (the breaking-news regression)."""
     seen: list[tuple[str, str | None, int | None]] = []
 
-    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+    def fake_firecrawl(query, max_results, time_range=None, topic=None, days=None):
         seen.append((query, topic, days))
         if "acquisition" in query:  # the recency query
             return [{"title": "BigCo acquires Acme", "url": "https://news.example/acme-deal", "snippet": "today"}]
         # general queries flood enough rows to fill a small cap on their own
         return [{"title": f"g{i}", "url": f"https://g{i}.com", "snippet": "x"} for i in range(8)]
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
     pack = retrieve_source_pack_merged(
         queries=["Acme funding", "Acme product", "Acme founders"],
         recency_query="Acme latest news 2026 acquisition merger",
@@ -72,7 +72,7 @@ def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
 
 def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.tavily_search",
+        "utils.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
     monkeypatch.setattr("utils.retrieval_grounding._fallback_search", lambda query, max_results: [])
@@ -84,13 +84,13 @@ def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
 def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
     calls = []
 
-    def fake_tavily(query, max_results, time_range=None, topic=None, days=None):
+    def fake_firecrawl(query, max_results, time_range=None, topic=None, days=None):
         calls.append(query)
         if len(calls) == 1:
-            return [{"title": "Tavily result", "url": "https://tavily.example", "snippet": "x"}]
+            return [{"title": "Chain result", "url": "https://chain.example", "snippet": "x"}]
         return []
 
-    monkeypatch.setattr("utils.search_providers.tavily_search", fake_tavily)
+    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
     monkeypatch.setattr(
         "utils.retrieval_grounding._fallback_search",
         lambda query, max_results: [{"title": "DDG result", "url": "https://ddg.example", "snippet": "x"}],
@@ -99,12 +99,12 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
         queries=["first", "second"], user_id="u1", max_per_query=3, max_total_sources=5
     )
     assert pack["provider"] == "mixed"
-    assert pack["providers"] == ["duckduckgo_html_fallback", "tavily"]
+    assert pack["providers"] == ["duckduckgo_html_fallback", "firecrawl"]
 
 
 def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.tavily_search",
+        "utils.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
     monkeypatch.setattr(
@@ -117,23 +117,7 @@ def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch
     assert pack["retrieval_outcome"] == "no_results"
     assert pack["provider"] == "none"
     assert [item["provider"] for item in pack["provider_diagnostics"]] == [
-        "tavily",
+        "firecrawl",
         "duckduckgo_html_fallback",
     ]
     assert all(item["outcome"] == "empty" for item in pack["provider_diagnostics"])
-
-
-def test_tavily_search_exposes_disabled_provider_diagnostic(monkeypatch):
-    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
-
-    from utils.tavily_client import tavily_search
-
-    result = tavily_search("unknown", max_results=3)
-
-    assert result == []
-    assert result.diagnostics == {
-        "provider": "tavily",
-        "outcome": "disabled",
-        "reason": "missing_api_key",
-        "result_count": 0,
-    }

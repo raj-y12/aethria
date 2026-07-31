@@ -10,7 +10,7 @@ from utils.adapters import scout_output_to_scout_info
 
 def _pack(sources: List[Dict[str, str]]) -> Dict[str, Any]:
     return {
-        "provider": "tavily",
+        "provider": "exa",
         "sources": sources,
         "url_allowlist": {source["url"] for source in sources},
     }

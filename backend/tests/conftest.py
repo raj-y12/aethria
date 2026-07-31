@@ -6,9 +6,11 @@ imports `api` therefore inherits real provider API keys, and retrieval tests
 start making live HTTP calls: slow, flaky, credit-burning, and dependent on
 whatever the live web returns today.
 
-This bit until now only because the older tests monkeypatch `tavily_search`. The
-Firecrawl→Tavily chain calls Firecrawl *first*, and nothing patched that, so a
-configured Firecrawl key turned every unpatched retrieval test into a live call.
+This bit once because the older tests monkeypatched only the provider that
+happened to be first in the chain. Adding a tier ahead of it left that tier
+unpatched, so a configured key turned every unpatched retrieval test into a live
+call. Blanking every provider key removes the class of bug rather than the
+instance — a new provider is covered the day it is added.
 
 Blanking the keys by default makes the unpatched path fail closed (the providers
 return `disabled`/`missing_api_key`) instead of silently going to the network. A
@@ -28,7 +30,7 @@ from __future__ import annotations
 
 import pytest
 
-_PROVIDER_KEYS = ("EXA_API_KEY", "FIRECRAWL_API_KEY", "TAVILY_API_KEY", "OPENAI_API_KEY")
+_PROVIDER_KEYS = ("EXA_API_KEY", "FIRECRAWL_API_KEY", "OPENAI_API_KEY")
 
 
 @pytest.fixture(autouse=True)
