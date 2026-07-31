@@ -1,0 +1,44 @@
+steps:
+  - id: build-backend-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --file
+      - backend/Dockerfile
+      - --tag
+      - europe-west1-docker.pkg.dev/$PROJECT_ID/aethria-backend/backend:$COMMIT_SHA
+      - .
+
+  - id: push-backend-image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - europe-west1-docker.pkg.dev/$PROJECT_ID/aethria-backend/backend:$COMMIT_SHA
+
+  - id: deploy-cloud-run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - aethria-backend
+      - --image=europe-west1-docker.pkg.dev/$PROJECT_ID/aethria-backend/backend:$COMMIT_SHA
+      - --region=europe-west1
+      - --platform=managed
+      - --service-account=cloud-run-backend@$PROJECT_ID.iam.gserviceaccount.com
+      - --allow-unauthenticated
+      - --ingress=all
+      - --min=1
+      - --max=1
+      - --concurrency=1
+      - --no-cpu-throttling
+      - --cpu=1
+      - --memory=2Gi
+      - --timeout=900s
+      - --quiet
+
+images:
+  - europe-west1-docker.pkg.dev/$PROJECT_ID/aethria-backend/backend:$COMMIT_SHA
+
+options:
+  logging: CLOUD_LOGGING_ONLY
