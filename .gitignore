@@ -38,9 +38,16 @@ logs/
 # Local agent/worktree state
 app-front-end/.superpowers/
 .worktrees/
+.claude/worktrees/
 
-# Archived experiments and local maintenance scratch space
-scripts/
+# Generated Graphify knowledge graph. Regenerate with scripts/update_graph.sh —
+# it is large, machine-specific, and never a source of truth.
+graphify-out/
+
+# Archived experiments and local maintenance scratch space at the repository
+# root. Checked-in maintenance scripts are re-included individually below.
+/scripts/*
+!/scripts/update_graph.sh
 unused_components/
 
 # Local JSON fallback store (Supabase is the source of truth in prod).
@@ -54,6 +61,11 @@ supabase/.temp/
 # Local agent/critique tool output
 .agent/
 .impeccable/critique/
+
+# Neural graph developer tool output and local dependency cache
+tools/neural-graph/node_modules/
+tools/neural-graph/dist/
+tools/neural-graph/.vite/
 
 # Checked-in maintenance scripts
 !backend/scripts/
