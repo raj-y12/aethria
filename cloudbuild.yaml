@@ -33,7 +33,12 @@ steps:
       - --no-invoker-iam-check
       - --ingress=all
       - --min=1
-      - --max=2
+      # Single instance: per-user agent loops are process-local asyncio tasks
+      # (api.py _per_user_loops) and RESUME_AGENT_LOOPS_ON_STARTUP=false, so a
+      # loop owned by a second instance dies with it and is never resumed.
+      - --max=1
+      # >1 because an open SSE stream (GET /api/stream) holds a request slot for
+      # its lifetime; at concurrency=1 it starves every other call on the instance.
       - --concurrency=8
       - --no-cpu-throttling
       - --cpu=1
