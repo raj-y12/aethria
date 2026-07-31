@@ -71,7 +71,7 @@ def test_firecrawl_error_falls_back_to_tavily_and_keeps_tier_diagnostics(monkeyp
 
     assert list(result) == list(tavily_rows)
     assert result.diagnostics["provider"] == "tavily"
-    assert [tier["provider"] for tier in result.diagnostics["tiers"]] == ["firecrawl", "tavily"]
+    assert [tier["provider"] for tier in result.diagnostics["tiers"]] == ["exa", "firecrawl", "tavily"]
 
 
 @pytest.mark.parametrize("payload", [

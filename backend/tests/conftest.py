@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import pytest
 
-_PROVIDER_KEYS = ("FIRECRAWL_API_KEY", "TAVILY_API_KEY", "OPENAI_API_KEY")
+_PROVIDER_KEYS = ("EXA_API_KEY", "FIRECRAWL_API_KEY", "TAVILY_API_KEY", "OPENAI_API_KEY")
 
 
 @pytest.fixture(autouse=True)

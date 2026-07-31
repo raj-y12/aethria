@@ -109,6 +109,42 @@ if ENABLED:
         buckets=(0, 1, 2, 5, 10, 25, 50, 100),
         registry=REGISTRY,
     )
+    # TEMPORARY: Exa discovery quality, to judge whether semantic search actually
+    # surfaces companies rather than articles before it becomes the sole primary.
+    EXA_DISCOVERY_REQUESTS = Counter(
+        "aethria_exa_discovery_requests_total",
+        "Temporary Exa discovery requests, by query intent and content fallback.",
+        ["query_type", "outcome", "fallback_reason"],
+        registry=REGISTRY,
+    )
+    EXA_DISCOVERY_UNIQUE_DOMAINS = Histogram(
+        "aethria_exa_discovery_unique_domains",
+        "Temporary: distinct hosts per Exa result set.",
+        ["query_type"],
+        buckets=(0, 1, 2, 3, 5, 8, 10, 15, 25),
+        registry=REGISTRY,
+    )
+    EXA_DISCOVERY_COMPANY_RATE = Histogram(
+        "aethria_exa_discovery_company_domain_rate",
+        "Temporary: share of Exa results on a company's own domain (0-1).",
+        ["query_type"],
+        buckets=(0.0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1.0),
+        registry=REGISTRY,
+    )
+    EXA_DISCOVERY_FIRECRAWL_RATE = Histogram(
+        "aethria_exa_discovery_firecrawl_success_rate",
+        "Temporary: share of Exa URLs Firecrawl scraped successfully (0-1).",
+        ["query_type"],
+        buckets=(0.0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1.0),
+        registry=REGISTRY,
+    )
+    EXA_DISCOVERY_COST = Histogram(
+        "aethria_exa_discovery_cost_dollars",
+        "Temporary: Exa's reported per-request dollar cost.",
+        ["query_type"],
+        buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5),
+        registry=REGISTRY,
+    )
     EVALUATION_MANIFESTS = Counter(
         "aethria_evaluation_manifest_total",
         "Evaluation manifest writes by path and outcome.",
@@ -317,7 +353,7 @@ def observe_retrieval_provider(
         return
     try:
         provider_label = _allowlisted(
-            provider, {"firecrawl", "tavily", "duckduckgo_html_fallback", "unknown"}
+            provider, {"exa", "firecrawl", "tavily", "duckduckgo_html_fallback", "unknown"}
         )
         outcome_label = _allowlisted(outcome, {"success", "empty", "error", "disabled"})
         extraction_label = "true" if extraction_ok else "false"
@@ -329,6 +365,45 @@ def observe_retrieval_provider(
             RETRIEVAL_PROVIDER_CREDITS.labels(**labels).observe(max(0, int(credits)))
     except Exception as e:  # pragma: no cover
         logger.debug("observe_retrieval_provider failed: %s", e)
+
+
+_EXA_QUERY_TYPES = {
+    "company", "founder", "funding", "market", "product",
+    "customers", "competitors", "hiring", "news",
+}
+_EXA_FALLBACK_REASONS = {"none", "exa_highlight", "firecrawl_error"}
+
+
+def observe_exa_discovery(
+    *, query_type: str, outcome: str, fallback_reason: str | None,
+    unique_domains: int, company_domain_rate: float, firecrawl_success_rate: float,
+    cost_usd: float | None,
+) -> None:
+    """TEMPORARY: record Exa discovery quality for the provider comparison.
+
+    Latency and result counts are not repeated here — `observe_retrieval_provider`
+    already records both under `provider="exa"`.
+    """
+    if not ENABLED:
+        return
+    try:
+        query_label = _allowlisted(query_type, _EXA_QUERY_TYPES)
+        EXA_DISCOVERY_REQUESTS.labels(
+            query_type=query_label,
+            outcome=_allowlisted(outcome, {"success", "empty", "error", "disabled"}),
+            fallback_reason=_allowlisted(fallback_reason or "none", _EXA_FALLBACK_REASONS),
+        ).inc()
+        EXA_DISCOVERY_UNIQUE_DOMAINS.labels(query_type=query_label).observe(max(0, int(unique_domains)))
+        EXA_DISCOVERY_COMPANY_RATE.labels(query_type=query_label).observe(
+            min(1.0, max(0.0, float(company_domain_rate)))
+        )
+        EXA_DISCOVERY_FIRECRAWL_RATE.labels(query_type=query_label).observe(
+            min(1.0, max(0.0, float(firecrawl_success_rate)))
+        )
+        if cost_usd is not None:
+            EXA_DISCOVERY_COST.labels(query_type=query_label).observe(max(0.0, float(cost_usd)))
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_exa_discovery failed: %s", e)
 
 
 def inc_evaluation_manifest(*, path: str, outcome: str) -> None:
