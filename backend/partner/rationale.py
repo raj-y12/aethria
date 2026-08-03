@@ -85,9 +85,16 @@ def ordered_decision_drivers(tags: FrozenSet[str], primary: str) -> List[str]:
     return out
 
 
-def _dim_line(m: int, p: int, t: int, e: int) -> str:
+def _dim_line(m: float, p: float, t: float, e: float) -> str:
+    """Render the per-dimension scores as they are actually stored.
+
+    These were previously passed through `int()`, which *truncates*: a stored
+    4.8 printed as "4/10" while the IC pack's own dimension table showed 4.8,
+    so one document disagreed with itself. One decimal place matches the
+    "Average score 5.2/10" line immediately beside it.
+    """
     return (
-        f"Market {m}/10, Product {p}/10, Technical {t}/10, Execution {e}/10."
+        f"Market {m:.1f}/10, Product {p:.1f}/10, Technical {t:.1f}/10, Execution {e:.1f}/10."
     )
 
 
@@ -95,11 +102,11 @@ def _tension_sentence(
     *,
     has_contradiction: bool,
     reviewer_disagreement: bool,
-    market_score: int,
-    product_score: int,
-    technical_score: int,
-    execution_score: int,
-    gap_threshold: int = 3,
+    market_score: float,
+    product_score: float,
+    technical_score: float,
+    execution_score: float,
+    gap_threshold: float = 3,
 ) -> str:
     if has_contradiction:
         return (
@@ -114,7 +121,7 @@ def _tension_sentence(
     lo = min(scores)
     if hi - lo >= gap_threshold:
         return (
-            f"Score dispersion is notable (high {hi}/10 vs low {lo}/10); focus validation on the weakest link."
+            f"Score dispersion is notable (high {hi:.1f}/10 vs low {lo:.1f}/10); focus validation on the weakest link."
         )
     return ""
 
@@ -126,10 +133,10 @@ def compose_decision_rationale(
     primary: str,
     label: str,
     avg_score: float,
-    market_score: int,
-    product_score: int,
-    technical_score: int,
-    execution_score: int,
+    market_score: float,
+    product_score: float,
+    technical_score: float,
+    execution_score: float,
     min_avg_pass: float,
     min_avg_strong_yes: float,
     min_avg_medium_maybe: float,
