@@ -313,7 +313,11 @@ class MemoGenerator:
             lines.append("|-----------|-------|------|-----------|")
             for dim_key, dim_label in SCORE_DIMENSIONS:
                 score_val = getattr(ri, dim_key, None)
-                score_str = f"{score_val}/10" if score_val is not None else "—"
+                # Stored scores are raw reviewer means (e.g. 5.403333). This was
+                # the one score in the memo printed unformatted, so the table
+                # read "5.403333/10" directly above a summary line that used
+                # one decimal — the same document disagreeing with itself.
+                score_str = f"{float(score_val):.1f}/10" if score_val is not None else "—"
                 band = (
                     rubric_band_for_numeric(float(score_val))
                     if score_val is not None
