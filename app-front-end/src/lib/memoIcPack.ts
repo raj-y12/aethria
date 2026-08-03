@@ -221,6 +221,26 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     if (allScores.length) sections.push({ title: 'Dimension scores', lines: allScores });
   }
 
+  // Firmographics read out of retrieved evidence. An IC pack that says
+  // "missing traction data" while the record holds employee counts and a
+  // revenue band is the failure this section exists to make visible.
+  const traction = startup.scout.traction_facts;
+  if (traction && Object.keys(traction).length) {
+    const TRACTION_LABELS: Array<[string, string]> = [
+      ['employees', 'Employees'],
+      ['headcount_growth', 'Headcount growth'],
+      ['revenue', 'Revenue'],
+      ['founded', 'Founded'],
+      ['funding_rounds', 'Prior funding rounds'],
+    ];
+    const lines = TRACTION_LABELS.filter(([key]) => traction[key]).map(
+      ([key, label]) => `${label}: ${traction[key]}`
+    );
+    if (lines.length) {
+      sections.push({ title: 'Traction (from retrieved evidence)', lines });
+    }
+  }
+
   const primaryRisks = startup.review?.diligence_red_flags ?? [];
   const secondaryRisks = (startup.review?.key_risks ?? []).filter(
     (r) => !primaryRisks.some((p) => r.includes(p) || p.includes(r))

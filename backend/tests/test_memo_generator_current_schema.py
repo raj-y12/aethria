@@ -95,3 +95,29 @@ def test_dimension_table_never_prints_a_raw_reviewer_mean():
     assert "| Market | 5.7/10 |" in memo
     assert "| Product | 5.4/10 |" in memo
     assert "| Execution | 4.8/10 |" in memo
+
+
+def test_traction_read_from_evidence_reaches_the_memo():
+    """Extracting traction is pointless if the reader never sees it.
+
+    The live failure was a memo saying "Missing revenue or traction data" while
+    the record held employee counts and a revenue band.
+    """
+    startup = _decided_startup()
+    startup.scout_info.traction_facts = {
+        "employees": "100-150",
+        "revenue": "$1M-$10M",
+        "founded": "2016",
+    }
+
+    memo = MemoGenerator().generate_memo(startup)
+
+    assert "Employees: 100-150" in memo
+    assert "Revenue: $1M-$10M" in memo
+
+
+def test_memo_omits_the_traction_line_when_nothing_was_found():
+    startup = _decided_startup()
+    startup.scout_info.traction_facts = None
+
+    assert "Traction (from evidence)" not in MemoGenerator().generate_memo(startup)

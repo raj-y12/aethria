@@ -112,6 +112,9 @@ export interface Scout {
    *  and the memo Founder section renders them only when present. */
   founder_signal?: string;
   founder_quote?: string;
+  /** Firmographics (employees, revenue, founded, prior rounds) read verbatim
+   *  out of retrieved evidence. Absent when nothing matched — never a guess. */
+  traction_facts?: Record<string, string> | null;
   references?: string[];
   source_evidence?: Array<{
     reference: string;
