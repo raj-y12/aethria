@@ -18,6 +18,7 @@ from utils.openai_client import build_openai_client
 
 from reviewer.schema import ReviewerOutput, validate_reviewer_output
 from utils.prompt_version import hash_prompt
+from utils.traction_extraction import render_traction_facts
 from utils.recency import reviewer_recency_directive
 from utils.scoring import DEFAULT_SCORE_SOURCE
 from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
@@ -429,6 +430,12 @@ def _format_scout_context_extras(scout_output: Dict[str, Any]) -> str:
     et = scout_output.get("est_tam")
     if et:
         lines.append(f"Est. TAM (scout): {et}")
+    # Firmographics read verbatim out of retrieved evidence. Without this the
+    # reviewer could not see traction the pipeline had already paid to retrieve,
+    # and flagged it as missing.
+    traction = render_traction_facts(scout_output.get("traction_facts"))
+    if traction:
+        lines.append(f"Traction (from retrieved evidence): {traction}")
     refs = scout_output.get("references")
     if isinstance(refs, list) and refs:
         hosts: list[str] = []

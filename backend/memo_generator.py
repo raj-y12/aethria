@@ -19,6 +19,7 @@ from models import Startup
 from utils.recency import memo_recency_note
 from utils.scoring import compute_overall_score, score_to_label
 from utils.score_semantics import rubric_band_for_numeric, rubric_score_bands_markdown_footnote
+from utils.traction_extraction import render_traction_facts
 
 _logger_memo = logging.getLogger("memo_generation")
 
@@ -204,6 +205,13 @@ class MemoGenerator:
                 lines.append(f"**Est. TAM:** {startup.scout_info.est_tam}")
             else:
                 lines.append("**Est. TAM:** Not provided")
+            # Firmographics lifted verbatim out of retrieved evidence. Printed
+            # because the reviewer once flagged "Missing revenue or traction
+            # data" while this text sat unread in the same record — surfacing it
+            # to the reader is what makes that failure visible next time.
+            traction = render_traction_facts(getattr(startup.scout_info, "traction_facts", None))
+            if traction:
+                lines.append(f"**Traction (from evidence):** {traction}")
             lines.append(f"**Scout Type:** {startup.scout_info.scout_type}")
             lines.append(f"**Confidence Score:** {startup.scout_info.confidence_score:.2f}")
             lines.append("")
@@ -313,7 +321,11 @@ class MemoGenerator:
             lines.append("|-----------|-------|------|-----------|")
             for dim_key, dim_label in SCORE_DIMENSIONS:
                 score_val = getattr(ri, dim_key, None)
-                score_str = f"{score_val}/10" if score_val is not None else "—"
+                # Stored scores are raw reviewer means (e.g. 5.403333). This was
+                # the one score in the memo printed unformatted, so the table
+                # read "5.403333/10" directly above a summary line that used
+                # one decimal — the same document disagreeing with itself.
+                score_str = f"{float(score_val):.1f}/10" if score_val is not None else "—"
                 band = (
                     rubric_band_for_numeric(float(score_val))
                     if score_val is not None

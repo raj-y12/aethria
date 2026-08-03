@@ -287,8 +287,16 @@ class Scout(ABC):
         return data
 
     def _normalize_scout_ids_inplace(self, data: Dict[str, Any]) -> None:
-        if not data.get("id"):
-            data["id"] = generate_id()
+        # The identifier is always minted here, never taken from the model.
+        #
+        # This used to fall back to `generate_id()` only when the model omitted
+        # `id`, and the prompt asked the model for one — so a compliant model's
+        # invented UUID always won and was persisted as `startup_id`. One live
+        # record carried the textbook placeholder
+        # `a1b2c3d4-e5f6-4711-9abc-1234567890ab`, which then printed as
+        # "Company ID" on a confidential IC pack. A primary key is ours to
+        # assign; a language model has no business proposing one.
+        data["id"] = generate_id()
         data["scout_type"] = self.scout_type
 
     @staticmethod
@@ -1203,7 +1211,10 @@ class Scout(ABC):
                 + "Output ONLY valid JSON matching the ScoutOutput schema "
                 "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
                 "{\n"
-                '  "id": "uuid",\n'
+                # `id` is deliberately absent: it is minted server-side in
+                # `_normalize_scout_ids_inplace` before validation. Asking the
+                # model for a UUID spent tokens on a value we discard, and
+                # invited it to believe it owns the primary key.
                 f'  "scout_type": "{self.scout_type}",\n'
                 '  "name": "string (canonical legal/brand company name, not the full query sentence)",\n'
                 '  "one_line": "string",\n'

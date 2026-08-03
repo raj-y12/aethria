@@ -408,6 +408,11 @@ class ScoutInfo(BaseModel):
     # education, source evidence, conflicts, and per-field confidence.
     # resolution_status: FOUND | PARTIAL | LOW_CONFIDENCE | NOT_FOUND.
     founder_resolution: Optional[Dict[str, Any]] = None
+    # Firmographic facts (employees, revenue, founded year, prior rounds) read
+    # verbatim out of retrieved evidence by `utils.traction_extraction`. None
+    # means nothing matched — never a guess. Exists because this text was being
+    # collected and then declared missing by the reviewer.
+    traction_facts: Optional[Dict[str, str]] = None
     # Optional provenance for enriched fields (e.g. est_tam, funding_stage, references): scout | reviewer_extraction | gap_retrieval | reviewer_text_infer
     field_provenance: Optional[Dict[str, str]] = None
     # High-level references / source notes for how this opportunity was discovered.

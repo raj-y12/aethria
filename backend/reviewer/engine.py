@@ -270,6 +270,7 @@ class ReviewerEngine:
             "est_tam": getattr(si, "est_tam", None),
             "funding_stage": getattr(si, "funding_stage", None),
             "location": getattr(si, "location", None),
+            "traction_facts": getattr(si, "traction_facts", None),
             "references": refs,
             "primary_thesis": getattr(si, "primary_thesis", None),
             "key_assumptions": getattr(si, "key_assumptions", None),

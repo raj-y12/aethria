@@ -13,6 +13,22 @@ import {
   SCORE_DIMENSIONS,
 } from '../design-system/semantics';
 
+/**
+ * Scores are stored as raw reviewer means (e.g. 5.403333) and were interpolated
+ * straight into the pack, so an IC document showed "Product 5.403333/10". One
+ * decimal place matches the partner rationale printed a page later, so the same
+ * number now reads the same way wherever it appears.
+ */
+function normalizeSourceUrl(value: string | undefined): string {
+  if (!value) return '';
+  const match = value.match(/https?:\/\/[^\s)\]]+/i);
+  return (match ? match[0] : value).trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function formatScore(score: number): string {
+  return score.toFixed(1);
+}
+
 const PDF_MARGIN = 18;
 const PDF_LINE_HEIGHT = 5;
 const PDF_FONT_SIZE_TITLE = 21;
@@ -189,7 +205,7 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
         const score = startup.review?.[id as keyof typeof startup.review];
         if (score == null || typeof score !== 'number') return null;
         const band = getScoreBand(score);
-        return `${name}: ${score}/10 (${band.label})`;
+        return `${name}: ${formatScore(score)}/10 (${band.label})`;
       })
       .filter(Boolean) as string[];
     const supporting = SCORE_DIMENSIONS.slice(2);
@@ -198,11 +214,31 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
         const score = startup.review?.[id as keyof typeof startup.review];
         if (score == null || typeof score !== 'number') return null;
         const band = getScoreBand(score);
-        return `${name}: ${score}/10 (${band.label})`;
+        return `${name}: ${formatScore(score)}/10 (${band.label})`;
       })
       .filter(Boolean) as string[];
     const allScores = [...scoreLines, ...scoreLines2];
     if (allScores.length) sections.push({ title: 'Dimension scores', lines: allScores });
+  }
+
+  // Firmographics read out of retrieved evidence. An IC pack that says
+  // "missing traction data" while the record holds employee counts and a
+  // revenue band is the failure this section exists to make visible.
+  const traction = startup.scout.traction_facts;
+  if (traction && Object.keys(traction).length) {
+    const TRACTION_LABELS: Array<[string, string]> = [
+      ['employees', 'Employees'],
+      ['headcount_growth', 'Headcount growth'],
+      ['revenue', 'Revenue'],
+      ['founded', 'Founded'],
+      ['funding_rounds', 'Prior funding rounds'],
+    ];
+    const lines = TRACTION_LABELS.filter(([key]) => traction[key]).map(
+      ([key, label]) => `${label}: ${traction[key]}`
+    );
+    if (lines.length) {
+      sections.push({ title: 'Traction (from retrieved evidence)', lines });
+    }
   }
 
   const primaryRisks = startup.review?.diligence_red_flags ?? [];
@@ -281,6 +317,23 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     origin.push(`Channel: Scout pipeline (${startup.scout.scout_type || 'scout'})`);
   }
   origin.push(`Company ID: ${startup.id}`);
+
+  // Identity and team resolution can land PARTIAL/LOW_CONFIDENCE and the pack
+  // still read as settled fact — the narrative prose gives no hint that the
+  // company was only partially identified or that no founder was confirmed.
+  // The repository fails closed with a *named* reason everywhere else; an IC
+  // document is the last place that should quietly drop the caveat.
+  const companyStatus = String(startup.scout.resolution_status ?? '').toUpperCase();
+  if (companyStatus && companyStatus !== 'FOUND') {
+    origin.push(`Identity resolution: ${companyStatus} — treat company details as unconfirmed`);
+  }
+  const founderStatus = String(
+    startup.scout.founder_resolution?.resolution_status ?? ''
+  ).toUpperCase();
+  if (founderStatus && founderStatus !== 'FOUND') {
+    origin.push(`Founder resolution: ${founderStatus} — team claims are not corroborated`);
+  }
+
   sections.push({ title: 'Deal origin', lines: origin });
 
   const timelineLines = getPipelineReplaySteps(startup).map(
@@ -307,9 +360,26 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
   sections.push({ title: 'Appendix & data lineage', lines: appendix });
 
   if (startup.scout.references?.length) {
+    // Sources arrive from two places and used to be printed as one flat list:
+    // pages the pipeline actually read (`source_evidence`), and URLs the
+    // reviewer's gap-retrieval step merely surfaced via search. An IC pack
+    // listing a PitchBook profile nothing was ever read from reads as
+    // corroboration it is not, so the unread ones are marked.
+    const readUrls = new Set(
+      (startup.scout.source_evidence ?? [])
+        .map((e) => normalizeSourceUrl(e.url ?? e.reference))
+        .filter(Boolean)
+    );
     sections.push({
       title: 'Sources',
-      lines: startup.scout.references.map((r) => String(r).trim()).filter(Boolean),
+      lines: startup.scout.references
+        .map((r) => String(r).trim())
+        .filter(Boolean)
+        .map((r) =>
+          readUrls.size && !readUrls.has(normalizeSourceUrl(r))
+            ? `${r}  [surfaced by search; not read]`
+            : r
+        ),
     });
   }
 
@@ -442,7 +512,7 @@ function drawScoreBars(doc: jsPDF, startup: Startup, y: number): number {
 
     doc.setFont('helvetica', 'bold');
     setColor(doc, color);
-    doc.text(`${score}/10`, barX + barW + 4, y);
+    doc.text(`${formatScore(score)}/10`, barX + barW + 4, y);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(PDF_FONT_SIZE_SMALL);
     setColor(doc, MUTED);

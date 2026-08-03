@@ -245,6 +245,38 @@ _ORG_NAME_MARKERS = (
     "college",
     "foundation",
     "group",
+    # Business descriptors. A LinkedIn profile lists every role a person has
+    # held, so a company name from an *unrelated* role reads as a capitalised
+    # multi-word phrase and passed the person-name shape test: "Blueprint Sales
+    # Solutions" was resolved as a founder named "Blueprint Sales Solutions"
+    # with role CEO, and became the "founders' industry pedigree" in an IC pack.
+    #
+    # Only words that are essentially never personal surnames are listed.
+    # "Sales", "Global", "Digital" and "Security" are deliberately excluded —
+    # Sales is a real Portuguese surname, and the rest read as adjectives.
+    "solutions",
+    "systems",
+    "technologies",
+    "technology",
+    "consulting",
+    "services",
+    "software",
+    "analytics",
+    "logistics",
+    "telematics",
+    "enterprises",
+    "industries",
+    "networks",
+    "robotics",
+    "dynamics",
+    "sciences",
+    "media",
+    "agency",
+    "studio",
+    "studios",
+    "associates",
+    "advisors",
+    "advisory",
 )
 
 _NEWS_HOSTS = frozenset(

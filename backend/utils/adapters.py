@@ -11,6 +11,7 @@ from utils.timeutil import utcnow
 from uuid import uuid4
 from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials, AethriaView
 from utils.scoring import enrich_scores
+from utils.traction_extraction import extract_traction_facts
 
 
 def financials_from_scout_output(scout_output: Dict[str, Any]) -> Financials:
@@ -95,6 +96,7 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         field_provenance=scout_output.get("field_provenance") if isinstance(scout_output.get("field_provenance"), dict) else None,
         references=scout_output.get("references") or None,
         source_evidence=scout_output.get("source_evidence") if isinstance(scout_output.get("source_evidence"), list) else None,
+        traction_facts=extract_traction_facts(scout_output),
         origin_type=scout_output.get("origin_type"),
         lookup_input_type=scout_output.get("lookup_input_type"),
         lookup_query=scout_output.get("lookup_query"),

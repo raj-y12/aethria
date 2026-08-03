@@ -1687,6 +1687,9 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "funding_stage": scout.get("funding_stage"),
             "location": scout.get("location"),
             "est_tam": scout.get("est_tam"),
+            "traction_facts": scout.get("traction_facts")
+            if isinstance(scout.get("traction_facts"), dict)
+            else None,
             "founder_names": scout.get("founder_names") or [],
             "references": scout.get("references") or [],
             "source_evidence": scout.get("source_evidence") or [],

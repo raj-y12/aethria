@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -44,6 +44,16 @@ def _claims():
 
 
 def _verified_link(claim_id, **overrides):
+    """A link whose evidence is valid *now*.
+
+    These timestamps were hardcoded (effective 2026-07-01, expiring
+    2026-08-01), so every test using them began failing with
+    `evidence_expired` the moment the wall clock passed that date — a time bomb
+    that turned seven passing tests red with no code change. The fixture's
+    intent is "currently valid evidence", so it is now expressed relative to
+    now. A test that wants expired evidence overrides `evidence_expires_at`.
+    """
+    now = datetime.now(timezone.utc)
     link = {
         "claim_id": claim_id,
         "evidence_item_id": f"evidence-{claim_id}",
@@ -54,10 +64,10 @@ def _verified_link(claim_id, **overrides):
         "trust_class": "independent",
         "untrusted_input": False,
         "prompt_injection_detected": False,
-        "evidence_effective_at": "2026-07-01T00:00:00+00:00",
-        "evidence_expires_at": "2026-08-01T00:00:00+00:00",
-        "artifact_effective_at": "2026-07-01T00:00:00+00:00",
-        "retrieved_at": "2026-07-01T01:00:00+00:00",
+        "evidence_effective_at": (now - timedelta(days=30)).isoformat(),
+        "evidence_expires_at": (now + timedelta(days=30)).isoformat(),
+        "artifact_effective_at": (now - timedelta(days=30)).isoformat(),
+        "retrieved_at": (now - timedelta(days=30, hours=-1)).isoformat(),
     }
     link.update(overrides)
     return link
