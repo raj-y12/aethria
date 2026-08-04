@@ -1,8 +1,15 @@
+import { useEffect, useState } from 'react';
 import Plate from '../Plate';
 import AccessForm from '../AccessForm';
 
 /** Plate 08 — the closing request-access plate, plus the colophon furniture. */
 export default function AccessPlate() {
+  // Computed after mount, not during SSG prerender — a year boundary between
+  // build and hydration would otherwise make the server- and client-rendered
+  // values disagree.
+  const [year, setYear] = useState<number | null>(null);
+  useEffect(() => setYear(new Date().getFullYear()), []);
+
   return (
     <>
       <Plate id="access" index="08 — 08" title="Request Access" capLeft="Access — Plate 08" capRight="Seats open in small batches">
@@ -34,7 +41,7 @@ export default function AccessPlate() {
           <p>
             London · San Francisco
             <br />
-            Specimen Edition · © {new Date().getFullYear()}
+            Specimen Edition · © {year ?? '—'}
           </p>
         </div>
       </div>

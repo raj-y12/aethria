@@ -218,3 +218,15 @@ class IdentityResolutionCaseRecord(_TenantModel):
     resolved_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
+
+
+class IdentityCaseGroup(BaseModel):
+    """One review unit for the identity queue: every open case whose
+    observation shares a verified/normalized domain, so an operator resolves
+    or rejects the canonical identity once instead of once per duplicate."""
+
+    group_key: str
+    canonical_domain: Optional[str] = None
+    cases: List[IdentityResolutionCaseRecord] = Field(default_factory=list)
+    observed_names: List[str] = Field(default_factory=list)
+    sources: List[str] = Field(default_factory=list)

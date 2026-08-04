@@ -10,6 +10,7 @@ from identity.models import (
     CompanyRecord,
     IdentityAdmission,
     IdentityCandidate,
+    IdentityCaseGroup,
     IdentityResolutionCaseRecord,
     IdentityStatus,
     NormalizedIdentifier,
@@ -1039,6 +1040,69 @@ class IdentityRepository:
                 max(1, min(int(limit), 500)),
             )
         return [case for row in rows if (case := _case_from_row(row)) is not None]
+
+    async def list_case_groups(
+        self, *, user_id: str, status: str = "open", limit: int = 100
+    ) -> List["IdentityCaseGroup"]:
+        """Group cases by the canonical identity their observation names.
+
+        Verified domain is the only signal treated as reliable enough to merge
+        cases automatically (fix direction step 1/5 in known-issues.md): two
+        observations that share a normalized domain are almost certainly the
+        same company, so their cases are grouped into one review unit. A case
+        whose observation has no domain is left in its own singleton group —
+        matching only on company name is not confident enough to auto-merge,
+        and stays separate until a human confirms it.
+        """
+        uid = require_user_id(user_id, context="IdentityRepository.list_case_groups")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                select c.*, o.observed_domain, o.observed_name, o.channel
+                from public.identity_resolution_cases c
+                join public.source_observations o
+                  on o.user_id = c.user_id and o.observation_id = c.observation_id
+                where c.user_id = $1 and c.status = $2
+                order by c.created_at desc
+                limit $3
+                """,
+                uid,
+                status,
+                max(1, min(int(limit), 500)),
+            )
+
+        groups_by_domain: Dict[str, IdentityCaseGroup] = {}
+        ordered_groups: List[IdentityCaseGroup] = []
+        for row in rows:
+            payload = db_row(row)
+            observed_domain = payload.pop("observed_domain", None)
+            observed_name = payload.pop("observed_name", None)
+            channel = payload.pop("channel", None)
+            payload["candidates"] = _json_value(payload.get("candidates"), [])
+            case = IdentityResolutionCaseRecord.model_validate(payload)
+            normalized_domain = normalize_domain(observed_domain)
+
+            if normalized_domain is not None and normalized_domain in groups_by_domain:
+                group = groups_by_domain[normalized_domain]
+                group.cases.append(case)
+                if observed_name and observed_name not in group.observed_names:
+                    group.observed_names.append(observed_name)
+                if channel and channel not in group.sources:
+                    group.sources.append(channel)
+                continue
+
+            group = IdentityCaseGroup(
+                group_key=normalized_domain or f"case:{case.identity_case_id}",
+                canonical_domain=normalized_domain,
+                cases=[case],
+                observed_names=[observed_name] if observed_name else [],
+                sources=[channel] if channel else [],
+            )
+            if normalized_domain is not None:
+                groups_by_domain[normalized_domain] = group
+            ordered_groups.append(group)
+
+        return ordered_groups
 
     async def get_case(
         self, *, user_id: str, identity_case_id: str

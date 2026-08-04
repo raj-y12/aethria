@@ -123,6 +123,49 @@ def test_file_storage_is_rejected_in_production(monkeypatch, tmp_path):
         Storage(str(tmp_path / "startups.json"))
 
 
+def test_rejection_analyzer_does_not_read_local_file_after_supabase_read_failure(
+    monkeypatch, tmp_path
+):
+    _enable_supabase(monkeypatch)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    from portfolio.rejection import RejectionAnalyzer
+
+    analyzer = RejectionAnalyzer(data_dir=str(tmp_path / "portfolio"), user_id="user-1")
+    monkeypatch.setattr(
+        analyzer, "_supabase_client", lambda: (_ for _ in ()).throw(ConnectionError("db down"))
+    )
+
+    with pytest.raises(RuntimeError, match="supabase_read_failed_no_local_fallback"):
+        analyzer.get_patterns()
+
+
+def test_rejection_analyzer_scopes_fallback_file_per_tenant(tmp_path):
+    from portfolio.rejection import RejectionAnalyzer
+
+    a = RejectionAnalyzer(data_dir=str(tmp_path), user_id="user-a")
+    b = RejectionAnalyzer(data_dir=str(tmp_path), user_id="user-b")
+
+    assert a.patterns_file != b.patterns_file
+    assert "user-a" in a.patterns_file.name
+    assert "user-b" in b.patterns_file.name
+
+
+def test_feed_fetcher_does_not_read_local_file_after_supabase_read_failure(
+    monkeypatch, tmp_path
+):
+    _enable_supabase(monkeypatch)
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    from utils.feed_fetcher import FeedFetcher
+
+    fetcher = FeedFetcher(cache_file=str(tmp_path / "feed_cache.json"), user_id="user-1")
+    monkeypatch.setattr(
+        fetcher, "_supabase_client", lambda: (_ for _ in ()).throw(ConnectionError("db down"))
+    )
+
+    with pytest.raises(RuntimeError, match="supabase_read_failed_no_local_fallback"):
+        fetcher._read_cache()
+
+
 def test_unknown_environment_is_fail_closed_but_local_dev_is_allowed(monkeypatch):
     import env_config
 

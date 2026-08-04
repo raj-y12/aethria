@@ -233,6 +233,33 @@ async def list_identity_cases(
     return {"cases": [_case(record) for record in records]}
 
 
+def _case_group(group: Any) -> Dict[str, Any]:
+    return {
+        "group_key": group.group_key,
+        "canonical_domain": group.canonical_domain,
+        "observation_count": len(group.cases),
+        "observed_names": group.observed_names,
+        "sources": group.sources,
+        "cases": [_case(case) for case in group.cases],
+    }
+
+
+@router.get("/api/identity-cases/groups")
+async def list_identity_case_groups(
+    request: Request,
+    status: IdentityCaseStatus = IdentityCaseStatus.OPEN,
+    limit: int = Query(default=100, ge=1, le=200),
+):
+    """Duplicate-observation-safe view of the review queue — one row per
+    canonical identity instead of one row per observation. See
+    docs/known-issues.md "Duplicate companies in the identity review queue"."""
+    user_id = require_authenticated_user(request)
+    groups = await _repository(request).list_case_groups(
+        user_id=user_id, status=status.value, limit=limit
+    )
+    return {"groups": [_case_group(group) for group in groups]}
+
+
 async def _resolved_or_existing(
     repository: Any, *, user_id: str, identity_case_id: str
 ) -> tuple[Any, Optional[Any]]:
@@ -311,6 +338,84 @@ async def resolve_identity_case(
         raise HTTPException(status_code=409, detail="Identity case state changed") from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="Invalid identity resolution") from exc
+
+
+async def _resolve_case_group(
+    request: Request, group_key: str, body: ResolveIdentityCaseBody
+) -> Dict[str, Any]:
+    """Transition every case in a group as a unit (fix direction step 4): the
+    first case runs the requested action (matching an existing company or
+    creating a new one); every remaining case in the group then matches the
+    same resulting company, rather than re-running "create" and producing a
+    duplicate company per case."""
+    user_id = require_authenticated_user(request)
+    repository = _repository(request)
+    groups = await repository.list_case_groups(
+        user_id=user_id, status="open", limit=500
+    )
+    group = next((g for g in groups if g.group_key == group_key), None)
+    if group is None or not group.cases:
+        raise HTTPException(status_code=404, detail="Identity case group not found")
+
+    case_ids = [case.identity_case_id for case in group.cases]
+    first_id, *rest_ids = case_ids
+    first_result = await resolve_identity_case(request, first_id, body)
+    results = [first_result]
+
+    if body.action in ("match", "create"):
+        company_id = first_result.get("company_id")
+        follow_up = (
+            ResolveIdentityCaseBody(
+                action="match",
+                selected_company_id=company_id,
+                resolution_note=body.resolution_note,
+            )
+            if company_id
+            else None
+        )
+        for case_id in rest_ids:
+            results.append(
+                await resolve_identity_case(request, case_id, follow_up)
+                if follow_up is not None
+                # The first case didn't resolve to a company (e.g. it was
+                # already resolved out-of-band) — fail closed per case rather
+                # than guess, leaving each for individual review.
+                else {"identity_case_id": case_id, "skipped": "no_resulting_company_id"}
+            )
+    else:
+        for case_id in rest_ids:
+            results.append(await resolve_identity_case(request, case_id, body))
+
+    return {"group_key": group_key, "results": results}
+
+
+@router.post("/api/identity-cases/groups/{group_key}/resolve")
+async def resolve_identity_case_group(
+    request: Request, group_key: str, body: ResolveIdentityCaseBody
+):
+    return await _resolve_case_group(request, group_key, body)
+
+
+@router.post("/api/identity-cases/groups/{group_key}/defer")
+async def defer_identity_case_group(
+    request: Request, group_key: str, body: CaseTransitionBody
+):
+    return await _resolve_case_group(
+        request,
+        group_key,
+        ResolveIdentityCaseBody(action="defer", resolution_note=body.resolution_note),
+    )
+
+
+@router.post("/api/identity-cases/groups/{group_key}/reject")
+async def reject_identity_case_group(
+    request: Request, group_key: str, body: CaseTransitionBody
+):
+    return await _resolve_case_group(
+        request,
+        group_key,
+        ResolveIdentityCaseBody(action="reject", resolution_note=body.resolution_note),
+    )
 
 
 @router.post("/api/identity-cases/{identity_case_id}/defer")

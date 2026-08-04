@@ -1058,13 +1058,22 @@ async def run_on_demand_lookup(
 
     try:
         if evaluation_prerequisites is None:
-            evaluation_prerequisites = await load_evaluation_prerequisites(
-                user_id=uid,
-                fund_intelligence_repository=fund_intelligence_repository,
+            try:
+                evaluation_prerequisites = await load_evaluation_prerequisites(
+                    user_id=uid,
+                    fund_intelligence_repository=fund_intelligence_repository,
+                )
+            except EvaluationPrerequisiteError as exc:
+                if exc.code != "thesis_required":
+                    raise
+                logger.info(
+                    "[%s] Lookup continuing without an active thesis",
+                    uid[:12],
+                )
+        if evaluation_prerequisites is not None:
+            evaluation_prerequisites.require_tenant(
+                uid, context="run_on_demand_lookup"
             )
-        evaluation_prerequisites.require_tenant(
-            uid, context="run_on_demand_lookup"
-        )
         # Lookups use their own slot so they never wait behind a full periodic cycle.
         async with lookup_execution_slot(uid):
             result = await _run_on_demand_lookup_inner(
@@ -1153,11 +1162,12 @@ async def _run_on_demand_lookup_inner(
     ] = None,
     ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
-    evaluation_prerequisites: EvaluationPrerequisites,
+    evaluation_prerequisites: Optional[EvaluationPrerequisites],
 ) -> PipelineExecutionResult:
-    evaluation_prerequisites.require_tenant(
-        user_id, context="_run_on_demand_lookup_inner"
-    )
+    if evaluation_prerequisites is not None:
+        evaluation_prerequisites.require_tenant(
+            user_id, context="_run_on_demand_lookup_inner"
+        )
     tenant = TenantContext(user_id=user_id)
     logger.info(
         "event=tenant_context user_id=%s module=on_demand_lookup",
@@ -1214,9 +1224,15 @@ async def _run_on_demand_lookup_inner(
             recovery_action="Restore Supabase connectivity and retry the lookup.",
         )
 
-    # Consume the exact immutable thesis context certified by the shared gate.
-    thesis_ctx = evaluation_prerequisites.thesis_context
-    logger.info("[%s] Lookup will evaluate against certified thesis", user_id[:12])
+    # Consume the exact immutable thesis context when one is certified; named
+    # lookups remain available without one.
+    thesis_ctx = (
+        evaluation_prerequisites.thesis_context
+        if evaluation_prerequisites is not None
+        else {}
+    )
+    if evaluation_prerequisites is not None:
+        logger.info("[%s] Lookup will evaluate against certified thesis", user_id[:12])
 
     try:
         settings = await asyncio.to_thread(load_settings, user_id)
@@ -1235,6 +1251,7 @@ async def _run_on_demand_lookup_inner(
             storage=storage,
             api_key=api_key,
             settings=settings,
+            thesis_ctx=thesis_ctx,
             evaluation_prerequisites=evaluation_prerequisites,
             use_resource_fund_thesis_fallback=False,
         )
@@ -1258,12 +1275,15 @@ async def _run_on_demand_lookup_inner(
     current_stage = "scout"
     try:
         lookup_run_id = (pipeline_run_id or "").strip() or str(uuid4())
-        evaluation_context = {
-            **(institutional_context or {}),
-            "thesis_version_id": evaluation_prerequisites.thesis_version_id,
-            "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
-            "policy_hash": evaluation_prerequisites.policy.policy_hash,
-        }
+        evaluation_context = {**(institutional_context or {})}
+        if evaluation_prerequisites is not None:
+            evaluation_context.update(
+                {
+                    "thesis_version_id": evaluation_prerequisites.thesis_version_id,
+                    "policy_version_id": evaluation_prerequisites.policy.policy_version_id,
+                    "policy_hash": evaluation_prerequisites.policy.policy_hash,
+                }
+            )
         await emit(
             "accepted",
             "succeeded",
@@ -1368,6 +1388,7 @@ async def _run_on_demand_lookup_inner(
         review_is_current = bool(
             not replace_startup_id
             and handoff_startup is not None
+            and evaluation_prerequisites is not None
             and _review_policy_is_current(
                 getattr(handoff_startup, "review_info", None),
                 evaluation_prerequisites,
@@ -1425,6 +1446,16 @@ async def _run_on_demand_lookup_inner(
                 detail="The lookup was cancelled after Reviewer completed.",
                 startup_id=startup_id,
             )
+        if not review_is_current:
+            # Reviewer just persisted a new review_info; handoff_startup is the
+            # object built before that persistence and no longer reflects it.
+            # Reload so Partner reads the same review it will read back later,
+            # instead of the stale pre-Reviewer snapshot.
+            get_startup = getattr(storage, "get_startup", None)
+            if callable(get_startup):
+                reloaded_startup = await asyncio.to_thread(get_startup, startup_id)
+                if reloaded_startup is not None:
+                    handoff_startup = reloaded_startup
         current_stage = "partner"
         partner_stage_started = time.perf_counter()
         await ensure_owned()

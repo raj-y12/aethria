@@ -17,6 +17,7 @@ import xml.etree.ElementTree as ET
 from uuid import uuid4
 
 from supabase_client import get_service_client
+import env_config
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +180,10 @@ class FeedFetcher:
                         return items if isinstance(items, list) else []
                 return None
             except Exception as e:
+                if not env_config.local_fallback_allowed():
+                    raise RuntimeError(
+                        "FeedFetcher: supabase_read_failed_no_local_fallback_in_production"
+                    ) from e
                 self.logger.warning("Supabase feed cache read failed; using file fallback: %s", e)
         if not self.cache_path.exists():
             return None
@@ -217,6 +222,10 @@ class FeedFetcher:
                     ).execute()
                 return
             except Exception as e:
+                if not env_config.local_fallback_allowed():
+                    raise RuntimeError(
+                        "FeedFetcher: supabase_write_failed_no_local_fallback_in_production"
+                    ) from e
                 self.logger.warning("Supabase feed cache write failed; using file fallback: %s", e)
         data = {"cached_at": time.time(), "items": items}
         temp_path = self.cache_path.with_suffix(".tmp")

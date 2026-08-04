@@ -716,6 +716,20 @@ class ReviewerEngine:
         else:
             primary["derived_verdict"] = "WEAK"
 
+    def _finalize_thesis_alignment_state(self, review_output: dict) -> None:
+        """Distinguish "no active thesis" from "alignment missing under an active
+        thesis" so Partner can fail closed on the latter instead of treating both
+        the same way (they were previously indistinguishable once
+        thesis_alignment_score came back None)."""
+        t = self.active_thesis
+        if not t or not t.get("version_id"):
+            review_output["thesis_alignment_state"] = "no_active_thesis"
+            return
+        tas = review_output.get("thesis_alignment_score")
+        review_output["thesis_alignment_state"] = (
+            "missing_under_active_thesis" if tas is None else "present"
+        )
+
     def _apply_rule_based_thesis_alignment(self, review_output: dict, scout_output: dict) -> None:
         """When thesis has no embeddings, set alignment from deterministic rules (no extra API calls)."""
         t = self.active_thesis
@@ -1021,6 +1035,7 @@ class ReviewerEngine:
                 self._apply_resource_fund_thesis_alignment(
                     review_output, scout_output, entry_id
                 )
+                self._finalize_thesis_alignment_state(review_output)
 
                 # Record token usage if cost controller exists (sum all persona calls)
                 if self.cost_controller:
@@ -1286,6 +1301,7 @@ class ReviewerEngine:
             self._apply_resource_fund_thesis_alignment(
                 review_output, scout_output, startup_id
             )
+            self._finalize_thesis_alignment_state(review_output)
             consensus = self._compute_consensus(successful_results)
             review_output["aethria_view"] = build_aethria_view(
                 review_output=review_output,

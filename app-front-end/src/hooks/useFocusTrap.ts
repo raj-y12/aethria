@@ -1,10 +1,15 @@
 import { useEffect, RefObject } from 'react';
 
 const FOCUSABLE =
-  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)';
 
 function getFocusables(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE));
+}
+
+function focusContainer(container: HTMLElement) {
+  if (!container.hasAttribute('tabindex')) container.tabIndex = -1;
+  container.focus();
 }
 
 /**
@@ -19,15 +24,20 @@ export function useFocusTrap(
     if (!enabled || !containerRef.current) return;
     const el = containerRef.current;
     const focusables = getFocusables(el);
-    if (focusables.length === 0) return;
-
-    const first = focusables[0];
-    first.focus();
+    if (focusables.length === 0) {
+      focusContainer(el);
+    } else {
+      focusables[0].focus();
+    }
 
     const handle = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
       const liveFocusables = getFocusables(el);
-      if (liveFocusables.length === 0) return;
+      if (liveFocusables.length === 0) {
+        e.preventDefault();
+        focusContainer(el);
+        return;
+      }
       const firstFocusable = liveFocusables[0];
       const lastFocusable = liveFocusables[liveFocusables.length - 1];
       const current = document.activeElement as HTMLElement | null;

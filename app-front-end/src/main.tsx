@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/react-router';
+import { MotionConfig } from 'framer-motion';
 import '@fontsource/instrument-sans/400.css';
 import '@fontsource/instrument-sans/500.css';
 import '@fontsource/instrument-sans/600.css';
@@ -60,11 +61,13 @@ function ClerkProviderWithRouter() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary label="root">
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <ClerkProviderWithRouter />
-        </BrowserRouter>
-      </QueryClientProvider>
+      <MotionConfig reducedMotion="user">
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <ClerkProviderWithRouter />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </MotionConfig>
     </ErrorBoundary>
   </React.StrictMode>,
 );

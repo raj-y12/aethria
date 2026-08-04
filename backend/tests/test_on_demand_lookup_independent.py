@@ -59,6 +59,7 @@ class _FakePartnerEngine:
     use_resource_fund_thesis_fallback = "unset"
     calls = 0
     result = True
+    last_kwargs = None
 
     def __init__(self, *args, **kwargs):
         type(self).fund_thesis = kwargs.get("fund_thesis", "missing")
@@ -69,6 +70,7 @@ class _FakePartnerEngine:
 
     async def run_startup(self, *args, **kwargs):
         type(self).calls += 1
+        type(self).last_kwargs = kwargs
         return type(self).result
 
 
@@ -188,7 +190,7 @@ async def test_on_demand_lookup_forwards_resolution_and_records_stage_timings(mo
 
 
 @pytest.mark.asyncio
-async def test_on_demand_lookup_blocks_when_no_mandate(monkeypatch):
+async def test_on_demand_lookup_runs_without_active_thesis(monkeypatch):
     _wire_common_engines(monkeypatch)
 
     async def load_prerequisites(**kwargs):
@@ -206,11 +208,14 @@ async def test_on_demand_lookup_blocks_when_no_mandate(monkeypatch):
         "user_123", "Perplexity AI", lookup_id="lookup-123"
     )
 
-    assert result.state is PipelineExecutionState.BLOCKED
-    assert result.code == "thesis_required"
-    assert _FakeScoutEngine.calls == 0
-    assert _FakeReviewerEngine.calls == 0
-    assert _FakePartnerEngine.calls == 0
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert result.startup_id == "startup-1"
+    assert _FakeScoutEngine.calls == 1
+    assert _FakeReviewerEngine.calls == 1
+    assert _FakePartnerEngine.calls == 1
+    assert not _FakeScoutEngine.active_thesis
+    assert not _FakeReviewerEngine.active_thesis
+    assert not _FakePartnerEngine.fund_thesis
 
 
 @pytest.mark.asyncio
@@ -300,6 +305,37 @@ async def test_direct_pipeline_cycle_gates_and_passes_governed_repository(monkey
             "fund_intelligence_repository": governed_repository,
         }
     ]
+
+
+@pytest.mark.asyncio
+async def test_periodic_pipeline_blocks_when_no_active_thesis(monkeypatch):
+    expected = EvaluationPrerequisiteError(
+        code="thesis_required",
+        detail="An active fund thesis is required before evaluation.",
+        recovery_action="Create and publish the fund thesis in Settings.",
+    )
+
+    async def load_prerequisites(**kwargs):
+        assert kwargs == {
+            "user_id": "user_123",
+            "fund_intelligence_repository": None,
+        }
+        raise expected
+
+    async def run_inner(*args, **kwargs):
+        raise AssertionError("periodic work must not start without an active thesis")
+
+    monkeypatch.setattr(
+        "pipeline_runner.load_evaluation_prerequisites", load_prerequisites
+    )
+    monkeypatch.setattr("pipeline_runner._run_one_pipeline_cycle_inner", run_inner)
+
+    result = await run_one_pipeline_cycle("user_123")
+
+    assert result.state is PipelineExecutionState.BLOCKED
+    assert result.code == "thesis_required"
+    assert result.detail == expected.detail
+    assert result.recovery_action == expected.recovery_action
 
 
 @pytest.mark.asyncio
@@ -629,6 +665,48 @@ async def test_retry_reruns_stale_review_before_partner(monkeypatch):
     assert _FakeReviewerEngine.calls == 1
     assert _FakeReviewerEngine.last_kwargs["force_rerun"] is True
     assert _FakePartnerEngine.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_partner_receives_reloaded_startup_after_reviewer_persists(monkeypatch):
+    """Reviewer persists review_info on the same startup row; Partner must read
+    that persisted snapshot, not the pre-Reviewer object it was handed off."""
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    stale_startup = SimpleNamespace(startup_id="startup-1", review_info=None)
+    fresh_startup = SimpleNamespace(
+        startup_id="startup-1",
+        review_info=SimpleNamespace(
+            structured_scoring={
+                "policy_version_id": "policy-live",
+                "policy_hash": "hash-live",
+            }
+        ),
+    )
+    reads = {"n": 0}
+
+    def get_startup(startup_id):
+        reads["n"] += 1
+        return stale_startup if reads["n"] == 1 else fresh_startup
+
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        get_startup=get_startup,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+
+    result = await run_on_demand_lookup(
+        "user_123",
+        "Perplexity AI",
+        lookup_id="lookup-reload-partner",
+    )
+
+    assert result.state is PipelineExecutionState.COMPLETED
+    assert _FakeReviewerEngine.calls == 1
+    assert _FakePartnerEngine.calls == 1
+    assert _FakePartnerEngine.last_kwargs["startup"] is fresh_startup
+    assert _FakePartnerEngine.last_kwargs["startup"] is not stale_startup
 
 
 @pytest.mark.asyncio

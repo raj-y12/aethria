@@ -41,9 +41,9 @@ export default function HomePage() {
     if (window.location.hash !== '#access') return;
     const el = document.getElementById('access');
     if (!el) return;
-    const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+    const t = setTimeout(() => el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }), 300);
     return () => clearTimeout(t);
-  }, []);
+  }, [reduce]);
 
   return (
     <div

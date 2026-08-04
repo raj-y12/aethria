@@ -5,10 +5,11 @@ import { Link } from 'react-router';
  * Used by AppFrame and SettingsPage so nav chrome is identical.
  */
 interface MobileHeaderProps {
+  isOpen: boolean;
   onMenuToggle: () => void;
 }
 
-export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
+export default function MobileHeader({ isOpen, onMenuToggle }: MobileHeaderProps) {
   return (
     <header
       className="flex items-center justify-between px-phi-4 pt-[max(var(--space-3),env(safe-area-inset-top))] pb-phi-3 border-b border-hairline bg-oxford"
@@ -26,6 +27,7 @@ export default function MobileHeader({ onMenuToggle }: MobileHeaderProps) {
         onClick={onMenuToggle}
         className="type-label-tab text-white/70 hover:text-white btn-interaction min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-controls="mobile-menu"
+        aria-expanded={isOpen}
         id="mobile-menu-button"
       >
         Menu

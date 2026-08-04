@@ -8,6 +8,8 @@
     "build": "tsc && vite-react-ssg build",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:marketing": "node scripts/check-marketing.mjs",
+    "check:waitlist": "node --experimental-strip-types scripts/check-waitlist-escaping.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },

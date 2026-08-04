@@ -389,7 +389,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               onAnimationComplete={completeWorkspaceChromeEntrance}
               className="flex-none"
             >
-              <MobileHeader onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
+              <MobileHeader isOpen={mobileMenuOpen} onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
               <AnimatePresence>
                 {mobileMenuOpen && (
                   <motion.nav

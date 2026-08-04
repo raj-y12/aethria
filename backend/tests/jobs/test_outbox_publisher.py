@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 from types import SimpleNamespace
 
@@ -70,6 +71,30 @@ async def test_outbox_delivery_failure_remains_retryable():
     assert repository.published == []
     assert repository.failed[0]["event_id"] == "event-1"
     assert "backplane unavailable" in repository.failed[0]["error"]
+
+
+@pytest.mark.asyncio
+async def test_outbox_loop_retries_after_transient_claim_failure():
+    outbox = importlib.import_module("jobs.outbox")
+    repository = _Repository([])
+    attempts = 0
+    publisher = outbox.OutboxPublisher(repository, poll_interval_seconds=0.05)
+
+    async def claim_outbox_batch(**_kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("database temporarily unavailable")
+        publisher._stopping.set()
+        return []
+
+    repository.claim_outbox_batch = claim_outbox_batch
+
+    runner = asyncio.create_task(publisher._run())
+    await asyncio.wait_for(runner, timeout=0.5)
+
+    assert attempts == 2
+    assert runner.exception() is None
 
 
 @pytest.mark.asyncio

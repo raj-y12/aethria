@@ -11,10 +11,11 @@ import pytest
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from evaluation_v2.governed_scoring import validate_governed_scoring_trace
+from partner.engine import PartnerEngine
 from reviewer.engine import ReviewerEngine
 from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.reviewer_resolution import apply_resolution_to_primary
-from utils.adapters import reviewer_output_to_review_info
+from utils.adapters import partner_output_to_partner_info, reviewer_output_to_review_info
 
 
 def _compiled_policy():
@@ -41,7 +42,7 @@ def _partner_rules():
     return rules
 
 
-def _prerequisites(user_id="user-a"):
+def _prerequisites(user_id="user-a", *, embedding_backed: bool = False):
     compiled = _compiled_policy()
     rules = _partner_rules()
     thesis = {
@@ -54,6 +55,14 @@ def _prerequisites(user_id="user-a"):
         "embedding_model": "none",
         "alignment_mode": "rule_based",
     }
+    if embedding_backed:
+        thesis.update(
+            {
+                "embedding": [0.1, 0.2, 0.3],
+                "embedding_model": "text-embedding-3-small",
+                "alignment_mode": "embedding",
+            }
+        )
     return EvaluationPrerequisites(
         user_id=user_id,
         thesis_context=thesis,
@@ -369,6 +378,9 @@ class _PersistingReviewerPersona:
             "team_analysis": ["Experienced operating team"],
             "business_model_analysis": ["Clear enterprise subscription model"],
             "structured_signals": {},
+            # Simulates the Reviewer base parser's normalized missing/malformed
+            # LLM alignment result under an active thesis.
+            "thesis_alignment_score": None,
         }
 
     def close(self):
@@ -381,13 +393,14 @@ async def _run_persisted_governed_review(
     traces: list[dict],
     *,
     adversarial_resolution: bool = False,
+    embedding_backed: bool = False,
 ):
     import meta.calibrator as calibrator_module
     import reviewer.engine as reviewer_module
     from models import ScoutInfo
     from utils.storage import Storage
 
-    prerequisites = _prerequisites()
+    prerequisites = _prerequisites(embedding_backed=embedding_backed)
     prerequisites.thesis_context["parsed_json"].update(
         {
             "stage_focus": ["Seed"],
@@ -501,6 +514,48 @@ async def test_governed_reviewer_to_partner_uses_persisted_exact_consensus(
         expected_grounding,
         expected_grounding,
     ]
+
+
+@pytest.mark.asyncio
+async def test_embedding_backed_active_thesis_without_alignment_blocks_otherwise_invest(
+    tmp_path, monkeypatch
+):
+    saved, reloaded, prerequisites = await _run_persisted_governed_review(
+        tmp_path,
+        monkeypatch,
+        [_persona_trace(9), _persona_trace(9), _persona_trace(9)],
+        embedding_backed=True,
+    )
+
+    assert saved is True
+    assert reloaded is not None and reloaded.review_info is not None
+    assert reloaded.review_info.fund_thesis_version_id == "thesis-live"
+    assert reloaded.review_info.thesis_alignment_score is None
+
+    partner = PartnerEngine(
+        storage=SimpleNamespace(_user_id="user-a"),
+        tenant_user_id="user-a",
+        use_llm_fallback=False,
+        evaluation_prerequisites=prerequisites,
+    )
+    entry = partner._build_entry(reloaded)
+    assert entry is not None
+    assert (
+        entry["review"].get("thesis_alignment_state")
+        == "missing_under_active_thesis"
+    )
+
+    decision = partner.decision_engine.decide(
+        entry["scout"],
+        entry["review"],
+        fund_thesis=partner.fund_thesis,
+    )
+
+    assert decision["recommendation"] == "MONITOR"
+    assert decision["human_review_required"] is True
+    assert decision["mandate_gate"] == "alignment_missing"
+    assert decision["mandate_gate"] != "no_mandate"
+    assert partner_output_to_partner_info(decision).mandate_gate == "alignment_missing"
 
 
 @pytest.mark.asyncio

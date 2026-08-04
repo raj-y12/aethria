@@ -4,8 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 const PROCESSING_DURATION_MS = 1200;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const URL_REGEX = /^https?:\/\/.+/;
-const API_BASE = import.meta.env.VITE_API_URL ?? '';
-const WAITLIST_URL = API_BASE ? `${API_BASE.replace(/\/$/, '')}/api/waitlist` : '/api/waitlist';
 const APP_URL = import.meta.env.VITE_APP_URL ?? '';
 
 const EASE_OUT_EXPO = 'cubic-bezier(0.16, 1, 0.3, 1)';
@@ -74,7 +72,7 @@ export default function AccessForm() {
     abortRef.current = new AbortController();
     setLoading(true);
     try {
-      const res = await fetch(WAITLIST_URL, {
+      const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: abortRef.current.signal,

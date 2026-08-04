@@ -14,6 +14,11 @@ interface IdentityResolutionDrawerProps {
   onResolved?: (result: unknown) => void;
   linkedJobId?: string | null;
   onRetryJob?: (jobId: string) => void;
+  /** When this case is one of several observations for the same company,
+   * resolving it must transition every linked case to the same company at
+   * once (see docs/known-issues.md "Duplicate companies in the identity
+   * review queue") — the caller supplies the group-aware resolve call. */
+  resolveCase?: (input: IdentityResolutionInput) => Promise<unknown>;
 }
 
 type DrawerMode = 'match' | 'create' | 'defer' | 'reject';
@@ -33,6 +38,7 @@ export default function IdentityResolutionDrawer({
   onResolved,
   linkedJobId,
   onRetryJob,
+  resolveCase,
 }: IdentityResolutionDrawerProps) {
   const queryClient = useQueryClient();
   const [mode, setMode] = useState<DrawerMode>('match');
@@ -43,7 +49,8 @@ export default function IdentityResolutionDrawer({
   const [canonicalDomain, setCanonicalDomain] = useState('');
 
   const resolution = useMutation({
-    mutationFn: (input: IdentityResolutionInput) => resolveIdentityCase(identityCase.identity_case_id, input),
+    mutationFn: (input: IdentityResolutionInput) =>
+      (resolveCase ?? ((i: IdentityResolutionInput) => resolveIdentityCase(identityCase.identity_case_id, i)))(input),
     onSuccess: async (result) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['identity', 'cases'] }),

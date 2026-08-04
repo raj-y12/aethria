@@ -7,33 +7,21 @@ import asyncio
 import sys
 import os
 import json
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Load .env file from parent directory (project root)
-env_path = Path(__file__).parent.parent / ".env"
-if env_path.exists():
-    load_dotenv(env_path)
-else:
-    # Also try loading from current directory
-    load_dotenv()
-
-# Add the backend directory to the path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pytest
+
+from integration_helpers import bootstrap_integration_test, require_openai_api_key
+
+bootstrap_integration_test()
+
 from scout.engine import ScoutEngine
 
 
 @pytest.mark.skip(reason="Integration test — requires live OPENAI_API_KEY and tenant_user_id (run directly: python tests/test_scouts.py)")
 async def test_scouts():
     """Run a single discovery cycle to test all Scouts."""
-    # Get API key from environment
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        print("ERROR: OPENAI_API_KEY environment variable is required")
-        sys.exit(1)
-    
+    api_key = require_openai_api_key()
+
     # Create engine
     engine = ScoutEngine(
         api_key=api_key,

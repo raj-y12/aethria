@@ -25,7 +25,7 @@ export default function LookupCommandBar({
         className,
       )}
     >
-      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">{label}</span>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/65">{label}</span>
       {showQuery ? (
         <>
           <span className="h-3 w-px shrink-0 bg-oxford/10" aria-hidden />
@@ -33,7 +33,7 @@ export default function LookupCommandBar({
         </>
       ) : null}
       {trailing ? (
-        <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/30">
+        <span className="ml-auto shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/65">
           {trailingLabel(trailing)}
         </span>
       ) : null}

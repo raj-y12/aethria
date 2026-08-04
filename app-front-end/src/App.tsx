@@ -62,6 +62,7 @@ function AppShell() {
   const isFlowRoute = pathname.startsWith(`${APP_ROOT}/flow`) || pathname.startsWith(`${APP_ROOT}/deal`);
   const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
+  const triggeringAgentsRef = useRef(false);
   const queryClient = useQueryClient();
   const reduceMotion = usePrefersReducedMotion();
   const entryTransition = getLoginEntryTransition(reduceMotion);
@@ -97,11 +98,24 @@ function AppShell() {
   // warm-hydrated) before kicking off a pipeline cycle: the trigger's backend
   // work otherwise competes with the login burst of reads and delays first paint.
   useEffect(() => {
-    if (!agentsEnabled || isSettingsRoute || !systemData.startupsReady || triggeredAgentsRef.current) return;
-    triggeredAgentsRef.current = true;
-    void triggerAgents().catch(() => {
-      triggeredAgentsRef.current = false;
-    });
+    if (
+      !agentsEnabled ||
+      isSettingsRoute ||
+      !systemData.startupsReady ||
+      triggeredAgentsRef.current ||
+      triggeringAgentsRef.current
+    ) return;
+    triggeringAgentsRef.current = true;
+    void (async () => {
+      try {
+        await triggerAgents();
+        triggeredAgentsRef.current = true;
+      } catch {
+        triggeredAgentsRef.current = false;
+      } finally {
+        triggeringAgentsRef.current = false;
+      }
+    })();
   }, [agentsEnabled, isSettingsRoute, systemData.startupsReady]);
 
   return (
@@ -250,7 +264,11 @@ function App() {
     if (!tokenReady && !hasLoginEntryHandoff) {
       return <LoadingAnimation />;
     }
-    return <AppShell />;
+    // Force a full unmount/remount of the tenant-bound shell on identity
+    // change — clearing the query cache alone leaves component state
+    // (Settings drafts, thesis/agent status, selected memo, dispatch state,
+    // the fund-configuration hook) alive across an account switch.
+    return <AppShell key={userId ?? 'anon'} />;
   }
 
   // Root or unknown path → go to app (or sign-in if not signed in)
