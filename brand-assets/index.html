@@ -12,11 +12,11 @@
     />
     <style>
       :root {
-        --oxford: #001433;
+        --oxford: #0a1629;
         --oxford-rgb: 0, 20, 51;
-        --paper: #f4f1ea;
-        --paper-bright: #f8f5ee;
-        --paper-deep: #e7e0d4;
+        --paper: #d9d7d4;
+        --paper-bright: #dddbd8;
+        --paper-deep: #d1cfcb;
         --charcoal: #26313f;
         --verdigris: #3d6b5e;
         --verdigris-soft: #7aab9a;
@@ -344,8 +344,11 @@
       }
       .file-preview.dark { background: var(--oxford); }
       .file-preview img { display: block; max-width: 100%; height: auto; }
-      .file-preview.wordmark { aspect-ratio: 4/1; }
-      .file-preview.wordmark img { width: 100%; max-height: 52px; object-fit: contain; }
+      /* 5:2 matches the bracketed lockup and the 320x132 / 1400x560 slots. */
+      .file-preview.wordmark { aspect-ratio: 5/2; }
+      .file-preview.wordmark img { width: 100%; max-height: 92px; object-fit: contain; }
+      .file-preview.tile { aspect-ratio: 11/7; }
+      .file-preview.tile img { width: 100%; object-fit: contain; }
       .file-preview.monogram { aspect-ratio: 1; }
       .file-preview.monogram img { width: 60%; max-width: 120px; }
       .file-preview.icon { aspect-ratio: 1; }
@@ -398,6 +401,7 @@
             <a href="#presets">Presets</a>
             <a href="#profile">Profile</a>
             <a href="#logos">Logos</a>
+            <a href="#workspace">Workspace</a>
             <a href="#palette">Palette</a>
             <a href="#hero">Hero</a>
           </nav>
@@ -511,16 +515,32 @@
         <div class="section-head">
           <span class="idx">04</span>
           <h2>Logos &amp; Icons</h2>
-          <span class="hint">Vector SVG — infinite resolution</span>
+          <span class="hint">Outlined vector — no font required, scales without limit</span>
         </div>
         <div class="file-grid">
           <article class="file-card file-card--wide">
+            <div class="file-preview wordmark"><img src="assets/logo-lockup-light.svg" alt="Aethria bracketed lockup, light" /></div>
+            <div class="file-meta"><strong>Primary lockup — light</strong><span>Vector · the marketing logo</span><br /><a class="btn btn-ghost" href="assets/logo-lockup-light.svg" download="aethria-lockup-light.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/logo-lockup-dark.svg" alt="Aethria bracketed lockup, dark" /></div>
+            <div class="file-meta"><strong>Primary lockup — dark</strong><span>Vector · the marketing logo</span><br /><a class="btn btn-ghost" href="assets/logo-lockup-dark.svg" download="aethria-lockup-dark.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark"><img src="assets/logo-lockup-transparent.svg" alt="Aethria lockup, transparent" /></div>
+            <div class="file-meta"><strong>Lockup — transparent</strong><span>Vector · place on any light ground</span><br /><a class="btn btn-ghost" href="assets/logo-lockup-transparent.svg" download="aethria-lockup-transparent.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/logo-lockup-inverse-transparent.svg" alt="Aethria lockup, transparent inverse" /></div>
+            <div class="file-meta"><strong>Lockup — transparent inverse</strong><span>Vector · place on any dark ground</span><br /><a class="btn btn-ghost" href="assets/logo-lockup-inverse-transparent.svg" download="aethria-lockup-inverse-transparent.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
             <div class="file-preview wordmark"><img src="assets/logo-wordmark-light.svg" alt="Aethria wordmark, light" /></div>
-            <div class="file-meta"><strong>Wordmark — light</strong><span>480 × 120</span><br /><a class="btn btn-ghost" href="assets/logo-wordmark-light.svg" download="aethria-wordmark-light.svg">Download SVG</a></div>
+            <div class="file-meta"><strong>Wordmark — light</strong><span>Vector · no brackets, tight spaces</span><br /><a class="btn btn-ghost" href="assets/logo-wordmark-light.svg" download="aethria-wordmark-light.svg">Download SVG</a></div>
           </article>
           <article class="file-card file-card--wide">
             <div class="file-preview wordmark dark"><img src="assets/logo-wordmark-dark.svg" alt="Aethria wordmark, dark" /></div>
-            <div class="file-meta"><strong>Wordmark — dark</strong><span>480 × 120</span><br /><a class="btn btn-ghost" href="assets/logo-wordmark-dark.svg" download="aethria-wordmark-dark.svg">Download SVG</a></div>
+            <div class="file-meta"><strong>Wordmark — dark</strong><span>Vector · no brackets, tight spaces</span><br /><a class="btn btn-ghost" href="assets/logo-wordmark-dark.svg" download="aethria-wordmark-dark.svg">Download SVG</a></div>
           </article>
           <article class="file-card">
             <div class="file-preview monogram"><img src="assets/logo-monogram-light.svg" alt="Aethria monogram, light" /></div>
@@ -529,6 +549,14 @@
           <article class="file-card">
             <div class="file-preview monogram dark"><img src="assets/logo-monogram-dark.svg" alt="Aethria monogram, dark" /></div>
             <div class="file-meta"><strong>Monogram — dark</strong><span>512 × 512</span><br /><a class="btn btn-ghost" href="assets/logo-monogram-dark.svg" download="aethria-monogram-dark.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview monogram"><img src="assets/logo-monogram-framed-light.svg" alt="Aethria framed monogram, light" /></div>
+            <div class="file-meta"><strong>Monogram framed — light</strong><span>512 × 512 · use at 256px+</span><br /><a class="btn btn-ghost" href="assets/logo-monogram-framed-light.svg" download="aethria-monogram-framed-light.svg">Download SVG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview monogram dark"><img src="assets/logo-monogram-framed-dark.svg" alt="Aethria framed monogram, dark" /></div>
+            <div class="file-meta"><strong>Monogram framed — dark</strong><span>512 × 512 · use at 256px+</span><br /><a class="btn btn-ghost" href="assets/logo-monogram-framed-dark.svg" download="aethria-monogram-framed-dark.svg">Download SVG</a></div>
           </article>
           <article class="file-card">
             <div class="file-preview icon dark"><img src="assets/logo-icon-light.svg" alt="App icon" /></div>
@@ -545,10 +573,69 @@
         </div>
       </section>
 
+      <!-- ============ GOOGLE WORKSPACE ============ -->
+      <section id="workspace">
+        <div class="section-head">
+          <span class="idx">05</span>
+          <h2>Google Workspace</h2>
+          <span class="hint">Exact-size PNGs — upload as-is, no resizing</span>
+        </div>
+        <div class="file-grid">
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark"><img src="assets/google-workspace/workspace-admin-logo-320x132-light.png" alt="Workspace admin logo, light" /></div>
+            <div class="file-meta"><strong>Admin console logo — light</strong><span>320 × 132 · 9 KB of 30 KB</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-admin-logo-320x132-light.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/google-workspace/workspace-admin-logo-320x132-dark.png" alt="Workspace admin logo, dark" /></div>
+            <div class="file-meta"><strong>Admin console logo — dark</strong><span>320 × 132 · 9 KB of 30 KB</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-admin-logo-320x132-dark.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/google-workspace/workspace-app-logo-120x120.png" alt="OAuth consent logo" /></div>
+            <div class="file-meta"><strong>OAuth consent screen</strong><span>120 × 120</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-app-logo-120x120.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/google-workspace/workspace-avatar-256x256.png" alt="Chat and profile avatar" /></div>
+            <div class="file-meta"><strong>Chat / profile avatar</strong><span>256 × 256</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-avatar-256x256.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/google-workspace/workspace-app-logo-512x512.png" alt="App identity 512" /></div>
+            <div class="file-meta"><strong>App identity</strong><span>512 × 512</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-app-logo-512x512.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/google-workspace/workspace-app-logo-1024x1024.png" alt="App identity 1024" /></div>
+            <div class="file-meta"><strong>App identity — hi-res</strong><span>1024 × 1024</span><br /><a class="btn btn-ghost" href="assets/google-workspace/workspace-app-logo-1024x1024.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview icon dark"><img src="assets/google-workspace/marketplace-icon-128x128.png" alt="Marketplace icon" /></div>
+            <div class="file-meta"><strong>Marketplace icon</strong><span>128 · 96 · 48 · 32</span><br /><a class="btn btn-ghost" href="assets/google-workspace/marketplace-icon-128x128.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview tile dark"><img src="assets/google-workspace/marketplace-tile-220x140.png" alt="Marketplace card banner" /></div>
+            <div class="file-meta"><strong>Marketplace card banner</strong><span>220 × 140</span><br /><a class="btn btn-ghost" href="assets/google-workspace/marketplace-tile-220x140.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card">
+            <div class="file-preview tile dark"><img src="assets/google-workspace/marketplace-tile-440x280.png" alt="Marketplace large tile" /></div>
+            <div class="file-meta"><strong>Marketplace large tile</strong><span>440 × 280</span><br /><a class="btn btn-ghost" href="assets/google-workspace/marketplace-tile-440x280.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/google-workspace/marketplace-marquee-1400x560.png" alt="Marketplace marquee" /></div>
+            <div class="file-meta"><strong>Marketplace marquee</strong><span>1400 × 560</span><br /><a class="btn btn-ghost" href="assets/google-workspace/marketplace-marquee-1400x560.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark"><img src="assets/google-workspace/lockup-2048-transparent.png" alt="Transparent lockup for Docs and Slides" /></div>
+            <div class="file-meta"><strong>Transparent lockup — Docs / Slides</strong><span>2048 wide · alpha</span><br /><a class="btn btn-ghost" href="assets/google-workspace/lockup-2048-transparent.png" download>Download PNG</a></div>
+          </article>
+          <article class="file-card file-card--wide">
+            <div class="file-preview wordmark dark"><img src="assets/google-workspace/lockup-2048-inverse-transparent.png" alt="Transparent inverse lockup" /></div>
+            <div class="file-meta"><strong>Transparent lockup — inverse</strong><span>2048 wide · alpha</span><br /><a class="btn btn-ghost" href="assets/google-workspace/lockup-2048-inverse-transparent.png" download>Download PNG</a></div>
+          </article>
+        </div>
+      </section>
+
       <!-- ============ PALETTE ============ -->
       <section id="palette">
         <div class="section-head">
-          <span class="idx">05</span>
+          <span class="idx">06</span>
           <h2>Core Palette</h2>
           <span class="hint">Click any swatch to copy the hex</span>
         </div>
@@ -558,7 +645,7 @@
       <!-- ============ HERO ============ -->
       <section id="hero">
         <div class="section-head">
-          <span class="idx">06</span>
+          <span class="idx">07</span>
           <h2>Hero Background</h2>
           <span class="hint">3840 × 1080 · 4K PNG</span>
         </div>
@@ -608,12 +695,12 @@
 
       /* ---------------- presets ---------------- */
       var PRESETS = {
-        aethria:  { name: 'Aethria',  base: '#e7e0d4', ink: '#001433', hole: '#001433', colors: ['#3d6b5e', '#7aab9a', '#c9d9ea', '#a88a5e'] },
+        aethria:  { name: 'Aethria',  base: '#d1cfcb', ink: '#0a1629', hole: '#0a1629', colors: ['#3d6b5e', '#7aab9a', '#c9d9ea', '#a88a5e'] },
         spectrum: { name: 'Spectrum', base: '#c6c2b9', ink: '#f8f5ee', hole: '#0b0d12', colors: ['#ff5a1f', '#2f6bff', '#8a36ff', '#00c2b2'] },
         ember:    { name: 'Ember',    base: '#1a1410', ink: '#ffe9cf', hole: '#0d0805', colors: ['#ff7a18', '#ff3d6e', '#ffb020', '#7a2bff'] },
         tide:     { name: 'Tide',     base: '#0b1622', ink: '#eaf3ff', hole: '#050a12', colors: ['#2bd0ff', '#1f6bff', '#5a3cff', '#00e0a4'] },
         bloom:    { name: 'Bloom',    base: '#f1e8df', ink: '#2a1726', hole: '#2a1726', colors: ['#ff6b9d', '#ff9e3d', '#a06bff', '#5ad1ff'] },
-        ink:      { name: 'Ink',      base: '#e9e5dc', ink: '#001433', hole: '#001433', colors: ['#001433', '#26313f', '#3d6b5e', '#7aab9a'] }
+        ink:      { name: 'Ink',      base: '#e9e5dc', ink: '#0a1629', hole: '#0a1629', colors: ['#0a1629', '#26313f', '#3d6b5e', '#7aab9a'] }
       };
 
       var PLATFORMS = [
@@ -1083,9 +1170,9 @@
         { key: 'tide',     mode: 'mono',     label: 'Monogram · Tide' },
         { key: 'ink',      mode: 'wordmark', label: 'Wordmark · Ink' },
         { key: null, mode: 'wordmark-plain', label: 'Wordmark · Plain — Dark',
-          override: { base: '#001433', ink: '#f4f1ea', accent: '#3d6b5e' } },
+          override: { base: '#0a1629', ink: '#d9d7d4', accent: '#7aab9a' } },
         { key: null, mode: 'wordmark-plain', label: 'Wordmark · Plain — Light',
-          override: { base: '#f4f1ea', ink: '#001433', accent: '#3d6b5e' } }
+          override: { base: '#d9d7d4', ink: '#0a1629', accent: '#3d6b5e' } }
       ];
       var profileWrap = document.getElementById('profile-gallery');
       function renderProfile(canvas, cfg, ratio) {
@@ -1153,7 +1240,7 @@
 
       /* ---------------- palette chips ---------------- */
       var PALETTE = [
-        ['Oxford', '#001433'], ['Paper', '#f4f1ea'], ['Paper bright', '#f8f5ee'], ['Paper deep', '#e7e0d4'],
+        ['Oxford', '#0a1629'], ['Stock', '#d9d7d4'], ['Stock bright', '#dddbd8'], ['Stock deep', '#d1cfcb'],
         ['Charcoal', '#26313f'], ['Verdigris', '#3d6b5e'], ['Verdigris soft', '#7aab9a'],
         ['Heritage gold', '#a88a5e'], ['Brass', '#8a704d'], ['Signal blue', '#c9d9ea']
       ];

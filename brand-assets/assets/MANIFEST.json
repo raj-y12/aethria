@@ -1,0 +1,220 @@
+{
+  "vector": [
+    {
+      "file": "logo-lockup-light.svg",
+      "w": 328.35,
+      "h": 169.31,
+      "use": "Primary logo"
+    },
+    {
+      "file": "logo-lockup-dark.svg",
+      "w": 328.35,
+      "h": 169.31,
+      "use": "Primary logo"
+    },
+    {
+      "file": "logo-lockup-transparent.svg",
+      "w": 328.35,
+      "h": 169.31,
+      "use": "Primary logo"
+    },
+    {
+      "file": "logo-lockup-inverse-transparent.svg",
+      "w": 328.35,
+      "h": 169.31,
+      "use": "Primary logo"
+    },
+    {
+      "file": "logo-wordmark-light.svg",
+      "w": 276.35,
+      "h": 141.31,
+      "use": "Wordmark"
+    },
+    {
+      "file": "logo-wordmark-dark.svg",
+      "w": 276.35,
+      "h": 141.31,
+      "use": "Wordmark"
+    },
+    {
+      "file": "logo-wordmark-transparent.svg",
+      "w": 276.35,
+      "h": 141.31,
+      "use": "Wordmark"
+    },
+    {
+      "file": "logo-wordmark-inverse-transparent.svg",
+      "w": 276.35,
+      "h": 141.31,
+      "use": "Wordmark"
+    },
+    {
+      "file": "logo-monogram-light.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark"
+    },
+    {
+      "file": "logo-monogram-dark.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark"
+    },
+    {
+      "file": "logo-monogram-transparent.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark"
+    },
+    {
+      "file": "logo-monogram-inverse-transparent.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark"
+    },
+    {
+      "file": "logo-monogram-framed-light.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark, framed"
+    },
+    {
+      "file": "logo-monogram-framed-dark.svg",
+      "w": 512.0,
+      "h": 512.0,
+      "use": "Square mark, framed"
+    },
+    {
+      "file": "logo-icon-light.svg",
+      "w": 32,
+      "h": 32,
+      "use": "App icon"
+    },
+    {
+      "file": "logo-icon-transparent.svg",
+      "w": 32,
+      "h": 32,
+      "use": "App icon, transparent"
+    },
+    {
+      "file": "favicon.svg",
+      "w": 32,
+      "h": 32,
+      "use": "Favicon"
+    }
+  ],
+  "raster": [
+    {
+      "file": "google-workspace/workspace-admin-logo-320x132-light.png",
+      "w": 320,
+      "h": 132,
+      "kb": 9.2,
+      "use": "Admin console company logo"
+    },
+    {
+      "file": "google-workspace/workspace-admin-logo-320x132-dark.png",
+      "w": 320,
+      "h": 132,
+      "kb": 9.2,
+      "use": "Admin console company logo"
+    },
+    {
+      "file": "google-workspace/workspace-app-logo-120x120.png",
+      "w": 120,
+      "h": 120,
+      "kb": 4.1,
+      "use": "OAuth consent screen / app identity"
+    },
+    {
+      "file": "google-workspace/workspace-app-logo-256x256.png",
+      "w": 256,
+      "h": 256,
+      "kb": 9.2,
+      "use": "App identity, hi-res"
+    },
+    {
+      "file": "google-workspace/workspace-app-logo-512x512.png",
+      "w": 512,
+      "h": 512,
+      "kb": 19.8,
+      "use": "App identity, hi-res"
+    },
+    {
+      "file": "google-workspace/workspace-app-logo-1024x1024.png",
+      "w": 1024,
+      "h": 1024,
+      "kb": 42.8,
+      "use": "App identity, hi-res"
+    },
+    {
+      "file": "google-workspace/marketplace-icon-32x32.png",
+      "w": 32,
+      "h": 32,
+      "kb": 1.0,
+      "use": "Marketplace application icon"
+    },
+    {
+      "file": "google-workspace/marketplace-icon-48x48.png",
+      "w": 48,
+      "h": 48,
+      "kb": 1.6,
+      "use": "Marketplace application icon"
+    },
+    {
+      "file": "google-workspace/marketplace-icon-96x96.png",
+      "w": 96,
+      "h": 96,
+      "kb": 3.3,
+      "use": "Marketplace application icon"
+    },
+    {
+      "file": "google-workspace/marketplace-icon-128x128.png",
+      "w": 128,
+      "h": 128,
+      "kb": 4.5,
+      "use": "Marketplace application icon"
+    },
+    {
+      "file": "google-workspace/marketplace-tile-220x140.png",
+      "w": 220,
+      "h": 140,
+      "kb": 5.9,
+      "use": "Marketplace card banner"
+    },
+    {
+      "file": "google-workspace/marketplace-tile-440x280.png",
+      "w": 440,
+      "h": 280,
+      "kb": 12.8,
+      "use": "Marketplace large tile"
+    },
+    {
+      "file": "google-workspace/marketplace-marquee-1400x560.png",
+      "w": 1400,
+      "h": 560,
+      "kb": 41.5,
+      "use": "Marketplace marquee"
+    },
+    {
+      "file": "google-workspace/workspace-avatar-256x256.png",
+      "w": 256,
+      "h": 256,
+      "kb": 9.2,
+      "use": "Chat app / profile avatar"
+    },
+    {
+      "file": "google-workspace/lockup-2048-transparent.png",
+      "w": 2048,
+      "h": 1056,
+      "kb": 78.1,
+      "use": "Transparent lockup for Docs/Slides"
+    },
+    {
+      "file": "google-workspace/lockup-2048-inverse-transparent.png",
+      "w": 2048,
+      "h": 1056,
+      "kb": 93.4,
+      "use": "Transparent lockup for Docs/Slides"
+    }
+  ]
+}
