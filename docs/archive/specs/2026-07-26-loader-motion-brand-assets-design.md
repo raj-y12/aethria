@@ -8,7 +8,7 @@ Bring the downloadable Aethria brand assets and banner studio into alignment wit
 
 - **Primary mark:** `Aethria.` in Playfair Display, set within two thin open brackets. The wordmark is dark ink on stock/light surfaces and stock on deep-ink surfaces; the full stop is verdigris.
 - **Small marks:** Monogram, icon, transparent icon, and favicon retain the letter `A` for legibility at small sizes, but replace the previous solid-square treatment with the same open bracket geometry and palette.
-- **Motion field:** Banners replace the current radial-gradient mesh with a dense, near-horizontal photographic motion-blur field. Overlapping broad soft bands and fine streaks run left-to-right across an Aethria ink base, using charcoal, verdigris, soft verdigris, and signal-blue notes. This should read as a blurred landscape or long-exposure scan, not light trails or a neon effect.
+- **Motion field:** Banners replace the current radial-gradient mesh with a restrained, directional field of fine linear streaks. Lines sweep diagonally across a cool graphite/stock base, vary in length and opacity, and include sparse verdigris highlights. This should read as photographic motion blur, not light trails or a neon effect.
 - **Texture:** Preserve a low-contrast grain overlay to avoid a flat digital surface.
 
 ## Asset system
@@ -22,7 +22,7 @@ Bring the downloadable Aethria brand assets and banner studio into alignment wit
 
 1. Replace blob generation and radial-gradient drawing with deterministic line-streak generation derived from the existing seeded configuration.
 2. Keep the existing platform dimensions, palette controls, layout options, canvas preview, and high-resolution PNG export behavior.
-3. Add the bracketed wordmark to the wordmark-only layout and preserve the verdigris full stop. Bracket arms and spacing match the gallery loader: 14px arms with the outer edge 26px from the mark.
+3. Add the bracketed wordmark to the wordmark-only layout and preserve the verdigris full stop.
 4. Use palette colors as subtle motion accents while ensuring readable ink typography above the background.
 
 ## Verification
