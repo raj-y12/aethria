@@ -550,6 +550,10 @@ class ReviewInfo(BaseModel):
     # Fund thesis alignment (Reviewer consensus row; set when pipeline runs with active thesis)
     fund_thesis_version_id: Optional[str] = None
     thesis_alignment_score: Optional[float] = None  # 0–1
+    # no_active_thesis | present | missing_under_active_thesis — lets Partner
+    # distinguish "no mandate to gate against" from "mandate active but LLM
+    # alignment came back None/malformed", which must fail closed, not open.
+    thesis_alignment_state: Optional[str] = None
     thesis_matches_fund: Optional[bool] = None
     thesis_fit_points: Optional[List[str]] = None
     thesis_deviation_points: Optional[List[str]] = None
@@ -600,7 +604,8 @@ class PartnerInfo(BaseModel):
     fund_fit: Optional[float] = None                 # 0-10, thesis alignment
     fund_fit_label: Optional[str] = None             # Strong fit | Partial fit | Weak fit | Outside thesis
     fund_fit_confidence: Optional[float] = None      # 0-1
-    mandate_gate: Optional[str] = None               # clear | weak_fit | outside_thesis | held | no_mandate
+    mandate_gate: Optional[str] = None               # clear | weak_fit | outside_thesis | held | alignment_missing | ownership_conflict | no_mandate
+    ownership_conflict: Optional[Dict[str, Any]] = None  # set when mandate_gate == ownership_conflict
     mandate_override_required: Optional[bool] = None # strong company held off-thesis, needs IC exception
 
 

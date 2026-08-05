@@ -147,7 +147,11 @@ async def test_empty_lookup_is_explicitly_skipped_before_gate(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_lookup_gate_failure_returns_actionable_blocked_result(monkeypatch):
+async def test_lookup_continues_without_active_thesis_instead_of_blocking(monkeypatch):
+    """On-demand lookup is mandate-aware, not thesis-gated (AGENTS.md, ADR-0010):
+    a missing thesis must not block it — only the periodic pipeline blocks on
+    that. See docs/known-issues.md "On-demand lookup behaviour conflicts with
+    the repository contract and ADR"."""
     import pipeline_runner
 
     async def load(**_kwargs):
@@ -161,9 +165,11 @@ async def test_lookup_gate_failure_returns_actionable_blocked_result(monkeypatch
 
     result = await pipeline_runner.run_on_demand_lookup("user-a", "Acme")
 
+    # Lookup proceeds past the thesis gate and reaches a real, unrelated gate
+    # (no OPENAI_API_KEY configured in this test) rather than blocking on
+    # "thesis_required" — proof the thesis check no longer short-circuits it.
     assert result.state is PipelineExecutionState.BLOCKED
-    assert result.code == "thesis_required"
-    assert result.recovery_action == "Publish a thesis in Settings."
+    assert result.code != "thesis_required"
 
 
 def test_lookup_runner_exposes_no_parallel_outcome_writer():

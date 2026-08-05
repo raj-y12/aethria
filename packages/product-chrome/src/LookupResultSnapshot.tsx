@@ -66,7 +66,7 @@ export default function LookupResultSnapshot({
       <div className={pad}>
         {isMemo ? (
           <>
-            <p className="mb-4 font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/40">
+            <p className="mb-4 font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/65">
               {intelligenceKicker}
             </p>
             {showCompanyName ? (
@@ -75,18 +75,18 @@ export default function LookupResultSnapshot({
               </h3>
             ) : null}
             {metaLine ? (
-              <p className="mt-1.5 font-mono text-[13px] tracking-[0.08em] text-oxford/50">{metaLine}</p>
+              <p className="mt-1.5 font-mono text-[13px] tracking-[0.08em] text-oxford/65">{metaLine}</p>
             ) : null}
             <div className="my-5 h-px bg-oxford/10" aria-hidden />
-            <p className="mb-1.5 font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/58">
+            <p className="mb-1.5 font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/65">
               {judgmentLabel}
             </p>
           </>
         ) : (
           <div className="mb-3 flex items-baseline justify-between gap-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-oxford/40">Result</p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-oxford/65">Result</p>
             {metaLine ? (
-              <p className="text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/35">{metaLine}</p>
+              <p className="text-right font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/65">{metaLine}</p>
             ) : null}
           </div>
         )}
@@ -124,7 +124,7 @@ export default function LookupResultSnapshot({
             // it is the finding, not a caption.
             lg
               ? 'pc-font-display mt-3 text-[clamp(1rem,1.8vw,1.125rem)] leading-[1.4] tracking-[-0.012em] text-oxford/80'
-              : 'font-sans leading-[1.6] text-oxford/58',
+              : 'font-sans leading-[1.6] text-oxford/65',
             isMemo ? 'mt-3 text-[15px] font-normal' : !lg ? 'mt-1.5' : '',
             !isMemo && !lg && (compact ? 'text-[13px]' : 'text-[15px]'),
           )}
@@ -132,10 +132,10 @@ export default function LookupResultSnapshot({
           {summary}
         </p>
         {thesisLine ? (
-          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/35">{thesisLine}</p>
+          <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/65">{thesisLine}</p>
         ) : null}
         {resolutionLine ? (
-          <p className="mt-2 border border-solid border-oxford/12 bg-oxford/[0.04] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/55">
+          <p className="mt-2 border border-solid border-oxford/12 bg-oxford/[0.04] px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.08em] text-oxford/65">
             {resolutionLine}
           </p>
         ) : null}
@@ -145,13 +145,13 @@ export default function LookupResultSnapshot({
             <div className={cx('bg-oxford/10', isMemo ? 'my-5 h-px' : 'my-3 h-px sm:my-4')} aria-hidden />
             {isMemo ? (
               <>
-                <p className="mb-[14px] font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/58">
+                <p className="mb-[14px] font-mono text-[12px] uppercase tracking-[0.11em] text-oxford/65">
                   {dimensionsLabel}
                 </p>
                 <div className="grid w-full grid-cols-5 gap-x-0.5 gap-y-1 sm:gap-x-2 sm:gap-y-2 md:gap-x-3">
                   {dimensions.map((d) => (
                     <div key={`label-${d.key}`} className="flex min-w-0 items-end justify-center text-center">
-                      <p className="m-0 font-mono text-[11px] leading-[1.25] tracking-[0.03em] text-oxford/55 sm:text-[12px]">
+                      <p className="m-0 font-mono text-[11px] leading-[1.25] tracking-[0.03em] text-oxford/65 sm:text-[12px]">
                         {/* five full labels overlap at this column width — prefer the abbreviation */}
                         {d.labelShort ?? d.label}
                       </p>
@@ -171,7 +171,7 @@ export default function LookupResultSnapshot({
               <div className="grid grid-cols-5 gap-x-1 sm:gap-x-2">
                 {dimensions.map((d) => (
                   <div key={d.key} className="flex min-w-0 flex-col items-center gap-0.5 text-center">
-                    <span className="font-mono text-[10px] text-oxford/35">{d.label}</span>
+                    <span className="font-mono text-[10px] text-oxford/65">{d.label}</span>
                     <span
                       className={cx(
                         'font-mono font-bold text-oxford/70',

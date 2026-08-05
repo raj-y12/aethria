@@ -71,6 +71,11 @@ describe('CrmExportAction', () => {
     // jsdom has no createObjectURL — stub it so the download side effect
     // doesn't throw and mask the success state under test.
     vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() });
+    // A real browser never navigates on this click — the `download` attribute
+    // triggers a file save instead. jsdom doesn't model that and logs a
+    // "Not implemented: navigation" error; stub click() so the component's
+    // download trick doesn't hit jsdom's unimplemented navigation path.
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     wrapper(<CrmExportAction opportunityId="opportunity-1" companyName="Acme" />);
     fireEvent.click(screen.getByRole('button', { name: /prepare crm export/i }));
     await screen.findByText('acme.ai');
@@ -79,6 +84,8 @@ describe('CrmExportAction', () => {
     await waitFor(() => expect(api.approveCrmExport).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/approved and downloaded/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /approve and download/i })).not.toBeInTheDocument();
+    expect(clickSpy).toHaveBeenCalledTimes(1);
+    clickSpy.mockRestore();
     vi.unstubAllGlobals();
   });
 });

@@ -10,6 +10,7 @@ import type { FounderResolution } from '../../types/startup';
 const RESOLUTION: FounderResolution = {
   company: 'Acme',
   resolution_status: 'FOUND',
+  confidence: 0.8,
   founders: [
     {
       name: 'Ada Byron',
@@ -20,7 +21,7 @@ const RESOLUTION: FounderResolution = {
       confidence: 0.8,
     },
   ],
-  missing_fields: ['x_url', 'github_url'],
+  missing_fields: [],
 };
 
 describe('founder section model', () => {
@@ -76,11 +77,65 @@ describe('founder section model', () => {
   it('prefers structured founders over legacy name lists', () => {
     const model = buildFounderSectionModel({
       founderResolution: RESOLUTION,
-      companyResolution: { query: 'Acme', canonical_name: 'Acme', founder_names: ['Someone Else'] },
+      companyResolution: {
+        query: 'Acme',
+        canonical_name: 'Acme',
+        confidence: 0.9,
+        resolution_status: 'FOUND',
+        founder_names: ['Someone Else'],
+      },
       scoutFounderNames: ['Another Person'],
     });
     expect(model.names).toEqual(['Ada Byron']);
   });
+
+  it.each([
+    [
+      'has unresolved fields',
+      {
+        company: 'Acme',
+        resolution_status: 'FOUND',
+        confidence: 0.8,
+        founders: [{ name: 'Resolver Name', confidence: 0.8 }],
+        missing_fields: ['role'],
+      },
+      { query: 'Acme', canonical_name: 'Acme', confidence: 0.9, resolution_status: 'FOUND' },
+    ],
+    [
+      'is low confidence',
+      {
+        company: 'Acme',
+        resolution_status: 'LOW_CONFIDENCE',
+        confidence: 0.3,
+        founders: [{ name: 'Resolver Name', confidence: 0.3 }],
+        missing_fields: [],
+      },
+      { query: 'Acme', canonical_name: 'Acme', confidence: 0.9, resolution_status: 'FOUND' },
+    ],
+    [
+      'is linked to a different company',
+      {
+        company: 'Different Co',
+        resolution_status: 'FOUND',
+        confidence: 0.8,
+        founders: [{ name: 'Resolver Name', confidence: 0.8 }],
+        missing_fields: [],
+      },
+      { query: 'Acme', canonical_name: 'Acme', confidence: 0.9, resolution_status: 'FOUND' },
+    ],
+  ] satisfies Array<[string, FounderResolution, { query: string; canonical_name: string; confidence: number; resolution_status: string }]>)(
+    'keeps trusted Scout founder names when the resolver %s',
+    (_reason, founderResolution, companyResolution) => {
+      const model = buildFounderSectionModel({
+        founderResolution,
+        companyResolution,
+        scoutFounderNames: ['Scout Founder'],
+      });
+
+      expect(model.candidates).toEqual([]);
+      expect(model.names).toEqual(['Scout Founder']);
+    },
+  );
 
   it('ignores blank names', () => {
     const model = buildFounderSectionModel({

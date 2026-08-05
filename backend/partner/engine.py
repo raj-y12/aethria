@@ -191,6 +191,7 @@ class PartnerEngine:
                 "score_variance": getattr(review_info, "score_variance", None),
                 "derived_verdict": getattr(review_info, "derived_verdict", None),
                 "thesis_alignment_score": getattr(review_info, "thesis_alignment_score", None),
+                "thesis_alignment_state": getattr(review_info, "thesis_alignment_state", None),
                 "thesis_matches_fund": getattr(review_info, "thesis_matches_fund", None),
                 "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
                 "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],

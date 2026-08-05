@@ -131,10 +131,26 @@ function ThresholdBar({
   const passMax = boundaries.passMonitorBoundary - 1;
   const monitorMax = boundaries.monitorInvestBoundary - 1;
   // null = not dragging. While dragging, the last pointer delta leans the bands
-  // in the direction of travel and relaxes to 0 the moment you hold still.
+  // in the direction of travel and relaxes to 0 the moment you hold still —
+  // pointer events alone can't detect "holding still", so an idle timer
+  // restarted on every move drives the relax.
   const [drag, setDrag] = useState<number | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearIdleTimer = () => {
+    if (idleTimerRef.current != null) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+  };
+  useEffect(() => clearIdleTimer, []);
   const onDrag = (delta: number | null) => {
-    setDrag(delta == null ? null : Math.max(-10, Math.min(10, delta * 2.5)));
+    clearIdleTimer();
+    if (delta == null) {
+      setDrag(null);
+      return;
+    }
+    setDrag(Math.max(-10, Math.min(10, delta * 2.5)));
+    idleTimerRef.current = setTimeout(() => setDrag(0), 120);
   };
 
   return (

@@ -20,6 +20,7 @@ from utils.scoring import compute_overall_score
 from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 from evaluation_v2.prerequisites import EvaluationPrerequisites
+from identity.ownership_gate import check_ownership_conflict
 from evaluation_v2.governed_scoring import (
     configured_scoring_dimensions,
     validate_governed_scoring_trace,
@@ -620,11 +621,46 @@ class PartnerDecisionEngine:
 
         result["company_quality"] = round(float(avg_score), 2)
 
-        if tas is None:
-            # Thesis-blind (no active mandate / alignment not computed): nothing to gate.
+        ownership_conflict = check_ownership_conflict(scout_output, review_output)
+        if ownership_conflict is not None:
+            # Fail closed ahead of the mandate gate — an acquired company must
+            # never reach an automatic INVEST/PASS off stale pre-acquisition
+            # traction (docs/known-issues.md, the Workvivo/Zoom case).
             result["fund_fit"] = None
             result["fund_fit_label"] = None
             result["fund_fit_confidence"] = None
+            held = mf.held_recommendation
+            result = self._apply_final_recommendation_fields(
+                result, held, result.get("assumption_risks"),
+                next_action=mf.held_next_action,
+            )
+            result["human_review_required"] = True
+            result["mandate_gate"] = "ownership_conflict"
+            result["mandate_override_required"] = True
+            result["ownership_conflict"] = ownership_conflict
+            self._log_finalize(scout_output, avg_score, avg_dims, "ownership_conflict", result)
+            return result
+
+        if tas is None:
+            result["fund_fit"] = None
+            result["fund_fit_label"] = None
+            result["fund_fit_confidence"] = None
+            if review_output.get("thesis_alignment_state") == "missing_under_active_thesis":
+                # A mandate IS active but its alignment came back None/malformed
+                # (e.g. the LLM omitted it under an embedding-backed thesis).
+                # This is ambiguous, not "no mandate" — fail closed rather than
+                # letting an otherwise-INVEST decision through ungated.
+                held = mf.held_recommendation
+                result = self._apply_final_recommendation_fields(
+                    result, held, result.get("assumption_risks"),
+                    next_action=mf.held_next_action,
+                )
+                result["human_review_required"] = True
+                result["mandate_gate"] = "alignment_missing"
+                result["mandate_override_required"] = True
+                self._log_finalize(scout_output, avg_score, avg_dims, "alignment_missing", result)
+                return result
+            # Thesis-blind (no active mandate): nothing to gate.
             result["mandate_gate"] = "no_mandate"
             result["mandate_override_required"] = False
             self._log_finalize(scout_output, avg_score, avg_dims, "no_mandate", result)

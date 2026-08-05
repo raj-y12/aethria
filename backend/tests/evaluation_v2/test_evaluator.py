@@ -1,5 +1,5 @@
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -18,6 +18,7 @@ from evaluation_v2.service import (
 
 
 EVALUATION_AT = datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
+EXPIRED_EVALUATION_AT = datetime(2026, 8, 2, 12, 0, tzinfo=timezone.utc)
 
 
 def _claims():
@@ -44,16 +45,6 @@ def _claims():
 
 
 def _verified_link(claim_id, **overrides):
-    """A link whose evidence is valid *now*.
-
-    These timestamps were hardcoded (effective 2026-07-01, expiring
-    2026-08-01), so every test using them began failing with
-    `evidence_expired` the moment the wall clock passed that date — a time bomb
-    that turned seven passing tests red with no code change. The fixture's
-    intent is "currently valid evidence", so it is now expressed relative to
-    now. A test that wants expired evidence overrides `evidence_expires_at`.
-    """
-    now = datetime.now(timezone.utc)
     link = {
         "claim_id": claim_id,
         "evidence_item_id": f"evidence-{claim_id}",
@@ -64,10 +55,10 @@ def _verified_link(claim_id, **overrides):
         "trust_class": "independent",
         "untrusted_input": False,
         "prompt_injection_detected": False,
-        "evidence_effective_at": (now - timedelta(days=30)).isoformat(),
-        "evidence_expires_at": (now + timedelta(days=30)).isoformat(),
-        "artifact_effective_at": (now - timedelta(days=30)).isoformat(),
-        "retrieved_at": (now - timedelta(days=30, hours=-1)).isoformat(),
+        "evidence_effective_at": "2026-07-01T00:00:00+00:00",
+        "evidence_expires_at": "2026-08-01T00:00:00+00:00",
+        "artifact_effective_at": "2026-07-01T00:00:00+00:00",
+        "retrieved_at": "2026-07-01T01:00:00+00:00",
     }
     link.update(overrides)
     return link
@@ -131,9 +122,10 @@ def test_same_snapshot_and_policy_produce_same_deterministic_result():
     snapshot, digest = snapshot_claims(
         _claims(),
         links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
     )
-    first = evaluate_snapshot(snapshot, _policy())
-    second = evaluate_snapshot(snapshot, _policy())
+    first = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+    second = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
 
     assert first == second
     assert first.recommendation.state is RecommendationState.ADVANCE
@@ -153,9 +145,9 @@ def test_missing_evidence_is_unscored_not_converted_to_zero():
 def test_required_unscored_criterion_forces_insufficient_evidence_despite_high_average():
     claims = [_claims()[0]]
     links = [_verified_link("claim-market")]
-    snapshot, _ = snapshot_claims(claims, links)
+    snapshot, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
 
-    result = evaluate_snapshot(snapshot, _policy())
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
 
     assert result.criteria[0].score == 8.0
     assert next(
@@ -240,11 +232,26 @@ def test_model_inferred_claim_cannot_establish_decisive_criterion():
 
 def test_verified_supported_claim_is_score_eligible():
     links = [_verified_link("claim-market"), _verified_link("claim-execution")]
-    snapshot, _ = snapshot_claims(_claims(), links)
+    snapshot, _ = snapshot_claims(_claims(), links, evaluation_at=EVALUATION_AT)
 
-    result = evaluate_snapshot(snapshot, _policy())
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
 
     assert result.recommendation.state is RecommendationState.ADVANCE
+
+
+def test_evidence_expiring_on_august_first_is_rejected_after_expiry():
+    snapshot, _ = snapshot_claims(
+        _claims(),
+        links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EXPIRED_EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(
+        snapshot, _policy(), evaluation_at=EXPIRED_EVALUATION_AT
+    )
+
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert all("evidence_expired" in item.quality_flags for item in result.criteria)
 
 
 def test_attributed_operator_claim_is_score_eligible_when_policy_allows_it():
@@ -303,9 +310,9 @@ def test_untrusted_input_is_provenance_not_an_eligibility_filter():
         _verified_link("claim-market", untrusted_input=True),
         _verified_link("claim-execution", untrusted_input=True),
     ]
-    snapshot, _ = snapshot_claims(_claims(), links)
+    snapshot, _ = snapshot_claims(_claims(), links, evaluation_at=EVALUATION_AT)
 
-    result = evaluate_snapshot(snapshot, _policy())
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
 
     assert result.recommendation.state is RecommendationState.ADVANCE
 
@@ -326,9 +333,13 @@ def test_hard_exclusion_is_deterministic_pass_with_driver():
     policy.decision_safety = policy.decision_safety.model_copy(
         update={"hard_exclusion_claim_types": ["excluded_sector"]}
     )
-    snapshot, _ = snapshot_claims(claims, links=[_verified_link("claim-exclusion")])
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[_verified_link("claim-exclusion")],
+        evaluation_at=EVALUATION_AT,
+    )
 
-    result = evaluate_snapshot(snapshot, policy)
+    result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
 
     assert result.recommendation.state is RecommendationState.PASS
     assert result.recommendation.human_review_required is True
@@ -360,9 +371,10 @@ def test_grounded_critical_risk_forces_pass_despite_high_supported_scores():
             _verified_link("claim-execution"),
             _verified_link("claim-critical-risk"),
         ],
+        evaluation_at=EVALUATION_AT,
     )
 
-    result = evaluate_snapshot(snapshot, policy)
+    result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
 
     assert result.recommendation.state is RecommendationState.PASS
     assert result.recommendation.human_review_required is True
@@ -390,9 +402,10 @@ def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
     snapshot, _ = snapshot_claims(
         claims,
         links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
     )
 
-    result = evaluate_snapshot(snapshot, policy)
+    result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
 
     assert result.recommendation.state is RecommendationState.ADVANCE
     assert result.recommendation.human_review_required is True

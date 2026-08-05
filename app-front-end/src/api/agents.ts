@@ -103,6 +103,6 @@ export async function triggerAgents(): Promise<TriggerResult> {
     method: 'POST',
     headers: { Accept: 'application/json' },
   });
-  const data = (await res.json()) as TriggerResult;
-  return data;
+  if (!res.ok) throw new Error(`Agent trigger failed: ${res.status}`);
+  return (await res.json()) as TriggerResult;
 }

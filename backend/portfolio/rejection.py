@@ -33,8 +33,11 @@ class RejectionAnalyzer:
     def __init__(self, data_dir: str = "data/portfolio", user_id: Optional[str] = None):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.patterns_file = self.data_dir / "rejection_patterns.json"
         self.user_id = (user_id or "").strip() or None
+        # ponytail: filename-safe tenant scoping — the fallback file must never
+        # be shared across tenants (it was previously one unscoped file).
+        file_suffix = f"_{self.user_id}" if self.user_id else ""
+        self.patterns_file = self.data_dir / f"rejection_patterns{file_suffix}.json"
         if env_config.use_supabase_storage() and not self.user_id:
             raise RuntimeError("RejectionAnalyzer requires explicit user_id when Supabase storage is enabled")
         self.logger = logging.getLogger("rejection.analyzer")
@@ -118,6 +121,10 @@ class RejectionAnalyzer:
                     return rows[0]["stats"]
                 return _empty_patterns()
             except Exception as e:
+                if not env_config.local_fallback_allowed():
+                    raise RuntimeError(
+                        "RejectionAnalyzer: supabase_read_failed_no_local_fallback_in_production"
+                    ) from e
                 self.logger.warning("Supabase rejection patterns read failed; using file fallback: %s", e)
         if not self.patterns_file.exists():
             return _empty_patterns()
@@ -155,6 +162,10 @@ class RejectionAnalyzer:
                     ).execute()
                 return
             except Exception as e:
+                if not env_config.local_fallback_allowed():
+                    raise RuntimeError(
+                        "RejectionAnalyzer: supabase_write_failed_no_local_fallback_in_production"
+                    ) from e
                 self.logger.warning("Supabase rejection patterns write failed; using file fallback: %s", e)
         temp_path = self.patterns_file.with_suffix(".tmp")
         with open(temp_path, "w") as f:

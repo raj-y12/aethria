@@ -446,6 +446,83 @@ async def test_operator_create_from_case_is_one_transactional_resolution():
     assert "identity_case.resolved" in str(connection.calls)
 
 
+def _case_group_row(*, case_id, observed_domain, observed_name="Acme", channel="manual_lookup", **overrides):
+    row = {
+        "identity_case_id": case_id,
+        "user_id": "fund-a",
+        "observation_id": case_id,  # distinct per row for this fixture's purposes
+        "status": "open",
+        "reason_code": "insufficient_verified_identifier",
+        "candidates": json.dumps([]),
+        "selected_company_id": None,
+        "resolution_note": None,
+        "resolved_by": None,
+        "resolved_at": None,
+        "created_at": _input().observed_at,
+        "updated_at": _input().observed_at,
+        "observed_domain": observed_domain,
+        "observed_name": observed_name,
+        "channel": channel,
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.mark.asyncio
+async def test_two_observations_with_the_same_verified_domain_produce_one_group():
+    rows = [
+        _case_group_row(case_id="case-1", observed_domain="acme.com", observed_name="Acme Inc"),
+        _case_group_row(case_id="case-2", observed_domain="https://www.acme.com/about", observed_name="Acme"),
+    ]
+    connection = _Connection(fetches=[rows])
+    repository = IdentityRepository(_Pool(connection))
+
+    groups = await repository.list_case_groups(user_id="fund-a", status="open")
+
+    assert len(groups) == 1
+    group = groups[0]
+    assert group.canonical_domain == "acme.com"
+    assert len(group.cases) == 2
+    assert {case.identity_case_id for case in group.cases} == {"case-1", "case-2"}
+    assert set(group.observed_names) == {"Acme Inc", "Acme"}
+
+
+@pytest.mark.asyncio
+async def test_two_observations_matching_only_on_ambiguous_name_stay_ungrouped():
+    rows = [
+        _case_group_row(case_id="case-1", observed_domain=None, observed_name="Acme"),
+        _case_group_row(case_id="case-2", observed_domain=None, observed_name="Acme"),
+    ]
+    connection = _Connection(fetches=[rows])
+    repository = IdentityRepository(_Pool(connection))
+
+    groups = await repository.list_case_groups(user_id="fund-a", status="open")
+
+    assert len(groups) == 2
+    assert all(group.canonical_domain is None for group in groups)
+    assert all(len(group.cases) == 1 for group in groups)
+    assert groups[0].group_key != groups[1].group_key
+
+
+@pytest.mark.asyncio
+async def test_three_observations_two_share_a_domain_one_does_not():
+    rows = [
+        _case_group_row(case_id="case-1", observed_domain="acme.com"),
+        _case_group_row(case_id="case-2", observed_domain="acme.com"),
+        _case_group_row(case_id="case-3", observed_domain="other.com", observed_name="Other Co"),
+    ]
+    connection = _Connection(fetches=[rows])
+    repository = IdentityRepository(_Pool(connection))
+
+    groups = await repository.list_case_groups(user_id="fund-a", status="open")
+
+    assert len(groups) == 2
+    acme_group = next(g for g in groups if g.canonical_domain == "acme.com")
+    other_group = next(g for g in groups if g.canonical_domain == "other.com")
+    assert len(acme_group.cases) == 2
+    assert len(other_group.cases) == 1
+
+
 class _ConflictInsertConnection:
     def __init__(self, connection):
         self.connection = connection

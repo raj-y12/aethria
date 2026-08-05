@@ -2347,6 +2347,20 @@ def health():
     return {"status": "ok"}
 
 
+def _durable_runner_state(service: Any) -> str:
+    task = getattr(service, "_runner", None)
+    if task is None:
+        return "not_started"
+    if not task.done():
+        return "running"
+    if task.cancelled():
+        return "cancelled"
+    try:
+        return "failed" if task.exception() is not None else "stopped"
+    except asyncio.CancelledError:
+        return "cancelled"
+
+
 @app.get("/api/system/status")
 async def system_status(request: Request):
     """Authenticated execution-plane status without secrets or raw exceptions."""
@@ -2354,6 +2368,20 @@ async def system_status(request: Request):
     counts: Dict[str, int]
     status = "ok"
     status_error: Optional[str] = None
+    durable_required = _durable_jobs_required()
+    durable_runtime = (
+        {
+            "worker": _durable_runner_state(_durable_job_worker),
+            "outbox_publisher": _durable_runner_state(_durable_outbox_publisher),
+        }
+        if durable_required
+        else {}
+    )
+    durable_runtime_ready = (
+        all(state == "running" for state in durable_runtime.values())
+        if durable_required
+        else True
+    )
     if _durable_job_repository is not None:
         try:
             counts = await _durable_job_repository.tenant_queue_depths(user_id=user_id)
@@ -2370,13 +2398,20 @@ async def system_status(request: Request):
             "company_lookup:queued": _lookup_queue.qsize() if _lookup_queue is not None else 0,
             "outbox:pending": 0,
         }
+    if durable_required and _durable_job_repository is None:
+        status = "degraded"
+    if durable_required and _durable_job_repository is not None and not durable_runtime_ready:
+        status = "degraded"
+        status_error = status_error or "durable_background_task_stopped"
     return {
         "status": status,
         "durable_jobs": {
-            "required": _durable_jobs_required(),
+            "required": durable_required,
             "ready": _durable_job_repository is not None,
             "error": status_error or (_durable_job_error if _durable_jobs_required() else None),
             "counts": counts,
+            "runtime_ready": durable_runtime_ready,
+            "runtime": durable_runtime,
         },
     }
 

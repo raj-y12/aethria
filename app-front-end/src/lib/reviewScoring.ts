@@ -12,6 +12,8 @@
  */
 import type { Review, ScoringDimension, StructuredScoring } from '../types/startup';
 
+const PRESENTATION_DIMENSION_KEYS = ['market', 'execution', 'product', 'technical', 'defensibility'] as const;
+
 export function isScoringDimension(value: unknown): value is ScoringDimension {
   if (!value || typeof value !== 'object') return false;
   const casted = value as { score?: unknown; components?: unknown };
@@ -53,6 +55,103 @@ function nullableString(value: unknown): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function presentationConfidence(value: unknown): number | null {
+  if (typeof value !== 'string') return null;
+  switch (value.trim().toLowerCase()) {
+    case 'extensive':
+      return 0.9;
+    case 'strong':
+      return 0.7;
+    case 'moderate':
+      return 0.5;
+    case 'limited':
+      return 0.3;
+    default:
+      return null;
+  }
+}
+
+function presentationDimension(value: unknown): ScoringDimension | null {
+  if (!value || typeof value !== 'object') return null;
+  const dimension = value as Record<string, unknown>;
+  if (typeof dimension.score !== 'number' || !Number.isFinite(dimension.score)) return null;
+
+  const components = Array.isArray(dimension.components)
+    ? Object.fromEntries(
+        dimension.components.flatMap((component) => {
+          if (!component || typeof component !== 'object') return [];
+          const item = component as Record<string, unknown>;
+          const id = nullableString(item.id);
+          if (!id || typeof item.score !== 'number' || !Number.isFinite(item.score)) return [];
+          const hasEvidence = item.has_evidence === true;
+          const interpretation = nullableString(item.interpretation) ?? '';
+          return [[id, {
+            score: item.score,
+            value: hasEvidence ? nullableString(item.label) : null,
+            label: hasEvidence ? nullableString(item.band) : null,
+            reasoning: interpretation,
+            evidence: hasEvidence ? interpretation || null : null,
+          }]];
+        }),
+      )
+    : {};
+  const reasoning = cleanStringList([
+    nullableString(dimension.analyst_summary),
+    ...(Array.isArray(dimension.supports) ? dimension.supports : []),
+  ]);
+  const weaknesses = cleanStringList(dimension.weakens);
+
+  return {
+    score: dimension.score,
+    confidence: presentationConfidence(dimension.confidence_label),
+    components,
+    reasoning: reasoning.length > 0 ? reasoning : null,
+    weaknesses: weaknesses.length > 0 ? weaknesses : null,
+    score_label: nullableString(dimension.band),
+  };
+}
+
+function scoringPresentationToStructuredScoring(value: unknown): StructuredScoring | null {
+  if (!value || typeof value !== 'object') return null;
+  const presentation = value as Record<string, unknown>;
+  if (typeof presentation.overall_score !== 'number' || !Number.isFinite(presentation.overall_score)) {
+    return null;
+  }
+  const rawDimensions = presentation.dimensions;
+  if (!Array.isArray(rawDimensions)) return null;
+
+  const dimensions = Object.fromEntries(
+    PRESENTATION_DIMENSION_KEYS.map((key) => [
+      key,
+      presentationDimension(
+        rawDimensions.find(
+          (dimension: unknown) =>
+            !!dimension &&
+            typeof dimension === 'object' &&
+            (dimension as Record<string, unknown>).id === key,
+        ),
+      ),
+    ]),
+  ) as Partial<Record<(typeof PRESENTATION_DIMENSION_KEYS)[number], ScoringDimension | null>>;
+  if (PRESENTATION_DIMENSION_KEYS.some((key) => !dimensions[key])) return null;
+
+  const market = dimensions.market!;
+  const execution = dimensions.execution!;
+  const product = dimensions.product!;
+  const technical = dimensions.technical!;
+  const defensibility = dimensions.defensibility!;
+  return {
+    market,
+    execution,
+    product,
+    technical,
+    defensibility,
+    overall_score: presentation.overall_score,
+    overall_confidence: presentationConfidence(presentation.confidence_label),
+    overall_dispersion: computeDispersion([market.score, product.score, technical.score, execution.score]),
+  };
+}
+
 /** Build a `ScoringDimension`-shaped object from flat review fields. */
 function flatDimension(
   score: unknown,
@@ -77,6 +176,8 @@ function flatDimension(
 export function normalizeStructuredScoring(review: Review | null | undefined): StructuredScoring | null {
   if (!review) return null;
   const reviewRecord = review as Record<string, unknown>;
+  const presentationCandidate = scoringPresentationToStructuredScoring(reviewRecord.scoring_presentation);
+  if (presentationCandidate) return presentationCandidate;
   const reviewerStructuredCandidate = Array.isArray(reviewRecord.reviews)
     ? (reviewRecord.reviews as Array<Record<string, unknown>>).find(
         (entry) => !!entry && typeof entry === 'object' && !!entry.structured_scoring

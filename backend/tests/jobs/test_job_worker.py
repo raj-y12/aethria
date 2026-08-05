@@ -209,6 +209,69 @@ async def test_worker_poll_backstop_wakes_when_notified():
 
 
 @pytest.mark.asyncio
+async def test_worker_loop_retries_after_transient_claim_failure():
+    worker_module = importlib.import_module("jobs.worker")
+    repository = _Repository()
+    attempts = 0
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={},
+        worker_id="worker-a",
+        poll_interval_seconds=0.05,
+    )
+
+    async def claim_next(**_kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("database temporarily unavailable")
+        worker._stopping.set()
+        worker.notify()
+        return None
+
+    repository.claim_next = claim_next
+
+    runner = asyncio.create_task(worker._run())
+    await asyncio.wait_for(runner, timeout=0.5)
+
+    assert attempts == 2
+    assert runner.exception() is None
+
+
+@pytest.mark.asyncio
+async def test_worker_loop_retries_after_transient_lease_recovery_failure():
+    worker_module = importlib.import_module("jobs.worker")
+    repository = _Repository()
+    recovery_attempts = 0
+    worker = worker_module.DurableJobWorker(
+        repository,
+        handlers={},
+        worker_id="worker-a",
+        poll_interval_seconds=0.05,
+    )
+
+    async def recover_exhausted_leases():
+        nonlocal recovery_attempts
+        recovery_attempts += 1
+        if recovery_attempts == 1:
+            raise RuntimeError("database temporarily unavailable")
+
+    async def claim_next(**_kwargs):
+        worker._stopping.set()
+        worker.notify()
+        return None
+
+    repository.dead_letter_exhausted_leases = recover_exhausted_leases
+    repository.claim_next = claim_next
+
+    runner = asyncio.create_task(worker._run())
+    await asyncio.wait_for(runner, timeout=0.5)
+
+    assert recovery_attempts == 2
+    assert runner.exception() is None
+
+
+@pytest.mark.asyncio
 async def test_rejected_heartbeat_fences_handler_before_authoritative_publication():
     worker_module = importlib.import_module("jobs.worker")
     repository = _Repository(_job(), heartbeat_result=False)

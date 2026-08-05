@@ -374,8 +374,8 @@ const WorkGrid = ({
     [queueView, onStartupClick]
   );
 
-  // Enter/Space activate natively now that rows are real buttons — only the
-  // arrow-key roving focus needs handling.
+  // Arrow-key roving focus is handled here; Enter/Space activation is bound
+  // at the row call site because docket rows use a button role.
   const handleRowKeyDown = useCallback(
     (e: React.KeyboardEvent, idx: number) => {
       if (e.key === 'ArrowDown') {
@@ -502,7 +502,14 @@ const WorkGrid = ({
           >
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;
-              const keyDown = (e: React.KeyboardEvent) => handleRowKeyDown(e, idx);
+              const keyDown = (e: React.KeyboardEvent) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleRowSelect(model.startup);
+                  return;
+                }
+                handleRowKeyDown(e, idx);
+              };
 
               return (
                 <motion.div

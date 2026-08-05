@@ -75,7 +75,7 @@ export default function MarketPlate() {
           companies scanned · <span className="text-[var(--accent)]">{IN_THESIS}</span> inside your thesis today.
         </p>
 
-        <div className="reveal d3 mt-5 flex flex-wrap gap-7 border-t border-solid border-[var(--line)] pt-4 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-3)]">
+        <div className="reveal d3 mt-5 flex flex-wrap gap-7 border-t border-solid border-[var(--line)] pt-4 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--ink-2)]">
           <span className="inline-flex items-center gap-2">
             <i className="inline-block h-[7px] w-[7px] rounded-full bg-[var(--ink-3)]" /> Scanned
           </span>

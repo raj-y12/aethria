@@ -8,10 +8,34 @@ interface WaitlistBody {
   linkedin?: string;
 }
 
+const MAX_LENGTHS = { name: 100, email: 320, role: 100, firm: 200, linkedin: 2000 } as const;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/** Rejects anything that isn't a well-formed https:// URL — used for both
+ * validation and as the href, so a malformed value can never reach the DOM. */
+export function parseHttpsUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
+    const notifyTo = process.env.AETHRIA_WAITLIST_NOTIFY_EMAIL;
+    if (!apiKey || !notifyTo) {
       return Response.json(
         { detail: 'Email service not configured' },
         { status: 503 }
@@ -20,88 +44,71 @@ export async function POST(request: Request) {
 
     const resend = new Resend(apiKey);
     const body = (await request.json()) as WaitlistBody;
-    const { name, email, role, firm, linkedin } = body;
+    const name = (body.name ?? '').trim();
+    const email = (body.email ?? '').trim();
+    const role = (body.role ?? '').trim();
+    const firm = (body.firm ?? '').trim();
+    const linkedinRaw = (body.linkedin ?? '').trim();
 
-    if (!name?.trim() || !email?.trim() || !role?.trim() || !firm?.trim()) {
+    if (!name || !email || !role || !firm) {
       return Response.json(
         { detail: 'Name, email, role, and firm are required' },
         { status: 400 }
       );
     }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    if (
+      name.length > MAX_LENGTHS.name ||
+      email.length > MAX_LENGTHS.email ||
+      role.length > MAX_LENGTHS.role ||
+      firm.length > MAX_LENGTHS.firm ||
+      linkedinRaw.length > MAX_LENGTHS.linkedin
+    ) {
+      return Response.json({ detail: 'One or more fields is too long' }, { status: 400 });
+    }
+    if (!EMAIL_REGEX.test(email)) {
       return Response.json(
         { detail: 'Please enter a valid email address' },
         { status: 400 }
       );
     }
+    let linkedin: string | null = null;
+    if (linkedinRaw) {
+      linkedin = parseHttpsUrl(linkedinRaw);
+      if (!linkedin) {
+        return Response.json(
+          { detail: 'LinkedIn must be a valid https:// URL' },
+          { status: 400 }
+        );
+      }
+    }
 
-    const notifyTo =
-      process.env.AETHRIA_WAITLIST_NOTIFY_EMAIL ?? 'delivered@resend.dev';
-    const linkedinLine = linkedin?.trim()
-      ? `<li>LinkedIn: <a href="${linkedin.trim()}">${linkedin.trim()}</a></li>`
+    const linkedinLine = linkedin
+      ? `<li>LinkedIn: <a href="${escapeHtml(linkedin)}">${escapeHtml(linkedin)}</a></li>`
       : '';
     const html = `
       <p><strong>New early access signup</strong></p>
       <ul>
-        <li>Name: ${name.trim()}</li>
-        <li>Email: ${email.trim()}</li>
-        <li>Role: ${role.trim()}</li>
-        <li>Firm: ${firm.trim()}</li>
+        <li>Name: ${escapeHtml(name)}</li>
+        <li>Email: ${escapeHtml(email)}</li>
+        <li>Role: ${escapeHtml(role)}</li>
+        <li>Firm: ${escapeHtml(firm)}</li>
         ${linkedinLine}
       </ul>
     `;
 
-    const { data, error } = await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: 'Aethria <early_access@mail.aethria.co>',
       to: [notifyTo],
-      subject: `Early access request: ${name.trim()} (${firm.trim()})`,
+      subject: `Early access request: ${name} (${firm})`,
       html,
     });
 
     if (error) {
-      return Response.json(
-        { detail: error.message || 'Failed to send email' },
-        { status: 502 }
-      );
+      return Response.json({ detail: 'Failed to record request' }, { status: 502 });
     }
 
-    // Persist to backend waitlist
-    let position: number | undefined;
-    const backendUrl = process.env.VITE_API_URL;
-    if (backendUrl) {
-      try {
-        const backendRes = await fetch(
-          `${backendUrl.replace(/\/$/, '')}/api/waitlist`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: name.trim(),
-              email: email.trim(),
-              role: role.trim(),
-              firm: firm.trim(),
-              linkedin: linkedin?.trim() || '',
-            }),
-          },
-        );
-        if (backendRes.ok) {
-          const backendData = await backendRes.json();
-          position = backendData.position;
-        }
-      } catch (backendErr) {
-        console.error('Failed to persist to backend waitlist:', backendErr);
-      }
-    }
-
-    return Response.json({ ok: true, id: data?.id, position }, { status: 200 });
-  } catch (err) {
-    const message =
-      err instanceof Error ? err.message : 'Something went wrong';
-    return Response.json(
-      { detail: `Failed to send: ${message}` },
-      { status: 500 }
-    );
+    return Response.json({ ok: true }, { status: 200 });
+  } catch {
+    return Response.json({ detail: 'Failed to record request' }, { status: 500 });
   }
 }

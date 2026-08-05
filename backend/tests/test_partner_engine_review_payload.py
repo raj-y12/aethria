@@ -29,6 +29,7 @@ PARTNER_REVIEW_PAYLOAD_KEYS = frozenset(
         "score_variance",
         "derived_verdict",
         "thesis_alignment_score",
+        "thesis_alignment_state",
         "thesis_matches_fund",
         "thesis_fit_points",
         "thesis_deviation_points",

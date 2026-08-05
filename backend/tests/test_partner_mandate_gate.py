@@ -83,3 +83,35 @@ def test_thesis_blind_lookup_does_not_gate():
     assert out["mandate_gate"] == "no_mandate"
     assert out["fund_fit"] is None
     assert out["mandate_override_required"] is False
+
+
+def test_acquired_company_with_stale_traction_is_blocked_not_auto_invested():
+    """Regression for the Workvivo/Zoom case in docs/known-issues.md: a strong
+    review built on pre-acquisition traction must not reach an automatic
+    INVEST — it is held for ownership/identity review instead."""
+    scout = _scout(why_now="Workvivo was acquired by Zoom in 2023.")
+    review = _strong_review(
+        overall_summary="Historical customer growth and a 2022 Series B round.",
+        thesis_alignment_score=0.85,
+    )
+
+    out = _engine().decide(scout, review)
+
+    assert out["recommendation"] != "INVEST"
+    assert out["mandate_gate"] == "ownership_conflict"
+    assert out["human_review_required"] is True
+    assert out["mandate_override_required"] is True
+    assert out["ownership_conflict"]["code"] == "ownership_conflict_detected"
+
+
+def test_operator_verified_spinout_clears_the_ownership_gate():
+    scout = _scout(
+        why_now="Was acquired by Zoom, then spun back out as an independent company.",
+        ownership_verified_spinout=True,
+    )
+    review = _strong_review(thesis_alignment_score=0.85)
+
+    out = _engine().decide(scout, review)
+
+    assert out["recommendation"] == "INVEST"
+    assert out["mandate_gate"] == "clear"

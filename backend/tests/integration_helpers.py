@@ -20,6 +20,19 @@ def bootstrap_integration_test() -> None:
 
 
 def require_openai_api_key() -> str:
+    """Gate live provider work behind an explicit opt-in.
+
+    These scripts are directly executable (not just pytest-skipped), and a
+    provider credential can already be present in the shell environment even
+    when it wasn't loaded from `.env` here — so the opt-in must be checked at
+    the point work actually starts, not merely around the `.env` load.
+    """
+    if os.environ.get("RUN_LIVE_TESTS") != "1":
+        print(
+            "ERROR: set RUN_LIVE_TESTS=1 to run this live integration script "
+            "and spend real provider credentials."
+        )
+        sys.exit(1)
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         print("ERROR: OPENAI_API_KEY environment variable is required")

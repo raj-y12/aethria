@@ -99,6 +99,15 @@ export interface IdentityAdmission {
   created: boolean;
 }
 
+export interface IdentityCaseGroup {
+  group_key: string;
+  canonical_domain: string | null;
+  observation_count: number;
+  observed_names: string[];
+  sources: string[];
+  cases: IdentityResolutionCase[];
+}
+
 export type IdentityResolutionInput =
   | { action: 'match'; selected_company_id: string; resolution_note?: string }
   | { action: 'create'; canonical_name: string; canonical_domain: string; resolution_note?: string }
@@ -153,6 +162,25 @@ export function resolveIdentityCase(
   input: IdentityResolutionInput,
 ): Promise<IdentityAdmission | IdentityResolutionCase> {
   return apiRequest(`/api/identity-cases/${encodedId(identityCaseId, 'identityCaseId')}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchIdentityCaseGroups(
+  status: IdentityCaseStatus = 'open',
+  limit = 100,
+): Promise<IdentityCaseGroup[]> {
+  const params = new URLSearchParams({ status, limit: String(limit) });
+  const result = await apiRequest<{ groups?: IdentityCaseGroup[] }>(`/api/identity-cases/groups?${params}`);
+  return Array.isArray(result.groups) ? result.groups : [];
+}
+
+export function resolveIdentityCaseGroup(
+  groupKey: string,
+  input: IdentityResolutionInput,
+): Promise<{ group_key: string; results: unknown[] }> {
+  return apiRequest(`/api/identity-cases/groups/${encodedId(groupKey, 'groupKey')}/resolve`, {
     method: 'POST',
     body: JSON.stringify(input),
   });

@@ -12,6 +12,13 @@
   animation: pc-dot-pulse 2.4s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .pc-live-dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 /* UI sans (Figtree on marketing, app --font-sans) — overrides global display headings on h3 */
 .pc-font-sans {
   font-family: var(--font-sans, 'Figtree', system-ui, -apple-system, sans-serif);

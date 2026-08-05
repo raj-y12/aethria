@@ -24,6 +24,8 @@ from utils.timeutil import utcnow
 
 logger = logging.getLogger("jobs.worker")
 JobHandler = Callable[[AgentJob], Awaitable[None]]
+_LOOP_ERROR_BACKOFF_MAX_SECONDS = 30.0
+_LOOP_ERROR_BACKOFF_MAX_EXPONENT = 8
 
 
 class DurableJobWorker:
@@ -232,8 +234,31 @@ class DurableJobWorker:
         return True
 
     async def _run(self) -> None:
+        consecutive_failures = 0
         while not self._stopping.is_set():
-            processed = await self.process_one()
+            try:
+                processed = await self.process_one()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                consecutive_failures += 1
+                retry_seconds = min(
+                    self.poll_interval_seconds
+                    * (2 ** min(consecutive_failures - 1, _LOOP_ERROR_BACKOFF_MAX_EXPONENT)),
+                    _LOOP_ERROR_BACKOFF_MAX_SECONDS,
+                )
+                logger.exception(
+                    "Durable job worker iteration failed; retrying in %.2fs",
+                    retry_seconds,
+                )
+                try:
+                    await asyncio.wait_for(
+                        self._stopping.wait(), timeout=retry_seconds
+                    )
+                except asyncio.TimeoutError:
+                    pass
+                continue
+            consecutive_failures = 0
             if not processed:
                 await self.wait_for_work()
 

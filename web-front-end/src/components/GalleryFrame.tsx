@@ -11,10 +11,14 @@ import { bureauTimes, editionNo } from '../lib/clocks';
 export default function GalleryFrame({ enter = true }: { enter?: boolean }) {
   const reduce = useReducedMotion();
   const [times, setTimes] = useState<{ label: string; time: string }[] | null>(null);
-  const [edition] = useState(editionNo());
+  // Computed after mount, not during SSG prerender — a day boundary between
+  // build and hydration would otherwise make the server- and client-rendered
+  // numbers disagree.
+  const [edition, setEdition] = useState<number | null>(null);
 
   useEffect(() => {
     setTimes(bureauTimes());
+    setEdition(editionNo());
     if (reduce) return;
     const id = window.setInterval(() => setTimes(bureauTimes()), 1000);
     return () => window.clearInterval(id);
@@ -47,7 +51,7 @@ export default function GalleryFrame({ enter = true }: { enter?: boolean }) {
         )}
       </div>
 
-      <div className={frameCx('br')}>Specimen Edition &middot; No. {edition}</div>
+      <div className={frameCx('br')}>Specimen Edition &middot; No. {edition ?? '—'}</div>
     </>
   );
 }

@@ -75,6 +75,35 @@ class _FailingStatusRepository(_Repository):
         raise RuntimeError("database temporarily unavailable")
 
 
+class _BackgroundTask:
+    def __init__(self, *, done=False, error=None, cancelled=False):
+        self._done = done
+        self._error = error
+        self._cancelled = cancelled
+
+    def done(self):
+        return self._done
+
+    def cancelled(self):
+        return self._cancelled
+
+    def exception(self):
+        return self._error
+
+
+class _DurableWorker:
+    def __init__(self, task=None):
+        self._runner = task or _BackgroundTask()
+
+    def notify(self):
+        pass
+
+
+class _DurableOutboxPublisher:
+    def __init__(self, task=None):
+        self._runner = task or _BackgroundTask()
+
+
 def _configure_auth(monkeypatch, api):
     monkeypatch.setattr(api, "verify_clerk_token", lambda token: "user_a")
     monkeypatch.setattr(
@@ -87,6 +116,13 @@ def _configure_auth(monkeypatch, api):
 def _configure_durable(monkeypatch, api, repository):
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setattr(api, "_durable_job_repository", repository, raising=False)
+    monkeypatch.setattr(api, "_durable_job_worker", _DurableWorker(), raising=False)
+    monkeypatch.setattr(
+        api,
+        "_durable_outbox_publisher",
+        _DurableOutboxPublisher(),
+        raising=False,
+    )
     monkeypatch.setattr(api, "_durable_job_error", None, raising=False)
     _configure_auth(monkeypatch, api)
 
@@ -345,3 +381,35 @@ def test_system_status_is_degraded_when_durable_counts_cannot_be_read(monkeypatc
     body = response.json()
     assert body["status"] == "degraded"
     assert body["durable_jobs"]["error"] == "durable_status_read_failed"
+    assert body["durable_jobs"]["runtime_ready"] is True
+    assert body["durable_jobs"]["runtime"] == {
+        "worker": "running",
+        "outbox_publisher": "running",
+    }
+
+
+def test_system_status_is_degraded_when_durable_worker_task_stops(monkeypatch):
+    import api
+
+    _configure_durable(monkeypatch, api, _Repository())
+    monkeypatch.setattr(
+        api,
+        "_durable_job_worker",
+        _DurableWorker(_BackgroundTask(done=True, error=RuntimeError("connection lost"))),
+        raising=False,
+    )
+
+    response = TestClient(api.app).get(
+        "/api/system/status", headers={"Authorization": "Bearer t"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["durable_jobs"]["ready"] is True
+    assert body["durable_jobs"]["runtime_ready"] is False
+    assert body["durable_jobs"]["error"] == "durable_background_task_stopped"
+    assert body["durable_jobs"]["runtime"] == {
+        "worker": "failed",
+        "outbox_publisher": "running",
+    }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, Awaitable, Callable, Mapping, Optional
 
 import metrics
@@ -12,6 +13,9 @@ from event_bus import publish as event_publish
 Publish = Callable[[str, str, dict], Awaitable[None]]
 Project = Callable[[str, str, dict], Awaitable[None]]
 Consumer = Callable[..., Awaitable[Any]]
+logger = logging.getLogger("jobs.outbox")
+_LOOP_ERROR_BACKOFF_MAX_SECONDS = 30.0
+_LOOP_ERROR_BACKOFF_MAX_EXPONENT = 8
 
 
 async def _publish_to_event_bus(user_id: str, event_type: str, payload: dict) -> None:
@@ -152,8 +156,31 @@ class OutboxPublisher:
         return published
 
     async def _run(self) -> None:
+        consecutive_failures = 0
         while not self._stopping.is_set():
-            count = await self.publish_once()
+            try:
+                count = await self.publish_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                consecutive_failures += 1
+                retry_seconds = min(
+                    self.poll_interval_seconds
+                    * (2 ** min(consecutive_failures - 1, _LOOP_ERROR_BACKOFF_MAX_EXPONENT)),
+                    _LOOP_ERROR_BACKOFF_MAX_SECONDS,
+                )
+                logger.exception(
+                    "Outbox publisher iteration failed; retrying in %.2fs",
+                    retry_seconds,
+                )
+                try:
+                    await asyncio.wait_for(
+                        self._stopping.wait(), timeout=retry_seconds
+                    )
+                except asyncio.TimeoutError:
+                    pass
+                continue
+            consecutive_failures = 0
             if count == 0:
                 try:
                     await asyncio.wait_for(

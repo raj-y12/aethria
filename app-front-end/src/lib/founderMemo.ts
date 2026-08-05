@@ -34,6 +34,28 @@ const NOT_FOUND_MESSAGE =
   'No founder could be confirmed from the sources retrieved for this company.';
 const NOT_GATHERED_MESSAGE = 'Founder details have not been gathered for this company yet.';
 
+function normalizedCompanyName(value: string | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function completeResolverMatchesCompany(
+  founderResolution: FounderResolution | null | undefined,
+  companyResolution: CompanyResolution | null | undefined,
+): boolean {
+  if (founderResolution?.resolution_status?.trim().toUpperCase() !== 'FOUND') return false;
+  if ((founderResolution.missing_fields?.length ?? 0) > 0) return false;
+  if (!companyResolution) return true;
+
+  const resolvedCompany = normalizedCompanyName(founderResolution.company);
+  return Boolean(resolvedCompany) && (
+    resolvedCompany === normalizedCompanyName(companyResolution.canonical_name)
+    || resolvedCompany === normalizedCompanyName(companyResolution.query)
+  );
+}
+
 /**
  * Derive what the memo's Founder section should show.
  *
@@ -46,15 +68,21 @@ export function buildFounderSectionModel({
   companyResolution,
   scoutFounderNames,
 }: FounderSectionInput): FounderSectionModel {
-  const candidates = (founderResolution?.founders ?? []).filter((f) =>
+  const scoutNames = (scoutFounderNames ?? []).filter((n) => String(n ?? '').trim());
+  const resolverCandidates = (founderResolution?.founders ?? []).filter((f) =>
     String(f?.name ?? '').trim(),
   );
+  const candidates = scoutNames.length > 0 && !completeResolverMatchesCompany(founderResolution, companyResolution)
+    ? []
+    : resolverCandidates;
 
   const names = candidates.length
     ? candidates.map((f) => f.name)
-    : companyResolution?.founder_names?.length
+    : scoutNames.length
+      ? scoutNames
+      : companyResolution?.founder_names?.length
       ? companyResolution.founder_names
-      : (scoutFounderNames ?? []).filter((n) => String(n ?? '').trim());
+      : [];
 
   // `founder_names` is reported as missing when nobody was found at all; the
   // section already says that in prose, so it is not repeated as a field.

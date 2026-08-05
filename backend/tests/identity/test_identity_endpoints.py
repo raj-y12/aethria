@@ -4,6 +4,7 @@ import pytest
 from identity.models import (
     CompanyRecord,
     IdentityAdmission,
+    IdentityCaseGroup,
     IdentityCaseStatus,
     IdentityResolutionCaseRecord,
     IdentityStatus,
@@ -255,6 +256,94 @@ def test_operator_can_match_create_defer_and_reject_with_server_actor(monkeypatc
         )
         assert response.status_code == 200
         assert fresh.actions[0][0] == action
+
+
+class _GroupRepository(_Repository):
+    """Two cases whose observations share a domain — the duplicate-review
+    scenario in docs/known-issues.md ("Duplicate companies in the identity
+    review queue"). Resolving the group must transition both cases as a unit,
+    both matched to the SAME company rather than each running its own action."""
+
+    def __init__(self):
+        super().__init__()
+        self.case_2 = self.case.model_copy(
+            update={"identity_case_id": "b6e2f9b1-2e3f-4a11-9c2d-9a6a1e2f5b10"}
+        )
+        self.cases_by_id = {
+            self.case.identity_case_id: self.case,
+            self.case_2.identity_case_id: self.case_2,
+        }
+
+    async def get_case(self, *, user_id, identity_case_id):
+        case = self.cases_by_id.get(identity_case_id)
+        return case if case is not None and user_id == "user_a" else None
+
+    async def list_case_groups(self, *, user_id, status="open", limit=100):
+        if user_id != "user_a":
+            return []
+        open_cases = [c for c in self.cases_by_id.values() if c.status.value == status]
+        if not open_cases:
+            return []
+        return [
+            IdentityCaseGroup(
+                group_key="acme.com",
+                canonical_domain="acme.com",
+                cases=open_cases,
+                observed_names=["Acme"],
+                sources=["manual_lookup"],
+            )
+        ]
+
+    async def resolve_case(self, **kwargs):
+        self.actions.append(("match", kwargs))
+        case_id = kwargs["identity_case_id"]
+        updated = self.cases_by_id[case_id].model_copy(
+            update={
+                "status": IdentityCaseStatus.RESOLVED,
+                "selected_company_id": kwargs["selected_company_id"],
+                "resolved_by": kwargs["resolved_by"],
+            }
+        )
+        self.cases_by_id[case_id] = updated
+        if case_id == self.case.identity_case_id:
+            self.case = updated
+        else:
+            self.case_2 = updated
+        return await self.get_admission_for_observation(
+            user_id=kwargs["user_id"], observation_id=updated.observation_id
+        )
+
+    async def get_admission_for_observation(self, *, user_id, observation_id):
+        return IdentityAdmission(
+            user_id="user_a",
+            observation_id=observation_id,
+            status=IdentityStatus.RESOLVED,
+            company_id=self.company.company_id,
+            opportunity_id=self.opportunity.opportunity_id,
+            identity_case_id=self.case.identity_case_id,
+            confidence=1,
+        )
+
+
+def test_resolving_a_grouped_case_transitions_every_linked_case_to_the_same_company(monkeypatch):
+    repository = _GroupRepository()
+    client = _client(monkeypatch, repository)
+
+    response = client.post(
+        "/api/identity-cases/groups/acme.com/resolve",
+        headers={"Authorization": "Bearer t"},
+        json={"action": "match", "selected_company_id": repository.company.company_id},
+    )
+
+    assert response.status_code == 200
+    match_actions = [action for action in repository.actions if action[0] == "match"]
+    assert len(match_actions) == 2
+    resolved_company_ids = {
+        action[1]["selected_company_id"] for action in match_actions
+    }
+    assert resolved_company_ids == {repository.company.company_id}
+    assert repository.case.status is IdentityCaseStatus.RESOLVED
+    assert repository.case_2.status is IdentityCaseStatus.RESOLVED
 
 
 def test_resolution_rejects_invalid_action_shape_without_database_details(monkeypatch):

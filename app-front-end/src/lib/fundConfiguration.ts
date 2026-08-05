@@ -421,16 +421,10 @@ export function loadFundConfiguration(settings?: Settings | null, userId?: strin
   try {
     const key = scopedFundConfigStorageKey(userId);
     if (!key) return fallback;
-    let raw = window.localStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     if (raw === null) {
-      // Carry the pre-tenant-scoped blob over once, then retire the shared key.
-      // ponytail: on a shared browser the first signed-in user claims it — the
-      // same exposure the unscoped key already had, now bounded to one read.
-      raw = window.localStorage.getItem(FUND_CONFIG_STORAGE_KEY);
-      if (raw !== null) {
-        window.localStorage.setItem(key, raw);
-        window.localStorage.removeItem(FUND_CONFIG_STORAGE_KEY);
-      }
+      // An unscoped legacy blob has no tenant provenance, so it cannot migrate.
+      window.localStorage.removeItem(FUND_CONFIG_STORAGE_KEY);
     }
     if (!raw) return fallback;
     return mergeFundConfiguration(fallback, JSON.parse(raw) as Partial<FundConfiguration>);
