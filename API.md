@@ -136,7 +136,6 @@ own fixed-window policy (`backend/security/rate_limiter.py`).
 |---|---|---|
 | `POST` | `/api/imports/csv` | Bounded CSV / CRM CSV / event / referral intake through canonical identity |
 | `GET` | `/api/imports/{import_batch_id}` | Row status (resolved / review-required / error) without raw CSV data |
-| `POST` | `/api/imports/companies` | Direct company import |
 | `POST` | `/api/opportunities/{opportunity_id}/confidential-artifacts` | Pitch-deck / email metadata with access + retention policy |
 | `GET`/`POST` | `/api/companies/{company_id}/outcomes` | Immutable, evidence-backed later observations |
 | `GET` | `/api/outcomes/coverage` | Coverage/valence disclosure; causal inference explicitly unsupported |
