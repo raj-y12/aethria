@@ -664,6 +664,9 @@
   color: var(--memo-ink-body);
   font-size: var(--memo-body-size);
   line-height: var(--memo-body-leading);
+  text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
   text-wrap: pretty;
 }
 
@@ -693,6 +696,10 @@
   color: var(--memo-ink-muted);
   font-size: var(--memo-body-size);
   line-height: var(--memo-body-leading);
+  text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  text-wrap: pretty;
 }
 
 .memoDecisionEyebrow,
@@ -1117,6 +1124,10 @@
   font-size: var(--memo-body-size);
   line-height: var(--memo-body-leading);
   counter-increment: memo-case;
+  text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+  text-wrap: pretty;
 }
 
 .memoCasePoint::before {
