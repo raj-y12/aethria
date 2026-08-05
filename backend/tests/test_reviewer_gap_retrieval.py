@@ -45,6 +45,22 @@ def test_build_gap_queries_orders_tam_funding_team():
     assert any("funding" in q for q in qs)
 
 
+def test_build_gap_queries_covers_product_and_technical_evidence():
+    """TAM isn't the only thin dimension — product (pain_alignment/ux/retention) and
+    technical/competitive (engineering_quality/competition) components have no dedicated
+    Scout field, so they ride the same thin-evidence gate rather than a per-field check."""
+    qs = build_gap_queries(
+        {
+            "name": "Acme AI",
+            "est_tam": "$5B",
+            "funding_stage": "Series A",
+            "references": ["https://acme.com", "https://news.com/acme"],
+        }
+    )
+    assert any("customer" in q and "retention" in q for q in qs)
+    assert any("technology" in q and "competitors" in q for q in qs)
+
+
 def test_enrich_adds_supplement_when_pack_non_empty(monkeypatch):
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL", "1")
     monkeypatch.setenv("REVIEWER_GAP_RETRIEVAL_ONLY_WHEN_GAPS", "1")

@@ -64,6 +64,14 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
     if is_weak_funding_stage(scout.get("funding_stage")):
         queries.append(f"{label} startup funding round investors valuation raised")
     queries.append(f"{label} startup founders team CEO traction customers pilots")
+    # Product and technical/competitive evidence are scored (pain_alignment, ux,
+    # retention, engineering_quality, competition, etc.) but Scout has no dedicated
+    # field for them, so — unlike TAM/funding — there is no per-field gap check to
+    # gate these on. They ride the same overall "scout_has_information_gaps" gate
+    # as the founders/traction query above: fetched only when evidence is already
+    # thin, never on well-sourced startups.
+    queries.append(f"{label} startup customer reviews case studies retention churn")
+    queries.append(f"{label} startup technology stack patents competitors market position")
     # De-dupe while preserving order
     seen: set[str] = set()
     out: List[str] = []
@@ -73,7 +81,7 @@ def build_gap_queries(scout: Dict[str, Any]) -> List[str]:
             continue
         seen.add(qn)
         out.append(qn)
-    return out[:4]
+    return out[:6]
 
 
 def _explicit_website_url(website_hint: Any) -> str:
@@ -144,7 +152,7 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
     anchor_host = hostname_from_user_hint(website)
     if anchor_host:
         queries.insert(0, f"site:{anchor_host} founders team about leadership")
-    queries = queries[:4]
+    queries = queries[:6]
     if not queries:
         return None
 
