@@ -676,3 +676,61 @@ that secret into Cloud Run.
 
 Confirmed Exa is fully retired from application code (only test fixtures and this
 doc referenced it); removed `EXA_API_KEY` from the Cloud Run `--set-secrets` list.
+
+---
+
+### Fabricated and mangled data reached a confidential IC pack
+
+**Status:** resolved · **Priority:** P0 · **Surface:** investment decision integrity ·
+**Verified in:** one exported IC pack (CameraMatics, 2026-07-31) audited against
+its row in `aethria-prod` · **Fixed by:** `726d556e`, `d1c5df65` (#50)
+
+Six distinct defects, all confirmed against the stored record rather than
+inferred, surfaced by manually auditing one real exported memo.
+
+### Root cause
+
+1. **Invented company identifier, persisted.** The Scout prompt asked the model
+   for `"id": "uuid"`; `_normalize_scout_ids_inplace` only minted a server-side
+   id when the model omitted one, so a compliant model's fabricated UUID always
+   won. The stored row's `startup_id` was the textbook placeholder
+   `a1b2c3d4-e5f6-4711-9abc-1234567890ab`, printed as "Company ID" on a
+   confidential document.
+2. **A company resolved as a founder.** "Blueprint Sales Solutions" passed the
+   person-name shape test (three capitalised words, no org marker) and became
+   `role=CEO` on the record, then "the founders' industry pedigree" in the
+   reviewer summary — scraped from an unrelated role on someone else's LinkedIn.
+3. **Retrieved traction was reported as missing, and it changed the decision.**
+   The reviewer flagged "Missing revenue or traction data" and the partner
+   passed partly on that basis, while the same row held concrete firmographics
+   (employee count, revenue range, funding rounds) inside a founder-evidence
+   snippet nothing read.
+4. **A document disagreed with itself on scores** — `int()` truncation printed
+   "Execution 4/10" beside a table showing 4.8 for the same field.
+5. **Raw floats reached the page** — "Product 5.403333/10".
+6. **PARTIAL identity and founder resolution were never surfaced.** Both were
+   `PARTIAL` at confidence 0.6 while the pack read as settled fact, and the
+   sources list mixed pages actually read with URLs gap-retrieval merely
+   surfaced.
+
+### Fix
+
+The company id is now always minted server-side; the prompt no longer asks
+for one. Business descriptors are now the org-marker signal for person-vs-company
+resolution (with "Sales"/"Global"/"Digital" deliberately excluded — real
+surnames and plain adjectives). `utils/traction_extraction.py` lifts
+firmographics out of evidence with rules only (no LLM) into
+`ScoutInfo.traction_facts` and the reviewer prompt, and now flows through to
+the API, frontend types, and both the markdown memo and IC pack renderers —
+an unmatched pattern still yields no key, so genuinely absent evidence still
+reads as absent. Scores render at one decimal place everywhere. Unread
+sources are now marked, and resolution status (including `PARTIAL`) is
+stated on the record rather than implied as settled.
+
+### What not to do
+
+Do not treat "the model didn't set a field" as "the field doesn't need a
+value" — the fabricated UUID happened because the code only filled the gap
+the model left, so a fabricating model's answer always won over a correct
+server-generated one. Server-authoritative fields must be set unconditionally,
+never merged with a model's optional output.
