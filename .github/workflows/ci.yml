@@ -227,6 +227,12 @@ jobs:
       - name: Apply institutional migrations
         run: |
           psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "create role anon; create role authenticated; create role service_role;"
+          psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "
+            create schema if not exists auth;
+            create or replace function auth.uid() returns uuid language sql stable as \$\$ select null::uuid \$\$;
+            create or replace function auth.jwt() returns jsonb language sql stable as \$\$ select '{}'::jsonb \$\$;
+            create or replace function auth.role() returns text language sql stable as \$\$ select null::text \$\$;
+          "
           for migration in \
             supabase/migrations/20260314000005_aethria_tables_from_code.sql \
             supabase/migrations/20260314000006_add_user_id_to_tables.sql \
