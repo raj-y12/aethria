@@ -140,6 +140,38 @@ ADR) from the start rather than to the root.
 
 *Impact: reader trust. Priority: process, not code.*
 
+### D11 · MetaAgent self-optimization never closes the loop
+
+**Where:** `backend/meta/` — `agent.py`, `mutator.py`, `reweighter.py`,
+`calibrator.py`, `analyser.py` (~1,400 lines).
+
+The analysis and proposal-generation machinery is fully wired and runs on
+schedule: it reads pipeline outcomes, generates prompt mutation proposals,
+scout-weight reweighting proposals, and reviewer-threshold calibration
+proposals. But nothing ever promotes a proposal into the live scout/reviewer
+engines — `agent.py`'s cycle report hardcodes `"production_mutations_applied":
+0` and is explicitly labeled `"analysis_only": True`. `PromptMutator` has a
+`_set_agent_prompt()` method that would write a mutation back to a running
+engine, but it is never called from `apply()`/`_apply_one()`, which only
+persist proposals to a JSON log. `ScoutReweighter.apply()` and
+`ThresholdCalibrator.apply()` are similarly defined but never invoked — only
+`.decide()` runs. Proposals are visible only via a read-only
+`GET /api/meta/prompt-library` (`routers/meta.py`).
+
+So "self-optimisation" (AGENTS.md: "MetaAgent — mutates prompts, reweights
+scout personas, recalibrates reviewer thresholds") currently means *proposes*,
+not *mutates* — every proposal requires a human to read the log and manually
+apply the change elsewhere. That may be the intended safety posture (AGENTS.md
+does say "Proposals become drafts, never live changes"), but the *operator
+promotion path* itself doesn't exist yet — there's no endpoint or job that
+takes an accepted proposal and writes it into a running engine, so today
+"become drafts" is the only state a proposal can ever reach.
+
+*Impact: the self-optimization feature is partially built — proposal
+generation without a promotion mechanism. Priority: decide deliberately
+whether to build the promotion path or trim the analysis machinery to match
+what's actually closed-loop today.*
+
 ---
 
 ## Part 2 — Direction of travel

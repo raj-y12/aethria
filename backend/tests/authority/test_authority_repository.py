@@ -23,10 +23,11 @@ class _Transaction:
 
 
 class _Connection:
-    def __init__(self, *, fetchrows=(), outbox_error=False):
+    def __init__(self, *, fetchrows=(), outbox_error=False, fetchval_result=0):
         self.fetchrows = deque(fetchrows)
         self.calls = []
         self.outbox_error = outbox_error
+        self.fetchval_result = fetchval_result
 
     def transaction(self):
         return _Transaction()
@@ -34,6 +35,10 @@ class _Connection:
     async def fetchrow(self, sql, *args):
         self.calls.append(("fetchrow", sql, args))
         return self.fetchrows.popleft() if self.fetchrows else None
+
+    async def fetchval(self, sql, *args):
+        self.calls.append(("fetchval", sql, args))
+        return self.fetchval_result
 
     async def execute(self, sql, *args):
         self.calls.append(("execute", sql, args))
@@ -386,19 +391,15 @@ async def test_conn_aware_workflow_transition_carries_projection_fields():
 async def test_rearm_clears_kill_switch_only_with_green_reconciliation_and_audits_it():
     connection = _Connection(
         fetchrows=[
-            _rollout_row(
-                mode="legacy",
-                version=6,
-                kill_switch=True,
-                last_reconciliation_status="green",
-            ),
+            _rollout_row(mode="legacy", version=6, kill_switch=True),
             _rollout_row(
                 mode="legacy",
                 version=7,
                 kill_switch=False,
                 last_reconciliation_status="green",
             ),
-        ]
+        ],
+        fetchval_result=0,  # no unresolved legacy projections -> live check is green
     )
     repository = AuthorityRepository(_Pool(connection))
 
@@ -417,17 +418,11 @@ async def test_rearm_clears_kill_switch_only_with_green_reconciliation_and_audit
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("status", [None, "pending"])
-async def test_rearm_repository_requires_green_reconciliation(status):
+@pytest.mark.parametrize("missing_count", [1, 5])
+async def test_rearm_repository_requires_green_reconciliation(missing_count):
     connection = _Connection(
-        fetchrows=[
-            _rollout_row(
-                mode="legacy",
-                version=6,
-                kill_switch=True,
-                last_reconciliation_status=status,
-            )
-        ]
+        fetchrows=[_rollout_row(mode="legacy", version=6, kill_switch=True)],
+        fetchval_result=missing_count,  # unresolved legacy projections -> live check is red
     )
     repository = AuthorityRepository(_Pool(connection))
 

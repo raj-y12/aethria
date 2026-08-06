@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
 import { useReducedMotion } from 'framer-motion';
 import { CountUp } from '../../lib/CountUp';
+import { useInView } from '../../lib/useInView';
 import Plate from '../Plate';
 
 /** Matches the real reviewer scoring dimensions (see backend/models.py SingleReview). */
@@ -15,26 +15,7 @@ const DIMS = [
 /** Plate 02 — the record, as a typographic plate: one specimen verdict, five reviewer dimensions. */
 export default function RecordPlate() {
   const reduce = useReducedMotion();
-  const [active, setActive] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || reduce) {
-      setActive(true);
-      return;
-    }
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0].isIntersecting) return;
-        obs.disconnect();
-        setActive(true);
-      },
-      { threshold: 0.3 },
-    );
-    obs.observe(root);
-    return () => obs.disconnect();
-  }, [reduce]);
+  const [rootRef, active] = useInView<HTMLDivElement>(reduce, 0.3);
 
   return (
     <Plate id="record" index="02 — 08" title="The Record" capLeft="The Record — Plate 02" capRight="One verdict · five dimensions">

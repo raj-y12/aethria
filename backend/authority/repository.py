@@ -14,6 +14,7 @@ from authority.models import (
     WorkflowState,
     WorkflowStateRecord,
 )
+from authority.reconciliation import check_tenant_reconciliation
 from tenant_context import require_user_id
 from utils.db_rows import db_row
 
@@ -229,7 +230,7 @@ class AuthorityRepository:
         actor_id: str,
         reason: str,
     ) -> RolloutRecord:
-        """Explicitly clear a rollback kill switch after reconciliation succeeds."""
+        """Explicitly clear a rollback kill switch after a live reconciliation check passes."""
         uid = require_user_id(user_id, context="AuthorityRepository.rearm_rollout")
         actor = str(actor_id or "").strip()
         normalized_reason = str(reason or "").strip()
@@ -259,18 +260,24 @@ class AuthorityRepository:
                     raise AuthorityTransitionError("authority kill switch is not active")
                 if current.mode is not RolloutMode.LEGACY:
                     raise AuthorityTransitionError("authority re-arm requires legacy rollout mode")
-                if current.last_reconciliation_status != "green":
-                    raise AuthorityBlocked("authority re-arm requires green reconciliation")
+                check = await check_tenant_reconciliation(conn, uid)
+                if check.status != "green":
+                    raise AuthorityBlocked(
+                        f"authority re-arm requires green reconciliation "
+                        f"({check.missing_legacy_projections} unresolved legacy projection(s))"
+                    )
                 row = await conn.fetchrow(
                     """
                     update public.tenant_authority_rollouts
-                    set kill_switch=false,version=version+1,activated_at=now(),activated_by=$3
+                    set kill_switch=false,version=version+1,activated_at=now(),activated_by=$3,
+                        last_reconciliation_status=$4
                     where user_id=$1 and version=$2 and kill_switch=true
                     returning *
                     """,
                     uid,
                     expected_version,
                     actor,
+                    check.status,
                 )
                 updated = self._rollout(row, user_id=uid)
                 await self._outbox(
@@ -288,39 +295,6 @@ class AuthorityRepository:
                         "last_reconciliation_status": updated.last_reconciliation_status,
                     },
                 )
-                return updated
-
-    async def set_reconciliation_status(
-        self, *, user_id: str, expected_version: int, actor_id: str, status: str
-    ) -> RolloutRecord:
-        """Audited, optimistic-concurrency update used before canonical re-arm/read."""
-        uid = require_user_id(user_id, context="AuthorityRepository.set_reconciliation_status")
-        normalized = str(status or "").strip().lower()
-        if normalized not in {"green", "red", "pending"}:
-            raise ValueError("reconciliation status must be green, red, or pending")
-        actor = str(actor_id or "").strip()
-        if not actor:
-            raise ValueError("actor_id is required")
-        async with self.pool.acquire() as conn:
-            async with conn.transaction():
-                await self._bootstrap_rollout(conn, user_id=uid)
-                current = self._rollout(await conn.fetchrow(
-                    "select * from public.tenant_authority_rollouts where user_id=$1 for update", uid
-                ), user_id=uid)
-                if current.version != expected_version:
-                    raise AuthorityConflict("stale authority rollout version")
-                row = await conn.fetchrow(
-                    """update public.tenant_authority_rollouts
-                       set last_reconciliation_status=$3, version=version+1,
-                           activated_by=$4
-                       where user_id=$1 and version=$2 returning *""",
-                    uid, expected_version, normalized, actor,
-                )
-                updated = self._rollout(row, user_id=uid)
-                await self._outbox(conn, user_id=uid, aggregate_type="authority_rollout",
-                    aggregate_id=uid, event_type="authority.reconciliation_updated",
-                    payload={"user_id": uid, "version": updated.version,
-                             "status": normalized, "actor_id": actor})
                 return updated
 
     @staticmethod

@@ -2,6 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../hooks';
+import { tokens } from '../design-system/tokens';
 
 export type SettingsActionDialogProps = {
   open: boolean;
@@ -17,7 +18,7 @@ export type SettingsActionDialogProps = {
   onConfirm: () => void;
 };
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 const ENABLED_FOCUSABLE =
   'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 

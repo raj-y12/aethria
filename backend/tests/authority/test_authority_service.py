@@ -1,6 +1,7 @@
 import pytest
 
 from authority.models import RolloutMode, RolloutRecord
+from authority.repository import AuthorityTransitionError
 from authority.service import AuthorityBlocked, AuthorityService
 
 
@@ -126,18 +127,11 @@ async def test_rollback_moves_canonical_tenant_to_killed_legacy_and_emits_audit_
 
 
 @pytest.mark.asyncio
-async def test_rearm_requires_green_reconciliation_and_explicit_expected_version():
-    repository = _Repository(
-        _rollout(
-            mode=RolloutMode.LEGACY,
-            version=6,
-            kill_switch=True,
-            last_reconciliation_status="pending",
-        )
-    )
+async def test_rearm_requires_active_kill_switch():
+    repository = _Repository(_rollout(mode=RolloutMode.LEGACY, version=6, kill_switch=False))
     service = AuthorityService(repository)
 
-    with pytest.raises(AuthorityBlocked, match="reconciliation"):
+    with pytest.raises(AuthorityTransitionError, match="kill switch"):
         await service.rearm(
             user_id="tenant-a",
             expected_version=6,
@@ -147,15 +141,12 @@ async def test_rearm_requires_green_reconciliation_and_explicit_expected_version
 
 
 @pytest.mark.asyncio
-async def test_rearm_delegates_audited_clear_after_green_reconciliation():
-    repository = _Repository(
-        _rollout(
-            mode=RolloutMode.LEGACY,
-            version=6,
-            kill_switch=True,
-            last_reconciliation_status="green",
-        )
-    )
+async def test_rearm_delegates_to_repository_for_the_live_reconciliation_check():
+    """The reconciliation check itself runs live in AuthorityRepository.rearm_rollout,
+    inside the same transaction as the kill-switch clear — see
+    test_authority_repository.test_rearm_repository_requires_green_reconciliation.
+    """
+    repository = _Repository(_rollout(mode=RolloutMode.LEGACY, version=6, kill_switch=True))
     service = AuthorityService(repository)
 
     record = await service.rearm(

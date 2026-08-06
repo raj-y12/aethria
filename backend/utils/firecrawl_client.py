@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 import certifi
 
 import metrics
+from utils.retry import retry_delay
 from utils.search_results import ProviderSearchResults
 
 logger = logging.getLogger("firecrawl")
@@ -180,7 +181,7 @@ def firecrawl_search(
             status = getattr(error, "code", None)
             if status in (429,) or (isinstance(status, int) and 500 <= status <= 599):
                 if attempt < retries:
-                    time.sleep(_retry_after(error, min(0.25 * (2 ** attempt), 2.0)))
+                    time.sleep(_retry_after(error, retry_delay(attempt)))
                     continue
             reason = "rate_limited" if status == 429 else "http_error"
             diagnostic = _provider_diagnostic(outcome="error", reason=reason, result_count=0, http_status=status)
@@ -193,7 +194,7 @@ def firecrawl_search(
             # `except Exception` here would otherwise make them the one failure
             # mode that never retries.
             if _is_transient(error) and attempt < retries:
-                time.sleep(min(0.25 * (2 ** attempt), 2.0))
+                time.sleep(retry_delay(attempt))
                 continue
             reason = "timeout" if _is_transient(error) else "request_error"
             logger.warning("Firecrawl search failed (%s): %s", reason, error)

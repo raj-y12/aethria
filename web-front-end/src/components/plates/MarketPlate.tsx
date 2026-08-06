@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { useReducedMotion } from 'framer-motion';
 import DottedMarketMap, { type MapHit } from '../DottedMarketMap';
 import Plate from '../Plate';
+import { useInView } from '../../lib/useInView';
 
 /** In-thesis companies plotted on the field (lon, lat). Copied verbatim from MarketSection. */
 const HITS: MapHit[] = [
@@ -22,36 +23,27 @@ const IN_THESIS = HITS.length;
 export default function MarketPlate() {
   const reduce = useReducedMotion();
   const scannedRef = useRef<HTMLSpanElement | null>(null);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [rootRef, isIn] = useInView<HTMLDivElement>(reduce, 0.3);
 
   // count up the scanned total once, on first view
   useEffect(() => {
     const el = scannedRef.current;
-    const root = rootRef.current;
-    if (!el || !root) return;
+    if (!el) return;
     if (reduce) {
       el.textContent = SCANNED_TOTAL.toLocaleString();
       return;
     }
-    const obs = new IntersectionObserver(
-      (entries) => {
-        if (!entries[0].isIntersecting) return;
-        obs.disconnect();
-        const counter = { v: 0 };
-        gsap.to(counter, {
-          v: SCANNED_TOTAL,
-          duration: 2.1,
-          ease: 'power2.out',
-          onUpdate: () => {
-            el.textContent = Math.round(counter.v).toLocaleString();
-          },
-        });
+    if (!isIn) return;
+    const counter = { v: 0 };
+    gsap.to(counter, {
+      v: SCANNED_TOTAL,
+      duration: 2.1,
+      ease: 'power2.out',
+      onUpdate: () => {
+        el.textContent = Math.round(counter.v).toLocaleString();
       },
-      { threshold: 0.3 },
-    );
-    obs.observe(root);
-    return () => obs.disconnect();
-  }, [reduce]);
+    });
+  }, [reduce, isIn]);
 
   return (
     <Plate

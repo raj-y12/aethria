@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import DecisionBadge from './DecisionBadge';
 import { usePrefersReducedMotion } from '../hooks';
+import { tokens } from '../design-system/tokens';
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 
 interface LookupReadyNoticeProps {
   /** Company name when a background lookup has finished and is unopened. */

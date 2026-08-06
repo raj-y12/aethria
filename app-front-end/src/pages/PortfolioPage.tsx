@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
-import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
-import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
+import { fetchPortfolioPositions } from '../api/portfolio';
+import { fetchOutcomeCoverage } from '../api/channelsOutcomes';
 import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
 import OutcomePanel from '../components/institutional/OutcomePanel';
 import CrmExportAction from '../components/portfolio/CrmExportAction';
@@ -103,7 +104,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const reduceMotion = usePrefersReducedMotion();
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
-  const positionsQuery = usePortfolioPositions();
+  const positionsQuery = useQuery({
+    queryKey: ['portfolio-positions', 100],
+    queryFn: () => fetchPortfolioPositions(100),
+    staleTime: 30_000,
+  });
   const rows = useMemo(
     () => buildPositionRows(positionsQuery.data ?? [], data.startups),
     [positionsQuery.data, data.startups],
@@ -150,7 +155,12 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     return map;
   }, [data.startups]);
 
-  const coverageQuery = useOutcomeCoverage();
+  const coverageQuery = useQuery({
+    queryKey: ['outcomes', 'coverage'],
+    queryFn: fetchOutcomeCoverage,
+    staleTime: 60_000,
+    retry: false,
+  });
   const coveragePct = useMemo(() => {
     const raw = Number(coverageQuery.data?.coverage_ratio ?? coverageQuery.data?.coverage_rate ?? 0);
     return Math.round(raw <= 1 ? raw * 100 : raw);

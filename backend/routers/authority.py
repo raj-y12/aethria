@@ -50,11 +50,6 @@ class ReplayProjectionBody(_AuthorityBody):
             raise ValueError("exactly one of event_id or opportunity_id is required")
         return self
 
-class ReconciliationBody(_AuthorityBody):
-    expected_version: StrictInt = Field(ge=0)
-    status: str = Field(min_length=1, max_length=20)
-
-
 class BackfillBody(_AuthorityBody):
     apply: StrictBool = False
     after: Optional[str] = Field(default=None, max_length=200)
@@ -212,19 +207,6 @@ async def replay_authority_projection(request: Request, body: ReplayProjectionBo
     selector = {"event_id": body.event_id} if body.event_id else {"opportunity_id": body.opportunity_id}
     applied = await _projection_consumer(request).replay(user_id=user_id, **selector)
     return {"applied": applied}
-
-@router.post("/api/authority/reconciliation")
-async def update_reconciliation(request: Request, body: ReconciliationBody):
-    user_id = require_authenticated_user(request)
-    try:
-        record = await _service(request).set_reconciliation_status(
-            user_id=user_id, expected_version=body.expected_version,
-            actor_id=user_id, status=body.status,
-        )
-    except (AuthorityConflict, AuthorityTransitionError, AuthorityBlocked, ValueError) as exc:
-        raise _conflict(exc) from exc
-    return rollout_payload(record)
-
 
 @router.post("/api/authority/backfill")
 async def backfill_legacy_startups(request: Request, body: BackfillBody):

@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import type { ActivitySummary } from '../api/activity';
+import { tokens } from '../design-system/tokens';
 import CountUp from './CountUp';
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 
 export interface ActivityStatItem {
   label: string;

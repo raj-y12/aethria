@@ -1,8 +1,5 @@
-import inspect
-
 import pytest
 
-from evaluation_v2 import compatibility
 from utils import partner_codes
 
 
@@ -78,23 +75,6 @@ def test_advance_ruling_never_projects_to_legacy_yes():
 
     assert projection.value == "MAYBE"
     assert projection.compatibility_reason == "advance"
-
-
-def test_evaluation_v2_compatibility_delegates_to_canonical_mapping():
-    source = inspect.getsource(compatibility.recommendation_to_legacy)
-
-    assert "legacy_partner_from_institutional_recommendation" in source
-    assert "RecommendationState.ADVANCE" not in source
-    assert "RecommendationState.MONITOR" not in source
-    assert "RecommendationState.PASS" not in source
-
-
-def test_insufficient_evidence_compatibility_requires_human_review():
-    assert compatibility.recommendation_to_legacy("insufficient_evidence") == {
-        "recommendation": "MONITOR",
-        "human_review_required": True,
-        "compatibility_reason": "insufficient_evidence",
-    }
 
 
 @pytest.mark.parametrize(

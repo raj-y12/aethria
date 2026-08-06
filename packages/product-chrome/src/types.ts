@@ -1,16 +1,3 @@
-export type MandateCardVariant = 'dark' | 'paper';
-
-export type MandateCardProps = {
-  variant: MandateCardVariant;
-  title: string;
-  tags?: string[];
-  excerpt?: string;
-  live?: boolean;
-  /** Tighter padding for app sidebar rail */
-  compact?: boolean;
-  className?: string;
-};
-
 export type LookupCommandBarProps = {
   label?: string;
   query?: string;

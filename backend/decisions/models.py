@@ -5,9 +5,9 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import Field
 
-from tenant_context import require_user_id
+from utils.tenant_model import TenantScopedModel
 from utils.timeutil import utcnow
 
 
@@ -59,16 +59,8 @@ class WorkflowActionStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class _TenantModel(BaseModel):
-    user_id: str
-
-    @field_validator("user_id")
-    @classmethod
-    def tenant(cls, value):
-        try:
-            return require_user_id(value, context=cls.__name__)
-        except RuntimeError as exc:
-            raise ValueError(str(exc)) from exc
+class _TenantModel(TenantScopedModel):
+    pass
 
 
 class HumanRulingInput(_TenantModel):
