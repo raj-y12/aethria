@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import SystemIntelligence, { FundFacetNav, isFundFacetTab, type FundFacetTab } from '../components/SystemIntelligence';
-import { useFundConfiguration, useCountUp } from '../hooks';
+import { useCountUp, useFundIntelligence } from '../hooks';
 import type { SystemData } from '../hooks/useSystemData';
 
 /**
@@ -45,7 +45,7 @@ export default function FundPage({ data }: { data: SystemData }) {
     isFundFacetTab(requestedTab) ? requestedTab : 'thesis'
   );
   const bodyScrollRef = useRef<HTMLDivElement>(null);
-  const { configuration: fundConfiguration } = useFundConfiguration(data.settings);
+  const fundIntelligence = useFundIntelligence(activeTab === 'intelligence' || activeTab === 'learning');
 
   useEffect(() => {
     bodyScrollRef.current?.scrollTo({ top: 0 });
@@ -116,14 +116,10 @@ export default function FundPage({ data }: { data: SystemData }) {
             activeTab={activeTab}
             onTabChange={changeTab}
             hideNav
-            startups={data.startups}
-            rejectionAnalytics={data.rejectionAnalytics}
-            metaReports={data.metaReports}
-            metaInsights={data.metaInsights}
             fundThesisRuntime={data.fundThesisRuntime}
             fundThesisRuntimeLoading={data.fundThesisRuntimeLoading}
             fundThesisRuntimeError={data.fundThesisRuntimeError}
-            fundConfiguration={fundConfiguration}
+            fundIntelligence={fundIntelligence}
           />
         </div>
       </div>
