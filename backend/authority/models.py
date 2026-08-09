@@ -8,15 +8,14 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import (
-    BaseModel,
     ConfigDict,
     Field,
-    StrictInt,
     field_validator,
     model_validator,
+    StrictInt,
 )
 
-from tenant_context import require_user_id
+from utils.tenant_model import TenantScopedModel
 from utils.timeutil import utcnow
 
 
@@ -54,18 +53,8 @@ class BlockCode(str, Enum):
     KILL_SWITCH_ACTIVE = "kill_switch_active"
 
 
-class _TenantModel(BaseModel):
+class _TenantModel(TenantScopedModel):
     model_config = ConfigDict(extra="forbid")
-
-    user_id: str
-
-    @field_validator("user_id")
-    @classmethod
-    def _validate_user_id(cls, value: str) -> str:
-        try:
-            return require_user_id(value, context=cls.__name__)
-        except RuntimeError as exc:
-            raise ValueError(str(exc)) from exc
 
 
 class _WorkflowBlockModel(_TenantModel):

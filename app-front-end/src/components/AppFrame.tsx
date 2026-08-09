@@ -331,11 +331,24 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     });
   }, [fundThesisSummary, data.settings?.fund_identity]);
 
+  const mandateAmendedAt = useMemo(() => {
+    const activeVersion = fundThesisSummary?.versions?.find(
+      (version) => version.id === fundThesisSummary.active_version_id,
+    );
+    if (!activeVersion?.created_at) return null;
+    return new Intl.DateTimeFormat('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      timeZone: 'UTC',
+    }).format(new Date(activeVersion.created_at));
+  }, [fundThesisSummary]);
+
   const mandate: SpineMandate = {
     hasThesis,
     fundName,
     summaryLine: mandateSummaryLine,
     versionNumber: fundThesisSummary?.active_version_number ?? null,
+    amendedAt: mandateAmendedAt,
   };
 
   const inlineDispatch: InlineDispatchProps = {

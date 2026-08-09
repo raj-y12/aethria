@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
 import type { FundThesisChange } from './settingsModel';
+import { tokens } from '../design-system/tokens';
 
 interface FundThesisConfirmationModalProps {
   open: boolean;
@@ -13,7 +14,7 @@ interface FundThesisConfirmationModalProps {
   onConfirm: () => void;
 }
 
-const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+const EASE_OUT = tokens.motion.ease;
 
 export default function FundThesisConfirmationModal({
   open,

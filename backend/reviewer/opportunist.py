@@ -1,13 +1,12 @@
 """Opportunist Reviewer — market-first evaluation lens."""
-from reviewer.base import Reviewer
-from reviewer.schema import ReviewerOutput
-from typing import Any, Mapping, Optional
+from reviewer.base import _PersonaReviewer
 
 
-class OpportunistReviewer(Reviewer):
+class OpportunistReviewer(_PersonaReviewer):
     """Market-first reviewer. Weights market size and timing, gives benefit of doubt on early-stage."""
-    
-    OPPORTUNIST_ADDENDUM = """
+
+    REVIEWER_TYPE = "opportunist"
+    ADDENDUM = """
 
 REVIEWER PERSONA: OPPORTUNIST / MARKET-FIRST
 Your additional lens:
@@ -17,23 +16,3 @@ Your additional lens:
 - Be more generous with scores when market timing is exceptional
 - Identify hidden optionality (platform potential, adjacent markets)
 - Your role is to find the next breakout opportunity before consensus forms"""
-
-    def __init__(
-        self,
-        api_key: str,
-        model: str = "gpt-5-nano",
-        tenant_user_id: str = "",
-        use_resource_fund_thesis_fallback: bool = True,
-        structured_scoring_enabled: bool = False,
-        structured_signal_grounding: Optional[Mapping[str, Any]] = None,
-    ):
-        self.reviewer_type = "opportunist"
-        super().__init__(
-            api_key,
-            model=model,
-            tenant_user_id=tenant_user_id,
-            use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
-            structured_scoring_enabled=structured_scoring_enabled,
-            structured_signal_grounding=structured_signal_grounding,
-        )
-        self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.OPPORTUNIST_ADDENDUM

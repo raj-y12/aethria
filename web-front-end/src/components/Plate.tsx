@@ -1,5 +1,6 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { createElement } from 'react';
 import { useReducedMotion } from 'framer-motion';
+import { useInView } from '../lib/useInView';
 
 export interface PlateProps {
   id?: string;
@@ -31,29 +32,8 @@ export default function Plate({
   children,
   headingLevel = 2,
 }: PlateProps) {
-  const ref = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
-  const [isIn, setIsIn] = useState(false);
-
-  useEffect(() => {
-    if (reduce || typeof IntersectionObserver === 'undefined') {
-      setIsIn(true);
-      return;
-    }
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsIn(true);
-          io.unobserve(el);
-        }
-      },
-      { threshold: 0.28 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, [reduce]);
+  const [ref, isIn] = useInView<HTMLElement>(reduce, 0.28);
 
   return (
     <section ref={ref} id={id} className={`plate${isIn ? ' in' : ''}`}>

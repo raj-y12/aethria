@@ -110,7 +110,6 @@ export default function QueueVerdictLine({
             variant={recommendation}
             queue
             prominent={prominent}
-            badges={ctx.fundConfiguration?.verdictBadges}
           />
         )}
         {convictionEl}
@@ -128,7 +127,6 @@ export default function QueueVerdictLine({
           variant={recommendation}
           queue
           prominent={prominent}
-          badges={ctx.fundConfiguration?.verdictBadges}
         />
         {convictionEl}
       </div>

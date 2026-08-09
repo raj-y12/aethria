@@ -1,11 +1,9 @@
-"""Automatic, tenant-scoped authority reconciliation."""
+"""Live authority reconciliation check, run inline before clearing a kill switch."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-
-from tenant_context import require_user_id
 
 
 @dataclass(frozen=True)
@@ -14,29 +12,27 @@ class ReconciliationResult:
     missing_legacy_projections: int
 
 
-class AuthorityReconciler:
-    """Check the safety invariant required before canonical reads."""
+async def check_tenant_reconciliation(conn: Any, user_id: str) -> ReconciliationResult:
+    """Check the safety invariant required before an authority kill-switch re-arm.
 
-    def __init__(self, pool: Any):
-        self.pool = pool
-
-    async def check_tenant(self, user_id: str) -> ReconciliationResult:
-        uid = require_user_id(user_id, context="AuthorityReconciler.check_tenant")
-        async with self.pool.acquire() as conn:
-            missing = int(await conn.fetchval(
-                """
-                select count(*)
-                from public.opportunities o
-                left join public.startups s
-                  on s.user_id=o.user_id
-                 and s.startup_id=o.legacy_startup_id::text
-                where o.user_id=$1
-                  and o.legacy_startup_id is not null
-                  and s.startup_id is null
-                """,
-                uid,
-            ) or 0)
-        return ReconciliationResult(
-            status="green" if missing == 0 else "red",
-            missing_legacy_projections=missing,
-        )
+    Runs on the caller's connection so it can execute inside the same
+    transaction as the re-arm write, instead of a separate background pass
+    with a staleness window.
+    """
+    missing = int(await conn.fetchval(
+        """
+        select count(*)
+        from public.opportunities o
+        left join public.startups s
+          on s.user_id=o.user_id
+         and s.startup_id=o.legacy_startup_id::text
+        where o.user_id=$1
+          and o.legacy_startup_id is not null
+          and s.startup_id is null
+        """,
+        user_id,
+    ) or 0)
+    return ReconciliationResult(
+        status="green" if missing == 0 else "red",
+        missing_legacy_projections=missing,
+    )

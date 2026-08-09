@@ -140,6 +140,50 @@ ADR) from the start rather than to the root.
 
 *Impact: reader trust. Priority: process, not code.*
 
+### D11 · MetaAgent's weight and calibration proposals have no promotion path (prompts do)
+
+**Where:** `backend/meta/` — `agent.py`, `mutator.py`, `reweighter.py`,
+`calibrator.py`, `analyser.py` (~1,400 lines); `backend/routers/meta.py`;
+`app-front-end/src/components/system/internals.tsx`.
+
+Corrected from an earlier pass that assumed the whole self-optimization loop
+was unclosed — it isn't, for prompts. **Prompt mutation is a complete,
+working, human-gated loop**: `PromptMutator.apply()` persists a proposal to
+the prompt library with `promotion_status: "pending"`
+(`mutator.py:460-479`); an operator reviews it and calls
+`POST /api/meta/prompts/promote` (`routers/meta.py:195-274`), reachable from
+a real UI control (`internals.tsx:799`, `promoteMetaPrompt()`); the next
+Scout/Reviewer engine construction picks up the promoted prompt via
+`_load_prompt_from_library()`. `_set_agent_prompt()` exists for
+same-cycle in-memory mutation but is correctly unused — the design is
+promote-then-rebuild, not hot-patch a running engine, which matches AGENTS.md
+("Proposals become drafts, never live changes") exactly.
+
+**Scout-weight reweighting and reviewer-threshold calibration are the actual
+gap.** `ScoutReweighter.decide()`/`ThresholdCalibrator.decide()` run every
+cycle and produce real proposals, but there is no promotion path at all for
+either: `GET /api/meta/weights` and `GET /api/meta/calibration`
+(`routers/meta.py:444-459`) are read-only, no `POST` endpoint exists, and no
+frontend caller applies them (confirmed by grep — zero hits for
+`promoteWeight`/`applyWeight`/`promoteCalibration`/`applyCalibration`
+anywhere in `app-front-end/src`). `ScoutReweighter.apply()` and
+`ThresholdCalibrator.apply()` are dead code with no caller and no way to
+ever be called — not a hot-patch method waiting for a future promotion UI,
+but an `apply()` for a promotion path that was never built.
+
+So "self-optimisation" (AGENTS.md: "MetaAgent — mutates prompts, reweights
+scout personas, recalibrates reviewer thresholds") is two-thirds proposal-only
+today: prompts close the loop end to end, weights and calibrations only
+propose. `ScoutReweighter`/`ThresholdCalibrator` run every cycle and generate
+real signal that nothing can ever act on.
+
+*Impact: two of three self-optimization arms are dead weight until a
+promotion path is built for them. Priority: either build
+`POST /api/meta/weights/promote` and `POST /api/meta/calibration/promote`
+(small — the prompt-promotion endpoint is the template) plus their frontend
+controls, or delete `ScoutReweighter.apply()`/`ThresholdCalibrator.apply()`
+and the `.decide()` calls feeding them until that's decided.*
+
 ---
 
 ## Part 2 — Direction of travel

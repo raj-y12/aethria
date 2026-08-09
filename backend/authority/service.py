@@ -134,7 +134,12 @@ class AuthorityService:
         actor_id: str,
         reason: str,
     ) -> RolloutRecord:
-        """Clear a rollback kill switch only through the audited recovery path."""
+        """Clear a rollback kill switch only through the audited recovery path.
+
+        The reconciliation check itself runs live inside
+        AuthorityRepository.rearm_rollout, in the same transaction as the
+        kill-switch clear, rather than against a cached status here.
+        """
         uid = require_user_id(user_id, context="AuthorityService.rearm")
         normalized_reason = str(reason or "").strip()
         if not normalized_reason:
@@ -142,20 +147,11 @@ class AuthorityService:
         context = await self.authority(user_id=uid)
         if not context.kill_switch:
             raise AuthorityTransitionError("authority kill switch is not active")
-        if context.last_reconciliation_status != "green":
-            raise AuthorityBlocked("authority re-arm requires green reconciliation")
         return await self.repository.rearm_rollout(
             user_id=uid,
             expected_version=expected_version,
             actor_id=actor_id,
             reason=normalized_reason,
-        )
-
-    async def set_reconciliation_status(self, *, user_id: str, expected_version: int,
-                                        actor_id: str, status: str) -> RolloutRecord:
-        uid = require_user_id(user_id, context="AuthorityService.set_reconciliation_status")
-        return await self.repository.set_reconciliation_status(
-            user_id=uid, expected_version=expected_version, actor_id=actor_id, status=status
         )
 
 

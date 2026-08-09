@@ -76,7 +76,6 @@
    * Spacing: Fibonacci sequence — each step × φ ≈ next value.
    * Tailwind classes: p-phi-1 … p-phi-9, gap-phi-4, mt-phi-6, etc.
    * Type: body 14px → title 23px (×φ) → hero 37px (×φ²). Line-height = φ.
-   * Flow columns: queue 38.2% : memo 61.8% beside the fixed spine (see .aethria-flow-grid).
    * ─────────────────────────────────────────────────────────────────────── */
   --phi: 1.618034;
   --space-1: 3px;    /* micro: icon padding, divider gap */
@@ -105,7 +104,6 @@
   --queue-pad-ambient-alt: 11px;
   --queue-pad-interrupt: 16px;
   --queue-pad-selected: 14px;
-  --queue-row-gap: var(--space-4);
   /* Selected queue title ↔ embedded memo company name */
   --case-title-size: clamp(25px, 2.45vw, 34px);
   --case-title-leading: 1.08;
@@ -140,7 +138,6 @@
     --space-8: 80px;
     --space-9: 128px;
     --layout-col-gap: var(--space-4);
-    --queue-row-gap: var(--space-5);
     --queue-content-measure: 40rem;
     --memo-editorial-measure: 42rem;
   }
@@ -149,24 +146,8 @@
 /* The spine — full-height oxford rail, constant across workspaces. */
 .aethria-spine { flex-shrink: 0; }
 
-/* Flow workspace — queue | active decision (lg+). The queue is compressed
- * utility; the Decision Stage owns the canvas.
- * display:grid comes from Tailwind `lg:grid` on the element (utilities load after this file;
- * a display:grid rule here would lose to `flex` otherwise). */
+/* Flow docket — full width; the memo opens as an overlay rather than a column. */
 @media screen and (min-width: 1024px) {
-  .aethria-flow-grid {
-    grid-template-rows: minmax(0, 1fr);
-    gap: var(--layout-col-gap);
-    min-height: 0;
-    overflow: hidden;
-    /* 38 / 62 — queue readable; stage still dominant (φ ≈ 38.2 : 61.8) */
-    grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
-  }
-
-  .aethria-flow-grid > * {
-    min-width: 0;
-  }
-
   .aethria-queue-surface {
     width: 100%;
     max-width: 100%;
@@ -177,13 +158,10 @@
     max-width: min(100%, var(--queue-content-measure));
   }
 
+  /* Matters are separated by space, not rules — the row's own tint is the only
+     thing that draws an edge, and only when it is selected or under the cursor. */
   .aethria-queue-list {
-    gap: var(--queue-row-gap);
-  }
-
-  /* Flow memo column — horizontal inset comes from the column gutter in FlowPage. */
-  .memoShellContent--workspace {
-    padding-inline: 0;
+    gap: var(--space-4);
   }
 }
 
@@ -840,6 +818,21 @@
 .focus-frame::after {
   right: -26px;
   border-left: 0;
+}
+/* Docket variant — the base brackets reach 40px past the framed body, more than
+   the room measure can spare once the docket narrows to its 38% basis. These
+   reach 32px, inside the column's px-phi-6 gutter at every width. The queue
+   row owns the full selected fill; only its content carries the px-phi-4
+   inset, so the fill does not get padded away from the bracket. */
+.focus-frame--docket::before,
+.focus-frame--docket::after {
+  width: 10px;
+}
+.focus-frame--docket::before {
+  left: -22px;
+}
+.focus-frame--docket::after {
+  right: -22px;
 }
 @media (max-width: 640px) {
   .focus-frame::before,

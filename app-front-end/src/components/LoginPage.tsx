@@ -14,8 +14,9 @@ import {
 } from '../api/activity';
 import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from '../lib/loginEntryTransition';
 import { fetchStartupsWithToken } from '../api/startups';
+import { tokens } from '../design-system/tokens';
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 
 /**
  * The arrival plate, compressed from the marketing gallery loader's 2450ms to

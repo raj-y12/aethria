@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
-import RoomHeader from '../components/RoomHeader';
+import { useQuery } from '@tanstack/react-query';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
-import { usePortfolioPositions } from '../hooks/usePortfolioPositions';
-import { useOutcomeCoverage } from '../hooks/useOutcomeCoverage';
+import { fetchPortfolioPositions } from '../api/portfolio';
+import { fetchOutcomeCoverage } from '../api/channelsOutcomes';
 import { buildPositionRows, sectorConcentration } from './portfolio/positionRows';
 import OutcomePanel from '../components/institutional/OutcomePanel';
 import CrmExportAction from '../components/portfolio/CrmExportAction';
@@ -19,6 +19,10 @@ function recOf(s: Startup): string | null {
   return typeof r === 'string' && r ? r.toUpperCase() : null;
 }
 
+function rulingToRecommendation(decision: 'MAYBE' | 'NO'): 'MONITOR' | 'PASS' {
+  return decision === 'NO' ? 'PASS' : 'MONITOR';
+}
+
 /** Instrument readout — a number with its label, no box. Counts up on arrival.
  * `value: null` means "unknown" (loading or failed source) — it renders an
  * em dash rather than fabricating a number. */
@@ -26,8 +30,8 @@ function Readout({ label, value, tone }: { label: string; value: number | null; 
   const shown = useCountUp(value ?? 0);
   return (
     <div className="flex flex-col gap-phi-1">
-      <span
-        className={`type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums ${
+        <span
+        className={`type-data !text-[clamp(32px,3.2vw,46px)] leading-none tabular-nums ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
         }`}
       >
@@ -86,11 +90,6 @@ function PositionOutcomes({ startupId }: { startupId: string }) {
   );
 }
 
-/* Ledger columns (lg+): Company | Sector | Stage | Score | Ruled. Aligned cells
- * make the book comparable down the page; below lg the row falls back to the
- * stacked name + meta line. */
-const LEDGER_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,0.8fr)_60px_minmax(0,0.9fr)] lg:items-baseline lg:gap-phi-4';
-
 /**
  * Portfolio — the *record*: positions held, read from the canonical
  * `/api/portfolio/positions` endpoint, plus decision history, concentration,
@@ -103,7 +102,11 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const reduceMotion = usePrefersReducedMotion();
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
 
-  const positionsQuery = usePortfolioPositions();
+  const positionsQuery = useQuery({
+    queryKey: ['portfolio-positions', 100],
+    queryFn: () => fetchPortfolioPositions(100),
+    staleTime: 30_000,
+  });
   const rows = useMemo(
     () => buildPositionRows(positionsQuery.data ?? [], data.startups),
     [positionsQuery.data, data.startups],
@@ -150,7 +153,12 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     return map;
   }, [data.startups]);
 
-  const coverageQuery = useOutcomeCoverage();
+  const coverageQuery = useQuery({
+    queryKey: ['outcomes', 'coverage'],
+    queryFn: fetchOutcomeCoverage,
+    staleTime: 60_000,
+    retry: false,
+  });
   const coveragePct = useMemo(() => {
     const raw = Number(coverageQuery.data?.coverage_ratio ?? coverageQuery.data?.coverage_rate ?? 0);
     return Math.round(raw <= 1 ? raw * 100 : raw);
@@ -161,29 +169,32 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const concentration = useMemo(() => sectorConcentration(rows), [rows]);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
+  const topPosition = concentration[0];
+  const convictionHeadline = rows.length > 0
+    ? `${rows.length} conviction${rows.length === 1 ? '' : 's'}. The record of what we chose.`
+    : 'The record of conviction.';
 
   return (
-    <div className="page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
-      <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom}`}>
-        {/* ── Header: place + book composition in one line of sight ── */}
-        <RoomHeader
-          className={workspaceLayout.headerBottom}
-          eyebrow="Conviction"
-          title="Portfolio"
-          readouts={
-            <div className="flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
-              <Readout label="Held" value={heldUnavailable ? null : rows.length} />
-              <Readout label="Monitoring" value={decided.monitoring} />
-              <Readout label="Passed" value={decided.passed} />
-            </div>
-          }
-        />
+    <div className="paper-dot-grid page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} min-h-full`}>
+        <header className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}>
+          <p className="type-label-section type-label-section--eyebrow">Portfolio</p>
+          <h1 className="type-display mt-phi-3 max-w-[56rem] text-[clamp(30px,3vw,42px)] leading-[1.08] text-oxford">
+            {convictionHeadline}
+          </h1>
+          <div className="mt-phi-6 flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+            <Readout label="Held" value={heldUnavailable ? null : rows.length} />
+            <Readout label="Watching" value={data.watchlistAnalytics.total} />
+            <Readout label="Top position" value={topPosition?.pct ?? null} />
+            <Readout label="Rulings recorded" value={decisionHistory.length} />
+          </div>
+        </header>
 
-        <div className="grid grid-cols-1 gap-x-phi-7 gap-y-phi-6 lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)]">
+        <div className="grid grid-cols-1 gap-x-phi-8 gap-y-phi-8 pt-phi-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.8fr)]">
           {/* ── Decision ledger (the record) ── */}
           <div className="flex min-w-0 flex-col gap-phi-6">
             <section aria-label="Decision ledger">
-              <SectionHead title="Held" detail={`${rows.length} ${rows.length === 1 ? 'position' : 'positions'}`} />
+              <SectionHead title="Positions" detail={`${rows.length} ${rows.length === 1 ? 'position' : 'positions'}`} />
 
               {/* Pointer, not a worklist — ruling happens in Flow, the book only points there. */}
               {decided.awaiting > 0 ? (
@@ -210,24 +221,19 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               ) : (
                 <ul className="mt-phi-4 flex flex-col">
                   {rows.map((row) => (
-                    <li key={row.position.position_id} data-testid="position-row" className="border-b border-oxford/[0.06] py-phi-3">
-                      <div className={LEDGER_GRID}>
-                        <span className="min-w-0">
-                          <span className="block truncate type-body-emphasis text-oxford">{row.name}</span>
-                          <span className="block truncate type-meta text-oxford/60 lg:hidden">
-                            {[row.sector, row.stage].filter(Boolean).join(' · ') || '—'}
+                    <li key={row.position.position_id} data-testid="position-row" className="group border-b border-oxford/[0.06]">
+                      <div className="-mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-4 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] lg:grid-cols-[minmax(0,1.15fr)_minmax(126px,0.65fr)_minmax(0,1.5fr)] lg:items-baseline">
+                        <span className="min-w-0 font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{row.name}</span>
+                        <span className="flex min-w-0 flex-col items-start gap-phi-1">
+                          <span className="type-meta text-oxford/60">INVESTED · {row.stage ?? 'POSITION'}</span>
+                          <span className="type-meta text-oxford/50">
+                            <span>{row.sector ?? 'SECTOR UNKNOWN'}</span>
+                            <span aria-hidden> · </span>
+                            <span>{row.score == null ? 'SCORE —' : `SCORE ${row.score.toFixed(1)}`}</span>
                           </span>
                         </span>
-                        <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">{row.sector ?? '—'}</span>
-                        <span className="hidden min-w-0 truncate type-meta text-oxford/60 lg:block">{row.stage ?? '—'}</span>
-                        <span className="type-data shrink-0 text-right text-oxford/70">
-                          {row.score == null ? '—' : row.score.toFixed(1)}
-                        </span>
-                        <span className="type-meta hidden shrink-0 truncate text-right text-oxford/60 lg:block">
-                          {new Date(row.position.entered_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                        </span>
+                        <p className="min-w-0 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale || 'No entry rationale recorded.'}</p>
                       </div>
-                      <p className="mt-phi-2 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale}</p>
                       {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
                       <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
                     </li>
@@ -250,18 +256,26 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       <button
                         type="button"
                         onClick={() => openDeal(item.startup.id)}
-                        className="group flex w-full items-start justify-between gap-phi-4 py-phi-3 text-left transition-colors hover:bg-oxford/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 btn-interaction btn-interaction--no-press"
+                        className="group -mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-6 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 btn-interaction btn-interaction--no-press lg:grid-cols-[minmax(0,1.15fr)_minmax(142px,0.55fr)_minmax(0,1.5fr)] lg:items-baseline"
                       >
-                        <span className="min-w-0">
-                          <span className="block truncate type-body-emphasis text-oxford">{item.name}</span>
-                          {item.notes ? (
-                            <span className="mt-phi-1 block line-clamp-2 type-meta text-oxford/60">{item.notes}</span>
-                          ) : null}
-                        </span>
-                        <span className="flex shrink-0 flex-col items-end gap-phi-1">
-                          <DecisionBadge variant={item.decision === 'NO' ? 'PASS' : 'MONITOR'} />
+                        <span className="flex min-w-0 flex-col items-start gap-phi-1">
+                          <span className="font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{item.name}</span>
                           <span className="type-meta tabular-nums text-oxford/55">{formatDate(item.resolvedAt)}</span>
                         </span>
+                        <span className="flex min-w-0 items-center gap-phi-2" aria-label="Aethria recommendation followed by your ruling">
+                          {recOf(item.startup) ? (
+                            <DecisionBadge
+                              variant={recOf(item.startup) as 'INVEST' | 'PASS' | 'MONITOR'}
+                              className="cursor-help"
+                            />
+                          ) : <span className="type-meta text-oxford/45">—</span>}
+                          <span className="type-meta text-oxford/45" aria-hidden>→</span>
+                          <DecisionBadge
+                            variant={rulingToRecommendation(item.decision)}
+                            className="cursor-help"
+                          />
+                        </span>
+                        <span className="min-w-0 type-body-sm leading-relaxed text-oxford/70">{item.notes || '—'}</span>
                       </button>
                     </li>
                   ))}
@@ -307,7 +321,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
             <section aria-label="Watchlist">
               <SectionHead
                 title="Watchlist"
-                detail={`${data.watchlistAnalytics.total}${data.watchlistAnalytics.stale ? ` · ${data.watchlistAnalytics.stale} stale` : ''}`}
+                detail={data.watchlistAnalytics.stale ? `${data.watchlistAnalytics.stale} stale` : undefined}
                 count={data.watchlistAnalytics.total}
               />
               {watchlistEntries.length === 0 ? (

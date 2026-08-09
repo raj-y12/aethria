@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
@@ -29,7 +29,6 @@ import {
   buildQueueRowContext,
   getVisibleRecommendation,
   resolveQueueAttentionDriver,
-  rowQueueOneLiner,
   rowSectorStageLine,
 } from '../lib/queueAttentionDriver';
 
@@ -46,8 +45,8 @@ interface WorkGridProps {
   onViewCounts?: (counts: Record<QueueView, number>) => void;
   /** AppFrame releases the initial cascade after a bare-to-full chrome entrance. */
   entranceReady?: boolean;
-  /** Fires once, after the initial visible row cascade has fully settled. */
-  onEntranceComplete?: (startup: Startup) => void;
+  /** Queue views, rendered into the docket's control line by the owning room. */
+  viewsSlot?: ReactNode;
 }
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
@@ -77,8 +76,7 @@ function getUnresolvedAt(startup: Startup): string | null {
 function buildDocketRow(
   startup: Startup,
   config: FundConfiguration,
-  watchlistSet: Set<string>,
-  displayIndex: string
+  watchlistSet: Set<string>
 ): DocketRowModel {
   const configuredScore = computeConfiguredScore(startup, config);
   const queueContext = buildQueueRowContext(startup, config, {
@@ -88,13 +86,11 @@ function buildDocketRow(
   const attentionDriver = resolveQueueAttentionDriver(queueContext);
   return {
     startup,
-    displayIndex,
     sourceBadge: getSourceBadge(startup),
     reviewBand: getReviewerQualityBand(startup.review),
     decisionVariant: getDecisionBadgeVariant(startup),
     queueContext,
     attentionDriver,
-    oneLiner: rowQueueOneLiner(queueContext, attentionDriver),
     sectorStage: rowSectorStageLine(startup),
     sortKeyValue: sortKey(startup),
     unresolvedAt: getUnresolvedAt(startup),
@@ -162,7 +158,7 @@ const WorkGrid = ({
   onQueueViewChange,
   onViewCounts,
   entranceReady = true,
-  onEntranceComplete,
+  viewsSlot,
 }: WorkGridProps): ReactElement => {
   const watchlistSet = watchlistIds ?? EMPTY_WATCHLIST_IDS;
   const config = fundConfiguration ?? createDefaultFundConfiguration();
@@ -277,16 +273,9 @@ const WorkGrid = ({
 
   const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  const stableIndex = useMemo(() => {
-    const byDiscovery = [...startups].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-    return new Map(byDiscovery.map((s, i) => [s.id, (i + 1).toString().padStart(2, '0')]));
-  }, [startups]);
-
   const allModels = useMemo(() => {
-    return startups.map((startup) =>
-      buildDocketRow(startup, config, watchlistSet, stableIndex.get(startup.id) ?? '00')
-    );
-  }, [startups, config, watchlistSet, stableIndex]);
+    return startups.map((startup) => buildDocketRow(startup, config, watchlistSet));
+  }, [startups, config, watchlistSet]);
 
   const viewCounts = useMemo(
     (): Record<QueueView, number> => ({
@@ -346,19 +335,6 @@ const WorkGrid = ({
     }
     return sorted;
   }, [allModels, queueView, sourceFilters, outcomeFilters, flagFilters, reviewFilters, sortFilter, pinnedNewId]);
-
-  const entranceCompleteRef = useRef(false);
-  const completeEntrance = useCallback(() => {
-    if (!entranceReady || entranceCompleteRef.current || !onEntranceComplete) return;
-    const first = orderedModels[0];
-    if (!first) return;
-    entranceCompleteRef.current = true;
-    onEntranceComplete?.(first.startup);
-  }, [entranceReady, onEntranceComplete, orderedModels]);
-
-  useEffect(() => {
-    if (reduceMotion && entranceReady) completeEntrance();
-  }, [completeEntrance, entranceReady, reduceMotion]);
 
   // Drop the pin once the selection moves off the pinned row (memo closed or
   // a different row selected), letting the acknowledged row leave the NEW view.
@@ -424,6 +400,7 @@ const WorkGrid = ({
         }
         onResetFilters={resetFilters}
         reduceMotion={reduceMotion}
+        viewsSlot={viewsSlot}
       />
 
       <LayoutGroup id="decision-queue">
@@ -494,11 +471,10 @@ const WorkGrid = ({
         ) : (
           <motion.div
             key={`${queueView}-${[...sourceFilters].join(',')}-${[...outcomeFilters].join(',')}-${[...flagFilters].join(',')}-${[...reviewFilters].join(',')}-${sortFilter}`}
-            className="aethria-queue-list flex w-full min-w-0 flex-col relative [contain:layout_style] py-phi-1 pb-phi-6"
+            className="aethria-queue-list relative flex w-full min-w-0 flex-col pt-phi-2 pb-phi-5 [contain:layout_style]"
             initial={reduceMotion ? false : 'hidden'}
             animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
-            onAnimationComplete={completeEntrance}
           >
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;

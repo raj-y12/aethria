@@ -2,8 +2,9 @@ import { motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SectionId } from './settingsModel';
 import { SpineNavButton } from '../components/SystemBar';
+import { tokens } from '../design-system/tokens';
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 
 export type SettingsStatusTone = 'live' | 'draft' | 'progress' | 'error' | 'restored' | 'success';
 

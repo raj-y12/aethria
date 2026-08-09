@@ -1,6 +1,4 @@
-import type { FundThesisSummary } from '../api/fundThesis';
-import type { Settings } from '../api/settings';
-import type { LookupResultSnapshotProps, MandateCardProps } from '@aethria/product-chrome';
+import type { LookupResultSnapshotProps } from '@aethria/product-chrome';
 import { getReviewerQualityBand } from '../design-system/semantics';
 import type { Startup } from '../types/startup';
 import { normalizeStructuredScoring } from './reviewScoring';
@@ -14,80 +12,6 @@ const DIMENSION_LABELS: Record<(typeof DIMENSION_KEYS)[number], string> = {
   technical: 'TECH',
   defensibility: 'DEF',
 };
-
-function thesisFundName(
-  fundThesisSummary: FundThesisSummary | null,
-  settings: Settings | null | undefined,
-): string {
-  const pj = fundThesisSummary?.parsed_json;
-  if (pj && typeof pj === 'object') {
-    for (const key of ['fund_name', 'name', 'title', 'fund', 'fund_title']) {
-      const val = (pj as Record<string, unknown>)[key];
-      if (typeof val === 'string' && val.trim()) return val.trim();
-    }
-  }
-  const settingsName = settings?.fund_identity?.fund_name?.trim();
-  if (settingsName) return settingsName;
-  if (fundThesisSummary?.active_version_number != null) {
-    return `Fund Thesis v${fundThesisSummary.active_version_number}`;
-  }
-  return '';
-}
-
-function thesisTags(
-  fundThesisSummary: FundThesisSummary | null,
-  settings: Settings | null | undefined,
-): string[] {
-  const fundStage = settings?.fund_identity?.stage_focus?.trim() || '';
-  const fundGeo = settings?.fund_identity?.geographic_focus?.trim() || '';
-  const scoutRegionRaw = settings?.agent_config?.scout_region?.trim() || '';
-  const scoutRegion =
-    scoutRegionRaw.length > 0
-      ? scoutRegionRaw.charAt(0).toUpperCase() + scoutRegionRaw.slice(1).toLowerCase()
-      : '';
-
-  const pj = fundThesisSummary?.parsed_json as Record<string, unknown> | undefined;
-  const toStrings = (v: unknown): string[] => {
-    if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim());
-    if (typeof v === 'string' && v.trim()) return [v.trim()];
-    return [];
-  };
-  const sectors = pj ? toStrings(pj.sectors ?? pj.sector ?? pj.focus_areas) : [];
-  const stages = pj ? toStrings(pj.stage_focus ?? pj.stage) : fundStage ? [fundStage] : [];
-  const geos = pj
-    ? toStrings(pj.geography ?? pj.geographies ?? pj.geographic_focus)
-    : fundGeo
-      ? [fundGeo]
-      : scoutRegion
-        ? [scoutRegion]
-        : [];
-  return [...stages, ...geos, ...sectors];
-}
-
-function thesisExcerpt(fundThesisSummary: FundThesisSummary | null): string | undefined {
-  const raw = fundThesisSummary?.raw_text?.trim();
-  if (!raw) return undefined;
-  const firstParagraph = raw.split(/\n\n+/)[0]?.trim();
-  if (!firstParagraph) return undefined;
-  return firstParagraph.length > 220 ? `${firstParagraph.slice(0, 217)}…` : firstParagraph;
-}
-
-export function buildMandateCardProps(
-  fundThesisSummary: FundThesisSummary | null,
-  settings: Settings | null | undefined,
-): MandateCardProps | null {
-  const title = thesisFundName(fundThesisSummary, settings);
-  if (!title && !fundThesisSummary?.active_version_id) return null;
-  const tags = thesisTags(fundThesisSummary, settings);
-  return {
-    variant: 'paper',
-    title: title || 'Fund mandate',
-    tags: tags.length > 0 ? tags : undefined,
-    excerpt: thesisExcerpt(fundThesisSummary),
-    live: Boolean(fundThesisSummary?.active_version_id),
-    compact: true,
-  };
-}
 
 const RESOLUTION_STATUS_LABELS: Record<string, string> = {
   FOUND: 'Identity confirmed',

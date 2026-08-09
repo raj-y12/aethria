@@ -37,9 +37,35 @@ def _region_label_for(tenant_user_id: str) -> str:
     return "global markets (no region filter)"
 
 
-class MarketDrivenScout(Scout):
+class _PersonaScout(Scout):
+    """Shared prompt-assembly for the four persona scouts below.
+
+    Each subclass only differs by SCOUT_TYPE and SYSTEM_PROMPT.
+    """
+
+    SCOUT_TYPE: str = ""
+
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
+        rl = _region_label_for(tenant_user_id)
+        prompt = (
+            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
+            + _SCOUT_QUANT_TRACTION_GUIDANCE
+            + _NEGATIVE_CONSTRAINTS_BLOCK
+            + _REFERENCE_RULES_BLOCK
+        )
+        super().__init__(
+            scout_type=self.SCOUT_TYPE,
+            system_prompt=prompt,
+            api_key=api_key,
+            model=model,
+            tenant_user_id=tenant_user_id,
+        )
+
+
+class MarketDrivenScout(_PersonaScout):
     """Scout A: Market-Driven — top-down, macro and large markets."""
 
+    SCOUT_TYPE = "market_driven"
     SYSTEM_PROMPT = """You are a Market-Driven Scout for a venture capital firm.
 
 Your cognitive strategy is TOP-DOWN:
@@ -74,26 +100,11 @@ DO NOT hallucinate financial or team data. Use null for unknown fields.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists (URLs, news, Crunchbase)."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
-        rl = _region_label_for(tenant_user_id)
-        prompt = (
-            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
-            + _SCOUT_QUANT_TRACTION_GUIDANCE
-            + _NEGATIVE_CONSTRAINTS_BLOCK
-            + _REFERENCE_RULES_BLOCK
-        )
-        super().__init__(
-            scout_type="market_driven",
-            system_prompt=prompt,
-            api_key=api_key,
-            model=model,
-            tenant_user_id=tenant_user_id,
-        )
 
-
-class BuilderTechnicalScout(Scout):
+class BuilderTechnicalScout(_PersonaScout):
     """Scout B: Builder/Technical — bottom-up, engineering-led."""
 
+    SCOUT_TYPE = "builder_technical"
     SYSTEM_PROMPT = """You are a Builder/Technical Scout for a venture capital firm.
 
 Your cognitive strategy is BOTTOM-UP:
@@ -121,26 +132,11 @@ DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
-        rl = _region_label_for(tenant_user_id)
-        prompt = (
-            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
-            + _SCOUT_QUANT_TRACTION_GUIDANCE
-            + _NEGATIVE_CONSTRAINTS_BLOCK
-            + _REFERENCE_RULES_BLOCK
-        )
-        super().__init__(
-            scout_type="builder_technical",
-            system_prompt=prompt,
-            api_key=api_key,
-            model=model,
-            tenant_user_id=tenant_user_id,
-        )
 
-
-class PainPointScout(Scout):
+class PainPointScout(_PersonaScout):
     """Scout C: Pain-Point — operational pain and monetizable wedges."""
 
+    SCOUT_TYPE = "pain_point"
     SYSTEM_PROMPT = """You are a Pain-Point Scout for a venture capital firm.
 
 Your cognitive strategy is PAIN-FOCUSED:
@@ -168,26 +164,11 @@ DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
-        rl = _region_label_for(tenant_user_id)
-        prompt = (
-            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
-            + _SCOUT_QUANT_TRACTION_GUIDANCE
-            + _NEGATIVE_CONSTRAINTS_BLOCK
-            + _REFERENCE_RULES_BLOCK
-        )
-        super().__init__(
-            scout_type="pain_point",
-            system_prompt=prompt,
-            api_key=api_key,
-            model=model,
-            tenant_user_id=tenant_user_id,
-        )
 
-
-class ContrarianScout(Scout):
+class ContrarianScout(_PersonaScout):
     """Scout D: Contrarian — non-obvious, anti-hype."""
 
+    SCOUT_TYPE = "contrarian"
     SYSTEM_PROMPT = """You are a Contrarian Scout for a venture capital firm.
 
 Your cognitive strategy is CONTRARIAN:
@@ -214,19 +195,3 @@ MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
 
 Output ONE real company per cycle. Focus on {_REGION_LABEL}. Include references that prove it exists."""
-
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
-        rl = _region_label_for(tenant_user_id)
-        prompt = (
-            self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
-            + _SCOUT_QUANT_TRACTION_GUIDANCE
-            + _NEGATIVE_CONSTRAINTS_BLOCK
-            + _REFERENCE_RULES_BLOCK
-        )
-        super().__init__(
-            scout_type="contrarian",
-            system_prompt=prompt,
-            api_key=api_key,
-            model=model,
-            tenant_user_id=tenant_user_id,
-        )

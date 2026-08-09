@@ -1,8 +1,9 @@
 import { motion } from 'framer-motion';
 import { usePrefersReducedMotion } from '../hooks';
 import { transitionOrReduced } from '../design-system/motion';
+import { tokens } from '../design-system/tokens';
 
-const EASE = [0.16, 1, 0.3, 1] as const;
+const EASE = tokens.motion.ease;
 
 /**
  * The house entrance motion — the Dispatch takeover's staggered upward

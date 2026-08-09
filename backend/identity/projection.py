@@ -27,26 +27,6 @@ async def link_admission_projection(
     )
 
 
-async def replay_projection(
-    repository: Any,
-    *,
-    user_id: str,
-    observation_id: str,
-    legacy_startup_id: str,
-) -> Any:
-    uid = require_user_id(user_id, context="identity.projection.replay_projection")
-    admission = await repository.get_admission_for_observation(
-        user_id=uid, observation_id=observation_id
-    )
-    if admission is None:
-        raise LookupError("Resolved observation admission not found for tenant")
-    return await link_admission_projection(
-        repository,
-        admission=admission,
-        legacy_startup_id=legacy_startup_id,
-    )
-
-
 class StartupCompatibilityProjectionRepository:
     """Atomic service-role repository for legacy startup display projections.
 

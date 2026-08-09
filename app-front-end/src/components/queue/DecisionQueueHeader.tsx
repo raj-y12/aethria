@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { tokens } from '../../design-system/tokens';
 import { productInteraction, productText } from '../../design-system/productSystem';
 import type { FundConfiguration } from '../../lib/fundConfiguration';
@@ -68,7 +68,7 @@ function AdvancedChip({
       onClick={onClick}
       aria-pressed={active}
       className={`type-meta min-h-[36px] whitespace-nowrap px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-        active ? 'bg-oxford text-paper' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/60'
+        active ? 'bg-surface-selected text-oxford' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/60'
       }`}
     >
       {label}
@@ -94,6 +94,8 @@ export interface DecisionQueueHeaderProps {
   activeFilterCount: number;
   onResetFilters: () => void;
   reduceMotion: boolean;
+  /** The queue views, rendered by the room that owns their state (FlowPage). */
+  viewsSlot?: ReactNode;
 }
 
 /**
@@ -119,46 +121,45 @@ export default function DecisionQueueHeader({
   activeFilterCount,
   onResetFilters,
   reduceMotion,
+  viewsSlot,
 }: DecisionQueueHeaderProps) {
   return (
     <div
-      className="sticky top-0 z-10 bg-surface-canvas pb-phi-2"
+      className="sticky top-0 z-10 bg-surface-canvas"
       title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
     >
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-1 border-b border-oxford/[0.06] pb-phi-2">
-        <span className="type-label-section">Docket</span>
+      {/* One control line, and it doubles as the rule the list hangs from. The
+          views name the place, so no "Docket" label; the select shows the active
+          ordering, so no "Sort" label either. */}
+      <div className="flex min-w-0 flex-nowrap items-center justify-between gap-x-phi-4 border-b border-oxford/[0.14] pb-phi-3">
+        <div className="min-w-0 flex-1">{viewsSlot}</div>
 
-        <div className="flex items-center gap-x-phi-4">
-          <label className="flex items-center gap-phi-2">
-            <span className="type-label-section">Sort</span>
-            <select
-              value={sortFilter}
-              onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
-              aria-label="Sort deals"
-              style={sortSelectStyle}
-              className="type-action h-9 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 outline-none transition-colors hover:text-oxford/80 focus-visible:outline-none"
-            >
-              {SORT_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="flex shrink-0 items-center gap-x-phi-4">
+          <select
+            value={sortFilter}
+            onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
+            aria-label="Sort deals"
+            style={sortSelectStyle}
+            className="type-action h-8 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 text-oxford/40 outline-none transition-colors hover:text-oxford focus-visible:outline-none"
+          >
+            {SORT_OPTIONS.map(({ value, label }) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
 
           <button
             type="button"
             onClick={onToggleAdvancedFilters}
             aria-expanded={showAdvancedFilters}
-            className={`type-action inline-flex h-9 shrink-0 items-center gap-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              showAdvancedFilters || hasActiveFilters
-                ? 'text-oxford'
-                : 'text-oxford/60 hover:text-oxford'
+            className={`type-action inline-flex h-8 shrink-0 items-center gap-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/40 hover:text-oxford'
             }`}
           >
             Filters
             {activeFilterCount > 0 ? (
-              <span className="tabular-nums text-oxford/60" aria-label={`${activeFilterCount} active`}>
+              <span className="tabular-nums" aria-label={`${activeFilterCount} active`}>
                 · {activeFilterCount}
               </span>
             ) : null}

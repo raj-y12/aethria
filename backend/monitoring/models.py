@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-from tenant_context import require_user_id
+from utils.tenant_model import TenantScopedModel
 from utils.timeutil import utcnow
 
 
@@ -54,20 +54,11 @@ class RefreshEnvelope(BaseModel):
         return normalized
 
 
-class RefreshRequest(BaseModel):
-    user_id: str
+class RefreshRequest(TenantScopedModel):
     opportunity_id: str = Field(min_length=1)
     reason: RefreshReason
     request_key: str = Field(min_length=8, max_length=200)
     envelope: RefreshEnvelope = Field(default_factory=RefreshEnvelope)
-
-    @field_validator("user_id")
-    @classmethod
-    def valid_tenant(cls, value: str) -> str:
-        try:
-            return require_user_id(value, context="RefreshRequest")
-        except RuntimeError as exc:
-            raise ValueError(str(exc)) from exc
 
 
 class BudgetReservationRecord(BaseModel):

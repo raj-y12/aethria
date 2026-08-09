@@ -38,6 +38,7 @@ import certifi
 
 import metrics
 from utils.reference_verify import normalize_url_for_match
+from utils.retry import retry_delay
 from utils.search_results import ProviderSearchResults
 
 logger = logging.getLogger("exa")
@@ -407,7 +408,7 @@ def exa_search(
             status = getattr(error, "code", None)
             retryable = status == 429 or (isinstance(status, int) and 500 <= status <= 599)
             if retryable and attempt < config["retries"]:
-                time.sleep(min(0.25 * (2 ** attempt), 2.0))
+                time.sleep(retry_delay(attempt))
                 continue
             reason = "rate_limited" if status == 429 else "http_error"
             logger.warning("Exa search failed: HTTP %s", status)
@@ -417,7 +418,7 @@ def exa_search(
             )
         except Exception as error:
             if _is_transient(error) and attempt < config["retries"]:
-                time.sleep(min(0.25 * (2 ** attempt), 2.0))
+                time.sleep(retry_delay(attempt))
                 continue
             reason = "timeout" if _is_transient(error) else "request_error"
             logger.warning("Exa search failed (%s): %s", reason, error)

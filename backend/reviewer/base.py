@@ -1008,3 +1008,33 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             self._call_llm_sync,
             scout_output,
         )
+
+
+class _PersonaReviewer(Reviewer):
+    """Shared init for reviewer personas that differ only by reviewer_type and
+    an optional system-prompt addendum appended after the base prompt is built.
+    """
+
+    REVIEWER_TYPE: str = "default"
+    ADDENDUM: str = ""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str = "gpt-5-nano",
+        tenant_user_id: str = "",
+        use_resource_fund_thesis_fallback: bool = True,
+        structured_scoring_enabled: bool = False,
+        structured_signal_grounding: Optional[Mapping[str, Any]] = None,
+    ):
+        self.reviewer_type = self.REVIEWER_TYPE
+        super().__init__(
+            api_key,
+            model=model,
+            tenant_user_id=tenant_user_id,
+            use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
+            structured_scoring_enabled=structured_scoring_enabled,
+            structured_signal_grounding=structured_signal_grounding,
+        )
+        if self.ADDENDUM:
+            self.SYSTEM_PROMPT = self.SYSTEM_PROMPT + self.ADDENDUM
