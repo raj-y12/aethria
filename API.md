@@ -94,6 +94,8 @@ own fixed-window policy (`backend/security/rate_limiter.py`).
 | `GET` | `/api/opportunities` | Bounded opportunity list |
 | `GET` | `/api/opportunities/{opportunity_id}` | Canonical opportunity record |
 | `GET` | `/api/opportunities/{opportunity_id}/decision-view` | Composed decision-ready view |
+| `GET` | `/api/opportunities/{opportunity_id}/decision-cases` | Historical decision-event collection: one case per completed evaluation, with its recommendation, criteria, linked rulings/overrides, Aethria-owned rationale interpretations, decision-time evidence snapshot, and separate later outcomes. Rulings without a recommendation link are returned as `unpaired_rulings`, never inferred into a case |
+| `GET` | `/api/evaluations/{evaluation_id}/precedents` | Deterministically ranked, tenant-scoped comparable historical decision episodes with component scores, match reasons, limitations, and separate later-outcome context |
 | `GET` | `/api/startups/{legacy_startup_id}/opportunity` | Legacy → canonical bridge |
 | `GET` | `/api/observations` | Bounded source-observation queue |
 | `GET` | `/api/identity-cases` | Open ambiguity queue |
@@ -118,6 +120,7 @@ own fixed-window policy (`backend/security/rate_limiter.py`).
 | `POST` | `/api/opportunities/{opportunity_id}/evaluate` | Explicit operator refresh; fails closed on unmet prerequisites |
 | `POST` | `/api/opportunities/{opportunity_id}/rulings` | Record the authoritative human ruling |
 | `GET` | `/api/opportunities/{opportunity_id}/rulings` | Ruling history |
+| `POST` | `/api/rulings/{ruling_id}/interpretation-corrections` | Append an operator correction to the Aethria-owned ruling interpretation; raw rationale remains unchanged |
 | `POST` | `/api/opportunities/{opportunity_id}/investment` | Record the investment transition |
 | `GET`/`POST` | `/api/opportunities/{opportunity_id}/actions` | Workflow actions and drafts |
 | `POST` | `/api/actions/{workflow_action_id}/approve` | Approval record — does **not** itself perform an external write |
@@ -170,6 +173,10 @@ All fund-thesis routes require Supabase and return `503` when it is unavailable.
 | Method | Path | Notes |
 |---|---|---|
 | `POST` | `/api/fund-intelligence/derive-overrides` | Derive attributed observations and proposals |
+| `GET` | `/api/fund-intelligence/observations` | Deterministic descriptive observations over historical Decision Cases; supports sector, stage, geography, thesis version, ISO date, and observation-type filters |
+| `GET` | `/api/fund-intelligence/hypotheses` | Conservative descriptive hypotheses grounded only in sufficiently supported Fund Intelligence observations; supports the same context filters and hypothesis family |
+| `GET` | `/api/fund-intelligence/hypotheses/{id}/replay` | Counterfactual replayability preview; fails closed when a hypothesis lacks a deterministic policy delta |
+| `GET` | `/api/fund-intelligence/counterfactual-proposals` | Draft machine-readable adaptation proposals grounded in hypotheses; returns `insufficient_basis` when existing policy semantics cannot represent the change |
 | `GET` | `/api/fund-intelligence/proposals` | Proposal inbox |
 | `GET` | `/api/fund-intelligence/proposals/{id}` | Proposal detail |
 | `POST` | `/api/fund-intelligence/proposals/{id}/preview` | Bounded preview; binds both policy and canonical-config hashes |

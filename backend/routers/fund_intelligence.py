@@ -132,6 +132,123 @@ async def list_proposals(
     return {"proposals": proposals}
 
 
+@router.get("/observations")
+async def list_observations(
+    request: Request,
+    sector: Optional[str] = None,
+    stage: Optional[str] = None,
+    geography: Optional[str] = None,
+    thesis_version_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    observation_type: Optional[str] = None,
+):
+    user_id = require_authenticated_user(request)
+    from datetime import datetime
+
+    def parse_date(value: Optional[str]):
+        if value is None:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid ISO-8601 date filter") from exc
+
+    observations = await _repository(request).get_observations(
+        user_id=user_id,
+        sector=sector,
+        stage=stage,
+        geography=geography,
+        thesis_version_id=thesis_version_id,
+        date_from=parse_date(date_from),
+        date_to=parse_date(date_to),
+        observation_type=observation_type,
+    )
+    return {"observations": observations}
+
+
+@router.get("/hypotheses")
+async def list_hypotheses(
+    request: Request,
+    sector: Optional[str] = None,
+    stage: Optional[str] = None,
+    geography: Optional[str] = None,
+    thesis_version_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    hypothesis_family: Optional[str] = None,
+):
+    user_id = require_authenticated_user(request)
+    from datetime import datetime
+
+    def parse_date(value: Optional[str]):
+        if value is None:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid ISO-8601 date filter") from exc
+
+    hypotheses = await _repository(request).get_hypotheses(
+        user_id=user_id,
+        sector=sector,
+        stage=stage,
+        geography=geography,
+        thesis_version_id=thesis_version_id,
+        date_from=parse_date(date_from),
+        date_to=parse_date(date_to),
+        hypothesis_family=hypothesis_family,
+    )
+    return {"hypotheses": hypotheses}
+
+
+@router.get("/hypotheses/{hypothesis_id}/replay")
+async def replay_hypothesis(request: Request, hypothesis_id: str):
+    validate_route_id(hypothesis_id, field_name="hypothesis_id")
+    user_id = require_authenticated_user(request)
+    preview = await _repository(request).get_replay_preview(
+        user_id=user_id, hypothesis_id=hypothesis_id
+    )
+    if preview is None:
+        raise HTTPException(status_code=404, detail="Hypothesis not found for tenant")
+    return preview
+
+
+@router.get("/counterfactual-proposals")
+async def list_counterfactual_proposals(
+    request: Request,
+    sector: Optional[str] = None,
+    stage: Optional[str] = None,
+    geography: Optional[str] = None,
+    thesis_version_id: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    hypothesis_family: Optional[str] = None,
+):
+    user_id = require_authenticated_user(request)
+    from datetime import datetime
+
+    def parse_date(value: Optional[str]):
+        if value is None:
+            return None
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="Invalid ISO-8601 date filter") from exc
+
+    proposals = await _repository(request).get_counterfactual_proposals(
+        user_id=user_id,
+        sector=sector,
+        stage=stage,
+        geography=geography,
+        thesis_version_id=thesis_version_id,
+        date_from=parse_date(date_from),
+        date_to=parse_date(date_to),
+        hypothesis_family=hypothesis_family,
+    )
+    return {"counterfactual_proposals": proposals}
+
+
 @router.get("/proposals/{policy_proposal_id}")
 async def get_proposal(request: Request, policy_proposal_id: str):
     validate_route_id(policy_proposal_id, field_name="policy_proposal_id")

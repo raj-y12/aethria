@@ -177,6 +177,222 @@ class FundIntelligenceRepository:
                     proposals.append(_public_row(row))
                 return {"observations": observations, "proposals": proposals}
 
+    async def get_observations(
+        self,
+        *,
+        user_id: str,
+        sector: Optional[str] = None,
+        stage: Optional[str] = None,
+        geography: Optional[str] = None,
+        thesis_version_id: Optional[str] = None,
+        date_from: Any = None,
+        date_to: Any = None,
+        observation_type: Optional[str] = None,
+    ) -> list[Dict[str, Any]]:
+        """Build descriptive observations from canonical historical decision episodes."""
+        from fund_intelligence.observations import build_observations
+
+        uid = require_user_id(user_id, context="FundIntelligenceRepository.get_observations")
+        async with self.pool.acquire() as conn:
+            evaluations = await conn.fetch(
+                """
+                select evaluation_id, opportunity_id, claim_snapshot,
+                       thesis_version_id, policy_version_id, created_at, completed_at
+                from public.evaluation_runs
+                where user_id=$1 and status='completed'
+                order by coalesce(completed_at, created_at), created_at, evaluation_id
+                limit 5000
+                """,
+                uid,
+            )
+            recommendations = await conn.fetch(
+                """
+                select recommendation_id, evaluation_id, recommended_state, created_at
+                from public.recommendations
+                where user_id=$1
+                order by created_at, recommendation_id
+                limit 10000
+                """,
+                uid,
+            )
+            rulings = await conn.fetch(
+                """
+                select hr.ruling_id, hr.recommendation_id, hr.decision, hr.created_at,
+                       os.override_type
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1
+                order by hr.created_at, hr.ruling_id
+                limit 10000
+                """,
+                uid,
+            )
+            interpretations = await conn.fetch(
+                """
+                select ruling_id, version, positive_factors, negative_factors,
+                       accepted_risks, decisive_factors, overridden_criteria,
+                       interpretation_id, source, created_at, provenance
+                from public.ruling_interpretations
+                where user_id=$1
+                order by ruling_id, version
+                limit 10000
+                """,
+                uid,
+            )
+            criteria = await conn.fetch(
+                """
+                select ca.evaluation_id, ca.criterion, ca.score, ca.confidence,
+                       ca.evidence_sufficiency
+                from public.criterion_assessments ca
+                join public.evaluation_runs e
+                  on e.user_id=ca.user_id and e.evaluation_id=ca.evaluation_id
+                where ca.user_id=$1 and e.status='completed'
+                order by ca.evaluation_id, ca.criterion
+                limit 40000
+                """,
+                uid,
+            )
+
+        def json_value(value: Any, default: Any) -> Any:
+            return _json(value, default)
+
+        recommendations_by_id: Dict[str, Dict[str, Any]] = {}
+        for row in recommendations:
+            item = dict(row)
+            recommendations_by_id[str(item["recommendation_id"])] = item
+        rulings_by_recommendation: Dict[str, Dict[str, Any]] = {}
+        for row in rulings:
+            item = dict(row)
+            recommendation_id = item.get("recommendation_id")
+            if recommendation_id:
+                rulings_by_recommendation[str(recommendation_id)] = item
+        interpretations_by_ruling: Dict[str, Dict[str, Any]] = {}
+        for row in interpretations:
+            item = dict(row)
+            interpretations_by_ruling[str(item["ruling_id"])] = {
+                **item,
+                "positive_factors": json_value(item.get("positive_factors"), []),
+                "negative_factors": json_value(item.get("negative_factors"), []),
+                "accepted_risks": json_value(item.get("accepted_risks"), []),
+                "decisive_factors": json_value(item.get("decisive_factors"), []),
+                "overridden_criteria": json_value(item.get("overridden_criteria"), []),
+                "provenance": json_value(item.get("provenance"), {}),
+            }
+        criteria_by_evaluation: Dict[str, list[Dict[str, Any]]] = {}
+        for row in criteria:
+            item = dict(row)
+            criteria_by_evaluation.setdefault(str(item["evaluation_id"]), []).append({
+                key: value for key, value in item.items() if key != "evaluation_id"
+            })
+
+        aliases = {
+            "sector": {"sector", "industry", "category"},
+            "stage": {"stage", "funding_stage"},
+            "geography": {"geography", "location", "country"},
+        }
+        episodes: list[Dict[str, Any]] = []
+        for raw in evaluations:
+            evaluation = dict(raw)
+            dimensions: Dict[str, str] = {}
+            for claim in json_value(evaluation.get("claim_snapshot"), []):
+                if not isinstance(claim, dict):
+                    continue
+                claim_type = str(claim.get("claim_type") or "").strip().lower()
+                value = str(claim.get("normalized_value") or claim.get("display_text") or "").strip().lower()
+                for dimension, names in aliases.items():
+                    if claim_type in names and value and dimension not in dimensions:
+                        dimensions[dimension] = value
+            recommendation = next(
+                (item for item in recommendations_by_id.values()
+                 if str(item.get("evaluation_id")) == str(evaluation["evaluation_id"])),
+                None,
+            )
+            ruling = (
+                rulings_by_recommendation.get(str(recommendation["recommendation_id"]))
+                if recommendation else None
+            )
+            episodes.append({
+                "evaluation_id": str(evaluation["evaluation_id"]),
+                "opportunity_id": str(evaluation.get("opportunity_id") or ""),
+                "decision_time": evaluation.get("completed_at") or evaluation.get("created_at"),
+                "thesis_version_id": evaluation.get("thesis_version_id"),
+                "policy_version_id": evaluation.get("policy_version_id"),
+                "dimensions": dimensions,
+                "criteria": criteria_by_evaluation.get(str(evaluation["evaluation_id"]), []),
+                "recommendation": recommendation,
+                "ruling": {
+                    **ruling,
+                    "interpretation": interpretations_by_ruling.get(str(ruling["ruling_id"])),
+                } if ruling else None,
+                "interpretation": interpretations_by_ruling.get(str(ruling["ruling_id"])) if ruling else None,
+            })
+        return build_observations(
+            episodes, sector=sector, stage=stage, geography=geography,
+            thesis_version_id=thesis_version_id, date_from=date_from, date_to=date_to,
+            observation_type=observation_type,
+        )
+
+    async def get_hypotheses(
+        self,
+        *,
+        user_id: str,
+        sector: Optional[str] = None,
+        stage: Optional[str] = None,
+        geography: Optional[str] = None,
+        thesis_version_id: Optional[str] = None,
+        date_from: Any = None,
+        date_to: Any = None,
+        hypothesis_family: Optional[str] = None,
+    ) -> list[Dict[str, Any]]:
+        """Build descriptive hypotheses from the deterministic observation projection."""
+        from fund_intelligence.hypotheses import build_hypotheses
+
+        observations = await self.get_observations(
+            user_id=user_id, sector=sector, stage=stage, geography=geography,
+            thesis_version_id=thesis_version_id, date_from=date_from, date_to=date_to,
+        )
+        return build_hypotheses(observations, hypothesis_family=hypothesis_family)
+
+    async def get_replay_preview(
+        self, *, user_id: str, hypothesis_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return a tenant-scoped, fail-closed replayability preview."""
+        from fund_intelligence.replay import build_replay_preview
+
+        uid = require_user_id(user_id, context="FundIntelligenceRepository.get_replay_preview")
+        hypotheses = await self.get_hypotheses(user_id=uid)
+        hypothesis = next(
+            (item for item in hypotheses if str(item.get("hypothesis_id")) == str(hypothesis_id)),
+            None,
+        )
+        return build_replay_preview(hypothesis) if hypothesis else None
+
+    async def get_counterfactual_proposals(
+        self,
+        *,
+        user_id: str,
+        sector: Optional[str] = None,
+        stage: Optional[str] = None,
+        geography: Optional[str] = None,
+        thesis_version_id: Optional[str] = None,
+        date_from: Any = None,
+        date_to: Any = None,
+        hypothesis_family: Optional[str] = None,
+    ) -> list[Dict[str, Any]]:
+        """Generate tenant-scoped draft counterfactuals without persistence or publication."""
+        from fund_intelligence.proposals import build_counterfactual_proposals
+
+        uid = require_user_id(
+            user_id, context="FundIntelligenceRepository.get_counterfactual_proposals"
+        )
+        hypotheses = await self.get_hypotheses(
+            user_id=uid, sector=sector, stage=stage, geography=geography,
+            thesis_version_id=thesis_version_id, date_from=date_from, date_to=date_to,
+            hypothesis_family=hypothesis_family,
+        )
+        return build_counterfactual_proposals(hypotheses)
+
     async def list_proposals(
         self, *, user_id: str, status: Optional[PolicyProposalStatus | str] = None, limit: int = 100
     ) -> list[Dict[str, Any]]:

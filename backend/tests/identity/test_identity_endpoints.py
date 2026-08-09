@@ -73,6 +73,22 @@ class _Repository:
     async def get_opportunity(self, *, user_id, opportunity_id):
         return self.opportunity if user_id == self.opportunity.user_id and opportunity_id == self.opportunity.opportunity_id else None
 
+    async def get_decision_cases(self, *, user_id, opportunity_id):
+        if user_id != "user_a" or opportunity_id != self.opportunity.opportunity_id:
+            return None
+        return {
+            "opportunity": {"opportunity_id": opportunity_id},
+            "current_lifecycle": {"decision_state": "discovered"},
+            "cases": [],
+            "outcomes": [],
+            "unpaired_rulings": [],
+        }
+
+    async def get_precedents(self, *, user_id, evaluation_id, limit):
+        if user_id != "user_a" or evaluation_id != "evaluation-1":
+            return None
+        return {"evaluation_id": evaluation_id, "precedents": []}
+
     async def get_opportunity_by_legacy_projection(self, *, user_id, legacy_startup_id):
         if user_id != self.opportunity.user_id or legacy_startup_id != self.opportunity.legacy_startup_id:
             return None
@@ -183,6 +199,39 @@ def test_company_and_opportunity_reads_are_tenant_scoped_and_safe(monkeypatch):
         f"/api/companies/{repository.company.company_id}",
         headers={"Authorization": "Bearer t"},
     )
+    assert other.status_code == 404
+
+
+def test_decision_cases_are_tenant_scoped(monkeypatch):
+    repository = _Repository()
+    own = _client(monkeypatch, repository).get(
+        f"/api/opportunities/{repository.opportunity.opportunity_id}/decision-cases",
+        headers={"Authorization": "Bearer t"},
+    )
+    other = _client(monkeypatch, repository, user_id="user-b").get(
+        f"/api/opportunities/{repository.opportunity.opportunity_id}/decision-cases",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert own.status_code == 200
+    assert own.json()["cases"] == []
+    assert other.status_code == 404
+
+
+def test_precedents_are_tenant_scoped(monkeypatch):
+    repository = _Repository()
+    own = _client(monkeypatch, repository).get(
+        "/api/evaluations/evaluation-1/precedents",
+        headers={"Authorization": "Bearer t"},
+    )
+    other = _client(monkeypatch, repository, user_id="user-b").get(
+        "/api/evaluations/evaluation-1/precedents",
+        headers={"Authorization": "Bearer t"},
+    )
+
+    assert own.status_code == 200
+    assert own.json()["evaluation_id"] == "evaluation-1"
+    assert own.json()["precedents"] == []
     assert other.status_code == 404
 
 
