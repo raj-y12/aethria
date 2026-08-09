@@ -1,10 +1,10 @@
 """Authenticated ruling and workflow-action controls."""
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from decisions.models import InitialHumanRulingDecision, HumanRulingInput, OverrideType, WorkflowActionType
 from routers.authority import require_write_path, with_authority_metadata
@@ -38,6 +38,38 @@ class ApproveActionBody(BaseModel):
 class InvestmentBody(BaseModel):
     rationale: str = Field(min_length=3, max_length=2000)
     investor_confidence: float = Field(default=0.5, ge=0, le=1)
+
+
+class InterpretationEvidenceReferenceBody(BaseModel):
+    reference_type: Literal["claim", "evidence"]
+    reference_id: str = Field(min_length=1, max_length=200)
+    attribution: Literal["explicit", "inferred"]
+    basis: str = Field(min_length=1, max_length=500)
+
+
+class InterpretationEvidenceInfluenceBody(BaseModel):
+    status: Literal["explicit", "inferred", "unknown"]
+    references: list[InterpretationEvidenceReferenceBody] = Field(default_factory=list, max_length=30)
+    limitations: list[str] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def validate_unknown_references(self):
+        if self.status == "unknown" and self.references:
+            raise ValueError("unknown evidence influence cannot contain references")
+        return self
+
+
+class InterpretationCorrectionBody(BaseModel):
+    positive_factors: list[str] = Field(default_factory=list, max_length=20)
+    negative_factors: list[str] = Field(default_factory=list, max_length=20)
+    accepted_risks: list[str] = Field(default_factory=list, max_length=20)
+    decisive_factors: list[str] = Field(default_factory=list, max_length=20)
+    overridden_criteria: list[str] = Field(default_factory=list, max_length=20)
+    strategic_exception: Optional[str] = Field(default=None, max_length=1000)
+    agreement_with_aethria: Literal["agree", "disagree", "mixed", "unknown"]
+    human_confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    evidence_influence: InterpretationEvidenceInfluenceBody
+    correction_note: str = Field(min_length=3, max_length=1000)
 
 
 def _repository(request: Request):
@@ -101,6 +133,26 @@ async def list_rulings(
         limit=limit,
     )
     return {"rulings": [record.model_dump(mode="json") for record in records]}
+
+
+@router.post("/api/rulings/{ruling_id}/interpretation-corrections")
+async def correct_ruling_interpretation(
+    request: Request, ruling_id: str, body: InterpretationCorrectionBody
+):
+    validate_route_id(ruling_id, field_name="ruling_id")
+    user_id = require_authenticated_user(request)
+    authority = await require_write_path(request, operation="ruling interpretation correction")
+    try:
+        record = await _repository(request).correct_ruling_interpretation(
+            user_id=user_id,
+            ruling_id=ruling_id,
+            correction=body.model_dump(mode="json"),
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return with_authority_metadata(record, authority)
 
 
 @router.post("/api/opportunities/{opportunity_id}/actions")

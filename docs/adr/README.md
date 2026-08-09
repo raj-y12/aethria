@@ -28,6 +28,7 @@ codebase, not when the record was written.
 | [0008](0008-env-registry.md) | A single registry for every environment variable | Accepted |
 | [0009](0009-rule-based-partner-llm-for-edge-cases.md) | Rule-based partner decisions; the LLM only for declared edge cases | Accepted |
 | [0010](0010-fail-closed-gates.md) | Fail closed on missing thesis, ambiguous identity, or thin evidence | Accepted |
+| [0011](0011-decision-case-and-fund-intelligence-authority.md) | Historical Decision Cases and Fund Intelligence authority boundaries | Accepted |
 
 ## Writing a new one
 

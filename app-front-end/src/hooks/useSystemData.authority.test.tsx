@@ -8,6 +8,7 @@ const api = vi.hoisted(() => ({
   fetchSystemStatus: vi.fn(),
   fetchFundThesisRuntime: vi.fn(),
   fetchSettings: vi.fn(),
+  fetchMetaReports: vi.fn(),
 }));
 
 vi.mock('../api/startups', () => ({ fetchStartups: api.fetchStartups }));
@@ -21,7 +22,7 @@ vi.mock('../api/analytics', () => ({
   fetchConcentrationAnalytics: vi.fn(), fetchSystemHealth: vi.fn(),
 }));
 vi.mock('../api/meta', () => ({
-  fetchMetaReports: vi.fn(), fetchMetaPromptState: vi.fn(), fetchMetaEvalSet: vi.fn(),
+  fetchMetaReports: api.fetchMetaReports, fetchMetaPromptState: vi.fn(), fetchMetaEvalSet: vi.fn(),
   fetchScoutWeights: vi.fn(), fetchCalibrationState: vi.fn(), fetchMetaInsights: vi.fn(),
 }));
 vi.mock('../lib/queryIntent', () => ({ getQueryConfig: () => ({}) }));
@@ -57,6 +58,7 @@ describe('useSystemData authority handoff', () => {
     api.fetchSystemStatus.mockReset();
     api.fetchFundThesisRuntime.mockReset();
     api.fetchSettings.mockReset();
+    api.fetchMetaReports.mockReset();
     api.fetchStartups.mockResolvedValue([{ id: 'startup-1' }]);
     api.fetchSystemStatus.mockResolvedValue({ status: 'ok', durable_jobs: { required: false, ready: true, error: null, counts: {} } });
     api.fetchFundThesisRuntime.mockResolvedValue({ mode: 'missing' });
@@ -71,5 +73,13 @@ describe('useSystemData authority handoff', () => {
       expect(api.fetchStartups).toHaveBeenCalledTimes(1);
       expect(result.current.startups).toEqual([{ id: 'startup-1' }]);
     });
+  });
+
+  it('does not load MetaAgent reports when the system panel is closed', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderHook(() => useSystemData({ systemPanelOpen: false }), { wrapper: wrapper(queryClient) });
+
+    await waitFor(() => expect(api.fetchStartups).toHaveBeenCalledTimes(1));
+    expect(api.fetchMetaReports).not.toHaveBeenCalled();
   });
 });

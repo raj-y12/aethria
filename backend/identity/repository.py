@@ -979,6 +979,388 @@ class IdentityRepository:
             payload[key] = _json_value(payload.get(key), [])
         return payload
 
+    async def get_decision_cases(
+        self, *, user_id: str, opportunity_id: str
+    ) -> Optional[Dict[str, Any]]:
+        """Return one historically coherent case per completed evaluation episode."""
+        uid = require_user_id(user_id, context="IdentityRepository.get_decision_cases")
+        async with self.pool.acquire() as conn:
+            opportunity_row = await conn.fetchrow(
+                """
+                select o.opportunity_id, o.company_id, o.context_key,
+                       o.decision_state, o.service_level, o.current_evaluation_id,
+                       o.current_recommendation_id, o.current_ruling_id,
+                       o.updated_at, c.canonical_name, c.canonical_domain
+                from public.opportunities o
+                join public.companies c
+                  on c.user_id=o.user_id and c.company_id=o.company_id
+                where o.user_id=$1 and o.opportunity_id=$2
+                """,
+                uid,
+                opportunity_id,
+            )
+            if opportunity_row is None:
+                return None
+            evaluations = await conn.fetch(
+                """
+                select evaluation_id, evidence_snapshot_hash, evidence_materiality_digest,
+                       claim_snapshot, thesis_version_id, policy_version_id, policy_hash,
+                       rubric_version, partner_rules_version, partner_rules_hash,
+                       model_manifest, prompt_manifest, status, created_at, completed_at
+                from public.evaluation_runs
+                where user_id=$1 and opportunity_id=$2 and status='completed'
+                order by coalesce(completed_at, created_at), created_at, evaluation_id
+                """,
+                uid,
+                opportunity_id,
+            )
+            recommendations = await conn.fetch(
+                """
+                select recommendation_id, evaluation_id, recommended_state,
+                       attention_priority, confidence as recommendation_confidence,
+                       decision_drivers, principal_risks, mandate_conflicts,
+                       missing_information, change_conditions, human_review_required,
+                       change_explanation, created_at
+                from public.recommendations
+                where user_id=$1 and opportunity_id=$2
+                order by created_at, recommendation_id
+                """,
+                uid,
+                opportunity_id,
+            )
+            criteria = await conn.fetch(
+                """
+                select ca.evaluation_id, ca.criterion, ca.score, ca.confidence,
+                       ca.evidence_sufficiency, ca.reasoning, ca.supporting_claim_ids,
+                       ca.contradicting_claim_ids, ca.missing_evidence, ca.quality_flags,
+                       ca.deterministic_adjustments
+                from public.criterion_assessments ca
+                join public.evaluation_runs e
+                  on e.user_id=ca.user_id and e.evaluation_id=ca.evaluation_id
+                where ca.user_id=$1 and e.opportunity_id=$2 and e.status='completed'
+                order by ca.evaluation_id, ca.criterion
+                """,
+                uid,
+                opportunity_id,
+            )
+            rulings = await conn.fetch(
+                """
+                select hr.ruling_id, hr.recommendation_id, hr.decision, hr.rationale,
+                       hr.risk_acknowledgement, hr.mandate_exception,
+                       hr.investor_confidence, hr.actor_id, hr.prior_ruling_id,
+                       hr.created_at, os.override_signal_id, os.override_type,
+                       os.note as override_note, os.recommendation_state,
+                       os.ruling_decision
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1 and hr.opportunity_id=$2
+                order by hr.created_at, hr.ruling_id
+                """,
+                uid,
+                opportunity_id,
+            )
+            interpretations = await conn.fetch(
+                """
+                select interpretation_id, ruling_id, opportunity_id, recommendation_id,
+                       evaluation_id, version, source, status, rationale_sha256,
+                       extraction_confidence, positive_factors, negative_factors,
+                       accepted_risks, decisive_factors, overridden_criteria,
+                       strategic_exception, agreement_with_aethria, human_confidence,
+                       evidence_influence, provenance, correction_note,
+                       supersedes_interpretation_id, created_at
+                from public.ruling_interpretations
+                where user_id=$1 and opportunity_id=$2
+                order by ruling_id, version
+                """,
+                uid,
+                opportunity_id,
+            )
+            outcomes = await conn.fetch(
+                """
+                select outcome_observation_id, company_id, opportunity_id,
+                       outcome_type, valence, summary, verification_state,
+                       materiality, effective_at, observed_at, supersedes_outcome_id
+                from public.outcome_observations
+                where user_id=$1 and opportunity_id=$2
+                order by observed_at, outcome_observation_id
+                """,
+                uid,
+                opportunity_id,
+            )
+
+        def normalize_json(
+            item: Dict[str, Any], defaults: Dict[str, Any]
+        ) -> Dict[str, Any]:
+            normalized = dict(item)
+            for key, default in defaults.items():
+                normalized[key] = _json_value(normalized.get(key), default)
+            return normalized
+
+        evaluation_payloads = []
+        for raw in evaluations:
+            evaluation = normalize_json(
+                dict(raw),
+                {"claim_snapshot": [], "model_manifest": {}, "prompt_manifest": {}},
+            )
+            evaluation["decision_time"] = evaluation.get("completed_at") or evaluation.get("created_at")
+            evaluation_payloads.append(evaluation)
+        recommendation_by_evaluation = {}
+        for raw in recommendations:
+            recommendation = normalize_json(
+                dict(raw),
+                {
+                    "decision_drivers": [], "principal_risks": [],
+                    "mandate_conflicts": [], "missing_information": [],
+                    "change_conditions": [],
+                },
+            )
+            recommendation_by_evaluation[str(recommendation["evaluation_id"])] = recommendation
+        criteria_by_evaluation: Dict[str, list[Dict[str, Any]]] = {}
+        for raw in criteria:
+            criterion = normalize_json(
+                dict(raw),
+                {
+                    "supporting_claim_ids": [], "contradicting_claim_ids": [],
+                    "missing_evidence": [], "quality_flags": [],
+                    "deterministic_adjustments": {},
+                },
+            )
+            evaluation_id = str(criterion.pop("evaluation_id"))
+            criteria_by_evaluation.setdefault(evaluation_id, []).append(criterion)
+
+        recommendation_ids = {
+            str(item["recommendation_id"]): str(item["evaluation_id"])
+            for item in recommendation_by_evaluation.values()
+        }
+        interpretations_by_ruling: Dict[str, list[Dict[str, Any]]] = {}
+        for raw in interpretations:
+            interpretation = normalize_json(
+                dict(raw),
+                {
+                    "positive_factors": [], "negative_factors": [], "accepted_risks": [],
+                    "decisive_factors": [], "overridden_criteria": [],
+                    "evidence_influence": {"status": "unknown", "references": [], "limitations": []},
+                    "provenance": {},
+                },
+            )
+            interpretations_by_ruling.setdefault(
+                str(interpretation["ruling_id"]), []
+            ).append(interpretation)
+        rulings_by_evaluation: Dict[str, list[Dict[str, Any]]] = {}
+        unpaired_rulings = []
+        for raw in rulings:
+            ruling = dict(raw)
+            history = interpretations_by_ruling.get(str(ruling.get("ruling_id")), [])
+            ruling["interpretation"] = history[-1] if history else None
+            ruling["interpretation_history"] = history
+            recommendation_id = ruling.get("recommendation_id")
+            evaluation_id = recommendation_ids.get(str(recommendation_id)) if recommendation_id else None
+            if evaluation_id is None:
+                unpaired_rulings.append(ruling)
+            else:
+                rulings_by_evaluation.setdefault(evaluation_id, []).append(ruling)
+
+        cases = []
+        for evaluation in evaluation_payloads:
+            evaluation_id = str(evaluation["evaluation_id"])
+            cases.append(
+                {
+                    "decision_time": evaluation["decision_time"],
+                    "evaluation": evaluation,
+                    "criteria": criteria_by_evaluation.get(evaluation_id, []),
+                    "recommendation": recommendation_by_evaluation.get(evaluation_id),
+                    "rulings": rulings_by_evaluation.get(evaluation_id, []),
+                }
+            )
+
+        current = dict(opportunity_row)
+        return {
+            "opportunity": {
+                "opportunity_id": current["opportunity_id"],
+                "company_id": current["company_id"],
+                "context_key": current["context_key"],
+            },
+            "current_identity": {
+                "canonical_name": current["canonical_name"],
+                "canonical_domain": current["canonical_domain"],
+            },
+            "current_lifecycle": {
+                key: current[key]
+                for key in (
+                    "decision_state", "service_level", "current_evaluation_id",
+                    "current_recommendation_id", "current_ruling_id", "updated_at",
+                )
+            },
+            "cases": cases,
+            "outcomes": [dict(item) for item in outcomes],
+            "unpaired_rulings": unpaired_rulings,
+        }
+
+    async def get_precedents(
+        self, *, user_id: str, evaluation_id: str, limit: int = 10
+    ) -> Optional[Dict[str, Any]]:
+        """Rank tenant-scoped historical evaluation episodes as explainable precedents."""
+        from decisions.precedent import rank_precedents
+
+        uid = require_user_id(user_id, context="IdentityRepository.get_precedents")
+        bounded = max(1, min(int(limit), 50))
+        async with self.pool.acquire() as conn:
+            target_row = await conn.fetchrow(
+                """
+                select e.evaluation_id, e.opportunity_id, o.company_id, o.context_key,
+                       e.claim_snapshot, e.thesis_version_id, e.policy_version_id,
+                       e.created_at, e.completed_at
+                from public.evaluation_runs e
+                join public.opportunities o
+                  on o.user_id=e.user_id and o.opportunity_id=e.opportunity_id
+                where e.user_id=$1 and e.evaluation_id=$2 and e.status='completed'
+                """,
+                uid,
+                evaluation_id,
+            )
+            if target_row is None:
+                return None
+            rows = await conn.fetch(
+                """
+                select e.evaluation_id, e.opportunity_id, o.company_id, o.context_key,
+                       e.claim_snapshot, e.thesis_version_id, e.policy_version_id,
+                       e.created_at, e.completed_at
+                from public.evaluation_runs e
+                join public.opportunities o
+                  on o.user_id=e.user_id and o.opportunity_id=e.opportunity_id
+                where e.user_id=$1 and e.status='completed' and e.evaluation_id<>$2
+                order by coalesce(e.completed_at,e.created_at) desc, e.evaluation_id
+                limit $3
+                """,
+                uid,
+                evaluation_id,
+                max(100, bounded * 20),
+            )
+            evaluation_rows = [dict(target_row), *[dict(row) for row in rows]]
+            evaluation_ids = [str(row["evaluation_id"]) for row in evaluation_rows]
+            recommendations = await conn.fetch(
+                """
+                select r.recommendation_id, r.opportunity_id, r.evaluation_id,
+                       r.recommended_state, r.created_at
+                from public.recommendations r
+                where r.user_id=$1 and r.evaluation_id = any($2::uuid[])
+                """,
+                uid,
+                evaluation_ids,
+            )
+            criteria = await conn.fetch(
+                """
+                select ca.evaluation_id, ca.criterion, ca.score, ca.confidence
+                from public.criterion_assessments ca
+                where ca.user_id=$1 and ca.evaluation_id = any($2::uuid[])
+                order by ca.evaluation_id, ca.criterion
+                """,
+                uid,
+                evaluation_ids,
+            )
+            rulings = await conn.fetch(
+                """
+                select hr.ruling_id, hr.opportunity_id, hr.recommendation_id,
+                       hr.decision, hr.created_at, os.override_type
+                from public.human_rulings hr
+                left join public.override_signals os
+                  on os.user_id=hr.user_id and os.ruling_id=hr.ruling_id
+                where hr.user_id=$1
+                order by hr.created_at desc
+                limit 5000
+                """,
+                uid,
+            )
+            interpretations = await conn.fetch(
+                """
+                select ri.*
+                from public.ruling_interpretations ri
+                where ri.user_id=$1
+                order by ri.ruling_id, ri.version desc
+                limit 5000
+                """,
+                uid,
+            )
+            outcomes = await conn.fetch(
+                """
+                select outcome_observation_id, opportunity_id, outcome_type, valence,
+                       verification_state, materiality, effective_at, observed_at
+                from public.outcome_observations
+                where user_id=$1
+                order by observed_at desc
+                limit 5000
+                """,
+                uid,
+            )
+
+        def json_value(value: Any, default: Any) -> Any:
+            return _json_value(value, default)
+
+        recommendation_by_evaluation = {
+            str(row["evaluation_id"]): dict(row) for row in recommendations
+        }
+        criteria_by_evaluation: Dict[str, list[Dict[str, Any]]] = {}
+        for row in criteria:
+            criteria_by_evaluation.setdefault(str(row["evaluation_id"]), []).append(dict(row))
+        interpretation_by_ruling: Dict[str, Dict[str, Any]] = {}
+        for row in interpretations:
+            ruling_id = str(row["ruling_id"])
+            if ruling_id not in interpretation_by_ruling:
+                interpretation_by_ruling[ruling_id] = dict(row)
+        rulings_by_recommendation: Dict[str, list[Dict[str, Any]]] = {}
+        unpaired_by_opportunity: Dict[str, list[Dict[str, Any]]] = {}
+        recommendation_ids = {str(row["recommendation_id"]) for row in recommendations}
+        for row in rulings:
+            ruling = dict(row)
+            recommendation_id = ruling.get("recommendation_id")
+            if recommendation_id and str(recommendation_id) in recommendation_ids:
+                rulings_by_recommendation.setdefault(str(recommendation_id), []).append(ruling)
+            else:
+                unpaired_by_opportunity.setdefault(str(ruling["opportunity_id"]), []).append(ruling)
+        outcomes_by_opportunity: Dict[str, list[Dict[str, Any]]] = {}
+        for row in outcomes:
+            outcomes_by_opportunity.setdefault(str(row["opportunity_id"]), []).append(dict(row))
+
+        def episode(row: Dict[str, Any]) -> Dict[str, Any]:
+            eid = str(row["evaluation_id"])
+            recommendation = recommendation_by_evaluation.get(eid)
+            recommendation_id = str(recommendation["recommendation_id"]) if recommendation else None
+            linked_rulings = []
+            for ruling in rulings_by_recommendation.get(recommendation_id or "", []):
+                normalized = dict(ruling)
+                normalized["interpretation"] = interpretation_by_ruling.get(str(ruling["ruling_id"]))
+                linked_rulings.append(normalized)
+            evaluation = {
+                "evaluation_id": eid,
+                "thesis_version_id": row.get("thesis_version_id"),
+                "policy_version_id": row.get("policy_version_id"),
+                "claim_snapshot": json_value(row.get("claim_snapshot"), []),
+            }
+            return {
+                "opportunity": {
+                    "opportunity_id": row["opportunity_id"],
+                    "company_id": row["company_id"],
+                    "context_key": row["context_key"],
+                },
+                "cases": [{
+                    "decision_time": row.get("completed_at") or row.get("created_at"),
+                    "evaluation": evaluation,
+                    "criteria": criteria_by_evaluation.get(eid, []),
+                    "recommendation": recommendation,
+                    "rulings": linked_rulings,
+                }],
+                "outcomes": outcomes_by_opportunity.get(str(row["opportunity_id"]), []),
+                "unpaired_rulings": unpaired_by_opportunity.get(str(row["opportunity_id"]), []),
+            }
+
+        target = episode(dict(target_row))
+        candidates = [episode(row) for row in evaluation_rows[1:]]
+        return {
+            "evaluation_id": evaluation_id,
+            "precedents": rank_precedents(target, candidates, limit=bounded),
+        }
+
     async def list_linked_legacy_startup_ids(self, *, user_id: str) -> List[str]:
         uid = require_user_id(
             user_id,
