@@ -104,7 +104,6 @@ export default function LoginPage() {
   const [introDone, setIntroDone] = useState(false);
   const [welcomeName, setWelcomeName] = useState('');
   const [activity, setActivity] = useState<ActivitySummary | null>(null);
-  const [activityLoading, setActivityLoading] = useState(false);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -226,7 +225,6 @@ export default function LoginPage() {
         const name = friendlyIdentifier(trimmedUsername);
         setWelcomeName(name);
         setPhase('welcome');
-        setActivityLoading(true);
 
         try {
           type ClerkSignInInternal = {
@@ -258,12 +256,14 @@ export default function LoginPage() {
               fetchActivitySummaryWithToken(token),
               startupPreload,
             ]);
-            if (summary) setActivity(summary);
+            if (summary && activityStatsFromSummary(summary).length > 0) {
+              setActivity(summary);
+            }
           }
         } catch {
           /* activity is optional */
         } finally {
-          setActivityLoading(false);
+          setLoading(false);
         }
         return;
       }
@@ -372,6 +372,7 @@ export default function LoginPage() {
       {!showIntro && (
       <motion.div
         key="main"
+        layout
         className="w-full max-w-[42rem] flex flex-col items-center"
         animate={
           entering
@@ -381,11 +382,21 @@ export default function LoginPage() {
             : { opacity: 1, y: 0 }
         }
         transition={{
+          layout: { duration: 0.42, ease: EASE },
           duration: entryTransition.contentExitMs / 1000,
           ease: EASE,
         }}
       >
 
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={phase}
+            initial={phase === 'welcome' ? { opacity: 0, y: 10 } : false}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6, transition: { duration: 0.18, ease: EASE } }}
+            transition={{ duration: 0.42, ease: EASE }}
+            className="w-full flex flex-col items-center"
+          >
         {/* Eyebrow */}
         <AnimatePresence mode="wait">
           {phase === 'welcome' ? (
@@ -432,20 +443,27 @@ export default function LoginPage() {
               <p
                 style={{
                   fontFamily: "var(--font-sans)",
-                  fontSize: '14px',
-                  color: 'rgba(var(--color-oxford-rgb), 0.6)',
+                  fontSize: '15px',
+                  fontWeight: 500,
+                  color: 'rgba(var(--color-oxford-rgb), 0.72)',
                   marginTop: '12px',
-                  marginBottom: '55px',
+                  marginBottom: '60px',
                   textAlign: 'center',
                 }}
               >
-                {activityLoading || hasStats
+                {hasStats
                   ? 'Agents continued working. Here is what happened.'
                   : 'Your workspace is current.'}
               </p>
             </motion.div>
           ) : (
-            <div key="login-frame" className="focus-frame w-full flex flex-col items-center">
+            <motion.div
+              key="login-frame"
+              initial={false}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.36, ease: EASE } }}
+              className="focus-frame w-full flex flex-col items-center"
+            >
               <motion.p
                 initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -484,14 +502,14 @@ export default function LoginPage() {
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
                 className="w-full"
               >
-                <div className="bg-oxford p-[clamp(1.5rem,4vw,2.5rem)]">
+                <div className="bg-oxford p-[clamp(1.25rem,3vw,2rem)]">
                   <div
                     ref={formShakeRef}
-                    className="relative border border-dashed border-[rgba(244,241,234,0.3)] p-6 sm:p-8"
+                    className="relative border border-dashed border-[rgba(244,241,234,0.3)] p-5 sm:p-6"
                   >
                     <form
                       onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
-                      className="flex flex-col gap-6"
+                      className="flex flex-col gap-4"
                       noValidate
                     >
                       <LoginField
@@ -563,7 +581,7 @@ export default function LoginPage() {
                   </div>
                 </div>
               </motion.div>
-            </div>
+            </motion.div>
           )}
         </AnimatePresence>
 
@@ -577,43 +595,11 @@ export default function LoginPage() {
               transition={{ duration: 0.55, ease: EASE, delay: 0.08 }}
               className="w-full flex flex-col items-center"
             >
-              {/* Loading pulse */}
-              {activityLoading && (
-                <motion.p
-                  animate={reduceMotion ? { opacity: 1 } : { opacity: [0.35, 0.8, 0.35] }}
-                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: '14px',
-                    color: 'rgba(var(--color-oxford-rgb), 0.4)',
-                    marginBottom: '64px',
-                    textAlign: 'center',
-                  }}
-                >
-                  Preparing workspace...
-                </motion.p>
-              )}
-
               {/* Stats — numbers count up on reveal */}
-              {!activityLoading && hasStats && (
+              {hasStats && (
                 <div style={{ marginBottom: '64px' }}>
                   <ActivityStatsRow stats={stats} reduceMotion={reduceMotion} />
                 </div>
-              )}
-
-              {/* No activity */}
-              {!activityLoading && !hasStats && (
-                <p
-                  style={{
-                    fontFamily: "var(--font-sans)",
-                    fontSize: '14px',
-                    color: 'rgba(var(--color-oxford-rgb), 0.6)',
-                    marginBottom: '64px',
-                    textAlign: 'center',
-                  }}
-                >
-                  Everything is current.
-                </p>
               )}
 
               {/* The optional activity request must never gate entry. */}
@@ -640,6 +626,8 @@ export default function LoginPage() {
             </motion.div>
           ) : null}
         </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
       )}
 
@@ -647,7 +635,7 @@ export default function LoginPage() {
       <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: entering || showIntro ? 0 : 1 }}
-        transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 1 }}
+        transition={{ duration: entering ? entryTransition.contentExitMs / 1000 : 1, delay: entering ? 0 : 0.6 }}
         className="fixed bottom-0 left-0 z-20 w-full p-phi-6 flex justify-center pointer-events-none"
       >
         <AuthInstitutionalFooter />
