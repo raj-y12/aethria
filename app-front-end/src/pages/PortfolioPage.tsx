@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import { fetchPortfolioPositions } from '../api/portfolio';
