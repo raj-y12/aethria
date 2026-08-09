@@ -5,13 +5,11 @@ import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAtten
 
 export interface DocketRowModel {
   startup: Startup;
-  displayIndex: string;
   sourceBadge: 'LOOKUP' | 'SCOUT';
   reviewBand: ReviewerQualityBand | null;
   decisionVariant: DecisionBadgeVariant;
   queueContext: QueueRowContext;
   attentionDriver: QueueAttentionDriver;
-  oneLiner: string | null;
   sectorStage: string;
   sortKeyValue: string;
   unresolvedAt: string | null;

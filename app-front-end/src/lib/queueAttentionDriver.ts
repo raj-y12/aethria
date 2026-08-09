@@ -409,42 +409,6 @@ export function resolveQueueAttentionDriver(ctx: QueueRowContext): QueueAttentio
   };
 }
 
-const LOW_SIGNAL_ONE_LINERS = new Set([
-  'Human ruling recorded.',
-  'Reviewer output is available.',
-  'Review is complete and ready for judgment.',
-  'Unresolved beyond the configured stale threshold.',
-  'Scout discovery is queued for reviewer judgment.',
-  'Human review required before conviction can form.',
-  'Partner flagged for human judgment.',
-  'Multiple reviewer verdicts diverge on this case.',
-]);
-
-const REDUNDANT_ROW_PHRASES = [
-  /\bthesis[- ]aligned\b/gi,
-  /\bhigh conviction\b/gi,
-  /\brequires review\b/gi,
-  /\bready for judgment\b/gi,
-  /\breview is complete\b/gi,
-  /\bhuman review required\b/gi,
-];
-
-function compactOneLiner(text: string): string {
-  let out = text.replace(/\s+/g, ' ').trim();
-  REDUNDANT_ROW_PHRASES.forEach((pattern) => {
-    out = out.replace(pattern, '');
-  });
-  out = out
-    .replace(/\s{2,}/g, ' ')
-    .replace(/\s*[,;]\s*/g, ', ')
-    .replace(/\s+\./g, '.')
-    .trim()
-    .replace(/^[,.;:\-]+/, '')
-    .replace(/[,;:\-]+$/, '')
-    .trim();
-  return out;
-}
-
 export function rowSectorStageLine(startup: Startup): string {
   const sector = (startup.scout.sector || '').split('/')[0].trim();
   const fundingStage = startup.scout.funding_stage?.trim();
@@ -452,26 +416,6 @@ export function rowSectorStageLine(startup: Startup): string {
   if (sector) parts.push(sector);
   if (fundingStage && fundingStage.toLowerCase() !== 'unknown') parts.push(fundingStage);
   return parts.join(' · ');
-}
-
-export function rowQueueOneLiner(ctx: QueueRowContext, driver: QueueAttentionDriver): string | null {
-  const { startup } = ctx;
-  const candidates = [
-    driver.detail?.trim(),
-    cleanQueueReason(startup.queue_reason),
-    startup.review?.aethria_view?.focal_question?.trim(),
-    startup.scout.one_line?.trim(),
-    startup.partner?.snapshot?.one_liner?.trim(),
-    startup.review?.overall_summary?.trim(),
-    startup.scout.biggest_unknown?.trim(),
-  ].filter((value): value is string => Boolean(value));
-
-  for (const candidate of candidates) {
-    if (LOW_SIGNAL_ONE_LINERS.has(candidate)) continue;
-    const compact = compactOneLiner(candidate);
-    if (compact.length >= 24) return compact;
-  }
-  return null;
 }
 
 export function buildQueueRowContext(

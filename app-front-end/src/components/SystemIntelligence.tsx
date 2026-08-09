@@ -54,7 +54,7 @@ export function FundFacetNav({
             aria-selected={isActive}
             onClick={() => onTabChange(tab.key)}
             className={`type-action group relative min-h-[32px] shrink-0 px-phi-4 py-phi-1 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive ? 'text-oxford' : 'text-oxford/60 hover:bg-oxford/[0.04] hover:text-oxford/80'
+              isActive ? 'bg-surface-selected text-oxford' : 'text-oxford/60 hover:bg-oxford/[0.04] hover:text-oxford/80'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
           >

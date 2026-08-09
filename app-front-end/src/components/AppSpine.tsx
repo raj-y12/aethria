@@ -26,6 +26,7 @@ export interface SpineMandate {
   fundName: string;
   summaryLine: string;
   versionNumber: number | null;
+  amendedAt?: string | null;
 }
 
 /**
@@ -268,7 +269,6 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                 <button
                   type="button"
                   onClick={() => navigate(mandate.hasThesis ? '/v1/fund' : '/v1/settings')}
-                  title={mandate.summaryLine || undefined}
                   aria-label={
                     mandate.hasThesis
                       ? `Active mandate: ${mandate.fundName || 'configured'} — open Fund`
@@ -284,9 +284,9 @@ export default function AppSpine({ telemetry, mandate, dispatchActive, onDispatc
                   <span className="mt-phi-1 block min-w-0 truncate font-sans text-[12px] font-medium leading-snug text-white/85 transition-colors group-hover:text-white">
                     {mandate.hasThesis ? mandate.fundName || 'Active mandate' : 'No active thesis'}
                   </span>
-                  {mandate.hasThesis && mandate.summaryLine ? (
+                  {mandate.hasThesis && mandate.amendedAt ? (
                     <span className="type-meta type-meta-inverse mt-0.5 block min-w-0 truncate transition-colors group-hover:text-white">
-                      {mandate.summaryLine}
+                      Amended {mandate.amendedAt} →
                     </span>
                   ) : null}
                 </button>

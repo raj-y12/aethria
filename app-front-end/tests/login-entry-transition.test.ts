@@ -11,9 +11,9 @@ describe('login entry transition', () => {
   it('exposes the session key and motion timings', () => {
     assert.equal(LOGIN_ENTRY_SESSION_KEY, 'aethria_just_logged_in');
     assert.deepEqual(getLoginEntryTransition(false), {
-      contentExitMs: 280,
-      appRevealMs: 550,
-      navigateDelayMs: 260,
+      contentExitMs: 180,
+      appRevealMs: 300,
+      navigateDelayMs: 120,
     });
     assert.deepEqual(getLoginEntryTransition(true), {
       contentExitMs: 0,

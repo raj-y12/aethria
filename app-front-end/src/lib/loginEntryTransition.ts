@@ -9,5 +9,5 @@ export type LoginEntryTransition = {
 export function getLoginEntryTransition(reduceMotion: boolean): LoginEntryTransition {
   return reduceMotion
     ? { contentExitMs: 0, appRevealMs: 80, navigateDelayMs: 0 }
-    : { contentExitMs: 280, appRevealMs: 550, navigateDelayMs: 260 };
+    : { contentExitMs: 180, appRevealMs: 300, navigateDelayMs: 120 };
 }

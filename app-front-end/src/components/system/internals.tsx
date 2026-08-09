@@ -141,7 +141,7 @@ export function TabSection({ title, label, children, className = '' }: { title: 
       {label ? <span className="type-label-section">{label}</span> : null}
     </div>
   );
-  const sectionClass = `flex flex-col gap-phi-3 px-phi-4 pt-phi-5 pb-phi-5 first:pt-phi-3 ${className}`.trim();
+  const sectionClass = `flex flex-col gap-phi-4 border-t border-oxford/[0.075] px-phi-4 py-phi-6 first:border-t-0 first:pt-phi-4 ${className}`.trim();
 
   if (reduceMotion) {
     return (
@@ -280,7 +280,7 @@ export function InstitutionalMandateTab({
       >
         {/* The mandate document itself: statement in the house serif, then the
             spec that gates the pipeline — set out, not boxed. */}
-        <p className="type-display max-w-[38rem] text-[clamp(20px,2.2vw,30px)] leading-[1.25] text-oxford">
+        <p className="type-display max-w-[38rem] text-[clamp(18px,1.5vw,24px)] leading-[1.32] text-oxford">
           {statement ??
             'No thesis statement on file. The spec below gates discovery until one is written.'}
         </p>
