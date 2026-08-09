@@ -22,3 +22,13 @@ def test_investment_transition_migration_preserves_history_and_adds_context():
     assert "investment_transition" in sql
     assert "historical invest rows remain compatible" in sql
     assert "create index if not exists human_rulings_investment_transition_idx" in sql
+
+
+def test_ruling_interpretation_migration_is_append_only_and_tenant_scoped():
+    path = Path(__file__).parents[3] / "supabase/migrations/20260809000001_ruling_interpretations.sql"
+    sql = path.read_text().lower()
+    assert "create table if not exists public.ruling_interpretations" in sql
+    assert "supersedes_interpretation_id" in sql
+    assert "prevent_ruling_interpretation_mutation" in sql
+    assert "alter table public.ruling_interpretations enable row level security" in sql
+    assert "user_id, ruling_id, version" in sql

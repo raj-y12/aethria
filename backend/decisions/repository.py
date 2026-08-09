@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
@@ -19,6 +20,7 @@ from decisions.service import (
     classify_override,
     ruling_to_opportunity_state,
 )
+from decisions.interpretation import build_ruling_interpretation_draft
 from tenant_context import require_user_id
 from utils.db_rows import db_row
 
@@ -57,6 +59,93 @@ class DecisionRepository:
             """,
             str(uuid4()), user_id, aggregate_type, aggregate_id, event_type, json.dumps(payload),
         )
+
+    async def _ruling_interpretation_context(
+        self, conn: Any, *, user_id: str, recommendation_id: Optional[str]
+    ) -> Optional[Dict[str, Any]]:
+        if not recommendation_id:
+            return None
+        row = await conn.fetchrow(
+            """
+            select r.recommendation_id, r.recommended_state,
+                   e.evaluation_id, e.claim_snapshot
+            from public.recommendations r
+            left join public.evaluation_runs e
+              on e.user_id=r.user_id and e.evaluation_id=r.evaluation_id
+            where r.user_id=$1 and r.recommendation_id=$2
+            """,
+            user_id,
+            recommendation_id,
+        )
+        if row is None:
+            return None
+        context = dict(row)
+        context["claim_snapshot"] = _json(context.get("claim_snapshot"), [])
+        return context
+
+    async def _create_ruling_interpretation(
+        self,
+        conn: Any,
+        *,
+        user_id: str,
+        ruling_id: str,
+        opportunity_id: str,
+        recommendation_id: Optional[str],
+        rationale: str,
+        decision: str,
+        investor_confidence: float,
+        risk_acknowledgement: Optional[str],
+        mandate_exception: Optional[str],
+        override_type: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        context = await self._ruling_interpretation_context(
+            conn, user_id=user_id, recommendation_id=recommendation_id
+        )
+        if context is None:
+            return None
+        draft = build_ruling_interpretation_draft(
+            rationale=rationale,
+            decision=decision,
+            investor_confidence=investor_confidence,
+            risk_acknowledgement=risk_acknowledgement,
+            mandate_exception=mandate_exception,
+            override_type=override_type,
+            context=context,
+        )
+        if draft is None:
+            return None
+        interpretation_id = str(uuid4())
+        payload = {
+            **draft,
+            "interpretation_id": interpretation_id,
+            "ruling_id": ruling_id,
+            "opportunity_id": opportunity_id,
+            "recommendation_id": recommendation_id,
+            "evaluation_id": context.get("evaluation_id"),
+            "version": 1,
+            "rationale_sha256": hashlib.sha256(rationale.encode()).hexdigest(),
+        }
+        await conn.execute(
+            """
+            insert into public.ruling_interpretations (
+              interpretation_id,user_id,ruling_id,opportunity_id,recommendation_id,
+              evaluation_id,version,source,status,rationale_sha256,extraction_confidence,
+              positive_factors,negative_factors,accepted_risks,decisive_factors,
+              overridden_criteria,strategic_exception,agreement_with_aethria,human_confidence,
+              evidence_influence,provenance,created_at
+            ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,
+              $14::jsonb,$15::jsonb,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21::jsonb,now())
+            """,
+            interpretation_id, user_id, ruling_id, opportunity_id, recommendation_id,
+            context.get("evaluation_id"), 1, draft["source"], draft["status"],
+            payload["rationale_sha256"], draft["extraction_confidence"],
+            json.dumps(draft["positive_factors"]), json.dumps(draft["negative_factors"]),
+            json.dumps(draft["accepted_risks"]), json.dumps(draft["decisive_factors"]),
+            json.dumps(draft["overridden_criteria"]), json.dumps(draft["strategic_exception"]),
+            draft["agreement_with_aethria"], draft["human_confidence"],
+            json.dumps(draft["evidence_influence"]), json.dumps(draft["provenance"]),
+        )
+        return payload
 
     async def create_ruling(self, ruling: HumanRulingInput, *, actor_id: str) -> Dict[str, Any]:
         uid = require_user_id(ruling.user_id, context="DecisionRepository.create_ruling")
@@ -117,6 +206,19 @@ class DecisionRepository:
                         recommendation_id, opportunity.get("recommended_state"),
                         ruling.decision.value, override.value, ruling.override_note,
                     )
+                interpretation = await self._create_ruling_interpretation(
+                    conn,
+                    user_id=uid,
+                    ruling_id=ruling_id,
+                    opportunity_id=ruling.opportunity_id,
+                    recommendation_id=recommendation_id,
+                    rationale=ruling.rationale,
+                    decision=ruling.decision.value,
+                    investor_confidence=ruling.investor_confidence,
+                    risk_acknowledgement=ruling.risk_acknowledgement,
+                    mandate_exception=ruling.mandate_exception,
+                    override_type=override.value if override else None,
+                )
                 await conn.execute(
                     """
                     update public.opportunities
@@ -206,6 +308,7 @@ class DecisionRepository:
                     )
                 payload = dict(row)
                 payload["override_type"] = override.value if override else None
+                payload["interpretation"] = interpretation
                 return payload
 
     async def create_investment_transition(
@@ -250,6 +353,19 @@ class DecisionRepository:
                     ruling_id, uid, opportunity_id, opportunity.get("current_recommendation_id"),
                     rationale, investor_confidence, actor_id, opportunity.get("current_ruling_id"),
                 )
+                interpretation = await self._create_ruling_interpretation(
+                    conn,
+                    user_id=uid,
+                    ruling_id=ruling_id,
+                    opportunity_id=opportunity_id,
+                    recommendation_id=opportunity.get("current_recommendation_id"),
+                    rationale=rationale,
+                    decision="invest",
+                    investor_confidence=investor_confidence,
+                    risk_acknowledgement=None,
+                    mandate_exception=None,
+                    override_type=None,
+                )
                 await conn.execute(
                     """update public.opportunities set current_ruling_id=$3,decision_state='invested',updated_at=now()
                     where opportunity_id=$1 and user_id=$2""", opportunity_id, uid, ruling_id,
@@ -285,7 +401,10 @@ class DecisionRepository:
                         transition_id=uuid4(),
                     )
                 result = db_row(row)
-                result.update({"decision": "invest", "position": position, "idempotent": False})
+                result.update({
+                    "decision": "invest", "position": position, "idempotent": False,
+                    "interpretation": interpretation,
+                })
                 return result
 
     async def list_rulings(
@@ -311,6 +430,111 @@ class DecisionRepository:
                 max(1, min(int(limit), 100)),
             )
         return [HumanRulingRecord.model_validate(db_row(row)) for row in rows]
+
+    async def correct_ruling_interpretation(
+        self,
+        *,
+        user_id: str,
+        ruling_id: str,
+        correction: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Append an operator correction without mutating the ruling or prior interpretation."""
+        uid = require_user_id(
+            user_id, context="DecisionRepository.correct_ruling_interpretation"
+        )
+        await self._require_write_path(user_id=uid, operation="ruling interpretation correction")
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                ruling = await conn.fetchrow(
+                    """
+                    select hr.ruling_id, hr.opportunity_id, hr.recommendation_id,
+                           hr.rationale, r.evaluation_id
+                    from public.human_rulings hr
+                    left join public.recommendations r
+                      on r.user_id=hr.user_id and r.recommendation_id=hr.recommendation_id
+                    where hr.user_id=$1 and hr.ruling_id=$2
+                    """,
+                    uid,
+                    ruling_id,
+                )
+                if ruling is None:
+                    raise LookupError("Ruling not found for tenant")
+                previous = await conn.fetchrow(
+                    """
+                    select * from public.ruling_interpretations
+                    where user_id=$1 and ruling_id=$2
+                    order by version desc limit 1
+                    """,
+                    uid,
+                    ruling_id,
+                )
+                if previous is None:
+                    raise LookupError("Ruling interpretation not found for tenant")
+                context = await self._ruling_interpretation_context(
+                    conn,
+                    user_id=uid,
+                    recommendation_id=ruling.get("recommendation_id"),
+                )
+                claim_ids = set()
+                evidence_ids = set()
+                if context:
+                    for claim in context.get("claim_snapshot") or []:
+                        if claim.get("claim_id"):
+                            claim_ids.add(str(claim["claim_id"]))
+                        evidence_ids.update(
+                            str(item) for item in claim.get("supporting_evidence_ids") or []
+                        )
+                        evidence_ids.update(
+                            str(item) for item in claim.get("contradicting_evidence_ids") or []
+                        )
+                influence = correction.get("evidence_influence") or {
+                    "status": "unknown", "references": [], "limitations": []
+                }
+                for reference in influence.get("references") or []:
+                    reference_id = str(reference.get("reference_id"))
+                    allowed = claim_ids if reference.get("reference_type") == "claim" else evidence_ids
+                    if reference_id not in allowed:
+                        raise ValueError("Correction references evidence outside the decision-time snapshot")
+                version = int(previous["version"]) + 1
+                interpretation_id = str(uuid4())
+                payload = {
+                    "interpretation_id": interpretation_id,
+                    "ruling_id": ruling_id,
+                    "opportunity_id": ruling["opportunity_id"],
+                    "recommendation_id": ruling.get("recommendation_id"),
+                    "evaluation_id": ruling.get("evaluation_id"),
+                    "version": version,
+                    "source": "operator_correction",
+                    "status": "complete",
+                    "rationale_sha256": hashlib.sha256(str(ruling["rationale"]).encode()).hexdigest(),
+                    "extraction_confidence": 1.0,
+                    **correction,
+                    "supersedes_interpretation_id": previous["interpretation_id"],
+                }
+                await conn.execute(
+                    """
+                    insert into public.ruling_interpretations (
+                      interpretation_id,user_id,ruling_id,opportunity_id,recommendation_id,
+                      evaluation_id,version,source,status,rationale_sha256,extraction_confidence,
+                      positive_factors,negative_factors,accepted_risks,decisive_factors,
+                      overridden_criteria,strategic_exception,agreement_with_aethria,human_confidence,
+                      evidence_influence,provenance,correction_note,supersedes_interpretation_id,created_at
+                    ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,
+                      $14::jsonb,$15::jsonb,$16::jsonb,$17::jsonb,$18,$19,$20::jsonb,$21::jsonb,
+                      $22,$23,now())
+                    """,
+                    interpretation_id, uid, ruling_id, ruling["opportunity_id"],
+                    ruling.get("recommendation_id"), ruling.get("evaluation_id"), version,
+                    payload["source"], payload["status"], payload["rationale_sha256"],
+                    payload["extraction_confidence"], json.dumps(payload.get("positive_factors", [])),
+                    json.dumps(payload.get("negative_factors", [])), json.dumps(payload.get("accepted_risks", [])),
+                    json.dumps(payload.get("decisive_factors", [])), json.dumps(payload.get("overridden_criteria", [])),
+                    json.dumps(payload.get("strategic_exception")), payload["agreement_with_aethria"],
+                    payload.get("human_confidence"), json.dumps(payload["evidence_influence"]),
+                    json.dumps(payload.get("provenance", {"source": "operator_correction"})),
+                    payload.get("correction_note"), payload["supersedes_interpretation_id"],
+                )
+                return payload
 
     async def _insert_action(
         self,
