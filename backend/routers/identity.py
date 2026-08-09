@@ -190,6 +190,44 @@ async def get_decision_view(request: Request, opportunity_id: str):
     return with_authority_metadata(record, authority) if authority else record
 
 
+@router.get("/api/opportunities/{opportunity_id}/decision-cases")
+async def get_decision_cases(request: Request, opportunity_id: str):
+    validate_route_id(opportunity_id, field_name="opportunity_id")
+    user_id = require_authenticated_user(request)
+    record = await _repository(request).get_decision_cases(
+        user_id=user_id, opportunity_id=opportunity_id
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    authority = (
+        await authority_for_request(request)
+        if has_authority_control_plane(request)
+        else None
+    )
+    return with_authority_metadata(record, authority) if authority else record
+
+
+@router.get("/api/evaluations/{evaluation_id}/precedents")
+async def get_precedents(
+    request: Request,
+    evaluation_id: str,
+    limit: int = Query(default=10, ge=1, le=50),
+):
+    validate_route_id(evaluation_id, field_name="evaluation_id")
+    user_id = require_authenticated_user(request)
+    record = await _repository(request).get_precedents(
+        user_id=user_id, evaluation_id=evaluation_id, limit=limit
+    )
+    if record is None:
+        raise HTTPException(status_code=404, detail="Evaluation not found")
+    authority = (
+        await authority_for_request(request)
+        if has_authority_control_plane(request)
+        else None
+    )
+    return with_authority_metadata(record, authority) if authority else record
+
+
 @router.get("/api/startups/{legacy_startup_id}/opportunity")
 async def get_opportunity_by_legacy_startup(request: Request, legacy_startup_id: str):
     """Resolve the compatibility startup projection to its canonical opportunity."""

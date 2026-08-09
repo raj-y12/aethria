@@ -532,3 +532,168 @@ class _ConflictInsertConnection:
         if "insert into public.company_identifiers" in sql.lower():
             return "INSERT 0 0"
         return "OK"
+
+
+@pytest.mark.asyncio
+async def test_decision_cases_preserve_historical_evaluation_episodes():
+    opportunity = _opportunity_row(
+        decision_state="invested",
+        current_evaluation_id="evaluation-2",
+        current_recommendation_id="recommendation-2",
+        current_ruling_id="ruling-2",
+        updated_at="current-opportunity-update",
+    )
+    base = {
+        **opportunity,
+        "canonical_name": "Acme Current Name",
+        "canonical_domain": "current.acme.com",
+    }
+    evaluations = [
+        {
+            "evaluation_id": "evaluation-1",
+            "opportunity_id": opportunity["opportunity_id"],
+            "evidence_snapshot_hash": "evidence-hash-1",
+            "evidence_materiality_digest": "materiality-1",
+            "claim_snapshot": json.dumps([{"claim_id": "claim-old", "display_text": "Old evidence"}]),
+            "thesis_version_id": "thesis-1",
+            "policy_version_id": "policy-1",
+            "policy_hash": "policy-hash-1",
+            "rubric_version": "rubric-1",
+            "partner_rules_version": "rules-1",
+            "partner_rules_hash": "rules-hash-1",
+            "model_manifest": json.dumps({"model": "old"}),
+            "prompt_manifest": json.dumps({"prompt": "old"}),
+            "status": "completed",
+            "created_at": "2026-01-01T10:00:00+00:00",
+            "completed_at": "2026-01-01T10:05:00+00:00",
+        },
+        {
+            "evaluation_id": "evaluation-2",
+            "opportunity_id": opportunity["opportunity_id"],
+            "evidence_snapshot_hash": "evidence-hash-2",
+            "evidence_materiality_digest": "materiality-2",
+            "claim_snapshot": json.dumps([{"claim_id": "claim-new", "display_text": "New evidence"}]),
+            "thesis_version_id": "thesis-2",
+            "policy_version_id": "policy-2",
+            "policy_hash": "policy-hash-2",
+            "rubric_version": "rubric-2",
+            "partner_rules_version": "rules-2",
+            "partner_rules_hash": "rules-hash-2",
+            "model_manifest": json.dumps({"model": "new"}),
+            "prompt_manifest": json.dumps({"prompt": "new"}),
+            "status": "completed",
+            "created_at": "2026-02-01T10:00:00+00:00",
+            "completed_at": "2026-02-01T10:05:00+00:00",
+        },
+    ]
+    recommendations = [
+        {
+            "recommendation_id": "recommendation-1",
+            "evaluation_id": "evaluation-1",
+            "recommended_state": "pass",
+            "attention_priority": 50,
+            "recommendation_confidence": 0.53,
+            "decision_drivers": json.dumps(["old driver"]),
+            "principal_risks": json.dumps(["old risk"]),
+            "mandate_conflicts": json.dumps([]),
+            "missing_information": json.dumps([]),
+            "change_conditions": json.dumps([]),
+            "human_review_required": True,
+            "change_explanation": None,
+            "created_at": "2026-01-01T10:06:00+00:00",
+        },
+        {
+            "recommendation_id": "recommendation-2",
+            "evaluation_id": "evaluation-2",
+            "recommended_state": "advance",
+            "attention_priority": 80,
+            "recommendation_confidence": 0.82,
+            "decision_drivers": json.dumps(["new driver"]),
+            "principal_risks": json.dumps(["new risk"]),
+            "mandate_conflicts": json.dumps([]),
+            "missing_information": json.dumps([]),
+            "change_conditions": json.dumps([]),
+            "human_review_required": True,
+            "change_explanation": "New evidence changed the recommendation.",
+            "created_at": "2026-02-01T10:06:00+00:00",
+        },
+    ]
+    criteria = [
+        {"evaluation_id": "evaluation-1", "criterion": "technical", "score": 5,
+         "confidence": 0.6, "evidence_sufficiency": "partial", "reasoning": "old",
+         "supporting_claim_ids": json.dumps(["claim-old"]), "contradicting_claim_ids": json.dumps([]),
+         "missing_evidence": json.dumps([]), "quality_flags": json.dumps([]),
+         "deterministic_adjustments": json.dumps({})},
+        {"evaluation_id": "evaluation-2", "criterion": "technical", "score": 9,
+         "confidence": 0.9, "evidence_sufficiency": "sufficient", "reasoning": "new",
+         "supporting_claim_ids": json.dumps(["claim-new"]), "contradicting_claim_ids": json.dumps([]),
+         "missing_evidence": json.dumps([]), "quality_flags": json.dumps([]),
+         "deterministic_adjustments": json.dumps({})},
+    ]
+    rulings = [
+        {"ruling_id": "ruling-1", "recommendation_id": "recommendation-1", "decision": "pass",
+         "rationale": "Old ruling", "risk_acknowledgement": None, "mandate_exception": None,
+         "investor_confidence": 0.6, "actor_id": "fund-a", "prior_ruling_id": None,
+         "created_at": "2026-01-02T10:00:00+00:00", "override_type": "timing", "override_note": "Old"},
+        {"ruling_id": "ruling-2", "recommendation_id": "recommendation-2", "decision": "invest",
+         "rationale": "New ruling", "risk_acknowledgement": None, "mandate_exception": None,
+         "investor_confidence": 0.82, "actor_id": "fund-a", "prior_ruling_id": "ruling-1",
+         "created_at": "2026-02-02T10:00:00+00:00", "override_type": "policy_disagreement", "override_note": "New"},
+        {"ruling_id": "ruling-unpaired", "recommendation_id": None, "decision": "monitor",
+         "rationale": "No deterministic recommendation link", "risk_acknowledgement": None,
+         "mandate_exception": None, "investor_confidence": 0.5, "actor_id": "fund-a",
+         "prior_ruling_id": "ruling-2", "created_at": "2026-02-03T10:00:00+00:00",
+         "override_type": None, "override_note": None},
+    ]
+    outcomes = [{
+        "outcome_observation_id": "outcome-1", "company_id": opportunity["company_id"],
+        "opportunity_id": opportunity["opportunity_id"], "outcome_type": "financing",
+        "valence": "positive", "summary": "Raised a subsequent round",
+        "verification_state": "verified", "materiality": 4,
+        "effective_at": "2026-03-01T10:00:00+00:00", "observed_at": "2026-03-02T10:00:00+00:00",
+        "supersedes_outcome_id": None,
+    }]
+    interpretations = [{
+        "interpretation_id": "interpretation-1", "ruling_id": "ruling-1",
+        "opportunity_id": opportunity["opportunity_id"], "recommendation_id": "recommendation-1",
+        "evaluation_id": "evaluation-1", "version": 1, "source": "aethria_inferred",
+        "status": "complete", "rationale_sha256": "rationale-hash",
+        "extraction_confidence": 0.75, "positive_factors": json.dumps([{"text": "Old"}]),
+        "negative_factors": json.dumps([]), "accepted_risks": json.dumps([]),
+        "decisive_factors": json.dumps([]), "overridden_criteria": json.dumps([]),
+        "strategic_exception": None, "agreement_with_aethria": "disagree",
+        "human_confidence": 0.6,
+        "evidence_influence": json.dumps({"status": "unknown", "references": [], "limitations": []}),
+        "provenance": json.dumps({"extractor": "rules-v1"}), "correction_note": None,
+        "supersedes_interpretation_id": None, "created_at": "2026-01-03T10:00:00+00:00",
+    }]
+    connection = _Connection(
+        fetchrows=[base], fetches=[evaluations, recommendations, criteria, rulings, interpretations, outcomes]
+    )
+    repository = IdentityRepository(_Pool(connection))
+
+    result = await repository.get_decision_cases(
+        user_id="fund-a", opportunity_id=opportunity["opportunity_id"]
+    )
+
+    assert [case["evaluation"]["evaluation_id"] for case in result["cases"]] == [
+        "evaluation-1", "evaluation-2"
+    ]
+    assert result["cases"][0]["recommendation"]["recommendation_id"] == "recommendation-1"
+    assert result["cases"][0]["rulings"][0]["ruling_id"] == "ruling-1"
+    assert result["cases"][0]["rulings"][0]["interpretation"]["interpretation_id"] == "interpretation-1"
+    assert result["cases"][1]["rulings"][0]["ruling_id"] == "ruling-2"
+    assert result["cases"][0]["decision_time"] == "2026-01-01T10:05:00+00:00"
+    assert result["cases"][0]["evaluation"]["claim_snapshot"][0]["claim_id"] == "claim-old"
+    assert result["cases"][1]["evaluation"]["claim_snapshot"][0]["claim_id"] == "claim-new"
+    assert result["cases"][0]["evaluation"]["evidence_materiality_digest"] == "materiality-1"
+    assert result["current_lifecycle"]["decision_state"] == "invested"
+    assert result["current_lifecycle"]["updated_at"] == "current-opportunity-update"
+    assert result["outcomes"][0]["outcome_type"] == "financing"
+    assert "outcomes" not in result["cases"][0]
+    assert result["unpaired_rulings"][0]["ruling_id"] == "ruling-unpaired"
+    assert all("user_id" not in row for row in result["outcomes"])
+
+    sql = "\n".join(call[1].lower() for call in connection.calls)
+    assert sql.count("user_id=$1") >= 5
+    assert "opportunity_id=$2" in sql
