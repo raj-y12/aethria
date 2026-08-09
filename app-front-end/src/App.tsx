@@ -67,8 +67,6 @@ function AppShell() {
   const reduceMotion = usePrefersReducedMotion();
   const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
-    // The Fund workspace surfaces meta/analytics — refresh them when it opens.
-    systemPanelOpen: !isSettingsRoute && isFundRoute,
     flowPanelOpen: isFlowRoute,
     portfolioPanelOpen: isPortfolioRoute,
   });

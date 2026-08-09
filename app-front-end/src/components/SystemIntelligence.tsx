@@ -1,14 +1,10 @@
 import { useState, useMemo } from 'react';
 import { motion, type Variants } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
-import type {
-  Startup, RejectionAnalytics,
-  MetaCycleReport, MetaInsightsPayload,
-} from '../types/startup';
 import type { FundThesisRuntime } from '../api/fundThesis';
+import type { FundIntelligenceData } from '../hooks/useFundIntelligence';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
-import { type FundConfiguration } from '../lib/fundConfiguration';
 
 /**
  * The three Fund facets, ordered by how an investor reads the instrument:
@@ -79,26 +75,20 @@ export function FundFacetNav({
 }
 
 interface SystemIntelligenceProps {
-  startups: Startup[];
   activeTab?: FundFacetTab;
   onTabChange?: (tab: FundFacetTab) => void;
   hideNav?: boolean;
-  rejectionAnalytics: RejectionAnalytics;
-  metaReports: MetaCycleReport[];
-  metaInsights: MetaInsightsPayload | null;
   fundThesisRuntime: FundThesisRuntime | null;
   fundThesisRuntimeLoading?: boolean;
   fundThesisRuntimeError?: string | null;
-  fundConfiguration?: FundConfiguration;
+  fundIntelligence: FundIntelligenceData;
 }
 
 import {
   TAB_CONTENT_CONTAINER_VARIANTS,
-  FundIntelligenceSummary,
-  AnalyticsTab,
   InstitutionalMandateTab,
-  LearningTab,
 } from './system/internals';
+import { FundHypothesesPanel, FundObservationsPanel } from './fund/FundIntelligenceSurface';
 
 export default function SystemIntelligence(props: SystemIntelligenceProps) {
   const [internalTab, setInternalTab] = useState<Tab>('thesis');
@@ -126,10 +116,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
         variants={tabContentContainerVariants}
       >
           {activeTab === 'intelligence' && (
-            <>
-              <AnalyticsTab rejection={props.rejectionAnalytics} />
-              <FundIntelligenceSummary startups={props.startups} fundConfiguration={props.fundConfiguration} />
-            </>
+            <FundObservationsPanel data={props.fundIntelligence} />
           )}
           {activeTab === 'thesis' && (
             <InstitutionalMandateTab
@@ -139,10 +126,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
             />
           )}
           {activeTab === 'learning' && (
-            <LearningTab
-              reports={props.metaReports}
-              insights={props.metaInsights}
-            />
+            <FundHypothesesPanel data={props.fundIntelligence} />
           )}
       </motion.div>
     </div>
