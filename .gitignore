@@ -62,10 +62,8 @@ supabase/.temp/
 .agent/
 .impeccable/critique/
 
-# Neural graph developer tool output and local dependency cache
-tools/neural-graph/node_modules/
-tools/neural-graph/dist/
-tools/neural-graph/.vite/
+# Local developer tools and generated tool output
+tools/
 
 # Checked-in maintenance scripts
 !backend/scripts/
