@@ -11,3 +11,4 @@ export { useQueryLiveGate } from './useQueryLiveGate';
 export { useAgentsEnabled } from './useAgentsEnabled';
 export { useAgentLogoutFlow } from './useAgentLogoutFlow';
 export { useFundConfiguration } from './useFundConfiguration';
+export { useFundIntelligence, useFundReplayPreview } from './useFundIntelligence';
