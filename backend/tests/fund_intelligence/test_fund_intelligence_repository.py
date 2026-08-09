@@ -26,6 +26,10 @@ class _Connection:
         self.calls.append(("fetchrow", sql, args))
         return self.fetchrows.popleft() if self.fetchrows else None
 
+    async def fetch(self, sql, *args):
+        self.calls.append(("fetch", sql, args))
+        return self.fetchrows.popleft() if self.fetchrows else []
+
     async def execute(self, sql, *args):
         self.calls.append(("execute", sql, args))
         return "OK"
@@ -184,3 +188,73 @@ async def test_settings_publication_binds_uuid_and_text_ids_separately():
     assert "$6" in insert[1]
     assert len(insert[2]) == 6
     assert insert[2][0] == insert[2][5]
+
+
+@pytest.mark.asyncio
+async def test_observations_read_only_projection_is_tenant_scoped_and_ignores_outcomes():
+    connection = _Connection([
+        [{
+            "evaluation_id": "evaluation-1", "opportunity_id": "opportunity-1",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-01T00:00:00+00:00", "completed_at": None,
+        }, {
+            "evaluation_id": "evaluation-2", "opportunity_id": "opportunity-2",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-02T00:00:00+00:00", "completed_at": None,
+        }, {
+            "evaluation_id": "evaluation-3", "opportunity_id": "opportunity-3",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-03T00:00:00+00:00", "completed_at": None,
+        }],
+        [
+            {"recommendation_id": "recommendation-1", "evaluation_id": "evaluation-1", "recommended_state": "advance", "created_at": "2026-01-01T00:00:00+00:00"},
+            {"recommendation_id": "recommendation-2", "evaluation_id": "evaluation-2", "recommended_state": "advance", "created_at": "2026-01-02T00:00:00+00:00"},
+            {"recommendation_id": "recommendation-3", "evaluation_id": "evaluation-3", "recommended_state": "advance", "created_at": "2026-01-03T00:00:00+00:00"},
+        ],
+        [
+            {"ruling_id": "ruling-1", "recommendation_id": "recommendation-1", "decision": "ADVANCE", "created_at": "2026-01-01T00:00:00+00:00", "override_type": None},
+            {"ruling_id": "ruling-2", "recommendation_id": "recommendation-2", "decision": "PASS", "created_at": "2026-01-02T00:00:00+00:00", "override_type": "strategic_exception"},
+            {"ruling_id": "ruling-3", "recommendation_id": "recommendation-3", "decision": "ADVANCE", "created_at": "2026-01-03T00:00:00+00:00", "override_type": None},
+        ],
+        [],
+    ])
+    result = await FundIntelligenceRepository(_Pool(connection)).get_observations(user_id="user-a")
+
+    assert result
+    assert all(args[0] == "user-a" for _, _, args in connection.calls)
+    assert not any("outcome_observations" in sql.lower() for _, sql, _ in connection.calls)
+
+
+@pytest.mark.asyncio
+async def test_observation_projection_exposes_latest_interpretation_provenance():
+    connection = _Connection([
+        [{
+            "evaluation_id": "evaluation-1", "opportunity_id": "opportunity-1",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-01T00:00:00+00:00", "completed_at": None,
+        }, {
+            "evaluation_id": "evaluation-2", "opportunity_id": "opportunity-2",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-02T00:00:00+00:00", "completed_at": None,
+        }, {
+            "evaluation_id": "evaluation-3", "opportunity_id": "opportunity-3",
+            "claim_snapshot": json.dumps([{"claim_type": "sector", "normalized_value": "fintech"}]),
+            "thesis_version_id": "thesis-1", "policy_version_id": "policy-1",
+            "created_at": "2026-01-03T00:00:00+00:00", "completed_at": None,
+        }],
+        [{"recommendation_id": f"recommendation-{i}", "evaluation_id": f"evaluation-{i}", "recommended_state": "advance", "created_at": f"2026-01-0{i}T00:00:00+00:00"} for i in range(1, 4)],
+        [{"ruling_id": f"ruling-{i}", "recommendation_id": f"recommendation-{i}", "decision": "ADVANCE", "created_at": f"2026-01-0{i}T00:00:00+00:00", "override_type": None} for i in range(1, 4)],
+        [{"ruling_id": f"ruling-{i}", "interpretation_id": f"interpretation-{i}-2", "version": 2, "source": "operator_correction", "created_at": "2026-02-01T00:00:00+00:00", "positive_factors": json.dumps(["retention"]), "negative_factors": "[]", "accepted_risks": "[]", "decisive_factors": "[]", "overridden_criteria": "[]"} for i in range(1, 4)],
+        [],
+    ])
+
+    result = await FundIntelligenceRepository(_Pool(connection)).get_observations(user_id="user-a")
+
+    assert result
+    assert all(item["interpretation_as_of"] == "latest_retrospective" for item in result)
+    assert all(item["interpretation_provenance"][0]["version"] == 2 for item in result)
