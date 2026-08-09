@@ -90,10 +90,6 @@ function PositionOutcomes({ startupId }: { startupId: string }) {
   );
 }
 
-/* Editorial ledger columns (lg+): Company | status/meta | rationale. The same
- * rhythm is used by positions and decision history; below lg the cells stack. */
-const LEDGER_GRID = 'lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(126px,0.65fr)_minmax(0,1.5fr)] lg:items-baseline lg:gap-x-phi-4 lg:gap-y-phi-2';
-
 /**
  * Portfolio — the *record*: positions held, read from the canonical
  * `/api/portfolio/positions` endpoint, plus decision history, concentration,
