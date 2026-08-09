@@ -15,7 +15,7 @@ function HeaderReadout({ label, value, suffix, text }: { label: string; value?: 
   const display = text != null ? text : value == null ? '--' : `${shown.toLocaleString()}${suffix ?? ''}`;
   return (
     <div className="flex flex-col gap-phi-1">
-      <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
+      <span className="type-data text-[clamp(28px,2.6vw,36px)] leading-none tabular-nums text-oxford">
         {display}
       </span>
       <span className="type-label-section">{label}</span>
@@ -79,8 +79,8 @@ export default function FundPage({ data }: { data: SystemData }) {
   const stats = runtime?.alignment_stats;
 
   return (
-    <div className="page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
-      <div className="flex-none bg-paper">
+    <div className="paper-dot-grid page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex-none bg-surface-canvas/95">
         <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
           <RoomHeader
             className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}
@@ -95,7 +95,7 @@ export default function FundPage({ data }: { data: SystemData }) {
               </div>
             }
           />
-          <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 pt-phi-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 border-b border-oxford/[0.075] pb-phi-3 pt-phi-3">
             <FundFacetNav activeTab={activeTab} onTabChange={changeTab} showRule={false} />
             <Link
               to="/v1/settings"
@@ -111,7 +111,7 @@ export default function FundPage({ data }: { data: SystemData }) {
         ref={bodyScrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
       >
-        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-3`}>
+        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-6`}>
           <SystemIntelligence
             activeTab={activeTab}
             onTabChange={changeTab}

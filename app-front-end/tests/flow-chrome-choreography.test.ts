@@ -35,17 +35,54 @@ describe('Home to Flow entrance choreography', () => {
     expect(workGridSource).toContain("translateY(3px)");
   });
 
-  it('reveals the first desktop memo only after the WorkGrid stagger completes', () => {
+  /* The memo is an overlay on every viewport, so Flow opens on the docket with
+   * nothing selected. Auto-revealing the first company would raise a modal over
+   * an operator who never asked for one — the old auto-select only made sense
+   * when the memo was a second column that would otherwise sit empty. A memo now
+   * opens on a deliberate act: a row click, or an ?open= deep link. */
+  it('opens on the docket and raises a memo only on a deliberate act', () => {
     expect(flowPageSource).toContain('const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);');
     expect(flowPageSource).toContain("const openId = searchParams.get('open');");
     expect(flowPageSource).toContain('onStartupClick={handleStartupClick}');
-    expect(flowPageSource).toContain('const handleGridEntranceComplete = useCallback((startup: Startup) => {');
-    expect(flowPageSource).toContain('setSelectedStartup((current) => current ?? startup);');
-    expect(flowPageSource).toContain('onEntranceComplete={isDesktop ? handleGridEntranceComplete : undefined}');
-    expect(workGridSource).toContain('onEntranceComplete?: (startup: Startup) => void;');
-    expect(workGridSource).toContain('onAnimationComplete={completeEntrance}');
-    expect(workGridSource).toContain('onEntranceComplete?.(first.startup);');
+    expect(flowPageSource).not.toContain('handleGridEntranceComplete');
+    expect(flowPageSource).not.toContain('onEntranceComplete');
+    expect(workGridSource).not.toContain('onEntranceComplete');
     expect(flowPageSource).not.toContain('INITIAL_MEMO_DELAY_MS');
     expect(flowPageSource).not.toContain('setTimeout(');
+  });
+
+  /* Desktop: the docket gives up its basis and settles left while the memo rises
+   * beside it. Driving the push through flex-basis rather than a static grid (or
+   * a `layout` transform) keeps the type from scaling during the move. Below lg
+   * there is no room for two columns, so the memo takes the screen as a modal. */
+  it('pushes the docket left and raises the memo beside it on desktop', () => {
+    expect(flowPageSource).not.toContain('aethria-flow-grid');
+    expect(flowPageSource).toContain('const splitOpen = isDesktop && Boolean(selectedStartup);');
+    expect(flowPageSource).toContain('const useModal = Boolean(selectedStartup) && !isDesktop;');
+    expect(flowPageSource).toContain("animate={{ flexBasis: splitOpen ? '38%' : '100%' }}");
+    expect(flowPageSource).toContain('<InvestmentMemoContent');
+    expect(flowPageSource).toContain('<InvestmentMemo');
+  });
+
+  /* The docket keeps its brackets in both states, so it still reads as a framed
+   * surface once it settles left rather than becoming a bare column. That needs
+   * the wide gutter in both states too — the brackets sit outside the body.
+   * The frame is pinned to the column and the matters scroll inside it, so the
+   * brackets, the headline and the tally all stay put. */
+  it('keeps the docket framed in both states, with the list scrolling inside', () => {
+    expect(flowPageSource).toContain('focus-frame focus-frame--docket mt-phi-5 mb-phi-5 flex min-h-0 flex-1 flex-col');
+    // The column itself must not scroll, or the frame would scroll away with it.
+    expect(flowPageSource).toContain('flex-col overflow-hidden');
+    expect(flowPageSource).toContain('min-h-0 flex-1 overflow-y-auto overscroll-contain');
+  });
+
+  /* Flow sits on the same room measure as Portfolio and Fund — the split happens
+   * inside --room-max rather than across the whole viewport. The docket brackets
+   * use the tucked variant so they fit the room's px-phi-5 gutter. */
+  it('lays the room out on the shared workspace measure', () => {
+    expect(flowPageSource).toContain('${workspaceLayout.shell}');
+    expect(flowPageSource).toContain('focus-frame--docket');
+    const css = readFileSync(resolve(import.meta.dirname, '../src/index.css'), 'utf8');
+    expect(css).toContain('.focus-frame--docket::before');
   });
 });

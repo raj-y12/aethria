@@ -12,13 +12,13 @@ export const SECONDARY_TYPE_SCALE = 0.92 as const;
 /** Spacing multiplier for laptop band (1024–1512px); primary gaps use full scale above that. */
 export const LAPTOP_SPACE_SCALE = 0.9 as const;
 
-/** Queue row vertical padding (px) — a compressed docket; selection reads
- *  through ink and the left bar, not expansion. */
+/** Queue row vertical padding (px) — the selected row keeps the same compact
+ *  control rhythm as the system rail while its typography carries emphasis. */
 export const queueRowPadding = {
   ambient: 10,
   ambientAlt: 11,
   interrupt: 16,
-  selected: 24,
+  selected: 14,
 } as const;
 
 /**
