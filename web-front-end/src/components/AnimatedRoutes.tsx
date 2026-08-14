@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import HomePage from '../HomePage';
+import TeamPage from '../TeamPage';
 
 const DURATION = 0.3;
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -23,7 +24,7 @@ for (const key of Object.keys(privateModules)) {
   }
 }
 
-const PUBLIC_PATHS = ['/', '/home', '/request-access'];
+const PUBLIC_PATHS = ['/', '/home', '/request-access', '/team'];
 
 export default function AnimatedRoutes() {
   const location = useLocation();
@@ -40,6 +41,7 @@ export default function AnimatedRoutes() {
 
   let element: React.ReactNode = null;
   if (pathname === '/' || pathname === '/home') element = <HomePage />;
+  else if (pathname === '/team') element = <TeamPage />;
   else if (pathname === '/request-access') element = null; // mid-redirect, see effect above
   else if (privateRoutes[pathname]) {
     const PrivateComponent = privateRoutes[pathname];

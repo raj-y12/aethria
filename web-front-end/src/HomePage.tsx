@@ -35,11 +35,12 @@ export default function HomePage() {
     setShowLoader(true);
   }, [reduce]);
 
-  // The application form lives further down the gallery spine (Task 11); honour
-  // old bookmarked/shared #access links.
+  // Honour any incoming plate hash — old bookmarked #access links, and the
+  // frame nav arriving from another route (e.g. /team → /home#market).
   useEffect(() => {
-    if (window.location.hash !== '#access') return;
-    const el = document.getElementById('access');
+    const hash = window.location.hash;
+    if (!hash) return;
+    const el = document.getElementById(hash.slice(1));
     if (!el) return;
     const t = setTimeout(() => el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }), 300);
     return () => clearTimeout(t);

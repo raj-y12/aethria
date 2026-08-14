@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react';
 
 /** Counts a single number up on first view; settles instantly under reduced motion. */
-export function CountUp({ to, active, reduce }: { to: number; active: boolean; reduce: boolean }) {
+export function CountUp({
+  to,
+  active,
+  reduce,
+  format,
+}: {
+  to: number;
+  active: boolean;
+  reduce: boolean;
+  /** Optional display formatter — e.g. thousands separators on large counts. */
+  format?: (n: number) => string;
+}) {
   const [n, setN] = useState(reduce ? to : 0);
   useEffect(() => {
     if (reduce || !active) return;
@@ -16,5 +27,5 @@ export function CountUp({ to, active, reduce }: { to: number; active: boolean; r
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [active, to, reduce]);
-  return <>{n}</>;
+  return <>{format ? format(n) : n}</>;
 }

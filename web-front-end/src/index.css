@@ -238,7 +238,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
+  /* Same box as the app's house button (.btn-aethria-solid): 36px tall, 40px
+     of horizontal padding. Marketing and product read as one system. */
+  min-height: 36px;
   width: auto;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -246,7 +248,7 @@
   text-transform: uppercase;
   color: var(--accent);
   border: 1px solid var(--accent);
-  padding: 0.75rem 1.5rem;
+  padding: 0 2.5rem;
   text-decoration: none;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
@@ -258,8 +260,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  padding: 0.75rem 1.5rem;
+  min-height: 36px;
+  padding: 0 1.5rem;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.18em;
@@ -270,6 +272,17 @@
 }
 .cta-secondary:hover {
   color: var(--ink);
+}
+
+/* The 36px box matches the app's house button, which is mouse-driven. Touch
+   input needs a bigger target than that (WCAG 2.5.5 / Apple HIG: 44px), so
+   raise it on coarse pointers only — the desktop proportion is unchanged. */
+@media (pointer: coarse) {
+  .cta-primary,
+  .cta-secondary,
+  .cta-submit {
+    min-height: 44px;
+  }
 }
 
 /* Plate 03 — a bold statement above the review spread, elevating the plate's
@@ -720,10 +733,11 @@
   text-align: center;
 }
 .dim .n {
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: clamp(1.7rem, 3.4vw, 2.5rem);
+  font-weight: 400;
   line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--ink);
 }
 .dim .k {
@@ -1032,14 +1046,6 @@ section[id] {
     padding-left: max(var(--page-margin-x-mobile), var(--safe-left));
     padding-right: max(var(--page-margin-x-mobile), var(--safe-right));
   }
-}
-
-/* Marketing — paper dot grid (grey stock texture, 28px, Oxford @ 3.5%) */
-.paper-dot-grid {
-  background-color: var(--color-paper);
-  background-image: radial-gradient(rgba(0, 20, 51, 0.055) 1px, transparent 1px);
-  background-size: 28px 28px;
-  background-repeat: repeat;
 }
 
 /* Oversized editorial display headline (hero / section openers) */
@@ -1537,20 +1543,6 @@ hr.doc-section-separator::before {
 
 .hero-result-snapshot {
   background: rgba(217, 215, 212, 0.9) !important;
-}
-
-/* CTA — expand-arrow on hover (padding/size set per instance) */
-.cta-button-arrow {
-  display: inline-block;
-  width: 0.5rem;
-  flex-shrink: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: width 250ms ease;
-}
-
-.group:hover .cta-button-arrow {
-  width: 1.5rem;
 }
 
 .case-proof-ticker {
@@ -2151,7 +2143,7 @@ hr.doc-section-separator::before {
 }
 
 
-/* Conviction — paper uses dot grid only (see .paper-dot-grid) */
+/* Conviction — paper stock, no texture */
 .home-closing-ledger {
   background-color: var(--color-paper);
 }
@@ -2487,4 +2479,64 @@ hr.doc-section-separator::before {
 
 .system-init-underline-a {
   width: 100%;
+}
+
+/* Team plate 02 — the house tenets, argued at display weight rather than
+   tabulated. Label rail left, claim and gloss right. */
+.tenet {
+  display: grid;
+  grid-template-columns: 12ch 1fr;
+  gap: 2rem;
+  padding: 1.7rem 0;
+  border-top: 1px solid var(--line);
+  align-items: baseline;
+}
+.tenet:last-of-type {
+  border-bottom: 1px solid var(--line);
+}
+.tenet .mark {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.tenet .claim {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.2rem, 2.1vw, 1.65rem);
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+}
+.tenet .gloss {
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0.55rem 0 0;
+  max-width: 56ch;
+}
+@media (max-width: 640px) {
+  .tenet {
+    grid-template-columns: 1fr;
+    gap: 0.55rem;
+  }
+}
+
+/* Verifiable company facts, set as a colophon rule rather than a table */
+.house-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 2.25rem;
+  margin-top: 2.5rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.house-facts strong {
+  font-weight: 400;
+  color: var(--ink-2);
 }

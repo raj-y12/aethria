@@ -16,10 +16,10 @@ export default defineConfig({
   server: {
     port: 3001,
   },
-  // Read by vite-react-ssg. Only '/' and '/home' are prerendered (both render
-  // HomePage); private routes and the gate stay client-side.
+  // Read by vite-react-ssg. '/' and '/home' render HomePage, '/team' renders
+  // TeamPage; private routes and the gate stay client-side.
   ssgOptions: {
     entry: 'src/main.tsx',
-    includedRoutes: () => ['/', '/home'],
+    includedRoutes: () => ['/', '/home', '/team'],
   },
 })
