@@ -5,6 +5,12 @@ from uuid import uuid4
 import pytest
 
 
+pytestmark = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"),
+    reason="TEST_DATABASE_URL is required for security PostgreSQL contract tests",
+)
+
+
 @pytest.mark.asyncio
 async def test_rate_limit_is_atomic_and_window_state_is_preserved():
     import asyncpg

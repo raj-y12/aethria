@@ -55,6 +55,28 @@ def test_legacy_supabase_baseline_leaves_missing_additive_versions_unapplied(
     ]
 
 
+def test_startups_read_contract_upgrades_an_existing_legacy_table_before_indexing():
+    migration = (
+        Path(__file__).parents[3]
+        / "db"
+        / "migrations"
+        / "20260811000018_startups_read_contract.sql"
+    ).read_text(encoding="utf-8").lower()
+
+    alter_start = migration.index("alter table public.startups")
+    index_start = migration.index("create unique index if not exists startups_user_normalized_display_name_uidx")
+    assert alter_start < index_start
+    for column in (
+        "display_name",
+        "list_one_line",
+        "list_confidence",
+        "list_score",
+        "partner_decision",
+        "list_resolution_status",
+    ):
+        assert f"add column if not exists {column}" in migration
+
+
 class _Transaction:
     async def __aenter__(self):
         return self

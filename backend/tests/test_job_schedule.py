@@ -11,6 +11,12 @@ from pipeline_execution import MetaCycleResult, StageExecutionState
 from portfolio.engine import PortfolioEngine
 
 
+pytestmark = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"),
+    reason="TEST_DATABASE_URL is required for schedule PostgreSQL contract tests",
+)
+
+
 @pytest.mark.asyncio
 async def test_claim_due_jobs_persists_intervals_and_isolates_tenants():
     import asyncpg

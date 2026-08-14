@@ -73,6 +73,70 @@ create table if not exists public.startups (
   list_resolution_status text generated always as (nullif(trim(scout_info ->> 'resolution_status'), '')) stored
 );
 
+-- The institutional Supabase contract may already have created public.startups
+-- with only its original columns. Extend that table additively before creating
+-- the provider-neutral read indexes; CREATE TABLE IF NOT EXISTS above is a
+-- no-op when that legacy table is present.
+alter table public.startups
+  add column if not exists human_resolution jsonb,
+  add column if not exists investment_memo_markdown text,
+  add column if not exists conviction_state jsonb,
+  add column if not exists unresolved_at timestamptz,
+  add column if not exists agent_trace jsonb,
+  add column if not exists first_seen_at timestamptz default now(),
+  add column if not exists last_seen_by_user_at timestamptz,
+  add column if not exists acknowledged_at timestamptz,
+  add column if not exists queue_reason text,
+  add column if not exists priority_reason text,
+  add column if not exists display_name text generated always as (nullif(trim(scout_info ->> 'name'), '')) stored,
+  add column if not exists list_one_line text generated always as (nullif(trim(scout_info ->> 'one_line'), '')) stored,
+  add column if not exists list_sector text generated always as (nullif(trim(scout_info ->> 'sector'), '')) stored,
+  add column if not exists list_scout_type text generated always as (nullif(trim(scout_info ->> 'scout_type'), '')) stored,
+  add column if not exists list_origin_type text generated always as (nullif(trim(scout_info ->> 'origin_type'), '')) stored,
+  add column if not exists list_lookup_query text generated always as (nullif(trim(scout_info ->> 'lookup_query'), '')) stored,
+  add column if not exists list_lookup_website text generated always as (nullif(trim(scout_info ->> 'lookup_website'), '')) stored,
+  add column if not exists list_confidence double precision generated always as (
+    coalesce(
+      case when scout_info ? 'confidence_score'
+             and nullif(trim(scout_info ->> 'confidence_score'), '') is not null
+           then (scout_info ->> 'confidence_score')::double precision
+           else null end,
+      0.5
+    )
+  ) stored,
+  add column if not exists list_score double precision generated always as (
+    case when review_info is null then null else
+      (coalesce((review_info ->> 'market_score')::double precision, 0.0)
+       + coalesce((review_info ->> 'product_score')::double precision, 0.0)
+       + coalesce((review_info ->> 'technical_score')::double precision, 0.0)
+       + coalesce((review_info ->> 'execution_score')::double precision, 0.0)) / 4.0
+    end
+  ) stored,
+  add column if not exists list_verdict text generated always as (nullif(trim(review_info ->> 'verdict'), '')) stored,
+  add column if not exists list_consensus_verdict text generated always as (nullif(trim(review_info ->> 'consensus_verdict'), '')) stored,
+  add column if not exists list_reviewed_at text generated always as (nullif(trim(review_info ->> 'reviewed_at'), '')) stored,
+  add column if not exists list_partnered_at text generated always as (nullif(trim(partner_info ->> 'partnered_at'), '')) stored,
+  add column if not exists short_summary text generated always as (left(coalesce(nullif(trim(review_info ->> 'overall_summary'), ''), ''), 400)) stored,
+  add column if not exists list_reviewer_disagreement boolean generated always as (
+    case when review_info is null then false
+      when review_info -> 'reviewer_disagreement' = 'true'::jsonb then true
+      when lower(trim(review_info ->> 'reviewer_disagreement')) in ('true', '1', 'yes') then true
+      else false end
+  ) stored,
+  add column if not exists partner_human_review_required boolean generated always as (
+    case when partner_info is null then false
+      when partner_info -> 'human_review_required' = 'true'::jsonb then true
+      when lower(trim(partner_info ->> 'human_review_required')) in ('true', '1', 'yes') then true
+      else false end
+  ) stored,
+  add column if not exists list_lookup_id text generated always as (nullif(trim(scout_info ->> 'lookup_id'), '')) stored,
+  add column if not exists partner_decision text generated always as (
+    nullif(trim(coalesce(nullif(trim(partner_info ->> 'recommendation'), ''),
+                         nullif(trim(partner_info ->> 'decision'), ''))), '')
+  ) stored,
+  add column if not exists list_location text generated always as (nullif(trim(scout_info ->> 'location'), '')) stored,
+  add column if not exists list_resolution_status text generated always as (nullif(trim(scout_info ->> 'resolution_status'), '')) stored;
+
 create unique index if not exists startups_user_startup_id_idx
   on public.startups (user_id, startup_id);
 create index if not exists startups_user_id_idx on public.startups (user_id);
