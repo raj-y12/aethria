@@ -1,7 +1,4 @@
-const ZONES = [
-  { label: 'London', tz: 'Europe/London' },
-  { label: 'San Francisco', tz: 'America/Los_Angeles' },
-] as const;
+const ZONES = [{ label: 'Dublin', tz: 'Europe/Dublin' }] as const;
 
 export function bureauTimes(now: Date = new Date()) {
   return ZONES.map(({ label, tz }) => ({

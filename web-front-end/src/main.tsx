@@ -14,8 +14,8 @@ import '@aethria/product-chrome';
 import App from './App.tsx';
 
 // Single catch-all: App renders our custom AnimatedRoutes, which does its own
-// pathname switching (public pages, private-route glob, redirects). SSG only
-// prerenders '/' and '/home' (both render HomePage) via includedRoutes in
+// pathname switching (public pages, private-route glob, redirects). SSG
+// prerenders '/', '/home' (both HomePage) and '/team' via includedRoutes in
 // vite.config.ts; every other path is handled client-side as before.
 export const routes: RouteRecord[] = [{ path: '*', element: <App /> }];
 

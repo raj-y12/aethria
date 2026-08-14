@@ -167,7 +167,7 @@ export default function AccessForm() {
           <button
             type="submit"
             disabled={loading || processing}
-            className="group mt-1 inline-flex min-h-[46px] w-full cursor-pointer items-center justify-center bg-[var(--color-paper)] px-6 py-3 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-oxford)] transition-colors duration-200 hover:bg-[var(--text-inverse)] disabled:cursor-not-allowed disabled:opacity-55"
+            className="cta-submit group mt-1 inline-flex min-h-9 w-full cursor-pointer items-center justify-center bg-[var(--color-paper)] px-10 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--color-oxford)] transition-colors duration-200 hover:bg-[var(--text-inverse)] disabled:cursor-not-allowed disabled:opacity-55"
           >
             <span>
               {loading ? `Submitting${'.'.repeat(ellipsisStep)}` : processing ? 'Processing' : 'Submit application'}

@@ -39,7 +39,7 @@ export default function AccessPlate() {
         </div>
         <div>
           <p>
-            London · San Francisco
+            Dublin, Ireland
             <br />
             Specimen Edition · © {year ?? '—'}
           </p>
