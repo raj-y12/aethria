@@ -12,14 +12,14 @@ export default function AccessPlate() {
 
   return (
     <>
-      <Plate id="access" index="08 — 08" title="Request Access" capLeft="Access — Plate 08" capRight="Seats open in small batches">
-        <div className="reveal d2" style={{ textAlign: 'center' }}>
+      <Plate id="access" index="08 — 08" title="Request Access" capLeft="Private access / conversation" capRight="Seats open in small batches" tone="quiet-transition">
+        <div className="access-intro reveal d2">
           <p className="hero-kicker">Request access</p>
           <h3 className="hero-statement" style={{ fontSize: 'clamp(1.8rem, 4vw, 3.2rem)' }}>
             For funds that need judgment with memory.
           </h3>
         </div>
-        <div className="reveal d3" style={{ marginTop: '2.5rem', backgroundColor: 'var(--color-oxford)', padding: 'clamp(1.5rem, 4vw, 2.5rem)' }}>
+        <div className="access-form-surface reveal d3">
           <AccessForm />
         </div>
       </Plate>

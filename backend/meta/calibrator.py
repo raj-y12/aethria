@@ -1,6 +1,6 @@
 """
 ThresholdCalibrator — adjusts sensitivity parameters based on calibration warnings.
-Backed by Supabase meta_calibration_state and meta_mutation_log (explicit user_id).
+Backed by provider-neutral meta_calibration_state and meta_mutation_log.
 """
 import logging
 import os
@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from utils.timeutil import utcnow
 
-from supabase_doc_store import doc_get, doc_set, list_append_only
+from batch1.store import doc_get, doc_set, list_append_only
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +40,12 @@ def load_calibration_state(user_id: str) -> Dict[str, Any]:
 class ThresholdCalibrator:
     """Adjusts confidence and reviewer thresholds based on calibration warnings."""
 
-    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int, user_id: str):
+    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int, user_id: str, settings: Dict[str, Any] | None = None):
         self.signal = signal_summary
         self.cycle_number = cycle_number
         self.user_id = user_id
         self.logger = logging.getLogger("meta.calibrator")
+        self.settings = settings if isinstance(settings, dict) else {}
         self.state = load_calibration_state(user_id)
 
     def decide(self) -> List[Dict]:
@@ -58,10 +59,7 @@ class ThresholdCalibrator:
             self.logger.info("[Calibrator] In cooldown, skipping calibration")
             return []
 
-        from utils.settings_loader import load_settings
-
-        settings = load_settings(self.user_id)
-        default_confidence = settings.get("agent_config", {}).get("confidence_threshold", 0.5)
+        default_confidence = self.settings.get("agent_config", {}).get("confidence_threshold", 0.5)
 
         if warning and "too strict" in warning.lower():
             current_ct = self.state.get("confidence_threshold_override") or default_confidence

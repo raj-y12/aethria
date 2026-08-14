@@ -15,6 +15,8 @@ export interface PlateProps {
   children: React.ReactNode;
   /** the plate title renders as this heading element; default 2 */
   headingLevel?: 2 | 3;
+  /** visual surface for the chapter; keeps content primitives reusable without flattening the page rhythm */
+  tone?: 'stock-editorial' | 'oxford-intelligence' | 'product-evidence' | 'image-led' | 'quiet-transition';
 }
 
 /**
@@ -31,12 +33,13 @@ export default function Plate({
   capRight,
   children,
   headingLevel = 2,
+  tone = 'stock-editorial',
 }: PlateProps) {
   const reduce = useReducedMotion();
   const [ref, isIn] = useInView<HTMLElement>(reduce, 0.28);
 
   return (
-    <section ref={ref} id={id} className={`plate${isIn ? ' in' : ''}`}>
+    <section ref={ref} id={id} className={`plate surface-${tone}${isIn ? ' in' : ''}`}>
       <span className="plate-cap-l">{capLeft}</span>
       <span className="plate-cap-r">{capRight}</span>
       <div className="framed">

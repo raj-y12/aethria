@@ -11,6 +11,7 @@ at the start of each pipeline cycle.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -255,6 +256,7 @@ def create_fund_thesis_version_for_user(
     additional_parsed_fields: Optional[Dict[str, Any]] = None,
     skip_embedding: bool = False,
     skip_if_unchanged: bool = False,
+    affected_startups_count: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Ensure fund_thesis row, append new version, optional embed, activate, pipeline link.
@@ -263,7 +265,7 @@ def create_fund_thesis_version_for_user(
     Service-role Supabase client required.
     """
     from tenant_context import require_user_id
-    from fund_thesis import count_user_startups, insert_thesis_pipeline_link, invalidate_thesis_cache
+    from fund_thesis import insert_thesis_pipeline_link, invalidate_thesis_cache
 
     uid = require_user_id(user_id, context="create_fund_thesis_version_for_user")
     raw = (raw_text or "").strip()
@@ -370,7 +372,7 @@ def create_fund_thesis_version_for_user(
         {"active_version_id": version_id, "updated_at": now_iso}
     ).eq("id", thesis_id).eq("user_id", uid).execute()
 
-    affected = count_user_startups(client, uid)
+    affected = max(0, int(affected_startups_count or 0))
     try:
         insert_thesis_pipeline_link(
             client,
@@ -399,6 +401,7 @@ def sync_fund_config_to_active_thesis(
     fund_config: Dict[str, Any],
     api_key: str = "",
     pipeline_run_id: Optional[str] = None,
+    affected_startups_count: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Create a thesis version only when fund_config mandate/scoring content changed vs active thesis.
@@ -433,6 +436,7 @@ def sync_fund_config_to_active_thesis(
         api_key=api_key,
         parsed_json_override=fund_config_to_thesis_parsed_json(fc),
         pipeline_run_id=pipeline_run_id,
+        affected_startups_count=affected_startups_count,
         # Settings deployment is a control-plane write.  Do not block the
         # user's save on an expensive/optional embedding request; the scoring
         # runtime already supports an empty embedding and can use rule-based
@@ -448,10 +452,11 @@ def activate_fund_thesis_version(
     user_id: str,
     version_id: str,
     pipeline_run_id: Optional[str] = None,
+    affected_startups_count: Optional[int] = None,
 ) -> None:
     """Set one version active; must belong to user's thesis."""
     from tenant_context import require_user_id
-    from fund_thesis import count_user_startups, insert_thesis_pipeline_link, invalidate_thesis_cache
+    from fund_thesis import insert_thesis_pipeline_link, invalidate_thesis_cache
 
     uid = require_user_id(user_id, context="activate_fund_thesis_version")
     vid = (version_id or "").strip()
@@ -483,7 +488,7 @@ def activate_fund_thesis_version(
         {"active_version_id": vid, "updated_at": now_iso}
     ).eq("id", thesis_id).eq("user_id", uid).execute()
 
-    affected = count_user_startups(client, uid)
+    affected = max(0, int(affected_startups_count or 0))
     insert_thesis_pipeline_link(
         client,
         user_id=uid,
@@ -492,3 +497,137 @@ def activate_fund_thesis_version(
         affected_startups_count=affected,
     )
     invalidate_thesis_cache(uid)
+
+
+async def create_fund_thesis_version_with_repository(
+    repository: Any,
+    *,
+    user_id: str,
+    raw_text: str,
+    api_key: str = "",
+    parsed_json_override: Optional[Dict[str, Any]] = None,
+    pipeline_run_id: Optional[str] = None,
+    additional_parsed_fields: Optional[Dict[str, Any]] = None,
+    skip_embedding: bool = False,
+    skip_if_unchanged: bool = False,
+    affected_startups_count: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Prepare external parse/embed work, then publish through async PostgreSQL."""
+    from tenant_context import require_user_id
+
+    uid = require_user_id(user_id, context="create_fund_thesis_version_with_repository")
+    raw = (raw_text or "").strip()
+    if not raw:
+        raise ValueError("raw_text required")
+    ak = (api_key or "").strip()
+    if isinstance(parsed_json_override, dict):
+        parsed = dict(parsed_json_override)
+    else:
+        if not ak:
+            raise ValueError("api_key (OPENAI_API_KEY) required when parsed_json_override is not set")
+        parsed = await asyncio.to_thread(parse_fund_thesis_raw, raw, ak)
+    if isinstance(additional_parsed_fields, dict):
+        parsed.update(additional_parsed_fields)
+    if skip_embedding:
+        vector: List[float] = []
+        model = "none"
+    else:
+        if not ak:
+            raise ValueError("api_key (OPENAI_API_KEY) required when skip_embedding is False")
+        model = os.getenv("FUND_THESIS_EMBED_MODEL", _DEFAULT_EMBED_MODEL)
+        vector = await asyncio.to_thread(embed_text_for_thesis, raw[:8000], ak, model)
+    return await repository.publish_version(
+        uid,
+        raw_text=raw,
+        parsed_json=parsed,
+        embedding=vector,
+        embedding_model=model,
+        pipeline_run_id=pipeline_run_id,
+        affected_startups_count=affected_startups_count or 0,
+        skip_if_unchanged=skip_if_unchanged,
+    )
+
+
+async def activate_fund_thesis_version_with_repository(
+    repository: Any,
+    *,
+    user_id: str,
+    version_id: str,
+    pipeline_run_id: Optional[str] = None,
+    affected_startups_count: Optional[int] = None,
+) -> None:
+    await repository.activate_version(
+        user_id,
+        version_id,
+        pipeline_run_id=pipeline_run_id,
+        affected_startups_count=affected_startups_count or 0,
+    )
+
+
+async def backfill_thesis_embeddings_with_repository(
+    repository: Any,
+    user_id: str,
+    *,
+    api_key: str,
+    limit: int = 50,
+    only_active: bool = False,
+    dry_run: bool = False,
+) -> Dict[str, Any]:
+    """Generate embeddings outside transactions and persist them with asyncpg."""
+    from tenant_context import require_user_id
+
+    uid = require_user_id(user_id, context="backfill_thesis_embeddings_with_repository")
+    versions = await repository.list_versions_missing_embeddings(
+        uid, only_active=only_active, limit=max(1, min(int(limit), 500))
+    )
+    if dry_run:
+        return {"scanned": len(versions), "eligible": len(versions), "embedded": 0, "failed": 0, "skipped": 0}
+    if not (api_key or "").strip():
+        raise ValueError("api_key (OPENAI_API_KEY) required to backfill embeddings")
+    model = os.getenv("FUND_THESIS_EMBED_MODEL", _DEFAULT_EMBED_MODEL)
+    embedded = 0
+    failed = 0
+    for version in versions:
+        try:
+            vector = await asyncio.to_thread(embed_text_for_thesis, str(version.get("raw_text") or "")[:8000], api_key, model)
+            await repository.upsert_embedding(uid, version["version_id"], vector, model)
+            embedded += 1
+        except Exception as exc:
+            logger.warning("[ThesisEmbedBackfill] failed for version %s: %s", str(version.get("version_id"))[:12], exc)
+            failed += 1
+    return {
+        "scanned": len(versions),
+        "eligible": len(versions),
+        "embedded": embedded,
+        "failed": failed,
+        "skipped": 0,
+    }
+
+
+async def sync_fund_config_to_active_thesis_with_repository(
+    repository: Any,
+    *,
+    user_id: str,
+    fund_config: Dict[str, Any],
+    pipeline_run_id: Optional[str] = None,
+    affected_startups_count: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Synchronize settings through the publication lock, without Supabase."""
+    from tenant_context import require_user_id
+    from utils.settings_loader import fund_config_raw_text, fund_config_to_thesis_parsed_json
+
+    uid = require_user_id(user_id, context="sync_fund_config_to_active_thesis_with_repository")
+    fc = fund_config if isinstance(fund_config, dict) else {}
+    raw_text = fund_config_raw_text(fc).strip()
+    if not raw_text:
+        return {"skipped": True, "reason": "empty_raw_text"}
+    return await repository.publish_version(
+        uid,
+        raw_text=raw_text,
+        parsed_json=fund_config_to_thesis_parsed_json(fc),
+        embedding=[],
+        embedding_model="none",
+        pipeline_run_id=pipeline_run_id,
+        affected_startups_count=affected_startups_count or 0,
+        skip_if_unchanged=True,
+    )

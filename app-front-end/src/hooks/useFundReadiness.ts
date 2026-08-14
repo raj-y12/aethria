@@ -16,6 +16,22 @@ export interface FundReadiness {
   refetch: () => void;
 }
 
+export type MandatePrompt = 'unavailable' | 'missing' | 'publish' | 'ready';
+
+export function deriveMandatePrompt({
+  hasActiveThesis,
+  mandatePublished,
+  unknown,
+}: {
+  hasActiveThesis: boolean;
+  mandatePublished: boolean;
+  unknown: boolean;
+}): MandatePrompt {
+  if (unknown) return 'unavailable';
+  if (mandatePublished) return 'ready';
+  return hasActiveThesis ? 'publish' : 'missing';
+}
+
 export function deriveFundReadiness(
   data: Pick<AgentsStatus, 'mandate_published'> | null,
   isError: boolean,
@@ -32,6 +48,7 @@ export function useFundReadiness(): FundReadiness {
     queryKey: ['agents-status'],
     queryFn: () => fetchAgentsStatus(),
     staleTime: 30_000,
+    refetchOnMount: 'always',
     placeholderData: (prev) => prev ?? undefined,
   });
 

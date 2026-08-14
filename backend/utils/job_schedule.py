@@ -2,14 +2,22 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Mapping, Optional, Set
+from typing import Any, Mapping, Optional, Set
 
-from supabase_client import get_service_client
+from schedule_repository import ScheduleRepository
 from tenant_context import require_user_id
 from utils.timeutil import ensure_aware
 
 
-def claim_due_jobs(
+_schedule_repository: ScheduleRepository | None = None
+
+
+def configure_schedule_repository(pool: Any | None) -> None:
+    global _schedule_repository
+    _schedule_repository = ScheduleRepository(pool) if pool is not None else None
+
+
+async def claim_due_jobs(
     user_id: str,
     intervals: Mapping[str, int],
     *,
@@ -25,15 +33,6 @@ def claim_due_jobs(
     if not normalized:
         return set()
 
-    params = {"p_user_id": uid, "p_intervals": normalized}
-    if now is not None:
-        params["p_now"] = ensure_aware(now).isoformat().replace("+00:00", "Z")
-    response = get_service_client().rpc("claim_due_agent_jobs", params).execute()
-    rows = (response.data or []) if hasattr(response, "data") else []
-    due: Set[str] = set()
-    for row in rows:
-        value = row.get("job_name") if isinstance(row, dict) else row
-        name = str(value or "").strip()
-        if name:
-            due.add(name)
-    return due
+    if _schedule_repository is None:
+        raise RuntimeError("schedule_repository_unavailable")
+    return await _schedule_repository.claim_due_jobs(uid, normalized, now=now)

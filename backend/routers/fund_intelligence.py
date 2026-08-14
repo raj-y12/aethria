@@ -15,6 +15,7 @@ from services.scoring.policy_compiler import (
     compile_policy_from_fund_config,
 )
 from utils.settings_loader import load_settings
+from settings_repository import SettingsRepository
 
 
 router = APIRouter(prefix="/api/fund-intelligence", tags=["fund-intelligence"])
@@ -90,7 +91,10 @@ async def _canonical_policy_result(
         current = dict(governed.get("policy_patch") or {})
         current_hash = str(governed.get("policy_hash") or "").strip()
     else:
-        settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+        pool = getattr(request.app.state, "durable_job_pool", None)
+        settings = await load_settings(
+            user_id, repository=SettingsRepository(pool), use_cache=False
+        )
         current = (
             dict(settings.get("fund_config"))
             if isinstance(settings.get("fund_config"), dict)

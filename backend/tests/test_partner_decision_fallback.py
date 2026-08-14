@@ -160,23 +160,17 @@ def test_handoff_quality_recommends_human_review_without_changing_recommendation
 
 
 def test_saved_score_bands_drive_partner_recommendation(monkeypatch):
-    import partner.decision as decision_mod
-
-    monkeypatch.setattr(
-        decision_mod,
-        "load_settings",
-        lambda user_id: {
-            "fund_config": {
+    settings = {
+        "fund_config": {
                 "scoreBands": [
                     {"min": 0, "max": 49, "label": "Pass"},
                     {"min": 50, "max": 69, "label": "Monitor"},
                     {"min": 70, "max": 100, "label": "Strong Proceed"},
                 ],
                 "thresholds": {"partnerReview": 50, "monitor": 50, "escalation": 70, "autoPass": 49},
-            }
-        },
-    )
-    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None, tenant_user_id="user_123")
+        }
+    }
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None, tenant_user_id="user_123", settings=settings)
     review = _base_review()
     review.update(
         {

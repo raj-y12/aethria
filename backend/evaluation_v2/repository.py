@@ -76,6 +76,7 @@ class EvaluationRepository:
         thesis_version_id: Optional[str] = None,
         model_manifest: Optional[Dict[str, Any]] = None,
         prompt_manifest: Optional[Dict[str, Any]] = None,
+        judgment_audit: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="EvaluationRepository.evaluate")
         await self._require_write_path(user_id=uid, operation="evaluation creation")
@@ -146,14 +147,14 @@ class EvaluationRepository:
                     insert into public.evaluation_runs (
                       evaluation_id,user_id,opportunity_id,trigger_type,actor_id,
                       evidence_snapshot_hash,evidence_materiality_digest,
-                      claim_snapshot,thesis_version_id,
+                      claim_snapshot,judgment_audit,thesis_version_id,
                       policy_version_id,policy_hash,rubric_version,
                       partner_rules_version,partner_rules_hash,model_manifest,
                       prompt_manifest,status,supersedes_evaluation_id,started_at,created_at
-                    ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,'running',$17,now(),now())
+                    ) values ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10,$11,$12,$13,$14,$15,$16::jsonb,$17::jsonb,'running',$18,now(),now())
                     """,
                     evaluation_id, uid, opportunity_id, trigger_type, actor_id,
-                    digest, content_digest, json.dumps(snapshot), thesis_version_id,
+                    digest, content_digest, json.dumps(snapshot), json.dumps(judgment_audit or {}), thesis_version_id,
                     policy.policy_version_id, policy.policy_hash, policy.rubric_version,
                     policy.partner_rules_version, policy.partner_rules_hash,
                     json.dumps(model_manifest or {}), json.dumps(prompt_manifest or {}),
@@ -251,6 +252,7 @@ class EvaluationRepository:
                     "opportunity_id": opportunity_id,
                     "evidence_snapshot_hash": digest,
                     "evidence_materiality_digest": content_digest,
+                    "judgment_audit": judgment_audit or {},
                     "criteria": [item.model_dump(mode="json") for item in result.criteria],
                     "recommendation": recommendation.model_dump(mode="json"),
                     "policy": policy.model_dump(mode="json"),
@@ -282,6 +284,7 @@ class EvaluationRepository:
             ("claim_snapshot", []),
             ("model_manifest", {}),
             ("prompt_manifest", {}),
+            ("judgment_audit", {}),
         ):
             evaluation_payload[key] = _json(evaluation_payload.get(key), default)
 

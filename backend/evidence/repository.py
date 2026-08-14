@@ -294,7 +294,7 @@ class EvidenceRepository:
                     json.dumps(sorted(set(missing_evidence))), json.dumps(list(search_questions)),
                     max(1, min(int(max_artifacts), 20)), max(0.0, float(budget_usd)), plan_hash,
                 )
-                payload = dict(row)
+                payload = db_row(row)
                 payload["missing_evidence"] = _json(payload.get("missing_evidence"), [])
                 payload["search_questions"] = _json(payload.get("search_questions"), [])
                 plan = EvidencePlanRecord.model_validate(payload)

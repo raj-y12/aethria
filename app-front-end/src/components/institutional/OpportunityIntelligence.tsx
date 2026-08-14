@@ -89,9 +89,13 @@ function RulingState({ message, unavailable = false }: { message: string; unavai
 
 export default function OpportunityIntelligence({
   startupId,
+  companyName = null,
+  onRulingRecorded,
   readOnly = false,
 }: {
   startupId: string;
+  companyName?: string | null;
+  onRulingRecorded?: () => void;
   readOnly?: boolean;
 }) {
   const opportunity = useQuery({
@@ -174,6 +178,8 @@ export default function OpportunityIntelligence({
         opportunityId={opportunity.data.opportunity_id}
         recommendationId={recommendationId}
         recommendedDecision={recommendedDecision}
+        companyName={companyName}
+        onRecorded={onRulingRecorded}
         readOnly={readOnly}
       />
     </section>

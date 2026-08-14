@@ -6,7 +6,7 @@
  */
 import { type ReactNode } from 'react';
 import type { MemoPartialPayload } from '../../api/startups';
-import type { Review, SingleReview, Startup } from '../../types/startup';
+import type { DecisionHistoryDecision, Review, SingleReview, Startup } from '../../types/startup';
 import { memoReferenceHref, memoReferenceLabel } from '../../lib/memoReferenceHref';
 import { DECISION_LABELS } from '../../design-system/semantics';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
@@ -241,9 +241,10 @@ export function pipelineReplayOneLiner(steps: PipelineReplayStep[]): string {
   return tail ? `${flow} · ${tail}` : flow;
 }
 
-export function decisionLabel(decision: RulingDecision): string {
+export function decisionLabel(decision: RulingDecision | DecisionHistoryDecision): string {
   if (decision === 'YES') return 'Invest';
   if (decision === 'NO') return 'Pass';
+  if (decision === 'ADVANCE') return 'Advance';
   return 'Monitor';
 }
 

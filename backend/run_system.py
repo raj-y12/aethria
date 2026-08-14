@@ -33,6 +33,9 @@ from jobs.postgres import DurableJobConfigurationError, create_pool
 from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from pipeline_runner import run_one_pipeline_cycle
 from tenant_context import require_user_id
+from utils.job_schedule import configure_schedule_repository
+from retrieval_cache.repository import RetrievalCacheRepository
+from utils.retrieval_grounding import configure_retrieval_cache
 
 
 class ColorFormatter(logging.Formatter):
@@ -128,6 +131,8 @@ async def run_system(
         if identity_repository is None or fund_intelligence_repository is None:
             try:
                 owned_pool = await create_pool()
+                configure_schedule_repository(owned_pool)
+                configure_retrieval_cache(RetrievalCacheRepository(owned_pool))
             except DurableJobConfigurationError as exc:
                 return PipelineExecutionResult.blocked(
                     code="institutional_repository_required",
@@ -188,6 +193,8 @@ async def run_system(
     finally:
         if owned_pool is not None:
             await owned_pool.close()
+            configure_schedule_repository(None)
+            configure_retrieval_cache(None)
 
 
 def _execution_exit_code(result: PipelineExecutionResult) -> int:

@@ -4,7 +4,7 @@ export const productText = {
   sectionLabel: 'type-label-section',
   mutedLabel: 'type-label-section',
   micro: 'type-meta',
-  body: 'type-body-sm leading-relaxed text-oxford/60',
+  body: 'type-body-sm leading-relaxed text-oxford/65',
   bodyStrong: 'type-body-emphasis text-oxford',
   numeric: 'type-data',
 };
@@ -25,7 +25,7 @@ export const productInteraction = {
   rulingChoiceIdle:
     'type-status inline-flex h-10 min-h-[40px] items-center justify-center rounded-none border-0 bg-oxford/[0.025] px-2.5 transition-colors hover:bg-oxford/[0.04] hover:text-oxford disabled:cursor-not-allowed disabled:opacity-30 btn-interaction focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset',
   selected: 'bg-surface-selected text-oxford',
-  idle: 'text-oxford/60 hover:text-oxford/[0.72]',
+  idle: 'text-oxford/65 hover:text-oxford/[0.72]',
 };
 
 export const productPanel = {

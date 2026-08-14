@@ -54,7 +54,7 @@ export default function LookupReadyNotice({ name, recommendation, onOpen, onDism
               type="button"
               onClick={onDismiss}
               aria-label="Dismiss memo ready notification"
-              className="type-action shrink-0 border-0 bg-transparent p-1 text-oxford/40 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+              className="type-action shrink-0 border-0 bg-transparent p-1 text-oxford/65 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
             >
               Dismiss
             </button>

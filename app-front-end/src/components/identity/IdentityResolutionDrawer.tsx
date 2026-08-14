@@ -93,7 +93,7 @@ export default function IdentityResolutionDrawer({
           <h2 className="mt-phi-2 font-display text-3xl font-medium leading-tight text-oxford">
             {observation?.observed_name || 'Observed company'}
           </h2>
-          <p className="type-body mt-phi-2 text-oxford/60">
+          <p className="type-body mt-phi-2 text-oxford/65">
             {observation?.channel ? `${reasonLabel(observation.channel)} · ` : ''}
             {reasonLabel(identityCase.reason_code)}
           </p>
@@ -149,11 +149,11 @@ export default function IdentityResolutionDrawer({
                       <div className="flex items-start justify-between gap-phi-4">
                         <div>
                           <h3 className="font-sans text-base font-semibold text-oxford">{candidate.canonical_name}</h3>
-                          <p className="type-meta mt-1 text-oxford/60">{candidate.canonical_domain}</p>
+                          <p className="type-meta mt-1 text-oxford/65">{candidate.canonical_domain}</p>
                         </div>
                         <span className="type-status">{confidenceLabel(candidate.confidence)}</span>
                       </div>
-                      {candidate.reason ? <p className="type-body mt-phi-2 text-oxford/60">{candidate.reason}</p> : null}
+                      {candidate.reason ? <p className="type-body mt-phi-2 text-oxford/65">{candidate.reason}</p> : null}
                       {candidate.evidence_urls.length ? (
                         <div className="mt-phi-2 flex flex-wrap gap-x-phi-3 gap-y-1">
                           {candidate.evidence_urls.map((url) => (
@@ -174,7 +174,7 @@ export default function IdentityResolutionDrawer({
                 </label>
               ))}
               {identityCase.candidates.length === 0 ? (
-                <p className="type-body border-y border-oxford/10 py-phi-4 text-oxford/60">
+                <p className="type-body border-y border-oxford/10 py-phi-4 text-oxford/65">
                   No credible existing match was returned. Create a canonical company or defer this observation.
                 </p>
               ) : null}
@@ -202,7 +202,7 @@ export default function IdentityResolutionDrawer({
                 placeholder="company.com"
                 className="mt-phi-2 w-full border-0 border-b border-oxford/20 bg-transparent px-0 py-2 text-oxford outline-none focus:border-oxford"
               />
-              <p className="type-meta mt-phi-2 text-oxford/55">Confirm this against an official source before creating the record.</p>
+              <p className="type-meta mt-phi-2 text-oxford/65">Confirm this against an official source before creating the record.</p>
             </div>
           </div>
         ) : null}

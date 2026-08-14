@@ -89,7 +89,7 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.22 }}
-              className="mt-phi-3 max-w-[48ch] text-center type-body text-oxford/60"
+              className="mt-phi-3 max-w-[48ch] text-center type-body text-oxford/65"
             >
               {firstPublication
                 ? 'You are publishing your first fund thesis and scoring policy. Scouting, review, and investment recommendations will use them as soon as deployment completes.'
@@ -106,7 +106,7 @@ export default function FundThesisConfirmationModal({
                 className="hidden gap-x-phi-4 border-b border-oxford/[0.16] px-phi-5 py-phi-3 md:grid md:grid-cols-[minmax(9rem,22%)_minmax(0,1fr)_minmax(0,1fr)]"
               >
                 <span aria-hidden />
-                <p className="type-label-section text-oxford/55">Currently live</p>
+                <p className="type-label-section text-oxford/65">Currently live</p>
                 <p className="type-label-section text-oxford">Proposed</p>
               </div>
               {changes.map((change) => (
@@ -122,8 +122,8 @@ export default function FundThesisConfirmationModal({
                     {change.label}
                   </h2>
                   <div className="min-w-0">
-                    <p className="mb-1 type-label-section text-oxford/55 md:hidden">Currently live</p>
-                    <p className="whitespace-pre-wrap break-words type-body-sm leading-relaxed text-oxford/55 [overflow-wrap:anywhere]">
+                    <p className="mb-1 type-label-section text-oxford/65 md:hidden">Currently live</p>
+                    <p className="whitespace-pre-wrap break-words type-body-sm leading-relaxed text-oxford/65 [overflow-wrap:anywhere]">
                       {change.previous}
                     </p>
                   </div>
@@ -155,7 +155,7 @@ export default function FundThesisConfirmationModal({
                 type="button"
                 onClick={onCancel}
                 disabled={busy}
-                className="type-action inline-flex min-h-11 items-center justify-center px-phi-3 text-oxford/60 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                className="type-action inline-flex min-h-11 items-center justify-center px-phi-3 text-oxford/65 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
               >
                 <span className="border-b border-oxford/10 pb-0.5 transition-colors hover:border-oxford/40">
                   Go back

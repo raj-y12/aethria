@@ -11,9 +11,11 @@ class DurableJobConfigurationError(RuntimeError):
 
 
 def database_dsn() -> str:
+    """Return the canonical DSN, with the historical Supabase name as fallback."""
     return (
-        os.getenv("DATABASE_URL", "") or os.getenv("SUPABASE_DB_URL", "")
-    ).strip()
+        os.getenv("DATABASE_URL", "").strip()
+        or os.getenv("SUPABASE_DB_URL", "").strip()
+    )
 
 
 async def create_pool(
@@ -23,7 +25,7 @@ async def create_pool(
     dsn = database_dsn()
     if not dsn:
         raise DurableJobConfigurationError(
-            "Durable jobs require DATABASE_URL or SUPABASE_DB_URL"
+            "Durable jobs require DATABASE_URL"
         )
     if create_pool_fn is None:
         import asyncpg

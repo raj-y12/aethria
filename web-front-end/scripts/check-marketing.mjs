@@ -17,14 +17,47 @@ if (html === undefined) {
   process.exit(1);
 }
 
+const teamHtml = await readFile(new URL('../dist/team.html', import.meta.url), 'utf8').catch(() => undefined);
+if (teamHtml === undefined) {
+  console.error('Marketing guard: dist/team.html does not exist — run the build first.');
+  process.exit(1);
+}
+
 const checks = [
   ['lede present', () => html.includes('Private-market judgment, on the record')],
+  ['home evidence spine present', () =>
+    ['Aethria', 'Fund thesis', 'Evidence trail', 'Human decision'].every((marker) => html.includes(marker))],
+  ['hero keeps editorial restraint', () => !html.includes('Decision surface') && !html.includes('Live / 001')],
   ['reviewer dims present', () =>
     ['Market', 'Product', 'Technical', 'Execution', 'Defensibility'].every((d) => html.includes(d))],
+  ['query dispatch sequence present', () =>
+    ['data-query-flow="dispatch-sequence"', 'Scouting', 'Reviewing', 'Deciding'].every((marker) => html.includes(marker))],
+  ['home drops repeated plate furniture', () =>
+    !['The Market — Plate 01', 'The Record — Plate 02', 'The Review — Plate 03', 'The Newsroom — Plate 04'].some(
+      (marker) => html.includes(marker)
+    )],
   ['JSON-LD present', () => html.includes('application/ld+json')],
   ['no fonts.googleapis.com', () => !html.includes('fonts.googleapis.com')],
   ['theme-color grey stock', () => /theme-color" content="#D9D7D4/i.test(html)],
   ['no scroll-cue marker', () => !html.toLowerCase().includes('scrollcue')],
+  ['team page uses thesis-led structure', () =>
+    ['Aethria keeps venture judgment on the record.', 'Most investment decisions disappear into the process.', 'How we work'].every((heading) =>
+      teamHtml.includes(heading)
+    )],
+  ['team page has route-specific metadata', () =>
+    ['<title>Aethria — Venture judgment, on the record</title>', 'content="Aethria keeps venture judgment on the record', 'href="https://aethria.co/team"'].every(
+      (marker) => teamHtml.includes(marker)
+    )],
+  ['team page includes the decision record', () =>
+    ['FUND THESIS', 'EVIDENCE', 'HUMAN DECISION'].every((marker) => teamHtml.includes(marker))],
+  ['team page uses concrete principles', () =>
+    ['Show the source', 'Keep the person in charge', 'Make every decision useful later'].every((principle) =>
+      teamHtml.includes(principle)
+    )],
+  ['team page has a founder photo slot', () =>
+    teamHtml.includes('data-image-slot="founder"') && teamHtml.includes('/raj-yendamuri.jpg') && !teamHtml.includes('team-photo-placeholder')],
+  ['team page drops internal and template language', () =>
+    !teamHtml.includes('The House') && !teamHtml.includes('The ruling') && !teamHtml.includes('Meet the founder')],
 ];
 
 const failed = checks.filter(([, fn]) => !fn()).map(([name]) => name);

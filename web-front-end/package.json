@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite-react-ssg build",
+    "build": "tsc && vite-react-ssg build && node scripts/postprocess-pages.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:marketing": "node scripts/check-marketing.mjs",
     "check:waitlist": "node --experimental-strip-types scripts/check-waitlist-escaping.mjs",

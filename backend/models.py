@@ -415,6 +415,8 @@ class ScoutInfo(BaseModel):
     traction_facts: Optional[Dict[str, str]] = None
     # Optional provenance for enriched fields (e.g. est_tam, funding_stage, references): scout | reviewer_extraction | gap_retrieval | reviewer_text_infer
     field_provenance: Optional[Dict[str, str]] = None
+    # Explicitly derived compatibility fields; never canonical evidence.
+    derived_compatibility: Dict[str, str] = Field(default_factory=dict)
     # High-level references / source notes for how this opportunity was discovered.
     # E.g. reports, trends, example companies, or general domain knowledge notes.
     references: Optional[List[str]] = None
@@ -570,6 +572,10 @@ class ReviewInfo(BaseModel):
     disagreement_summary: Optional[str] = None
     # Unified narrative from template (no extra LLM in v1).
     aethria_view: Optional[AethriaView] = None
+    # Derived evidence-vs-judgment guard; original review remains inside this audit payload.
+    contradiction_guard: Optional[Dict[str, Any]] = None
+    # Canonical decision-time context snapshot used by the guard and downstream audit.
+    canonical_context_snapshot: Optional[Dict[str, Any]] = None
 
 
 class PartnerSnapshot(BaseModel):
@@ -607,6 +613,8 @@ class PartnerInfo(BaseModel):
     mandate_gate: Optional[str] = None               # clear | weak_fit | outside_thesis | held | alignment_missing | ownership_conflict | no_mandate
     ownership_conflict: Optional[Dict[str, Any]] = None  # set when mandate_gate == ownership_conflict
     mandate_override_required: Optional[bool] = None # strong company held off-thesis, needs IC exception
+    # Derived guard for any Partner narrative corrected against canonical evidence.
+    contradiction_guard: Optional[Dict[str, Any]] = None
 
 
 class Financials(BaseModel):

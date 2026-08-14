@@ -68,7 +68,7 @@ function AdvancedChip({
       onClick={onClick}
       aria-pressed={active}
       className={`type-meta min-h-[36px] whitespace-nowrap px-phi-4 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 ${
-        active ? 'bg-surface-selected text-oxford' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/60'
+        active ? 'bg-surface-selected text-oxford' : 'bg-oxford/[0.035] hover:bg-oxford/[0.065] text-oxford/65'
       }`}
     >
       {label}
@@ -93,6 +93,9 @@ export interface DecisionQueueHeaderProps {
   hasActiveFilters: boolean;
   activeFilterCount: number;
   onResetFilters: () => void;
+  /** Free-text retrieval across the whole docket, regardless of the active view. */
+  query: string;
+  onQueryChange: (value: string) => void;
   reduceMotion: boolean;
   /** The queue views, rendered by the room that owns their state (FlowPage). */
   viewsSlot?: ReactNode;
@@ -120,6 +123,8 @@ export default function DecisionQueueHeader({
   hasActiveFilters,
   activeFilterCount,
   onResetFilters,
+  query,
+  onQueryChange,
   reduceMotion,
   viewsSlot,
 }: DecisionQueueHeaderProps) {
@@ -135,12 +140,30 @@ export default function DecisionQueueHeader({
         <div className="min-w-0 flex-1">{viewsSlot}</div>
 
         <div className="flex shrink-0 items-center gap-x-phi-4">
+          <label className="flex min-w-0 items-center">
+            <span className="sr-only">Find a company in the docket</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => onQueryChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape' && query) {
+                  e.stopPropagation();
+                  onQueryChange('');
+                }
+              }}
+              placeholder="Find a company"
+              autoComplete="off"
+              className="type-meta h-8 w-[9rem] min-w-0 border-0 border-b border-oxford/15 bg-transparent px-0 pb-0.5 text-oxford outline-none transition-colors placeholder:text-oxford/65 focus:border-oxford/40 focus-visible:outline-none sm:w-[12rem] [&::-webkit-search-cancel-button]:appearance-none"
+            />
+          </label>
+
           <select
             value={sortFilter}
             onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
             aria-label="Sort deals"
             style={sortSelectStyle}
-            className="type-action h-8 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 text-oxford/40 outline-none transition-colors hover:text-oxford focus-visible:outline-none"
+            className="type-action h-8 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 text-oxford/65 outline-none transition-colors hover:text-oxford focus-visible:outline-none"
           >
             {SORT_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>
@@ -154,7 +177,7 @@ export default function DecisionQueueHeader({
             onClick={onToggleAdvancedFilters}
             aria-expanded={showAdvancedFilters}
             className={`type-action inline-flex h-8 shrink-0 items-center gap-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/40 hover:text-oxford'
+              showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/65 hover:text-oxford'
             }`}
           >
             Filters

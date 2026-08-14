@@ -162,7 +162,7 @@ class StartupCompatibilityProjectionRepository:
                     f"""
                     update public.startups
                     set {', '.join(assignments)}
-                    where user_id=$1 and startup_id=$2::uuid
+                    where user_id=$1 and startup_id=$2
                     returning startup_id
                     """,
                     *arguments,

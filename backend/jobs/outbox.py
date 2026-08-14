@@ -25,19 +25,10 @@ async def _publish_to_event_bus(user_id: str, event_type: str, payload: dict) ->
 async def _project_legacy_read_models(
     user_id: str, event_type: str, payload: dict
 ) -> None:
+    """Compatibility hook retained for 5D; canonical policy events need no projection."""
     if event_type != "governed_policy_version.published":
         return
-    from services.scoring.policy_store import publish_policy
-
-    fund_config = payload.get("fund_config")
-    expected_hash = str(payload.get("policy_hash") or "").strip()
-    if not isinstance(fund_config, dict) or not expected_hash:
-        raise ValueError("Governed policy outbox event is missing its exact projection")
-    projected = await asyncio.to_thread(
-        publish_policy, user_id, fund_config=fund_config
-    )
-    if projected.get("policy_hash") != expected_hash:
-        raise RuntimeError("Legacy policy projection hash mismatch")
+    return
 
 
 class OutboxPublisher:

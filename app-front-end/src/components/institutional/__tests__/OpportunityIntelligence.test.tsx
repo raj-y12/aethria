@@ -107,9 +107,10 @@ describe('OpportunityIntelligence', () => {
   it('requires a rationale before recording a human ruling', async () => {
     renderWorkspace();
     fireEvent.click(await screen.findByRole('button', { name: 'Monitor' }));
-    expect(screen.getByRole('button', { name: 'Commit ruling' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Review ruling' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Ruling rationale'), { target: { value: 'Customer pull is credible; monitor until retention is verified.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review ruling' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit this ruling' }));
     await waitFor(() => expect(api.createHumanRuling).toHaveBeenCalledWith('opportunity-1', expect.objectContaining({
       decision: 'monitor', rationale: 'Customer pull is credible; monitor until retention is verified.',
     })));
@@ -125,7 +126,8 @@ describe('OpportunityIntelligence', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pass' }));
     fireEvent.change(screen.getByLabelText('Override attribution'), { target: { value: 'missing_private_evidence' } });
     fireEvent.change(screen.getByLabelText('Ruling rationale'), { target: { value: 'Spoke with two design partners directly.' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Commit ruling' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review ruling' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Commit this ruling' }));
     await waitFor(() => expect(api.createHumanRuling).toHaveBeenCalledWith('opportunity-1', expect.objectContaining({
       decision: 'pass', override_type: 'missing_private_evidence',
     })));
@@ -145,7 +147,7 @@ describe('OpportunityIntelligence', () => {
     });
     api.fetchEvidenceLedger.mockResolvedValue({ artifacts: [], items: [], claims: [], links: [], plans: [] });
     renderWorkspace();
-    expect(await screen.findByRole('button', { name: 'Commit ruling' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Review ruling' })).toBeInTheDocument();
     expect(await screen.findByText('Insufficient evidence')).toBeInTheDocument();
     expect(screen.getByText('Verified market demand')).toBeInTheDocument();
     expect(screen.getByText('Resolve missing evidence: market.')).toBeInTheDocument();

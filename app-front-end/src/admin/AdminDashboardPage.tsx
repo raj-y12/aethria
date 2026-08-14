@@ -52,7 +52,7 @@ function StatusPill({ active, label }: { active: boolean; label: string }) {
       className={`type-status inline-flex items-center border px-2 py-1 ${
         active
           ? 'border-oxford/20 bg-oxford text-paper'
-          : 'border-oxford/[0.08] bg-transparent text-oxford/60'
+          : 'border-oxford/[0.08] bg-transparent text-oxford/65'
       }`}
     >
       {label}
@@ -115,7 +115,7 @@ export default function AdminDashboardPage() {
           <h1 className="mt-3 font-display text-[44px] leading-none text-oxford lg:text-[58px]">
             Master Log
           </h1>
-          <p className="mt-4 max-w-[720px] type-body text-oxford/60">
+          <p className="mt-4 max-w-[720px] type-body text-oxford/65">
             Global session, agent, startup, and pipeline visibility across every known user.
           </p>
         </div>
@@ -160,7 +160,7 @@ export default function AdminDashboardPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search users, email, status"
-              className="min-w-0 flex-1 bg-transparent border-0 border-b border-oxford/10 rounded-none outline-none focus:border-oxford/40 transition-colors type-body text-oxford py-2 placeholder:text-oxford/45"
+              className="min-w-0 flex-1 bg-transparent border-0 border-b border-oxford/10 rounded-none outline-none focus:border-oxford/40 transition-colors type-body text-oxford py-2 placeholder:text-oxford/65"
             />
             <div className="flex flex-wrap gap-2">
               {(['all', 'online', 'agents'] as UserFilter[]).map((option) => (
@@ -171,7 +171,7 @@ export default function AdminDashboardPage() {
                   className={`type-action border px-3 py-2 transition-colors ${
                     filter === option
                       ? 'border-oxford bg-oxford text-paper'
-                      : 'border-oxford/[0.08] text-oxford/60 hover:text-oxford'
+                      : 'border-oxford/[0.08] text-oxford/65 hover:text-oxford'
                   }`}
                 >
                   {option}
@@ -202,11 +202,11 @@ export default function AdminDashboardPage() {
                   <tr key={row.user_id} className="border-t border-oxford/[0.06] align-top">
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.display_name}</p>
-                      <p className="mt-1 type-meta text-oxford/60">{row.email ?? row.user_id}</p>
+                      <p className="mt-1 type-meta text-oxford/65">{row.email ?? row.user_id}</p>
                     </td>
                     <td className="px-4 py-4">
                       <StatusPill active={row.is_logged_in} label={row.is_logged_in ? 'Online' : 'Offline'} />
-                      <p className="mt-2 type-meta text-oxford/60">
+                      <p className="mt-2 type-meta text-oxford/65">
                         {row.active_sessions_count} active / last {formatDate(row.last_active_at)}
                       </p>
                     </td>
@@ -216,20 +216,20 @@ export default function AdminDashboardPage() {
                         <StatusPill active={row.agent_config.reviewers_enabled} label="Review" />
                         <StatusPill active={row.agent_config.partners_enabled} label="Partner" />
                       </div>
-                      <p className="mt-2 type-meta text-oxford/60">
+                      <p className="mt-2 type-meta text-oxford/65">
                         {row.agent_config.agents_status} / loop {row.loop_alive ? 'alive' : 'idle'}
                       </p>
                     </td>
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.startup_stats.total} total</p>
-                      <p className="mt-1 type-meta text-oxford/60">{decisionSummary(row)}</p>
+                      <p className="mt-1 type-meta text-oxford/65">{decisionSummary(row)}</p>
                     </td>
                     <td className="px-4 py-4">
                       <p className="type-body-sm text-oxford">{row.pipeline_stats.runs_24h} runs in 24h</p>
-                      <p className="mt-1 type-meta text-oxford/60">
+                      <p className="mt-1 type-meta text-oxford/65">
                         Latest {formatDate(row.pipeline_stats.latest_activity_at)}
                       </p>
-                      <p className="mt-1 type-meta text-oxford/60">
+                      <p className="mt-1 type-meta text-oxford/65">
                         {row.pipeline_stats.startups_found_24h} found / {row.pipeline_stats.decisions_24h} decisions
                       </p>
                     </td>
@@ -237,7 +237,7 @@ export default function AdminDashboardPage() {
                 ))}
                 {users.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center type-body text-oxford/60">
+                    <td colSpan={5} className="px-4 py-10 text-center type-body text-oxford/65">
                       No users match this view.
                     </td>
                   </tr>
@@ -247,7 +247,7 @@ export default function AdminDashboardPage() {
           </div>
 
           {overview && (
-            <p className="type-meta text-oxford/60">
+            <p className="type-meta text-oxford/65">
               Generated {formatDate(overview.generated_at)}. Clerk session data is cached briefly by the backend.
             </p>
           )}

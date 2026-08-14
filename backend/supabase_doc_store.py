@@ -1,7 +1,8 @@
 """
 Supabase-backed storage for list and doc JSON blobs.
 Every operation requires an explicit user_id (no run_context or default tenant).
-Uses get_service_client(); tables: portfolio_*, memory, settings, analytics_*, meta_*.
+Uses get_service_client() for legacy domains that have not yet moved to the
+provider-neutral Batch 1 persistence boundary.
 """
 import logging
 import time
@@ -60,15 +61,7 @@ def _client():
 
 # ---- List tables (user_id + id + data, ordered by created_at) ----
 LIST_TABLES = {
-    "portfolio_decisions",
-    "portfolio_positions",
-    "portfolio_rejections",
-    "portfolio_watchlist",
-    "portfolio_signals",
-    "portfolio_agent_metrics",
     "fund_policy_versions",
-    "meta_mutation_log",
-    "meta_reports",
     "lookup_job_outcomes",
 }
 
@@ -198,7 +191,7 @@ def list_append(
 
 
 def list_append_only(table: str, record: Dict[str, Any], *, user_id: str) -> str:
-    """Append with generated id (for mutation_log, meta_reports). Returns id."""
+    """Append a legacy list row with a generated id. Returns id."""
     uid = require_user_id(user_id, context=f"list_append_only({table})")
     rid = str(uuid4())
     record = dict(record)
@@ -215,14 +208,7 @@ def list_append_only(table: str, record: Dict[str, Any], *, user_id: str) -> str
 
 # ---- Doc tables (user_id + key + data) ----
 DOC_TABLES = {
-    "portfolio_budgets",
     "memory",
-    "settings",
-    "analytics_sector_concentration",
-    "meta_prompt_library",
-    "meta_scout_weights",
-    "meta_calibration_state",
-    "meta_cycle_counters",
 }
 
 

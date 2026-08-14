@@ -1,6 +1,6 @@
 """
 PromptMutator — decides which prompts to mutate and rewrites them via LLM.
-Backed by Supabase meta_prompt_library and meta_mutation_log.
+Backed by provider-neutral meta_prompt_library and meta_mutation_log.
 """
 import json
 import logging
@@ -14,7 +14,7 @@ from utils.timeutil import utcnow
 from uuid import uuid4
 
 from utils.prompt_version import hash_prompt
-from supabase_doc_store import doc_get, doc_set, list_get_all, list_append_only
+from batch1.store import doc_get, doc_set, list_get_all, list_append_only
 from meta.prompt_gating import PROMPT_LIBRARY_DATA_KEY
 from meta.schema import (
     PromptMutationBatchResult,

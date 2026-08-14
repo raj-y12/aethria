@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Mapping
 
 from clerk_admin import list_active_sessions_by_user, list_clerk_users
-from supabase_client import get_service_client
 
 
 def _now() -> datetime:
@@ -198,6 +197,7 @@ def build_admin_overview_from_rows(
 
 def _fetch_rows(table: str, columns: str) -> List[Dict[str, Any]]:
     try:
+        from supabase_client import get_service_client
         response = get_service_client().table(table).select(columns).execute()
         rows = response.data if hasattr(response, "data") else []
         return rows if isinstance(rows, list) else []
@@ -215,13 +215,14 @@ def _known_user_ids(*row_groups: Iterable[Mapping[str, Any]], clerk_users: Itera
     return out
 
 
-def build_admin_overview(*, loop_status_by_user: Mapping[str, bool] | None = None) -> Dict[str, Any]:
-    settings_rows = _fetch_rows("settings", "user_id,data")
-    startup_rows = _fetch_rows("startups", "user_id,partner_decision")
-    pipeline_rows = _fetch_rows(
-        "pipeline_activity",
-        "user_id,timestamp,startups_found,reviewed_count,decisions_made,escalations_count",
-    )
+def build_admin_overview(*, loop_status_by_user: Mapping[str, bool] | None = None, pipeline_rows: List[Dict[str, Any]] | None = None, startup_rows: List[Dict[str, Any]] | None = None, settings_rows: List[Dict[str, Any]] | None = None) -> Dict[str, Any]:
+    if settings_rows is None:
+        settings_rows = _fetch_rows("settings", "user_id,data")
+    if startup_rows is None:
+        startup_rows = _fetch_rows("startups", "user_id,partner_decision")
+    else:
+        startup_rows = list(startup_rows)
+    pipeline_rows = list(pipeline_rows or [])
     clerk_users = list_clerk_users()
     loop_status = dict(loop_status_by_user or {})
     user_ids = _known_user_ids(
@@ -240,4 +241,3 @@ def build_admin_overview(*, loop_status_by_user: Mapping[str, bool] | None = Non
         pipeline_rows=pipeline_rows,
         loop_status_by_user=loop_status,
     )
-

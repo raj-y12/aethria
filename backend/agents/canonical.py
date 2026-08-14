@@ -20,6 +20,7 @@ class EvidenceReview(BaseModel):
     principal_risks: List[str] = Field(default_factory=list)
     decision_drivers: List[str] = Field(default_factory=list)
     confidence: float = Field(ge=0, le=1)
+    regulatory_context: str = ""
 
 
 class PartnerRoute(BaseModel):
@@ -32,7 +33,7 @@ class PartnerRoute(BaseModel):
 class EvidenceReviewer:
     """Reviewer that reports only what the immutable evaluation contains."""
 
-    def review(self, evaluation: Dict[str, Any]) -> EvidenceReview:
+    def review(self, evaluation: Dict[str, Any], *, regulatory_context: str = "") -> EvidenceReview:
         recommendation = evaluation.get("recommendation") or {}
         criteria = list(evaluation.get("criteria") or [])
         scored = [item for item in criteria if item.get("score") is not None]
@@ -50,6 +51,7 @@ class EvidenceReviewer:
             principal_risks=[str(item) for item in recommendation.get("principal_risks") or []],
             decision_drivers=[str(item) for item in recommendation.get("decision_drivers") or []],
             confidence=float(recommendation.get("confidence") or 0),
+            regulatory_context=regulatory_context,
         )
 
 

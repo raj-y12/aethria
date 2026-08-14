@@ -1,6 +1,6 @@
 """
 Sector clustering and concentration tracking.
-Backed by Supabase analytics_sector_concentration table.
+Backed by the provider-neutral analytics_sector_concentration table.
 """
 import logging
 import math
@@ -12,7 +12,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from utils.timeutil import utcnow
 
-from supabase_doc_store import doc_get, doc_set
+from batch1.store import doc_get, doc_set
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def _extract_keywords(text: str) -> List[str]:
 
 
 class ClusterAnalyzer:
-    """Analyzes sector concentration and theme clusters. Backed by Supabase."""
+    """Analyzes sector concentration and theme clusters."""
 
     def __init__(self, user_id: str, output_file: str = "data/analytics/sector_concentration.json"):
         self.user_id = user_id

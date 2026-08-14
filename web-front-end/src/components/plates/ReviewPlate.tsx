@@ -11,8 +11,9 @@ export default function ReviewPlate() {
       id="review"
       index="03 — 08"
       title="The Review"
-      capLeft="The Review — Plate 03"
-      capRight="The disagreement, preserved"
+      capLeft="Review / disagreement preserved"
+      capRight="Source, reviewer, decision"
+      tone="product-evidence"
     >
       <p className="review-statement reveal d2">Investment judgment is not consensus.</p>
       <div className="review reveal d2">

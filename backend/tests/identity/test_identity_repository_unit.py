@@ -697,3 +697,37 @@ async def test_decision_cases_preserve_historical_evaluation_episodes():
     sql = "\n".join(call[1].lower() for call in connection.calls)
     assert sql.count("user_id=$1") >= 5
     assert "opportunity_id=$2" in sql
+
+
+@pytest.mark.asyncio
+async def test_decision_view_exposes_canonical_ruling_history_for_memo_reads():
+    row = {
+        **_opportunity_row(
+            decision_state="active_review",
+            current_ruling_id="ruling-advanced",
+        ),
+        "canonical_name": "Advanced Co",
+        "canonical_domain": "advanced.example",
+        "recommended_state": "advance",
+        "recommendation_confidence": 0.8,
+        "decision_drivers": json.dumps(["customer evidence"]),
+        "principal_risks": json.dumps([]),
+        "missing_information": json.dumps([]),
+        "change_conditions": json.dumps([]),
+        "current_ruling_decision": "advance",
+        "ruling_history": json.dumps([{
+            "ruling_id": "ruling-advanced",
+            "decision": "advance",
+            "rationale": "Advance to diligence.",
+            "created_at": "2026-08-11T10:00:00Z",
+        }]),
+    }
+    connection = _Connection(fetchrows=[row])
+    repository = IdentityRepository(_Pool(connection))
+
+    result = await repository.get_decision_view(
+        user_id="fund-a", opportunity_id=row["opportunity_id"]
+    )
+
+    assert result["ruling_history"][0]["decision"] == "advance"
+    assert result["ruling_history"][0]["rationale"] == "Advance to diligence."

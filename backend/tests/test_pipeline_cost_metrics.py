@@ -9,7 +9,7 @@ def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
     created = []
 
     class Controller:
-        def __init__(self, *, user_id, enforce_limits):
+        def __init__(self, *, user_id, enforce_limits, settings=None):
             created.append((user_id, enforce_limits))
 
     class Engine:

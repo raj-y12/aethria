@@ -11,6 +11,7 @@ import metrics
 from jobs.lookup_outcomes import (
     LookupAttemptDisposition,
     LookupAttemptOutcome,
+    LookupOutcomeCorrupt,
     LookupOutcomeStoreUnavailable,
 )
 from jobs.models import (
@@ -86,6 +87,70 @@ class DurableJobRepository:
             raise LookupOutcomeStoreUnavailable(
                 "Atomic durable job/lookup outcome write failed"
             ) from exc
+
+    async def record_lookup_outcome(
+        self, outcome: LookupAttemptOutcome
+    ) -> LookupAttemptOutcome:
+        """Persist a compatibility-queue outcome through the durable authority."""
+        validated = LookupAttemptOutcome.model_validate(outcome)
+        try:
+            async with self.pool.acquire() as conn:
+                await self._upsert_lookup_outcome(conn, validated)
+        except LookupOutcomeStoreUnavailable:
+            raise
+        except Exception as exc:
+            raise LookupOutcomeStoreUnavailable(
+                "Durable lookup outcome write failed"
+            ) from exc
+        return validated
+
+    async def latest_lookup_attempt(
+        self, *, user_id: str, lookup_id: str
+    ) -> Optional[LookupAttemptOutcome]:
+        """Return the newest valid attempt for a tenant-scoped lookup."""
+        uid = require_user_id(user_id, context="DurableJobRepository.latest_lookup_attempt")
+        lid = str(lookup_id or "").strip()
+        if not lid:
+            raise ValueError("lookup_id is required")
+        try:
+            async with self.pool.acquire() as conn:
+                records = await conn.fetch(
+                    """
+                    select data from public.lookup_job_outcomes
+                    where user_id = $1 and data->>'lookup_id' = $2
+                    """,
+                    uid,
+                    lid,
+                )
+        except Exception as exc:
+            raise LookupOutcomeStoreUnavailable(
+                "Durable lookup outcome read failed"
+            ) from exc
+        matching = []
+        for record in records:
+            data = record.get("data") if hasattr(record, "get") else record["data"]
+            try:
+                outcome = LookupAttemptOutcome.model_validate(data)
+            except Exception as exc:
+                raise LookupOutcomeCorrupt(
+                    "Durable lookup outcome failed contract validation"
+                ) from exc
+            if outcome.user_id != uid:
+                raise LookupOutcomeCorrupt(
+                    "Durable lookup outcome tenant does not match storage scope"
+                )
+            matching.append(outcome)
+        if not matching:
+            return None
+        return max(
+            matching,
+            key=lambda item: (
+                item.attempt,
+                item.recorded_at,
+                item.job_id,
+                item.pipeline_run_id,
+            ),
+        )
 
     @staticmethod
     def _validate_lookup_outcome(

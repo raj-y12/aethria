@@ -13,12 +13,14 @@ with [Backend] / [App] / [Web] / [Agents] so you can see API and frontend activi
 """
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+from urllib.parse import urlsplit
 
 try:
     from dotenv import load_dotenv
@@ -30,6 +32,10 @@ BACKEND_DIR = REPO_ROOT / "backend"
 APP_FRONTEND_DIR = REPO_ROOT / "app-front-end"
 WEB_FRONTEND_DIR = REPO_ROOT / "web-front-end"
 ENV_FILE = REPO_ROOT / ".env"
+COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+SNAPSHOT_COMPOSE_FILE = REPO_ROOT / "docker-compose.snapshot.yml"
+SNAPSHOT_DATABASE_NAME = "aethria_prod_snapshot"
+SNAPSHOT_VERIFIER = BACKEND_DIR / "scripts" / "verify_local_snapshot.py"
 
 BACKEND_PORT = 8000
 APP_FRONTEND_PORT = 3000
@@ -111,6 +117,96 @@ def _build_banner(use_color: bool) -> str:
         f"  Rolling logs below.\n"
         f"{line}\n"
     )
+
+
+class _TerminalRenderer:
+    """Keep the launcher banner fixed while log lines scroll below it."""
+
+    def __init__(
+        self,
+        banner: str,
+        *,
+        stream=None,
+        enabled: bool | None = None,
+        terminal_lines: int | None = None,
+        terminal_columns: int | None = None,
+        use_color: bool = False,
+    ) -> None:
+        self._stream = stream or sys.stdout
+        self._banner = banner.rstrip("\n")
+        self._banner_lines = self._banner.splitlines()
+        self._terminal_lines = terminal_lines or shutil.get_terminal_size(
+            fallback=(120, 24)
+        ).lines
+        self._terminal_columns = terminal_columns or shutil.get_terminal_size(
+            fallback=(120, 24)
+        ).columns
+        self._use_color = use_color
+        title_lines = self._banner_lines[1:7]
+        title_width = max(
+            (len(ANSI_RE.sub("", line)) for line in title_lines),
+            default=0,
+        )
+        self._title_box_width = min(
+            max(title_width + 4, BANNER_WIDTH),
+            self._terminal_columns,
+        )
+        interactive = self._stream.isatty() if enabled is None else enabled
+        self._fixed = bool(
+            interactive and self._terminal_lines > len(self._banner_lines) + 2
+        )
+        self._lock = threading.RLock()
+
+    def _banner_line(self, index: int, line: str) -> str:
+        clean_line = ANSI_RE.sub("", line)
+        if 1 <= index <= 6:
+            # Keep the artwork at its original left-aligned banner position.
+            clean_line = clean_line.rstrip().ljust(self._title_box_width)
+            left_padding = 0
+            right_padding = self._terminal_columns - self._title_box_width
+            if not self._use_color:
+                return f"{' ' * left_padding}{clean_line}{' ' * right_padding}"
+            return (
+                f"{' ' * left_padding}\x1b[47m{OXFORD_BLUE}{clean_line}"
+                f"{RESET}{' ' * right_padding}"
+            )
+        else:
+            clean_line = clean_line.ljust(self._terminal_columns)
+        if not self._use_color:
+            return clean_line
+        return clean_line
+
+    def start(self) -> None:
+        with self._lock:
+            if not self._fixed:
+                self._stream.write(f"{self._banner}\n")
+                self._stream.flush()
+                return
+            self._stream.write("\x1b[2J\x1b[H")
+            for index, line in enumerate(self._banner_lines):
+                self._stream.write(f"{self._banner_line(index, line)}\x1b[K\n")
+            first_log_line = len(self._banner_lines) + 1
+            self._stream.write(
+                f"\x1b[{first_log_line};{self._terminal_lines}r"
+                f"\x1b[{first_log_line};1H"
+            )
+            self._stream.flush()
+
+    def emit(self, line: str) -> None:
+        with self._lock:
+            if not self._fixed:
+                self._stream.write(f"{line}\n")
+                self._stream.flush()
+                return
+            self._stream.write(f"\r{line}\x1b[K\n")
+            self._stream.flush()
+
+    def close(self) -> None:
+        if not self._fixed:
+            return
+        with self._lock:
+            self._stream.write("\x1b[r\x1b[?25h")
+            self._stream.flush()
 
 
 def _strip_ansi(text: str) -> str:
@@ -223,14 +319,179 @@ def _format_log_line(prefix: str, source_color: str, text: str, use_color: bool)
     return f"{ts_part} | {source_part} | {level_part} | {message_part}"
 
 
-def _stream_output(pipe, prefix: str, color: str = "", use_color: bool = False) -> None:
+def _should_start_agents(*, use_supabase: bool, agent_user_id: str) -> bool:
+    """Only start the tenant-scoped agent CLI when an explicit tenant exists."""
+    return bool(agent_user_id.strip())
+
+
+def _local_postgres_dsn() -> str:
+    """Return the configured local DSN, or an empty string for remote storage."""
+    dsn = os.getenv("DATABASE_URL", "").strip()
+    if not dsn:
+        return ""
+    parsed = urlsplit(dsn)
+    if parsed.hostname not in {"127.0.0.1", "localhost"}:
+        return ""
+    if parsed.port != 15432:
+        return ""
+    return dsn
+
+
+def _is_snapshot_database(database_url: str) -> bool:
+    """Return whether a DSN targets the preserved local production snapshot."""
+    return urlsplit(database_url).path.lstrip("/") == SNAPSHOT_DATABASE_NAME
+
+
+def _compose_file_for_database(database_url: str) -> Path:
+    """Keep the preserved snapshot on a volume separate from disposable tests."""
+    return SNAPSHOT_COMPOSE_FILE if _is_snapshot_database(database_url) else COMPOSE_FILE
+
+
+def _should_apply_local_migrations(database_url: str) -> bool:
+    """Normal startup may migrate disposable test databases, never the snapshot."""
+    return not _is_snapshot_database(database_url)
+
+
+def _compose_command() -> list[str]:
+    docker = shutil.which("docker")
+    if docker is not None:
+        probe = subprocess.run(
+            [docker, "compose", "version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if probe.returncode == 0:
+            return [docker, "compose"]
+    legacy = shutil.which("docker-compose")
+    if legacy is not None:
+        return [legacy]
+    raise RuntimeError(
+        "Docker Compose is required to start local PostgreSQL "
+        "(install the Docker Compose plugin or docker-compose)"
+    )
+
+
+def _docker_compose(
+    *args: str,
+    check: bool = True,
+    capture_output: bool = False,
+    compose_file: Path = COMPOSE_FILE,
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [*_compose_command(), "-f", str(compose_file), *args],
+        cwd=str(REPO_ROOT),
+        check=check,
+        capture_output=capture_output,
+        text=True,
+    )
+
+
+def _local_postgres_running(compose_file: Path = COMPOSE_FILE) -> bool:
+    result = _docker_compose(
+        "ps",
+        "--status",
+        "running",
+        "-q",
+        "postgres",
+        check=False,
+        capture_output=True,
+        compose_file=compose_file,
+    )
+    return bool(result.stdout and result.stdout.strip())
+
+
+def _start_local_postgres_and_migrate(database_url: str) -> bool:
+    """Start local PostgreSQL and verify the snapshot or migrate test storage."""
+    compose_file = _compose_file_for_database(database_url)
+    if not compose_file.exists():
+        raise RuntimeError(f"Local PostgreSQL compose file is missing: {compose_file}")
+    already_running = _local_postgres_running(compose_file)
+    started = not already_running
+    if not already_running:
+        print("  [run.py] Starting local PostgreSQL...", flush=True)
+        _docker_compose("up", "-d", "postgres", compose_file=compose_file)
+    try:
+        parsed = urlsplit(database_url)
+        database_name = parsed.path.lstrip("/")
+        database_user = parsed.username or "aethria"
+        deadline = time.time() + 30.0
+        database_ready = False
+        while time.time() < deadline:
+            if _wait_for_tcp("127.0.0.1", 15432, timeout_seconds=0.5):
+                probe = _docker_compose(
+                    "exec",
+                    "-T",
+                    "postgres",
+                    "pg_isready",
+                    "-U",
+                    database_user,
+                    "-d",
+                    database_name,
+                    check=False,
+                    capture_output=True,
+                    compose_file=compose_file,
+                )
+                if probe.returncode == 0:
+                    database_ready = True
+                    break
+            time.sleep(0.25)
+        if not database_ready:
+            raise RuntimeError(
+                f"Local PostgreSQL database {database_name!r} did not become ready"
+            )
+
+        if _should_apply_local_migrations(database_url):
+            print("  [run.py] Applying local PostgreSQL migrations...", flush=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(BACKEND_DIR / "scripts" / "migrate_postgres.py"),
+                    "--database-url",
+                    database_url,
+                ],
+                cwd=str(BACKEND_DIR),
+                check=True,
+                env={**os.environ, "DATABASE_URL": database_url},
+            )
+        else:
+            print("  [run.py] Verifying preserved local production snapshot...", flush=True)
+            subprocess.run(
+                [
+                    sys.executable,
+                    str(SNAPSHOT_VERIFIER),
+                    "--database-url",
+                    database_url,
+                ],
+                cwd=str(REPO_ROOT),
+                check=True,
+                env={**os.environ, "DATABASE_URL": database_url},
+            )
+        return started
+    except Exception:
+        if started:
+            _docker_compose("stop", "postgres", check=False, compose_file=compose_file)
+        raise
+
+
+def _stream_output(
+    pipe,
+    prefix: str,
+    color: str = "",
+    use_color: bool = False,
+    renderer: _TerminalRenderer | None = None,
+) -> None:
     """Read lines from pipe and print with enhanced formatting. Runs in thread."""
     try:
         for line in iter(pipe.readline, b""):
             if line:
                 text = line.decode("utf-8", errors="replace").rstrip()
                 if text:
-                    print(f"  {_format_log_line(prefix, color, text, use_color)}", flush=True)
+                    formatted = f"  {_format_log_line(prefix, color, text, use_color)}"
+                    if renderer is not None:
+                        renderer.emit(formatted)
+                    else:
+                        print(formatted, flush=True)
     except (ValueError, OSError):
         pass
     finally:
@@ -261,9 +522,16 @@ def _stop_process(proc: subprocess.Popen | None) -> None:
             pass
 
 
-def _wait_for_tcp(host: str, port: int, timeout_seconds: float = 20.0) -> bool:
+def _wait_for_tcp(
+    host: str,
+    port: int,
+    timeout_seconds: float = 20.0,
+    process: subprocess.Popen | None = None,
+) -> bool:
     deadline = time.time() + timeout_seconds
     while time.time() < deadline:
+        if process is not None and process.poll() is not None:
+            return False
         try:
             with socket.create_connection((host, port), timeout=0.5):
                 return True
@@ -306,8 +574,22 @@ def main() -> int:
     app_proc = None
     web_proc = None
     agents_proc = None
+    started_local_postgres = False
+    local_database_url = ""
+    renderer = _TerminalRenderer(
+        _build_banner(use_color),
+        stream=sys.stdout,
+        enabled=sys.stdout.isatty(),
+        use_color=use_color,
+    )
+    renderer.start()
 
     try:
+        local_database_url = _local_postgres_dsn()
+        if local_database_url:
+            started_local_postgres = _start_local_postgres_and_migrate(
+                local_database_url
+            )
         backend_proc = subprocess.Popen(
             [sys.executable, "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", str(BACKEND_PORT), "--workers", "1"],
             cwd=str(BACKEND_DIR),
@@ -315,11 +597,25 @@ def main() -> int:
             stderr=subprocess.STDOUT,
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
+        t_backend = threading.Thread(
+            target=_stream_output,
+            args=(backend_proc.stdout, "[Backend]", BACKEND_COLOR, use_color, renderer),
+            daemon=True,
+        )
+        t_backend.start()
         if backend_proc.poll() is not None:
+            t_backend.join(timeout=1)
             print("  [run.py] Backend process exited before accepting connections.", flush=True)
             return 1
-        if not _wait_for_tcp("127.0.0.1", BACKEND_PORT):
-            print(f"  [run.py] Backend did not accept TCP connections on 127.0.0.1:{BACKEND_PORT} within 20s.", flush=True)
+        if not _wait_for_tcp("127.0.0.1", BACKEND_PORT, process=backend_proc):
+            t_backend.join(timeout=1)
+            if backend_proc.poll() is not None:
+                print(
+                    f"  [run.py] Backend exited during startup (code {backend_proc.returncode}).",
+                    flush=True,
+                )
+            else:
+                print(f"  [run.py] Backend did not accept TCP connections on 127.0.0.1:{BACKEND_PORT} within 20s.", flush=True)
             return 1
         if backend_proc.poll() is not None:
             print("  [run.py] Backend process exited during startup.", flush=True)
@@ -349,11 +645,13 @@ def main() -> int:
         # If unset, skip the agents process; pipeline runs when users log in and trigger via API.
         use_supabase = os.getenv("USE_SUPABASE_STORAGE", "").lower() in ("1", "true", "yes")
         agent_user_id = os.getenv("AETHRIA_AGENT_USER_ID", "").strip()
-        start_agents = True
-        if use_supabase and not agent_user_id:
-            start_agents = False
-            print("  [run.py] Supabase on; no AETHRIA_AGENT_USER_ID. Skipping the legacy agents subprocess. "
-                  "The API will resume user-scoped agent loops after login.", flush=True)
+        start_agents = _should_start_agents(
+            use_supabase=use_supabase,
+            agent_user_id=agent_user_id,
+        )
+        if not start_agents:
+            print("  [run.py] No AETHRIA_AGENT_USER_ID. Skipping the legacy agents subprocess. "
+                  "The API will run user-scoped agent loops after login.", flush=True)
         agents_proc = None
         if start_agents:
             agents_cmd = [sys.executable, "run_system.py"]
@@ -368,29 +666,23 @@ def main() -> int:
             )
 
         # Stream logs
-        t_backend = threading.Thread(
-            target=_stream_output,
-            args=(backend_proc.stdout, "[Backend]", BACKEND_COLOR, use_color),
-            daemon=True,
-        )
         t_app = threading.Thread(
             target=_stream_output,
-            args=(app_proc.stdout, "[App]", APP_COLOR, use_color),
+            args=(app_proc.stdout, "[App]", APP_COLOR, use_color, renderer),
             daemon=True,
         )
         t_web = threading.Thread(
             target=_stream_output,
-            args=(web_proc.stdout, "[Web]", WEB_COLOR, use_color),
+            args=(web_proc.stdout, "[Web]", WEB_COLOR, use_color, renderer),
             daemon=True,
         )
         if agents_proc is not None:
             t_agents = threading.Thread(
                 target=_stream_output,
-                args=(agents_proc.stdout, "[Agents]", AGENTS_COLOR, use_color),
+                args=(agents_proc.stdout, "[Agents]", AGENTS_COLOR, use_color, renderer),
                 daemon=True,
             )
             t_agents.start()
-        t_backend.start()
         t_app.start()
         t_web.start()
 
@@ -410,11 +702,29 @@ def main() -> int:
             time.sleep(0.25)
     except KeyboardInterrupt:
         pass
+    except Exception as exc:
+        print(f"  [run.py] Startup failed: {exc}", file=sys.stderr, flush=True)
+        return 1
     finally:
         _stop_process(backend_proc)
         _stop_process(app_proc)
         _stop_process(web_proc)
         _stop_process(agents_proc)
+        if started_local_postgres:
+            try:
+                _docker_compose(
+                    "stop",
+                    "postgres",
+                    check=False,
+                    compose_file=_compose_file_for_database(local_database_url),
+                )
+            except Exception as exc:
+                print(
+                    f"  [run.py] Could not stop local PostgreSQL: {exc}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+        renderer.close()
         print("\nStopped.", flush=True)
 
     return 0

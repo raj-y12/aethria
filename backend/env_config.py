@@ -51,9 +51,9 @@ class EnvVar:
 # ---------------------------------------------------------------------------
 REGISTRY: List[EnvVar] = [
     # --- Core / storage ------------------------------------------------------
-    EnvVar("USE_SUPABASE_STORAGE", "bool", "", "Core / storage",
-           "Enable Supabase-backed storage. Required for pipeline execution; "
-           "local file storage is a dev-only fallback.", required=True, example="1"),
+    EnvVar("USE_SUPABASE_STORAGE", "bool", "", "Legacy Supabase compatibility",
+           "Deprecated compatibility switch; normal runtime persistence uses DATABASE_URL.",
+           required=False, example="0"),
     EnvVar("DATA_DIR", "str", "data", "Core / storage", "Root dir for local fallback data."),
     EnvVar("PORTFOLIO_DIR", "str", "data/portfolio", "Core / storage",
            "Local fallback dir for the portfolio JSON store."),
@@ -61,6 +61,9 @@ REGISTRY: List[EnvVar] = [
            "Local fallback path for the startups store (dev only)."),
     EnvVar("SETTINGS_PATH", "str", "data/settings.json", "Core / storage",
            "Local fallback path for per-user settings (dev only)."),
+    EnvVar("LOCAL_SNAPSHOT_READ_ONLY", "bool", "", "Core / storage",
+           "Local imported production snapshot mode; keeps repositories readable and disables autonomous writers.",
+           example="0"),
 
     # --- OpenAI / models -----------------------------------------------------
     EnvVar("OPENAI_API_KEY", "secret", "", "OpenAI / models",
@@ -215,6 +218,14 @@ REGISTRY: List[EnvVar] = [
            "Rollback lever: moves one provider (exa|firecrawl) to the head of the chain."),
     EnvVar("RETRIEVAL_FALLBACK_ENABLED", "bool", "1", "Search providers",
            "Use the keyless DuckDuckGo retrieval when the whole provider chain returns nothing."),
+    EnvVar("RETRIEVAL_CACHE_TTL_GENERAL_SECONDS", "int", "86400", "Search providers",
+           "Freshness window for general retrieval cache entries."),
+    EnvVar("RETRIEVAL_CACHE_TTL_NEWS_SECONDS", "int", "21600", "Search providers",
+           "Freshness window for news retrieval cache entries."),
+    EnvVar("RETRIEVAL_CACHE_TTL_COMPANY_SECONDS", "int", "604800", "Search providers",
+           "Freshness window for company retrieval cache entries."),
+    EnvVar("RETRIEVAL_CACHE_TTL_PEOPLE_SECONDS", "int", "604800", "Search providers",
+           "Freshness window for people retrieval cache entries."),
     EnvVar("RETRIEVAL_QUERY_CONCURRENCY", "int", "4", "Search providers",
            "Retrieval queries in flight at once within one merged pack (1 = sequential). "
            "Merge order stays deterministic regardless of this value."),
@@ -244,18 +255,25 @@ REGISTRY: List[EnvVar] = [
     EnvVar("FIRECRAWL_SCRAPE_MAX_URLS", "int", "3", "Firecrawl", "Max URLs sent to Firecrawl scrape."),
 
 
-    # --- Supabase client / pool ---------------------------------------------
-    EnvVar("SUPABASE_URL", "str", None, "Supabase", "Supabase project URL.", required=True,
-           example="https://your-project.supabase.co"),
-    EnvVar("SUPABASE_SERVICE_ROLE_KEY", "secret", "", "Supabase",
-           "Service-role key (server only; never sent to the frontend).", required=True),
-    EnvVar("SUPABASE_ANON_KEY", "secret", "", "Supabase", "Anon key (optional, server side)."),
-    EnvVar("VITE_SUPABASE_URL", "str", "", "Supabase", "Supabase URL fallback read from VITE_ var."),
-    EnvVar("SUPABASE_RETRY_ATTEMPTS", "int", "6", "Supabase", "Transport retry attempts."),
-    EnvVar("SUPABASE_MAX_RETRY_DELAY_SECONDS", "float", "1.5", "Supabase", "Max backoff between retries."),
-    EnvVar("SUPABASE_POOL_MAX_CONNECTIONS", "int", "40", "Supabase", "httpx pool max connections."),
-    EnvVar("SUPABASE_POOL_MAX_KEEPALIVE", "int", "20", "Supabase", "httpx pool max keepalive connections."),
-    EnvVar("SUPABASE_POOL_KEEPALIVE_EXPIRY", "int", "60", "Supabase", "httpx keepalive expiry (s)."),
+    # --- Legacy Supabase compatibility --------------------------------------
+    EnvVar("SUPABASE_URL", "str", "", "Legacy Supabase compatibility",
+           "Optional project URL for isolated legacy/test tooling."),
+    EnvVar("SUPABASE_SERVICE_ROLE_KEY", "secret", "", "Legacy Supabase compatibility",
+           "Optional service-role key for isolated legacy/test tooling."),
+    EnvVar("SUPABASE_ANON_KEY", "secret", "", "Legacy Supabase compatibility",
+           "Optional anon key for isolated legacy/test tooling."),
+    EnvVar("VITE_SUPABASE_URL", "str", "", "Legacy Supabase compatibility",
+           "Optional legacy URL fallback; not used by normal runtime."),
+    EnvVar("SUPABASE_RETRY_ATTEMPTS", "int", "6", "Legacy Supabase compatibility",
+           "Legacy transport retry attempts."),
+    EnvVar("SUPABASE_MAX_RETRY_DELAY_SECONDS", "float", "1.5", "Legacy Supabase compatibility",
+           "Legacy max backoff between retries."),
+    EnvVar("SUPABASE_POOL_MAX_CONNECTIONS", "int", "40", "Legacy Supabase compatibility",
+           "Legacy HTTP pool max connections."),
+    EnvVar("SUPABASE_POOL_MAX_KEEPALIVE", "int", "20", "Legacy Supabase compatibility",
+           "Legacy HTTP pool max keepalive connections."),
+    EnvVar("SUPABASE_POOL_KEEPALIVE_EXPIRY", "int", "60", "Legacy Supabase compatibility",
+           "Legacy HTTP keepalive expiry (seconds)."),
 
     # --- Admin dashboard -----------------------------------------------------
     EnvVar("ADMIN_DASHBOARD_ENABLED", "bool", None, "Admin",
@@ -280,11 +298,12 @@ REGISTRY: List[EnvVar] = [
     EnvVar("ALLOW_PROCESS_LOCAL_STATE", "bool", "false", "Event bus",
            "Explicitly acknowledge single-instance process-local queues/cancellation state."),
     EnvVar("DATABASE_URL", "secret", "", "Event bus",
-           "Direct Postgres connection string for the LISTEN/NOTIFY backplane "
-           "(Supabase exposes one). Required when EVENT_BUS_BACKPLANE=postgres."),
-    EnvVar("SUPABASE_DB_URL", "secret", "", "Event bus",
-           "Fallback Postgres connection string for the backplane (used if "
-           "DATABASE_URL is unset)."),
+           "Direct Postgres connection string for the LISTEN/NOTIFY backplane. "
+           "Required when EVENT_BUS_BACKPLANE=postgres."),
+    EnvVar("SNAPSHOT_DATABASE_URL", "secret", "", "Local snapshot validation",
+           "Local production-snapshot DSN used only by bounded import/validation tooling."),
+    EnvVar("SUPABASE_DB_URL", "secret", "", "Legacy Supabase compatibility",
+           "Deprecated database URL accepted only by historical tooling."),
 
     # --- Durable jobs -------------------------------------------------------
     EnvVar("DURABLE_JOB_DB_POOL_MIN", "int", "1", "Durable jobs",
@@ -325,6 +344,10 @@ REGISTRY: List[EnvVar] = [
     EnvVar("LOOKUP_WEBSITE_FETCH_TIMEOUT", "float", "5.0", "Scoring / misc", "Timeout fetching a looked-up website."),
     EnvVar("DEAL_CONTEXT_LOG_PIPELINE", "bool", "", "Scoring / misc", "Log deal-context assembly during pipeline."),
     EnvVar("AETHRIA_TOKEN_COST_PER_1K_USD", "float", "0.001", "Scoring / misc", "Assumed $/1k tokens for cost estimates."),
+
+    # --- Local contract tests ------------------------------------------------
+    EnvVar("TEST_DATABASE_URL", "secret", "", "Local contract tests",
+           "Vanilla PostgreSQL DSN used only by PostgreSQL contract tests."),
 ]
 
 _BY_NAME = {v.name: v for v in REGISTRY}

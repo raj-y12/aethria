@@ -256,6 +256,7 @@ def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInf
         confidence=confidence,
         next_action=str(partner_output.get("next_action") or ""),
         human_review_required=bool(partner_output.get("human_review_required", False)),
+        contradiction_guard=partner_output.get("contradiction_guard"),
         partner_agent_id=partner_output.get("partner_agent_id"),
         partnered_at=partnered,
         llm_fallback_reason=partner_output.get("llm_fallback_reason"),

@@ -17,7 +17,7 @@ from openai import OpenAI
 from utils.openai_client import build_openai_client
 from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
-from utils.settings_loader import load_settings, recommendation_for_score_from_fund_config
+from utils.settings_loader import DEFAULT_SETTINGS, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from identity.ownership_gate import check_ownership_conflict
@@ -236,6 +236,7 @@ class PartnerDecisionEngine:
         use_resource_fund_thesis_fallback: bool = True,
         evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
         include_deal_context_digest: Optional[bool] = None,
+        settings: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the decision engine.
@@ -250,6 +251,7 @@ class PartnerDecisionEngine:
         self.use_llm_fallback = use_llm_fallback
         self.logger = logging.getLogger("partner.decision")
         self.tenant_user_id = (tenant_user_id or "").strip()
+        self.settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
         self.evaluation_prerequisites = evaluation_prerequisites
         if evaluation_prerequisites is not None:
             evaluation_prerequisites.require_tenant(
@@ -270,8 +272,7 @@ class PartnerDecisionEngine:
             self.evaluation_policy = None
         if self.tenant_user_id and evaluation_prerequisites is None:
             try:
-                settings = load_settings(self.tenant_user_id)
-                fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+                fc = self.settings.get("fund_config") if isinstance(self.settings.get("fund_config"), dict) else {}
                 self._fund_config = dict(fc)
                 if self._fund_config:
                     self.logger.info(

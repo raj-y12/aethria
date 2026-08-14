@@ -1,0 +1,3 @@
+# Optional compatibility/test tooling only. This is intentionally excluded from
+# the production runtime image and the main requirements lock.
+supabase==2.28.2

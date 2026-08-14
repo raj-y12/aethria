@@ -16,9 +16,14 @@ import fcntl
 import os
 
 from tenant_context import require_user_id
+from batch2.context import get_state as get_batch2_state
+from batch1.context import get_state as get_batch1_state
+from batch2.repository import Batch2State
+from batch2.store import metric_append, metrics_get_all
+from batch3.context import get_state as get_batch3_state
+from batch3.repository import Batch3State
+from batch3.store import list_get_all as batch3_list_get_all, list_replace as batch3_list_replace, list_upsert as batch3_list_upsert
 import env_config
-from supabase_doc_store import list_get_all, list_get_by_id, list_upsert
-from supabase_client import get_service_client
 from portfolio.schemas import (
     StartupRecord,
     DecisionRecord,
@@ -29,6 +34,7 @@ from portfolio.schemas import (
     AgentMetric,
     SystemHealthRecord,
 )
+from portfolio.canonical_projection import canonical_startup_record
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +54,14 @@ class PortfolioStore:
     - agent_metrics.json: Agent performance metrics
     """
     
-    def __init__(self, data_dir: str = "data/portfolio", user_id: Optional[str] = None):
+    def __init__(
+        self,
+        data_dir: str = "data/portfolio",
+        user_id: Optional[str] = None,
+        batch2_state: Optional[Batch2State] = None,
+        canonical_startups: Optional[List[Dict[str, Any]]] = None,
+        legacy_startup_aliases: Optional[Dict[str, str]] = None,
+    ):
         """
         Initialize portfolio store.
 
@@ -59,19 +72,27 @@ class PortfolioStore:
         self.data_dir = Path(data_dir)
         self.logger = logging.getLogger("portfolio.store")
         explicit_uid = user_id.strip() if user_id and user_id.strip() else None
-        remote_configured = (
-            env_config.use_supabase_storage() and env_config.supabase_configured()
+        postgres_configured = bool(
+            explicit_uid and (get_batch1_state() is not None or env_config.is_production_env())
         )
-        if remote_configured and not explicit_uid:
-            raise RuntimeError("PortfolioStore requires explicit user_id when Supabase storage is enabled")
-        if env_config.use_supabase_storage() and env_config.is_production_env():
-            env_config.require_supabase_configured("PortfolioStore")
-        elif not env_config.local_fallback_allowed() and not remote_configured:
+        if not env_config.local_fallback_allowed() and not postgres_configured:
             raise RuntimeError(
                 "PortfolioStore: local_storage_disabled_in_production; "
-                "enable Supabase storage or explicitly use a non-production environment"
+                "configure the shared PostgreSQL repository or explicitly use a non-production environment"
             )
         self._tenant_user_id = explicit_uid
+        self._canonical_startups = {
+            str(row.get("startup_id")): canonical_startup_record(row)
+            for row in (canonical_startups or [])
+            if isinstance(row, dict) and row.get("startup_id")
+        } if canonical_startups is not None else None
+        self._legacy_startup_aliases = {
+            str(legacy): str(canonical)
+            for legacy, canonical in (legacy_startup_aliases or {}).items()
+            if str(legacy).strip() and str(canonical).strip()
+        }
+        self.batch2_state = batch2_state or get_batch2_state()
+        self.batch3_state = get_batch3_state()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         
         # File paths (fallback mode only)
@@ -84,15 +105,7 @@ class PortfolioStore:
             "signals": self.data_dir / "signals.json",
             "agent_metrics": self.data_dir / "agent_metrics.json",
         }
-        self._supabase_tables = {
-            "startups": "portfolio_startups",
-            "decisions": "portfolio_decisions",
-            "portfolio": "portfolio_positions",
-            "rejections": "portfolio_rejections",
-            "watchlist": "portfolio_watchlist",
-            "signals": "portfolio_signals",
-            "agent_metrics": "portfolio_agent_metrics",
-        }
+        self._supabase_tables: Dict[str, str] = {}
 
         # Initialize local files only in explicit local/dev mode.
         if env_config.local_fallback_allowed():
@@ -100,21 +113,17 @@ class PortfolioStore:
                 if not p.exists():
                     self._write_local_file(p, [])
 
-    def _is_supabase_configured(self) -> bool:
-        return env_config.supabase_configured()
-
-    def _using_supabase(self) -> bool:
+    def _using_postgres(self) -> bool:
         return (
-            env_config.use_supabase_storage()
-            and self._is_supabase_configured()
-            and bool(self._tenant_user_id)
-        )
+            get_batch1_state() is not None or env_config.is_production_env()
+        ) and bool(self._tenant_user_id)
+
+    # Compatibility name for isolated tests and old imports.
+    def _using_supabase(self) -> bool:
+        return self._using_postgres()
 
     def _supabase_uid(self) -> str:
         return require_user_id(self._tenant_user_id, context="PortfolioStore")
-
-    def _supabase_client(self):
-        return get_service_client()
 
     def _file_key_for_path(self, file_path: Path) -> Optional[str]:
         for k, p in self.files.items():
@@ -122,148 +131,16 @@ class PortfolioStore:
                 return k
         return None
 
-    def _row_to_startup_record(self, row: Dict[str, Any]) -> Dict[str, Any]:
-        """Normalize portfolio_startups row into StartupRecord shape used by portfolio layer."""
-        return {
-            "id": row.get("id") or row.get("startup_id") or "",
-            "startup_id": row.get("startup_id") or row.get("id") or "",
-            "name": row.get("name") or "",
-            "one_line": row.get("one_line") or "",
-            "sector": row.get("sector") or "",
-            "problem": row.get("problem") or "",
-            "solution": row.get("solution") or "",
-            "target_users": row.get("target_users") or "",
-            "why_now": row.get("why_now") or "",
-            "scout_type": row.get("scout_type") or "",
-            "scout_confidence": row.get("scout_confidence") or 0.0,
-            "discovered_at": row.get("discovered_at") or "",
-            "version": row.get("version") or 1,
-            "metadata": row.get("metadata") if isinstance(row.get("metadata"), dict) else {},
-        }
-
-    def _startup_record_to_row(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        rid = record.get("id") or record.get("startup_id") or str(uuid4())
-        return {
-            "id": rid,
-            "user_id": self._supabase_uid(),
-            "startup_id": record.get("startup_id") or rid,
-            "name": record.get("name", ""),
-            "one_line": record.get("one_line", ""),
-            "sector": record.get("sector", ""),
-            "problem": record.get("problem", ""),
-            "solution": record.get("solution", ""),
-            "target_users": record.get("target_users", ""),
-            "why_now": record.get("why_now", ""),
-            "scout_type": record.get("scout_type", ""),
-            "scout_confidence": record.get("scout_confidence", 0.0),
-            "discovered_at": record.get("discovered_at") or utcnow().isoformat(),
-            "version": int(record.get("version") or 1),
-            "metadata": record.get("metadata") if isinstance(record.get("metadata"), dict) else {},
-        }
-
-    def _get_startups_supabase(self) -> List[Dict[str, Any]]:
-        try:
-            uid = self._supabase_uid()
-            r = (
-                self._supabase_client()
-                .table(self._supabase_tables["startups"])
-                .select("*")
-                .eq("user_id", uid)
-                .order("discovered_at")
-                .execute()
-            )
-            rows = (r.data or []) if hasattr(r, "data") else []
-            return [self._row_to_startup_record(row) for row in rows if isinstance(row, dict)]
-        except Exception as e:
-            self.logger.error(
-                "portfolio_storage_unavailable operation=read_startups backend=supabase error=%s",
-                e,
-            )
-            if not env_config.is_production_env():
-                self.logger.warning(
-                    "portfolio_storage_fallback environment=non_production operation=read_startups"
-                )
-                return self._read_local_file(self.files["startups"])
-            raise RuntimeError(
-                "PortfolioStore: supabase_read_failed; local fallback is disabled"
-            ) from e
-
-    def _duplicate_startup_id_supabase(self, name: str) -> Optional[str]:
-        """Return the id of an existing portfolio startup with the same (case-insensitive)
-        name, or None. Targeted query — does NOT download the whole table (the old
-        name-dedup re-fetched every row on every insert, an O(n) egress hit per add).
-        """
-        new_name = (name or "").strip()
-        if not new_name:
-            return None
-        try:
-            uid = self._supabase_uid()
-            # ILIKE does the case-insensitive match; escape LIKE metacharacters so a
-            # name containing % or _ matches literally, then confirm exact equality.
-            pattern = new_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            r = (
-                self._supabase_client()
-                .table(self._supabase_tables["startups"])
-                .select("id,name")
-                .eq("user_id", uid)
-                .ilike("name", pattern)
-                .limit(5)
-                .execute()
-            )
-            rows = (r.data or []) if hasattr(r, "data") else []
-            target = new_name.lower()
-            for row in rows:
-                if isinstance(row, dict) and (row.get("name") or "").strip().lower() == target:
-                    return row.get("id")
-        except Exception as e:
-            self.logger.error(
-                "portfolio_storage_unavailable operation=duplicate_check backend=supabase error=%s",
-                e,
-            )
-            if not env_config.is_production_env():
-                self.logger.warning(
-                    "portfolio_storage_fallback environment=non_production operation=duplicate_check"
-                )
-                return None
-            raise RuntimeError(
-                "PortfolioStore: supabase_duplicate_check_failed; refusing write"
-            ) from e
-
-    def _upsert_startup_supabase(self, record: Dict[str, Any]) -> str:
-        uid = self._supabase_uid()
-        row = self._startup_record_to_row(record)
-        rid = row["id"]
-        existing = (
-            self._supabase_client()
-            .table(self._supabase_tables["startups"])
-            .select("id,version")
-            .eq("user_id", uid)
-            .eq("id", rid)
-            .limit(1)
-            .execute()
-        )
-        existing_rows = (existing.data or []) if hasattr(existing, "data") else []
-        if existing_rows:
-            row["version"] = int(existing_rows[0].get("version") or 1) + 1
-            self.logger.info("Updated startups record %s to version %s", rid, row["version"])
-        else:
-            row["version"] = int(record.get("version") or 1)
-            self.logger.info("Added new startups record %s", rid)
-
-        self._supabase_client().table(self._supabase_tables["startups"]).upsert(
-            row,
-            on_conflict="id",
-        ).execute()
-        return rid
-
     def _read_file(self, file_path: Path) -> List[Dict[str, Any]]:
         """Read from Supabase (preferred) or JSON fallback."""
         file_key = self._file_key_for_path(file_path)
-        table = self._supabase_tables.get(file_key) if file_key else None
-        if table and self._using_supabase():
-            if file_key == "startups":
-                return self._get_startups_supabase()
-            return list_get_all(table, user_id=self._supabase_uid())
+        if file_key == "agent_metrics" and self.batch2_state is not None:
+            return metrics_get_all(user_id=self._supabase_uid(), state=self.batch2_state)
+        if file_key in {"decisions", "portfolio", "rejections", "watchlist", "signals"} and self.batch3_state is not None:
+            table = {"decisions": "portfolio_decisions", "portfolio": "portfolio_positions", "rejections": "portfolio_rejections", "watchlist": "portfolio_watchlist", "signals": "portfolio_signals"}[file_key]
+            return batch3_list_get_all(table, user_id=self._supabase_uid(), state=self.batch3_state)
+        if file_key == "startups" and self._using_postgres():
+            raise RuntimeError("PortfolioStore: canonical_startup_snapshot_unavailable")
         if not env_config.local_fallback_allowed():
             raise RuntimeError(
                 "PortfolioStore: local_storage_disabled; remote storage is required"
@@ -297,16 +174,15 @@ class PortfolioStore:
         In Supabase mode, upserts by id for mapped list tables and startups.
         """
         file_key = self._file_key_for_path(file_path)
-        table = self._supabase_tables.get(file_key) if file_key else None
-        if table and self._using_supabase():
-            if file_key == "startups":
-                for rec in data:
-                    self._upsert_startup_supabase(rec)
-                return
-            uid = self._supabase_uid()
-            for rec in data:
-                list_upsert(table, rec, user_id=uid)
+        if file_key == "agent_metrics" and self.batch2_state is not None:
+            self.batch2_state.replace_metrics(data)
             return
+        if file_key in {"decisions", "portfolio", "rejections", "watchlist", "signals"} and self.batch3_state is not None:
+            table = {"decisions": "portfolio_decisions", "portfolio": "portfolio_positions", "rejections": "portfolio_rejections", "watchlist": "portfolio_watchlist", "signals": "portfolio_signals"}[file_key]
+            batch3_list_replace(table, data, user_id=self._supabase_uid(), state=self.batch3_state)
+            return
+        if file_key == "startups":
+            raise RuntimeError("PortfolioStore: startup_persistence_owned_by_StartupRepository")
         self._write_local_file(file_path, data)
 
     def _write_local_file(self, file_path: Path, data: List[Dict[str, Any]]):
@@ -350,20 +226,13 @@ class PortfolioStore:
         record["id"] = record_id
 
         table = self._supabase_tables.get(file_key)
-        if table and self._using_supabase():
-            if file_key == "startups":
-                return self._upsert_startup_supabase(record)
-            uid = self._supabase_uid()
-            existing = list_get_by_id(table, record_id, user_id=uid)
-            if existing is not None:
-                record["version"] = existing.get("version", 0) + 1
-                self.logger.info(f"Updated {file_key} record {record_id} to version {record['version']}")
-            else:
-                record["version"] = 1
-                self.logger.info(f"Added new {file_key} record {record_id}")
-            list_upsert(table, record, user_id=uid)
-            return record_id
-
+        if file_key in {"decisions", "portfolio", "rejections", "watchlist", "signals"} and self.batch3_state is not None:
+            table = {"decisions": "portfolio_decisions", "portfolio": "portfolio_positions", "rejections": "portfolio_rejections", "watchlist": "portfolio_watchlist", "signals": "portfolio_signals"}[file_key]
+            return batch3_list_upsert(table, record, user_id=self._supabase_uid(), state=self.batch3_state)
+        if file_key == "agent_metrics" and self.batch2_state is not None:
+            return metric_append(record, user_id=self._supabase_uid(), state=self.batch2_state)
+        if file_key == "startups":
+            raise RuntimeError("PortfolioStore: startup_persistence_owned_by_StartupRepository")
         if not env_config.local_fallback_allowed():
             raise RuntimeError(
                 "PortfolioStore: local_storage_disabled; remote storage is required"
@@ -384,36 +253,10 @@ class PortfolioStore:
     
     # Startup methods
     def add_startup(self, scout_output: Dict[str, Any], agent_id: str = "scout_v1") -> str:
-        """Add a startup to canonical record."""
-        startup_id = scout_output.get("id", str(uuid4()))
-        
-        record: StartupRecord = {
-            "id": startup_id,
-            "name": scout_output.get("name", ""),
-            "one_line": scout_output.get("one_line", ""),
-            "sector": scout_output.get("sector", ""),
-            "problem": scout_output.get("problem", ""),
-            "solution": scout_output.get("solution", ""),
-            "target_users": scout_output.get("target_users", ""),
-            "why_now": scout_output.get("why_now", ""),
-            "scout_type": scout_output.get("scout_type", ""),
-            "scout_confidence": scout_output.get("confidence", 0.0),
-            "discovered_at": utcnow().isoformat(),
-            "version": 1,
-            "metadata": {
-                "agent_id": agent_id,
-                "source": "scout",
-            },
-        }
-        
-        if self._using_supabase():
-            # Legacy duplicate protection for name-based duplicates — targeted query,
-            # not a full-table scan.
-            dup_id = self._duplicate_startup_id_supabase(record.get("name") or "")
-            if dup_id:
-                self.logger.info("Duplicate company name detected in Supabase; skipping add: %s", record.get("name"))
-                return dup_id or startup_id
-        return self._append_record("startups", record)
+        """Compatibility no-op; canonical startup creation belongs to StartupRepository."""
+        del agent_id
+        startup_id = str(scout_output.get("startup_id") or scout_output.get("id") or "").strip()
+        return self._legacy_startup_aliases.get(startup_id, startup_id)
     
     # Decision methods
     def add_decision(
@@ -543,11 +386,10 @@ class PortfolioStore:
                 next_check = utcnow() + timedelta(days=interval)
                 record["next_check_at"] = next_check.isoformat()
                 record["version"] = record.get("version", 1) + 1
-                if self._using_supabase() and self._supabase_tables.get("watchlist"):
-                    list_upsert(
-                        self._supabase_tables["watchlist"],
-                        record,
-                        user_id=self._supabase_uid(),
+                if self.batch3_state is not None:
+                    batch3_list_upsert(
+                        "portfolio_watchlist", record,
+                        user_id=self._supabase_uid(), state=self.batch3_state,
                     )
                 else:
                     records[i] = record
@@ -566,11 +408,10 @@ class PortfolioStore:
             updated = dict(record)
             updated.update(patch)
             updated["version"] = int(record.get("version") or 0) + 1
-            if self._using_supabase():
-                list_upsert(
-                    self._supabase_tables["watchlist"],
-                    updated,
-                    user_id=self._supabase_uid(),
+            if self.batch3_state is not None:
+                batch3_list_upsert(
+                    "portfolio_watchlist", updated,
+                    user_id=self._supabase_uid(), state=self.batch3_state,
                 )
             else:
                 records[index] = updated
@@ -637,6 +478,11 @@ class PortfolioStore:
     # Query methods
     def get_startup(self, startup_id: str) -> Optional[Dict[str, Any]]:
         """Get startup by ID."""
+        requested = str(startup_id or "").strip()
+        if self._canonical_startups is not None:
+            canonical_id = self._legacy_startup_aliases.get(requested, requested)
+            record = self._canonical_startups.get(canonical_id)
+            return dict(record) if record is not None else None
         records = self._read_file(self.files["startups"])
         for record in records:
             if record.get("id") == startup_id:
@@ -660,6 +506,8 @@ class PortfolioStore:
     
     def get_all_startups(self) -> List[Dict[str, Any]]:
         """Get all startups."""
+        if self._canonical_startups is not None:
+            return [dict(record) for record in self._canonical_startups.values()]
         return self._read_file(self.files["startups"])
     
     def get_all_decisions(self) -> List[Dict[str, Any]]:

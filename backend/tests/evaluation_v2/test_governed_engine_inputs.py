@@ -95,13 +95,6 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
     prerequisites = _prerequisites()
     monkeypatch.setattr(
         reviewer_module,
-        "load_settings",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("governed reviewer must not reload settings")
-        ),
-    )
-    monkeypatch.setattr(
-        reviewer_module,
         "load_active_policy",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("governed reviewer must not reload policy")
@@ -182,13 +175,6 @@ def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(mo
         "_load_partner_rules",
         lambda: (_ for _ in ()).throw(
             AssertionError("governed partner must not reload rules")
-        ),
-    )
-    monkeypatch.setattr(
-        partner_module,
-        "load_settings",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("governed partner must not reload settings")
         ),
     )
 
@@ -428,7 +414,6 @@ async def _run_persisted_governed_review(
     monkeypatch.setattr(reviewer_module, "DefaultReviewer", _PersistingReviewerPersona)
     monkeypatch.setattr(reviewer_module, "SkepticalReviewer", _PersistingReviewerPersona)
     monkeypatch.setattr(reviewer_module, "OpportunistReviewer", _PersistingReviewerPersona)
-    monkeypatch.setattr(reviewer_module, "load_settings", lambda _uid: {"agent_config": {}})
     monkeypatch.setattr(
         reviewer_module, "enrich_scout_for_reviewer_llm", lambda scout, _uid: scout
     )

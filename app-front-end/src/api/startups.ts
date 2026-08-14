@@ -19,7 +19,9 @@ export async function fetchStartups(): Promise<Startup[]> {
       const canonicalRes = await authedFetch(`${API_BASE}/api/opportunities?limit=250`, { headers: { Accept: 'application/json' } });
       if (!canonicalRes.ok) throw new Error(`Canonical opportunities API error: ${canonicalRes.status}`);
       const data = await canonicalRes.json() as { opportunities?: OpportunityDecisionView[] };
-      return (data.opportunities ?? []).map(canonicalOpportunityToStartup);
+      if (Array.isArray(data.opportunities) && data.opportunities.length > 0) {
+        return data.opportunities.map(canonicalOpportunityToStartup);
+      }
     }
   }
   const res = await authedFetch(`${API_BASE}/api/startups`, { headers: { Accept: 'application/json' } });
@@ -133,8 +135,9 @@ export async function fetchStartupDetail(
           }
         }
       }
-      if (!canonicalRes.ok) return null;
-      return canonicalOpportunityToStartup(await canonicalRes.json() as OpportunityDecisionView);
+      if (canonicalRes.ok) {
+        return canonicalOpportunityToStartup(await canonicalRes.json() as OpportunityDecisionView);
+      }
     }
   }
   const res = await authedFetch(

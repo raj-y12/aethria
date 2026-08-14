@@ -31,7 +31,7 @@ function SignalMeta({
   hypothesis?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-1 type-meta text-oxford/55">
+    <div className="flex flex-wrap items-center gap-x-phi-3 gap-y-phi-1 type-meta text-oxford/65">
       <span>{hypothesis ? 'Hypothesis' : formatObservationSegment(item.segment)}</span>
       <span aria-hidden>·</span>
       <span>{item.sample_size} episodes</span>
@@ -46,7 +46,7 @@ function EvidenceBalance({ item }: { item: FundObservation | FundHypothesis }) {
   const supportPct = total ? (item.supporting_case_ids.length / total) * 100 : 0;
   return (
     <div className="flex flex-col gap-phi-1" aria-label={observationEvidenceLabel(item)}>
-      <div className="flex items-center justify-between gap-phi-3 type-meta text-oxford/60">
+      <div className="flex items-center justify-between gap-phi-3 type-meta text-oxford/65">
         <span>{item.supporting_case_ids.length} supporting</span>
         <span>{item.contradictory_case_ids.length} contradictory</span>
       </div>
@@ -98,7 +98,7 @@ function ObservationCard({ item, lead = false, onInspect }: { item: FundObservat
     <article className={lead ? 'flex flex-col gap-phi-4 border-r border-oxford/[0.1] pr-phi-6' : 'flex flex-col gap-phi-3 border-t border-oxford/[0.1] pt-phi-3'}>
       <div className="flex items-center justify-between gap-phi-3">
         <span className="type-label-section">{formatObservationFamily(item.observation_type)}</span>
-        {lead ? <span className="type-meta text-oxford/45">Lead observation</span> : null}
+        {lead ? <span className="type-meta text-oxford/65">Lead observation</span> : null}
       </div>
       <FamilyRule family={item.observation_type} />
       <p className={lead ? 'type-display max-w-2xl text-[clamp(21px,2.3vw,32px)] leading-[1.2] text-oxford' : 'type-body-sm leading-relaxed text-oxford/78'}>
@@ -115,11 +115,11 @@ function ObservationCard({ item, lead = false, onInspect }: { item: FundObservat
 
 function Provenance({ item }: { item: FundObservation }) {
   if (item.interpretation_as_of === 'none_available' || !item.interpretation_provenance.length) {
-    return <p className="type-meta text-oxford/50">No retrospective interpretation is attached to these observations.</p>;
+    return <p className="type-meta text-oxford/65">No retrospective interpretation is attached to these observations.</p>;
   }
   const provenance = item.interpretation_provenance[0];
   return (
-    <p className="type-meta leading-relaxed text-oxford/55">
+    <p className="type-meta leading-relaxed text-oxford/65">
       Retrospective interpretation provenance · version {provenance?.version ?? '—'}
       {provenance?.source ? ` · ${provenance.source.replace(/_/g, ' ')}` : ''}
     </p>
@@ -132,9 +132,9 @@ function EvidenceList({ label, ids }: { label: string; ids: string[] }) {
       <p className="type-label-section">{label} · {ids.length}</p>
       {ids.length ? (
         <ul className="flex flex-col gap-phi-1">
-          {ids.map((id) => <li key={id} className="type-meta text-oxford/55">Decision reference · {id}</li>)}
+          {ids.map((id) => <li key={id} className="type-meta text-oxford/65">Decision reference · {id}</li>)}
         </ul>
-      ) : <p className="type-meta text-oxford/45">None recorded</p>}
+      ) : <p className="type-meta text-oxford/65">None recorded</p>}
     </div>
   );
 }
@@ -179,7 +179,7 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
               {isHypothesis ? hypothesisItem?.statement : observationStatement(observationItem as FundObservation)}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="type-action shrink-0 px-phi-2 py-phi-1 text-oxford/60 hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30" aria-label="Close evidence inspector">Close</button>
+          <button type="button" onClick={onClose} className="type-action shrink-0 px-phi-2 py-phi-1 text-oxford/65 hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30" aria-label="Close evidence inspector">Close</button>
         </header>
         <div className="flex flex-col gap-phi-6 px-phi-5 py-phi-5">
           <EvidenceBalance item={item} />
@@ -191,14 +191,14 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
           </div>
           <div className="flex flex-col gap-phi-2 border-t border-oxford/10 pt-phi-4">
             <p className="type-label-section">Historical scope</p>
-            <p className="type-meta text-oxford/55">{item.time_window.from ?? 'Unknown'} → {item.time_window.to ?? 'Unknown'}</p>
-            <p className="type-meta leading-relaxed text-oxford/55">Thesis: {item.thesis_versions.join(', ') || 'Not recorded'}</p>
-            <p className="type-meta leading-relaxed text-oxford/55">Policy: {item.policy_versions.join(', ') || 'Not recorded'}</p>
+            <p className="type-meta text-oxford/65">{item.time_window.from ?? 'Unknown'} → {item.time_window.to ?? 'Unknown'}</p>
+            <p className="type-meta leading-relaxed text-oxford/65">Thesis: {item.thesis_versions.join(', ') || 'Not recorded'}</p>
+            <p className="type-meta leading-relaxed text-oxford/65">Policy: {item.policy_versions.join(', ') || 'Not recorded'}</p>
           </div>
           <div className="flex flex-col gap-phi-2 border-t border-oxford/10 pt-phi-4">
             <p className="type-label-section">Limitations</p>
             <ul className="flex flex-col gap-phi-2">
-              {item.limitations.map((limitation) => <li key={limitation} className="type-note leading-relaxed text-oxford/60">{limitation}</li>)}
+              {item.limitations.map((limitation) => <li key={limitation} className="type-note leading-relaxed text-oxford/65">{limitation}</li>)}
             </ul>
           </div>
           {isHypothesis ? (
@@ -208,14 +208,14 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
                 <span>Replay: {replay.isLoading ? 'Checking…' : replay.isError ? 'Unavailable' : replay.data?.replay_status === 'not_replayable' ? 'Not replayable' : 'Not evaluated'}</span>
                 <span>Counterfactual: {proposal?.proposal_status === 'insufficient_basis' ? 'Insufficient basis' : proposal?.proposal_status ?? 'Not available'}</span>
               </div>
-              {replay.data?.limitations.map((limitation) => <p key={limitation} className="type-note leading-relaxed text-oxford/55">{limitation}</p>)}
-              <p className="type-meta text-oxford/45">No later outcome observations were used for this replay status.</p>
+              {replay.data?.limitations.map((limitation) => <p key={limitation} className="type-note leading-relaxed text-oxford/65">{limitation}</p>)}
+              <p className="type-meta text-oxford/65">No later outcome observations were used for this replay status.</p>
             </div>
           ) : null}
           {isHypothesis ? (
             <div className="flex flex-col gap-phi-2 border-t border-oxford/10 pt-phi-4">
               <p className="type-label-section">Source observations</p>
-              {hypothesisItem?.source_observation_ids.map((id) => <p key={id} className="type-meta text-oxford/55">Observation reference · {id}</p>)}
+              {hypothesisItem?.source_observation_ids.map((id) => <p key={id} className="type-meta text-oxford/65">Observation reference · {id}</p>)}
             </div>
           ) : null}
         </div>
@@ -252,7 +252,7 @@ export function FundObservationsPanel({ data }: { data: FundIntelligenceData }) 
       ) : null}
       {remaining.length ? (
         <section className="flex flex-col gap-phi-3">
-          <div className="flex items-baseline justify-between gap-phi-3"><h2 className="type-label-section">Pattern field</h2><span className="type-meta text-oxford/45">Historical associations</span></div>
+          <div className="flex items-baseline justify-between gap-phi-3"><h2 className="type-label-section">Pattern field</h2><span className="type-meta text-oxford/65">Historical associations</span></div>
           <div className="grid gap-x-phi-6 gap-y-phi-4 md:grid-cols-2">
             {remaining.map((item) => <ObservationCard key={item.observation_id} item={item} onInspect={() => setSelection({ kind: 'observation', item })} />)}
           </div>
@@ -286,14 +286,14 @@ export function FundHypothesesPanel({ data }: { data: FundIntelligenceData }) {
       {lead ? (
         <div className="grid gap-phi-6 border-y border-dashed border-oxford/20 py-phi-6 lg:grid-cols-[1.45fr_0.85fr]">
           <article className="flex flex-col gap-phi-4">
-            <p className="type-label-section text-oxford/60">Tentative hypothesis · {lead.hypothesis_family.replace(/_/g, ' ')}</p>
+            <p className="type-label-section text-oxford/65">Tentative hypothesis · {lead.hypothesis_family.replace(/_/g, ' ')}</p>
             <p className="type-display max-w-2xl text-[clamp(21px,2.3vw,32px)] leading-[1.2] text-oxford">{lead.statement}</p>
             <SignalMeta item={lead} hypothesis />
             <button type="button" onClick={() => setSelection({ kind: 'hypothesis', item: lead })} className="type-action w-fit border-b border-dashed border-oxford/25 pb-0.5 text-left text-oxford/65 hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30">Inspect basis →</button>
           </article>
           <div className="flex flex-col gap-phi-4 border-l border-oxford/[0.1] pl-phi-5">
             <EvidenceBalance item={lead} />
-            <div className="flex flex-col gap-phi-2 type-meta text-oxford/60"><span>Descriptive association</span><span>{sufficiencyLabel(lead.sufficiency)}</span><span>Replay status available on inspection</span></div>
+            <div className="flex flex-col gap-phi-2 type-meta text-oxford/65"><span>Descriptive association</span><span>{sufficiencyLabel(lead.sufficiency)}</span><span>Replay status available on inspection</span></div>
           </div>
         </div>
       ) : null}
@@ -303,8 +303,8 @@ export function FundHypothesesPanel({ data }: { data: FundIntelligenceData }) {
           <div className="flex flex-col divide-y divide-dashed divide-oxford/15 border-y border-dashed border-oxford/15">
             {secondary.map((item) => (
               <button key={item.hypothesis_id} type="button" onClick={() => setSelection({ kind: 'hypothesis', item })} className="grid gap-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30 md:grid-cols-[1fr_auto]">
-                <span><span className="type-body-sm text-oxford/75">{item.statement}</span><span className="mt-phi-1 block type-meta text-oxford/50">{item.hypothesis_family.replace(/_/g, ' ')} · {sufficiencyLabel(item.sufficiency)}</span></span>
-                <span className="type-meta text-oxford/55">{item.supporting_case_ids.length} supporting · {item.contradictory_case_ids.length} contradictory</span>
+                <span><span className="type-body-sm text-oxford/75">{item.statement}</span><span className="mt-phi-1 block type-meta text-oxford/65">{item.hypothesis_family.replace(/_/g, ' ')} · {sufficiencyLabel(item.sufficiency)}</span></span>
+                <span className="type-meta text-oxford/65">{item.supporting_case_ids.length} supporting · {item.contradictory_case_ids.length} contradictory</span>
               </button>
             ))}
           </div>

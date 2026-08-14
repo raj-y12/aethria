@@ -189,12 +189,17 @@ def merge_scout_info_enrichment(
         return scout_info
 
     prov = dict(scout_info.field_provenance or {})
+    derived = dict(getattr(scout_info, "derived_compatibility", None) or {})
     if "est_tam" in patches:
         prov["est_tam"] = "reviewer_extraction"
+        derived["est_tam"] = "reviewer_extraction"
     if "funding_stage" in patches:
         prov["funding_stage"] = "reviewer_text_inference"
+        derived["funding_stage"] = "reviewer_text_inference"
     if "references" in patches:
         prov["references"] = "gap_retrieval"
+        derived["references"] = "gap_retrieval"
     patches["field_provenance"] = prov
+    patches["derived_compatibility"] = derived
 
     return scout_info.model_copy(update=patches)

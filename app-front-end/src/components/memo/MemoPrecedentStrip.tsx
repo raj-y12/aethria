@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { DECISION_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
 import type { PrecedentCandidate } from '../../lib/institutionalConviction';
-import type { RulingDecision } from '../../types/startup';
+import type { DecisionHistoryDecision } from '../../types/startup';
 
 const APP_ROOT = '/v1';
 
@@ -10,13 +10,14 @@ function dealPath(startupId: string): string {
   return `${APP_ROOT}?deal=${encodeURIComponent(startupId)}`;
 }
 
-function rulingLabel(decision: RulingDecision): string {
+function rulingLabel(decision: DecisionHistoryDecision): string {
   if (decision === 'YES') return 'Invest';
   if (decision === 'NO') return 'Pass';
+  if (decision === 'ADVANCE') return 'Advance';
   return 'Monitor';
 }
 
-function rulingVariant(decision: RulingDecision): 'invest' | 'pass' | 'monitor' {
+function rulingVariant(decision: DecisionHistoryDecision): 'invest' | 'pass' | 'monitor' {
   if (decision === 'YES') return 'invest';
   if (decision === 'NO') return 'pass';
   return 'monitor';

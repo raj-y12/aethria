@@ -107,16 +107,14 @@ def test_review_is_tenant_scoped_and_only_creates_draft(monkeypatch):
     import routers.fund_intelligence as routes
 
     repository = _Repository()
-    monkeypatch.setattr(
-        routes,
-        "load_settings",
-        lambda *args, **kwargs: {
+    async def load_settings(*args, **kwargs):
+        return {
             "fund_config": {
                 "publishedPolicyHash": "old-hash",
                 "scoringWeights": [{"key": "market", "weight": 20}],
             }
-        },
-    )
+        }
+    monkeypatch.setattr(routes, "load_settings", load_settings)
     monkeypatch.setattr(
         routes,
         "compile_policy_from_fund_config",
@@ -218,16 +216,14 @@ def test_preview_and_accept_are_bound_to_the_same_compiled_policy_hash(monkeypat
         "compile_policy_from_fund_config",
         lambda config, require_publish_ready=True: {"policy_hash": "bound-hash"},
     )
-    monkeypatch.setattr(
-        routes,
-        "load_settings",
-        lambda *args, **kwargs: {
+    async def load_settings(*args, **kwargs):
+        return {
             "fund_config": {
                 "publishedPolicyHash": "old-hash",
                 "scoringWeights": [{"key": "market", "weight": 20}],
             }
-        },
-    )
+        }
+    monkeypatch.setattr(routes, "load_settings", load_settings)
     client = _client(monkeypatch, repository)
 
     preview = client.post(

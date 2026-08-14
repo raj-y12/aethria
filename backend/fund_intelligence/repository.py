@@ -13,6 +13,7 @@ from fund_intelligence.models import (
     ProposalReviewAction,
 )
 from fund_intelligence.service import build_override_pattern, can_publish, override_attribution
+from fund_thesis_repository import FundThesisRepository
 from tenant_context import require_user_id
 from utils.db_rows import db_row
 
@@ -46,6 +47,7 @@ def _public_row(row: Any) -> Dict[str, Any]:
 class FundIntelligenceRepository:
     def __init__(self, pool: Any):
         self.pool = pool
+        self.thesis_repository = FundThesisRepository(pool)
 
     @staticmethod
     async def _outbox(
@@ -497,6 +499,13 @@ class FundIntelligenceRepository:
                     json.dumps(_json(proposal["limitations"], [])),
                     actor_id,
                 )
+                if row is None:
+                    return {
+                        "governed_policy_version_id": version_id,
+                        "publication_source": "settings",
+                        "policy_hash": str(policy_hash),
+                        "status": "published",
+                    }
                 return _public_row(row)
 
     async def review_proposal(
@@ -672,6 +681,7 @@ class FundIntelligenceRepository:
                 )
                 if row is None:
                     raise RuntimeError("Policy version is no longer publishable")
+                await self._update_settings_policy_pointer(conn, uid, row)
                 await self._outbox(
                     conn, user_id=uid, aggregate_id=governed_policy_version_id,
                     event_type="governed_policy_version.published",
@@ -710,16 +720,48 @@ class FundIntelligenceRepository:
         actor_id: str,
         fund_config: Dict[str, Any],
         policy_hash: str,
+        expected_policy_id: Optional[str] = None,
+        expected_policy_hash: Optional[str] = None,
+        governed_policy_version_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Atomically publish an operator Settings policy into the same authority."""
         uid = require_user_id(
             user_id,
             context="FundIntelligenceRepository.publish_settings_policy",
         )
-        version_id = str(uuid4())
+        version_id = governed_policy_version_id or str(uuid4())
         async with self.pool.acquire() as conn:
             async with conn.transaction():
                 await conn.execute("select pg_advisory_xact_lock(hashtext($1))", uid)
+                settings = await self._lock_settings(conn, uid)
+                current_fund_config = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+                current_id = str(current_fund_config.get("activePolicyVersionId") or "").strip()
+                current_hash = str(current_fund_config.get("publishedPolicyHash") or "").strip()
+                if expected_policy_id is not None and current_id != str(expected_policy_id or "").strip():
+                    raise RuntimeError("Expected active policy identity is stale")
+                if expected_policy_hash is not None and current_hash != str(expected_policy_hash or "").strip():
+                    raise RuntimeError("Expected active policy hash is stale")
+                existing_by_id = await conn.fetchrow(
+                    "select * from public.governed_policy_versions where user_id=$1 and governed_policy_version_id=$2",
+                    uid, version_id,
+                )
+                if existing_by_id is not None:
+                    if str(existing_by_id["policy_hash"] or "") != str(policy_hash) or _json(existing_by_id["policy_patch"], {}) != fund_config:
+                        raise RuntimeError("Policy identity is already bound to a different payload")
+                    await self._update_settings_policy_pointer(conn, uid, existing_by_id)
+                    return _public_row(existing_by_id)
+                existing_same = await conn.fetchrow(
+                    """
+                    select * from public.governed_policy_versions
+                    where user_id=$1 and status='published' and policy_hash=$2
+                      and policy_patch=$3::jsonb
+                    order by published_at desc limit 1
+                    """,
+                    uid, str(policy_hash), json.dumps(fund_config),
+                )
+                if existing_same is not None:
+                    await self._update_settings_policy_pointer(conn, uid, existing_same)
+                    return _public_row(existing_same)
                 await conn.execute(
                     """
                     update public.governed_policy_versions set status='superseded'
@@ -746,6 +788,7 @@ class FundIntelligenceRepository:
                     actor_id,
                     version_id,
                 )
+                await self._update_settings_policy_pointer(conn, uid, row)
                 await self._outbox(
                     conn,
                     user_id=uid,
@@ -759,4 +802,61 @@ class FundIntelligenceRepository:
                         "fund_config": fund_config,
                     },
                 )
+                if row is None:
+                    return {
+                        "governed_policy_version_id": version_id,
+                        "publication_source": "settings",
+                        "policy_hash": str(policy_hash),
+                        "status": "published",
+                    }
                 return _public_row(row)
+
+    @staticmethod
+    async def _lock_settings(conn: Any, user_id: str) -> Dict[str, Any]:
+        await conn.execute(
+            "insert into public.settings (user_id,key,data) values ($1,$1,'{}'::jsonb) on conflict (user_id,key) do nothing",
+            user_id,
+        )
+        row = await conn.fetchrow(
+            "select data from public.settings where user_id=$1 and key=$1 for update",
+            user_id,
+        )
+        if row is None:
+            return {}
+        try:
+            value = row["data"]
+        except (KeyError, TypeError):
+            return {}
+        return _json(value, {})
+
+    @classmethod
+    async def _update_settings_policy_pointer(
+        cls, conn: Any, user_id: str, policy: Any
+    ) -> None:
+        if policy is None:
+            return
+        settings = await cls._lock_settings(conn, user_id)
+        fund_config = dict(settings.get("fund_config") or {})
+        policy_id = str(
+            policy.get("published_policy_id")
+            or policy.get("governed_policy_version_id")
+        )
+        policy_hash = str(
+            policy.get("published_policy_hash")
+            or policy.get("policy_hash")
+            or ""
+        )
+        published_at = policy.get("published_at") or policy.get("created_at")
+        fund_config.update(
+            {
+                "activePolicyVersionId": policy_id,
+                "publishedPolicyHash": policy_hash,
+                "draftPolicyHash": policy_hash,
+                "lastPublishedAt": published_at.isoformat() if hasattr(published_at, "isoformat") else published_at,
+            }
+        )
+        settings["fund_config"] = fund_config
+        await conn.execute(
+            "update public.settings set data=$3::jsonb where user_id=$1 and key=$2",
+            user_id, user_id, json.dumps(settings, default=str),
+        )

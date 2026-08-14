@@ -1,5 +1,9 @@
 """
-Supabase-backed storage for the startups table only.
+Legacy Supabase-backed compatibility storage for the startups table.
+
+This module is retained only for migration/import tooling and pool-less legacy
+tests or development fallback. Normal runtime startup reads and writes use
+``startup_repository.StartupRepository`` and must not construct this class.
 
 Row-level upserts and targeted selects (no full-table delete+rewrite).
 Requires migrations 20260401000001_startups_list_projection_and_indexes.sql and
@@ -327,9 +331,11 @@ class SupabaseStartupsStorage:
         user_id: str,
         *,
         ownership_fence: Optional[OwnershipFence] = None,
+        settings: Optional[dict] = None,
     ) -> None:
         self._client = client
         self._user_id = user_id
+        self._settings = settings if isinstance(settings, dict) else None
         self._ownership_fence: Optional[OwnershipFence] = None
         self.logger = logger
         if ownership_fence is not None:
@@ -378,13 +384,12 @@ class SupabaseStartupsStorage:
         raise last_exc
 
     def _settings_for_trace(self) -> dict:
-        try:
-            from utils.settings_loader import load_settings
-
-            return load_settings(self._user_id)
-        except Exception as e:
-            self.logger.debug("agent_trace settings unavailable: %s", e)
-            return {}
+        if self._settings is not None:
+            return self._settings
+        # Trace generation is synchronous. Settings must be injected by the
+        # async orchestration boundary; never perform persistence I/O here.
+        self.logger.debug("agent_trace settings snapshot unavailable")
+        return {}
 
     def _fetch_page_raw(self, offset: int, limit: int) -> List[dict]:
         try:
@@ -469,8 +474,8 @@ class SupabaseStartupsStorage:
 
         Stores the full deterministic scoring trace (facts/labels/component scores) plus
         denormalized columns for cheap calibration queries. Append-only — never updates.
-        Returns True on insert, False on any failure (a trail-write must NEVER break the
-        review pipeline). Safe no-op if the `scoring_trails` table is absent.
+        Returns True when appended to the active provider-neutral Batch 4A state and
+        False when that state is unavailable; a trail-write must never break review.
         """
         if not isinstance(trace, dict) or not startup_id:
             return False
@@ -486,19 +491,26 @@ class SupabaseStartupsStorage:
             "sector_tam_benchmark": trace.get("sector_tam_benchmark"),
             "trail": trace,
         }
-        try:
-            self._execute_with_retry(
-                lambda: self._client.table("scoring_trails").insert(row, returning="minimal").execute()
-            )
-            return True
-        except Exception as e:
-            self.logger.warning(
-                "Supabase scoring_trails insert failed for %s: %s. "
-                "Apply migration 20260604000002_scoring_trail.sql if the table is missing.",
-                startup_id,
-                e,
-            )
-            return False
+        from batch4a.context import get_state as get_batch4a_state
+        state = get_batch4a_state()
+        if state is None:
+            # Compatibility-only path for callers that still construct this
+            # Supabase adapter directly. Normal API runtime persists through
+            # Batch4ARepository on the shared PostgreSQL pool.
+            try:
+                self._client.table("scoring_trails").insert(
+                    row, returning="minimal"
+                ).execute()
+                return True
+            except Exception as exc:
+                self.logger.warning(
+                    "Batch4A scoring trail state is unavailable for %s: %s",
+                    startup_id,
+                    exc,
+                )
+                return False
+        state.append_scoring_trail(row)
+        return True
 
     def record_evaluation_manifest(
         self,
@@ -937,16 +949,12 @@ class SupabaseStartupsStorage:
             existing_name_id = self._find_startup_id_by_name(new_name)
             if existing_name_id and existing_name_id != sid:
                 if pr:
-                    try:
-                        self._client.table("startup_pipeline_state").delete().eq(
-                            "user_id", self._user_id
-                        ).eq("startup_id", sid).execute()
-                    except Exception as cleanup_error:
-                        self.logger.warning(
-                            "Could not remove raced lookup pipeline state %s: %s",
-                            sid,
-                            cleanup_error,
-                        )
+                    from batch4a.context import get_state as get_batch4a_state
+                    state = get_batch4a_state()
+                    if state is not None:
+                        state.remove_pipeline_state(sid)
+                    else:
+                        self.logger.warning("Batch4A state unavailable while removing raced lookup state %s", sid)
                 self.logger.info(
                     "Concurrent duplicate resolved to existing startup %s", existing_name_id
                 )

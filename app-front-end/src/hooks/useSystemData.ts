@@ -279,6 +279,10 @@ export function useSystemData(options: UseSystemDataOptions = {}): SystemData {
     queryKey: ['fund-thesis', 'runtime'],
     queryFn: fetchFundThesisRuntime,
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 120_000 }),
+    // The warm-start snapshot is only an optimistic first paint. This gate
+    // controls whether the operator may run the pipeline, so it must always
+    // reconcile with the current backend on mount.
+    refetchOnMount: 'always',
     refetchInterval: isTabVisible ? 120_000 : false,
   });
 

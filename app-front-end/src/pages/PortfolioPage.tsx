@@ -62,7 +62,7 @@ function SectionHead({ title, detail, count }: { title: string; detail?: string;
 }
 
 function QuietEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-phi-4 type-body-sm text-oxford/60">{children}</p>;
+  return <p className="mt-phi-4 type-body-sm text-oxford/65">{children}</p>;
 }
 
 /* Outcome recording is per-position and collapsed by default — the book stays
@@ -77,7 +77,7 @@ function PositionOutcomes({ startupId }: { startupId: string }) {
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="type-status text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+        className="type-status text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
       >
         {open ? 'Hide outcomes' : 'Record outcome'}
       </button>
@@ -201,7 +201,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <button
                   type="button"
                   onClick={() => navigate('/v1/flow')}
-                  className="group mt-phi-3 inline-flex items-center gap-phi-2 type-body-sm text-oxford/60 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  className="group mt-phi-3 inline-flex items-center gap-phi-2 type-body-sm text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                 >
                   <span className="type-data tabular-nums text-oxford">{decided.awaiting}</span>
                   <span>awaiting your ruling — rule in Flow</span>
@@ -225,8 +225,8 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       <div className="-mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-4 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] lg:grid-cols-[minmax(0,1.15fr)_minmax(126px,0.65fr)_minmax(0,1.5fr)] lg:items-baseline">
                         <span className="min-w-0 font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{row.name}</span>
                         <span className="flex min-w-0 flex-col items-start gap-phi-1">
-                          <span className="type-meta text-oxford/60">INVESTED · {row.stage ?? 'POSITION'}</span>
-                          <span className="type-meta text-oxford/50">
+                          <span className="type-meta text-oxford/65">INVESTED · {row.stage ?? 'POSITION'}</span>
+                          <span className="type-meta text-oxford/65">
                             <span>{row.sector ?? 'SECTOR UNKNOWN'}</span>
                             <span aria-hidden> · </span>
                             <span>{row.score == null ? 'SCORE —' : `SCORE ${row.score.toFixed(1)}`}</span>
@@ -260,7 +260,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       >
                         <span className="flex min-w-0 flex-col items-start gap-phi-1">
                           <span className="font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{item.name}</span>
-                          <span className="type-meta tabular-nums text-oxford/55">{formatDate(item.resolvedAt)}</span>
+                          <span className="type-meta tabular-nums text-oxford/65">{formatDate(item.resolvedAt)}</span>
                         </span>
                         <span className="flex min-w-0 items-center gap-phi-2" aria-label="Aethria recommendation followed by your ruling">
                           {recOf(item.startup) ? (
@@ -268,8 +268,8 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                               variant={recOf(item.startup) as 'INVEST' | 'PASS' | 'MONITOR'}
                               className="cursor-help"
                             />
-                          ) : <span className="type-meta text-oxford/45">—</span>}
-                          <span className="type-meta text-oxford/45" aria-hidden>→</span>
+                          ) : <span className="type-meta text-oxford/65">—</span>}
+                          <span className="type-meta text-oxford/65" aria-hidden>→</span>
                           <DecisionBadge
                             variant={rulingToRecommendation(item.decision)}
                             className="cursor-help"
@@ -306,7 +306,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
                         />
                       </span>
-                      <span className="type-data text-right text-oxford/60">
+                      <span className="type-data text-right text-oxford/65">
                         {entry.count} · {entry.pct}%
                       </span>
                     </li>
@@ -341,7 +341,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                         </span>
                         <span
                           className={`type-data shrink-0 transition-colors ${
-                            e.stale_warning ? 'text-escalation' : 'text-oxford/60 group-hover:text-oxford'
+                            e.stale_warning ? 'text-escalation' : 'text-oxford/65 group-hover:text-oxford'
                           }`}
                         >
                           {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
@@ -368,7 +368,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               {(coverageQuery.data?.limitations ?? []).length > 0 ? (
                 <ul className="mt-phi-3 flex flex-col gap-phi-1">
                   {coverageQuery.data?.limitations?.map((limitation) => (
-                    <li key={limitation} className="type-meta text-oxford/55">{limitation}</li>
+                    <li key={limitation} className="type-meta text-oxford/65">{limitation}</li>
                   ))}
                 </ul>
               ) : null}

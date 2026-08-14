@@ -6,7 +6,8 @@ import asyncio
 import copy
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+import inspect
 from datetime import datetime
 from utils.timeutil import utcnow
 
@@ -17,13 +18,14 @@ from tenant_context import require_user_id
 from fund_thesis import rule_based_thesis_alignment, thesis_context_has_embeddings
 from pipeline_state import upsert_pipeline_state
 from utils.storage import Storage
-from utils.settings_loader import dimension_weights_from_fund_config, get_runtime_limits, is_reviewers_enabled, load_settings
+from utils.settings_loader import DEFAULT_SETTINGS, dimension_weights_from_fund_config, runtime_limits_from_settings
 from utils.scoring import DEFAULT_SCORE_SOURCE, compute_overall_score, enrich_scores
 from services.scoring import DeterministicScoringEngine
-from services.scoring.policy_store import load_active_policy
+from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.founder_enrichment import founder_resolution_for_review
+from founder_context import build_founder_context
 from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from evaluation_v2.governed_scoring import (
@@ -36,6 +38,13 @@ from pipeline_execution import StageExecutionResult
 
 
 logger = logging.getLogger(__name__)
+
+
+def load_active_policy(*args, **kwargs):
+    """Legacy test seam; governed runtime consumes EvaluationPrerequisites."""
+    from services.scoring.policy_store import load_active_policy as _load_active_policy
+
+    return _load_active_policy(*args, **kwargs)
 
 
 class ReviewerEngine:
@@ -63,6 +72,11 @@ class ReviewerEngine:
         active_thesis: Optional[Dict[str, Any]] = None,
         use_resource_fund_thesis_fallback: bool = True,
         evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
+        regulatory_context_loader: Optional[Callable[[str, str], Any]] = None,
+        canonical_context_loader: Optional[Callable[[str, str], Any]] = None,
+        founder_persister: Optional[Callable[..., Any]] = None,
+        settings: Optional[Dict[str, Any]] = None,
+        startup_repository: Any = None,
     ):
         """
         Initialize the Reviewer engine.
@@ -75,6 +89,10 @@ class ReviewerEngine:
             inferred = (getattr(storage, "_user_id", None) or "").strip()
         self.tenant_user_id = require_user_id(inferred, context="ReviewerEngine")
         self.evaluation_prerequisites = evaluation_prerequisites
+        self.settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
+        self.regulatory_context_loader = regulatory_context_loader
+        self.canonical_context_loader = canonical_context_loader
+        self.founder_persister = founder_persister
         if evaluation_prerequisites is not None:
             evaluation_prerequisites.require_tenant(
                 self.tenant_user_id, context="ReviewerEngine"
@@ -90,6 +108,7 @@ class ReviewerEngine:
             use_resource_fund_thesis_fallback = False
         self.api_key = api_key
         self.storage = storage
+        self.startup_repository = startup_repository
         self.interval_seconds = interval_seconds
         self.model = model
         self.batch_size = batch_size
@@ -174,10 +193,9 @@ class ReviewerEngine:
                 return DeterministicScoringEngine(policy=policy)
             return DeterministicScoringEngine(policy=policy)
         try:
-            settings = load_settings(self.tenant_user_id)
-            fc = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
+            fc = self.settings.get("fund_config") if isinstance(self.settings.get("fund_config"), dict) else {}
             dim_weights = dimension_weights_from_fund_config(fc)
-            policy = load_active_policy(self.tenant_user_id)
+            policy = compile_policy_from_fund_config(fc)
             if dim_weights:
                 self.logger.info(
                     "reviewer_settings user_id=%s scoring_weights=%s",
@@ -215,6 +233,96 @@ class ReviewerEngine:
                 r.close()
             except Exception as exc:  # pragma: no cover - defensive
                 self.logger.debug("Reviewer close failed: %s", exc)
+
+    async def _load_regulatory_context(self, scout_output: Dict[str, Any]) -> Dict[str, Any] | None:
+        """Load one bounded canonical packet before the three-persona fan-out."""
+        loader = getattr(self, "regulatory_context_loader", None)
+        if loader is None:
+            return None
+        startup_id = str(scout_output.get("id") or "").strip()
+        if not startup_id:
+            return None
+        try:
+            loaded = loader(self.tenant_user_id, startup_id)
+            if inspect.isawaitable(loaded):
+                loaded = await loaded
+            if not isinstance(loaded, dict) or not str(loaded.get("text") or "").strip():
+                return None
+            self.logger.info(
+                "legacy_reviewer_regulatory_context startup_id=%s chars=%d",
+                startup_id,
+                int(loaded.get("chars") or len(str(loaded.get("text") or ""))),
+            )
+            return loaded
+        except Exception as exc:
+            self.logger.warning("Legacy regulatory context unavailable for %s: %s", startup_id, exc)
+            return None
+
+    async def _load_canonical_context(self, scout_output: Dict[str, Any]) -> Dict[str, Any] | None:
+        loader = getattr(self, "canonical_context_loader", None)
+        startup_id = str(scout_output.get("id") or "").strip()
+        if loader is None or not startup_id:
+            return None
+        try:
+            loaded = loader(self.tenant_user_id, startup_id)
+            if inspect.isawaitable(loaded):
+                loaded = await loaded
+            if not isinstance(loaded, dict):
+                return None
+            contexts = {
+                str(key): value for key, value in (loaded.get("contexts") or {}).items()
+                if isinstance(value, dict) and value.get("has_canonical_coverage")
+            }
+            return {"contexts": contexts, "has_canonical_coverage": bool(contexts)} if contexts else None
+        except Exception as exc:
+            self.logger.warning("Canonical context unavailable for %s: %s", startup_id, exc)
+            return None
+
+    async def _prepare_scout_for_llm(self, scout_output: Dict[str, Any]) -> Dict[str, Any]:
+        prepared = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
+        canonical_context = await self._load_canonical_context(scout_output)
+        canonical_contexts = {}
+        if canonical_context is not None:
+            canonical_contexts.update(canonical_context.get("contexts") or {})
+        context = await self._load_regulatory_context(scout_output)
+        if context is not None:
+            prepared["_canonical_regulatory_context"] = context
+        founder_resolution = scout_output.get("founder_resolution")
+        if founder_resolution is None:
+            founder_resolution = founder_resolution_for_review(
+                scout_output, prepared, self.tenant_user_id
+            )
+        if founder_resolution is not None:
+            founder_context = build_founder_context(founder_resolution)
+            if founder_context.get("text"):
+                prepared["_canonical_founder_context"] = founder_context
+                canonical_contexts.setdefault("founder", founder_context)
+                self.logger.info(
+                    "legacy_reviewer_founder_context startup_id=%s chars=%d",
+                    str(scout_output.get("id") or "").strip(),
+                    int(founder_context.get("chars") or 0),
+                )
+        if context is not None:
+            canonical_contexts.setdefault("regulatory", context)
+        if canonical_contexts:
+            prepared["_canonical_context"] = {
+                "contexts": canonical_contexts,
+                "has_canonical_coverage": any(
+                    bool(packet.get("has_canonical_coverage", True))
+                    for packet in canonical_contexts.values()
+                    if isinstance(packet, dict)
+                ),
+            }
+        return prepared
+
+    async def _review_personas(self, scout_for_llm: Dict[str, Any]) -> list:
+        """Fan out the unchanged legacy three-persona contract with one shared packet."""
+        return await asyncio.gather(
+            self.reviewer.review(scout_for_llm),
+            self.skeptical_reviewer.review(scout_for_llm),
+            self.opportunist_reviewer.review(scout_for_llm),
+            return_exceptions=True,
+        )
     
     def _compute_consensus(self, results: list) -> dict:
         """
@@ -308,7 +416,7 @@ class ReviewerEngine:
         prev_prompt = rev.SYSTEM_PROMPT
         try:
             rev.set_prompt(candidate_system_prompt)
-            scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
+            scout_for_llm = await self._prepare_scout_for_llm(scout_output)
             res = await rev.review(scout_for_llm)
             if res is None:
                 return None
@@ -612,6 +720,19 @@ class ReviewerEngine:
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
         return updated
 
+    def _guard_review_output(
+        self, review_output: Dict[str, Any], canonical_context: Dict[str, Any] | None
+    ) -> tuple[Dict[str, Any], Dict[str, Any]]:
+        """Apply the shared deterministic evidence guard before persistence."""
+        from contradiction_gate import apply_contradiction_gate
+
+        audit = apply_contradiction_gate(
+            user_id=self.tenant_user_id,
+            review=review_output,
+            canonical_context=canonical_context,
+        )
+        return dict(audit["guarded_review"]), audit
+
     @staticmethod
     def _score_reasoning_from_structured_trace(trace: Dict[str, Any]) -> Dict[str, str]:
         from config.scoring_config import DIMENSION_SCORE_BANDS, get_confidence_level, MISSING_EVIDENCE_ITEMS
@@ -786,7 +907,7 @@ class ReviewerEngine:
         Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting review cycle at {utcnow().isoformat()}")
-        if not is_reviewers_enabled(self.tenant_user_id):
+        if not (self.settings.get("agent_config") or {}).get("reviewers_enabled", False):
             self.logger.info("Review cycle skipped (reviewers disabled in settings)")
             self.last_cycle_stats = {
                 "reviewed_count": 0,
@@ -829,14 +950,14 @@ class ReviewerEngine:
                 detail="No unreviewed startup is eligible for the Reviewer stage.",
             )
         try:
-            cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", effective_batch))
+            cycle_limit = int(runtime_limits_from_settings(self.settings).get("max_agents_per_run", effective_batch))
             effective_batch = min(effective_batch, max(1, cycle_limit))
         except Exception as e:
             self.logger.warning("Reviewer runtime limits unavailable, using batch size: %s", e)
         
         # Load confidence threshold from settings
         try:
-            settings = load_settings(self.tenant_user_id)
+            settings = self.settings
         except Exception as e:
             self.logger.warning("Reviewer settings unavailable, using defaults: %s", e)
             settings = {"agent_config": {}}
@@ -951,7 +1072,7 @@ class ReviewerEngine:
                 continue
             scout_output = self._build_scout_output_payload(startup)
             entry_id = scout_output["id"]
-            scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
+            scout_for_llm = await self._prepare_scout_for_llm(scout_output)
 
             try:
                 self.logger.info(
@@ -960,14 +1081,7 @@ class ReviewerEngine:
                 )
                 
                 # Run all 3 reviewers in parallel
-                default_task = self.reviewer.review(scout_for_llm)
-                skeptical_task = self.skeptical_reviewer.review(scout_for_llm)
-                opportunist_task = self.opportunist_reviewer.review(scout_for_llm)
-                
-                results = await asyncio.gather(
-                    default_task, skeptical_task, opportunist_task,
-                    return_exceptions=True,
-                )
+                results = await self._review_personas(scout_for_llm)
                 
                 # Collect successful results
                 reviewer_types = ["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
@@ -1063,7 +1177,13 @@ class ReviewerEngine:
 
                 # Convert to ReviewInfo and save (primary fields from default reviewer)
                 from utils.adapters import reviewer_output_to_review_info
-                review_info = reviewer_output_to_review_info(review_output)
+                canonical_context_snapshot = scout_for_llm.get("_canonical_context")
+                guarded_review, contradiction_guard = self._guard_review_output(
+                    review_output, canonical_context_snapshot
+                )
+                review_info = reviewer_output_to_review_info(guarded_review)
+                review_info.contradiction_guard = contradiction_guard
+                review_info.canonical_context_snapshot = canonical_context_snapshot
                 review_info.reviewer_agent_id = self.agent_id
                 review_info.reviews = single_reviews
                 review_info.consensus_verdict = consensus["consensus_verdict"]
@@ -1078,15 +1198,38 @@ class ReviewerEngine:
                 founder_resolution = founder_resolution_for_review(
                     scout_output, scout_for_llm, self.tenant_user_id
                 )
-                success = await asyncio.to_thread(
-                    self.storage.add_review,
-                    entry_id,
-                    review_info,
-                    pipeline_run_id=pipeline_run_id,
-                    enrichment_review_output=review_output,
-                    enrichment_gap_reference_urls=gap_urls or None,
-                    enrichment_founder_resolution=founder_resolution,
-                )
+                if founder_resolution is not None and self.founder_persister is not None:
+                    try:
+                        await self.founder_persister(
+                            user_id=self.tenant_user_id,
+                            startup_id=entry_id,
+                            resolution=founder_resolution,
+                        )
+                    except Exception as exc:
+                        # Canonical people persistence is additive during the
+                        # strangler migration; legacy review storage remains the
+                        # compatibility fallback when it is unavailable.
+                        self.logger.warning(
+                            "canonical_people_persistence_failed startup_id=%s: %s",
+                            entry_id, exc,
+                        )
+                if getattr(self, "startup_repository", None) is not None:
+                    success = await self.startup_repository.update_review(
+                        self.tenant_user_id, entry_id, review_info,
+                        pipeline_run_id=pipeline_run_id,
+                        enrichment_review_output=guarded_review,
+                        enrichment_gap_reference_urls=gap_urls or None,
+                        enrichment_founder_resolution=founder_resolution,
+                        settings=self.settings,
+                    )
+                else:
+                    success = await asyncio.to_thread(
+                        self.storage.add_review, entry_id, review_info,
+                        pipeline_run_id=pipeline_run_id,
+                        enrichment_review_output=guarded_review,
+                        enrichment_gap_reference_urls=gap_urls or None,
+                        enrichment_founder_resolution=founder_resolution,
+                    )
                 
                 if success:
                     reviewed_count += 1
@@ -1115,7 +1258,7 @@ class ReviewerEngine:
                                 if any(kw in item.lower() for kw in negative_keywords)
                             ]
                             if negative_items:
-                                self.deal_memory.record_failed_assumptions(
+                                await self.deal_memory.record_failed_assumptions(
                                     negative_items
                                 )
                         except Exception as e:
@@ -1210,12 +1353,12 @@ class ReviewerEngine:
         if startup.review_info is not None and not force_rerun:
             self.logger.info("Startup already reviewed: %s", startup_id)
             return True
-        if not bypass_agent_enabled_gate and not is_reviewers_enabled(self.tenant_user_id):
+        if not bypass_agent_enabled_gate and not (self.settings.get("agent_config") or {}).get("reviewers_enabled", False):
             self.logger.info("run_startup skipped (reviewers disabled in settings): %s", startup_id)
             return False
 
         try:
-            settings = load_settings(self.tenant_user_id)
+            settings = self.settings
         except Exception as e:
             self.logger.warning("Reviewer settings unavailable for run_startup, using defaults: %s", e)
             settings = {"agent_config": {}}
@@ -1247,16 +1390,10 @@ class ReviewerEngine:
         scout_output = self._build_scout_output_payload(startup)
         if force_rerun and startup.review_info is not None:
             scout_output["_prior_review"] = startup.review_info.model_dump(mode="json")
-        scout_for_llm = enrich_scout_for_reviewer_llm(scout_output, self.tenant_user_id)
+        scout_for_llm = await self._prepare_scout_for_llm(scout_output)
 
         try:
-            default_task = self.reviewer.review(scout_for_llm)
-            skeptical_task = self.skeptical_reviewer.review(scout_for_llm)
-            opportunist_task = self.opportunist_reviewer.review(scout_for_llm)
-            results = await asyncio.gather(
-                default_task, skeptical_task, opportunist_task,
-                return_exceptions=True,
-            )
+            results = await self._review_personas(scout_for_llm)
             reviewer_types = ["DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer"]
             successful_results = []
             for i, res in enumerate(results):
@@ -1311,9 +1448,19 @@ class ReviewerEngine:
             ).model_dump(mode="json")
 
             from utils.adapters import reviewer_output_to_review_info
+            from contradiction_gate import apply_contradiction_gate
             single_reviews = self._build_single_reviews(successful_results)
 
-            review_info = reviewer_output_to_review_info(review_output)
+            canonical_context_snapshot = scout_for_llm.get("_canonical_context")
+            contradiction_guard = apply_contradiction_gate(
+                user_id=self.tenant_user_id,
+                review=review_output,
+                canonical_context=canonical_context_snapshot,
+            )
+            guarded_review = contradiction_guard["guarded_review"]
+            review_info = reviewer_output_to_review_info(guarded_review)
+            review_info.contradiction_guard = contradiction_guard
+            review_info.canonical_context_snapshot = canonical_context_snapshot
             review_info.reviewer_agent_id = self.agent_id
             review_info.reviews = single_reviews
             review_info.consensus_verdict = consensus["consensus_verdict"]
@@ -1336,17 +1483,31 @@ class ReviewerEngine:
             founder_resolution = founder_resolution_for_review(
                 scout_output, scout_for_llm, self.tenant_user_id
             )
-            saved = bool(
-                await asyncio.to_thread(
-                    self.storage.add_review,
-                    startup_id,
-                    review_info,
+            if getattr(self, "startup_repository", None) is not None:
+                saved = bool(await self.startup_repository.update_review(
+                    self.tenant_user_id, startup_id, review_info,
                     pipeline_run_id=pipeline_run_id,
-                    enrichment_review_output=review_output,
+                    enrichment_review_output={
+                        **guarded_review,
+                        "contradiction_guard": contradiction_guard,
+                        "canonical_context_snapshot": canonical_context_snapshot,
+                    },
                     enrichment_gap_reference_urls=gap_urls or None,
                     enrichment_founder_resolution=founder_resolution,
-                )
-            )
+                    settings=self.settings,
+                ))
+            else:
+                saved = bool(await asyncio.to_thread(
+                    self.storage.add_review, startup_id, review_info,
+                    pipeline_run_id=pipeline_run_id,
+                    enrichment_review_output={
+                        **guarded_review,
+                        "contradiction_guard": contradiction_guard,
+                        "canonical_context_snapshot": canonical_context_snapshot,
+                    },
+                    enrichment_gap_reference_urls=gap_urls or None,
+                    enrichment_founder_resolution=founder_resolution,
+                ))
             if saved:
                 startup.review_info = review_info
                 startup.update_timestamp()

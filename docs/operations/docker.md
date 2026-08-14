@@ -23,6 +23,7 @@ The image layout mirrors production:
 /app/
   backend/     ← WORKDIR; uvicorn runs here
   resources/   ← policy JSON (partner/reviewer/rubric/thesis rules)
+  db/          ← provider-neutral PostgreSQL migrations
 ```
 
 ## Run
@@ -35,6 +36,22 @@ docker run --rm -p 8000:8000 --env-file .env -e PORT=8000 aethria-backend
 
 Or use docker compose (see below).
 
+### Local production snapshot protection
+
+The normal compose stack uses the disposable `aethria-postgres-test-data`
+volume. The restored production snapshot is intentionally separate and is
+started only through `docker-compose.snapshot.yml`, which uses the explicitly
+created external volume `aethria-prod-snapshot-data`.
+
+`run.py` detects `aethria_prod_snapshot`, selects the snapshot compose stack,
+and verifies `db/snapshots/aethria_prod_snapshot_manifest.json`. It never runs
+normal migrations against that database. A manifest mismatch stops startup;
+it does not repair or overwrite the snapshot.
+
+The snapshot volume is not removed by normal compose cleanup. To intentionally
+replace it, stop the services, create a new backup first, and perform the
+restore as a separate operator action. Do not add the backup dump to git.
+
 ### Required environment variables
 
 For full pipeline execution, set at minimum:
@@ -42,9 +59,10 @@ For full pipeline execution, set at minimum:
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_API_KEY` | LLM calls for scout/reviewer/partner |
-| `USE_SUPABASE_STORAGE=1` | Production storage path |
-| `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Backend service-role client |
+| `DATABASE_URL` | Canonical PostgreSQL connection (local, Cloud SQL, Supabase Postgres, or another supported provider) |
+| `USE_SUPABASE_STORAGE=1` | Legacy Supabase Data API compatibility routes only |
+| `SUPABASE_URL` | Required only by legacy Supabase compatibility routes |
+| `SUPABASE_SERVICE_ROLE_KEY` | Required only by legacy Supabase compatibility routes |
 | `CLERK_JWKS_URL` | JWT verification |
 
 See [DEVELOPMENT.md](../../DEVELOPMENT.md) for optional variables (`SCOUT_MODEL`, `ALLOWED_ORIGINS`, etc.).
@@ -60,9 +78,10 @@ MAX_CONCURRENT_PIPELINE_CYCLES=1
 
 Add them to `.env` or pass with `-e`.
 
-### Local file storage fallback
+### Compatibility file storage fallback
 
-If `USE_SUPABASE_STORAGE=0`, the backend writes under `backend/data/`. Mount a volume:
+Only run without `DATABASE_URL` in explicit non-production compatibility mode. In
+that mode, legacy local writes go under `backend/data/`. Mount a volume:
 
 ```bash
 docker run --rm -p 8000:8000 --env-file .env \
@@ -70,7 +89,8 @@ docker run --rm -p 8000:8000 --env-file .env \
   aethria-backend
 ```
 
-Production Docker usage should keep `USE_SUPABASE_STORAGE=1`.
+Production Docker usage should provide `DATABASE_URL`; it may point to Supabase
+Postgres, but the canonical runtime is not tied to the Supabase Data API.
 
 ## Docker Compose
 
@@ -81,6 +101,17 @@ docker compose up --build
 ```
 
 Stops with `Ctrl+C` or `docker compose down`.
+
+The separate snapshot stack is selected automatically by `run.py` when the
+local `DATABASE_URL` names `aethria_prod_snapshot`. For direct inspection:
+
+```bash
+docker volume create aethria-prod-snapshot-data
+docker compose -f docker-compose.snapshot.yml up -d postgres
+```
+
+Do not run `docker compose down -v` against the snapshot stack unless you have
+an external backup and explicitly intend to remove that snapshot volume.
 
 ## Health check
 

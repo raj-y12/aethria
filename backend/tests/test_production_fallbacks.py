@@ -19,7 +19,7 @@ def _enable_local(monkeypatch):
     monkeypatch.delenv("FASTAPI_ENV", raising=False)
 
 
-def test_portfolio_store_does_not_read_local_file_after_supabase_read_failure(
+def test_portfolio_store_requires_canonical_snapshot_in_supabase_mode(
     monkeypatch, tmp_path
 ):
     _enable_supabase(monkeypatch)
@@ -27,9 +27,7 @@ def test_portfolio_store_does_not_read_local_file_after_supabase_read_failure(
     from portfolio.store import PortfolioStore
 
     store = PortfolioStore(data_dir=str(tmp_path / "portfolio"), user_id="user-1")
-    monkeypatch.setattr(store, "_supabase_client", lambda: (_ for _ in ()).throw(ConnectionError("db down")))
-
-    with pytest.raises(RuntimeError, match="supabase_read_failed"):
+    with pytest.raises(RuntimeError, match="canonical_startup_snapshot_unavailable"):
         store.get_all_startups()
 
     assert not (tmp_path / "portfolio" / "startups.json").exists()
@@ -54,13 +52,13 @@ def test_cost_controller_does_not_write_local_budget_after_supabase_load_failure
     monkeypatch.setenv("ENVIRONMENT", "production")
     import portfolio.cost_control as cost_control
 
-    monkeypatch.setattr(cost_control, "load_settings", lambda _user_id: {})
     monkeypatch.setattr(cost_control, "doc_get", lambda *args, **kwargs: (_ for _ in ()).throw(ConnectionError("db down")))
 
     with pytest.raises(RuntimeError, match="supabase_budget_load_failed"):
         cost_control.CostController(
             budget_file=str(tmp_path / "budgets.json"),
             user_id="user-1",
+            settings={},
         )
 
     assert not (tmp_path / "budgets.json").exists()
@@ -123,19 +121,13 @@ def test_file_storage_is_rejected_in_production(monkeypatch, tmp_path):
         Storage(str(tmp_path / "startups.json"))
 
 
-def test_rejection_analyzer_does_not_read_local_file_after_supabase_read_failure(
-    monkeypatch, tmp_path
-):
-    _enable_supabase(monkeypatch)
+def test_rejection_analyzer_requires_provider_neutral_snapshot_in_production(monkeypatch, tmp_path):
     monkeypatch.setenv("ENVIRONMENT", "production")
     from portfolio.rejection import RejectionAnalyzer
 
     analyzer = RejectionAnalyzer(data_dir=str(tmp_path / "portfolio"), user_id="user-1")
-    monkeypatch.setattr(
-        analyzer, "_supabase_client", lambda: (_ for _ in ()).throw(ConnectionError("db down"))
-    )
 
-    with pytest.raises(RuntimeError, match="supabase_read_failed_no_local_fallback"):
+    with pytest.raises(RuntimeError, match="batch2_asyncpg_snapshot_required"):
         analyzer.get_patterns()
 
 
@@ -150,19 +142,13 @@ def test_rejection_analyzer_scopes_fallback_file_per_tenant(tmp_path):
     assert "user-b" in b.patterns_file.name
 
 
-def test_feed_fetcher_does_not_read_local_file_after_supabase_read_failure(
-    monkeypatch, tmp_path
-):
-    _enable_supabase(monkeypatch)
+def test_feed_fetcher_requires_provider_neutral_snapshot_in_production(monkeypatch, tmp_path):
     monkeypatch.setenv("ENVIRONMENT", "production")
     from utils.feed_fetcher import FeedFetcher
 
     fetcher = FeedFetcher(cache_file=str(tmp_path / "feed_cache.json"), user_id="user-1")
-    monkeypatch.setattr(
-        fetcher, "_supabase_client", lambda: (_ for _ in ()).throw(ConnectionError("db down"))
-    )
 
-    with pytest.raises(RuntimeError, match="supabase_read_failed_no_local_fallback"):
+    with pytest.raises(RuntimeError, match="batch2_asyncpg_snapshot_required"):
         fetcher._read_cache()
 
 

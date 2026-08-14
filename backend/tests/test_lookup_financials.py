@@ -84,9 +84,6 @@ def _payload(financials=None):
 @pytest.fixture
 def scout(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: True)
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {

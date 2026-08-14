@@ -1,28 +1,23 @@
 """
 Shared settings loader for API and agent engines.
-Backed by Supabase settings table so UI toggles control backend agents.
+Settings transport is direct PostgreSQL; normalization remains in this module.
 Settings are keyed by user_id so each user has their own settings.
-user_id must always be passed explicitly when using Supabase (no run_context).
+user_id must always be passed explicitly (no run_context).
 """
 import hashlib
 import json
 import logging
 import os
-import env_config
 import time
 from pathlib import Path
 from typing import Any, Optional
 
-from supabase_doc_store import doc_get, doc_set
+from settings_repository import SettingsRepository
 
 _SETTINGS_TABLE = "settings"
 _SETTINGS_CACHE_TTL_SECONDS = 2.0
 _SETTINGS_CACHE: dict[str, tuple[float, dict]] = {}
 logger = logging.getLogger(__name__)
-
-
-def _using_supabase() -> bool:
-    return env_config.use_supabase_storage()
 
 
 def _settings_key(user_id: Optional[str], *, for_save: bool = False) -> Optional[str]:
@@ -149,22 +144,26 @@ def get_settings_path() -> Path:
     return root / settings_path if not Path(settings_path).is_absolute() else Path(settings_path)
 
 
-def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> dict:
-    """Load settings for a user. Requires explicit user_id when USE_SUPABASE_STORAGE is enabled."""
+async def load_settings(
+    user_id: Optional[str] = None,
+    *,
+    repository: SettingsRepository | None = None,
+    use_cache: bool = True,
+) -> dict:
+    """Load, normalize, and cache settings from the injected PostgreSQL repository."""
     key = _settings_key(user_id, for_save=False)
-    if _using_supabase() and not key:
-        raise RuntimeError(
-            "load_settings requires explicit user_id when USE_SUPABASE_STORAGE is enabled"
-        )
     if not key:
         return json.loads(json.dumps(DEFAULT_SETTINGS))
     cached = _SETTINGS_CACHE.get(key) if use_cache else None
     now = time.monotonic()
     if cached and (now - cached[0]) <= _SETTINGS_CACHE_TTL_SECONDS:
         return json.loads(json.dumps(cached[1]))
-    data = doc_get(_SETTINGS_TABLE, key, user_id=key)
+    if repository is None:
+        raise RuntimeError("load_settings requires an explicit SettingsRepository")
+    data = await repository.get(key, key=key)
     if not data or not isinstance(data, dict):
         out = json.loads(json.dumps(DEFAULT_SETTINGS))
+        out = await _reconcile_settings_with_active_thesis(out, key, repository)
         _SETTINGS_CACHE[key] = (now, out)
         logger.info("settings_load user_id=%s source=defaults", key[:24])
         return json.loads(json.dumps(out))
@@ -205,6 +204,7 @@ def load_settings(user_id: Optional[str] = None, *, use_cache: bool = True) -> d
         stored_threshold = stored_ac.get("confidence_threshold") if isinstance(stored_ac, dict) else None
         if stored_threshold in (0.5, "0.5"):
             ac["confidence_threshold"] = DEFAULT_SETTINGS["agent_config"]["confidence_threshold"]
+    out = await _reconcile_settings_with_active_thesis(out, key, repository)
     _SETTINGS_CACHE[key] = (time.monotonic(), out)
     logger.info(
         "settings_load user_id=%s source=database fund_config=%s rubric=%d score_bands=%d",
@@ -226,18 +226,125 @@ def _deep_merge_dict(base: dict, saved: dict) -> dict:
     return out
 
 
-def save_settings(settings: dict, user_id: Optional[str] = None) -> None:
-    """Persist settings to Supabase for a user."""
+async def _reconcile_settings_with_active_thesis(
+    settings: dict,
+    user_id: str,
+    repository: SettingsRepository,
+) -> dict:
+    """Make the canonical active thesis authoritative for effective settings.
+
+    Settings still owns operator controls such as agent enablement. The
+    structured fund mandate is a projection of the canonical thesis, however,
+    so stale settings rows must not make the UI or workers observe an older
+    mandate. Repositories without the optional thesis lookup retain the legacy
+    unit-test/dev behavior.
+    """
+    getter = getattr(repository, "get_active_thesis_for_settings", None)
+    if getter is None:
+        return settings
+    try:
+        thesis = await getter(user_id)
+    except Exception:
+        logger.warning("settings_thesis_reconcile_failed user_id=%s", user_id[:24], exc_info=True)
+        return settings
+    if not isinstance(thesis, dict):
+        return settings
+    settings["fund_config"] = reconcile_fund_config_with_thesis(
+        settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {},
+        raw_text=str(thesis.get("raw_text") or ""),
+        parsed_json=thesis.get("parsed_json"),
+        version_number=thesis.get("version_number"),
+        version_id=thesis.get("version_id"),
+    )
+    return settings
+
+
+def reconcile_fund_config_with_thesis(
+    fund_config: dict,
+    *,
+    raw_text: str,
+    parsed_json: Any,
+    version_number: Any = None,
+    version_id: Any = None,
+) -> dict:
+    """Overlay canonical thesis content onto a settings fund-config projection."""
+    result = _deep_merge_dict(DEFAULT_SETTINGS["fund_config"], fund_config if isinstance(fund_config, dict) else {})
+    parsed = parsed_json
+    if isinstance(parsed, str):
+        try:
+            parsed = json.loads(parsed)
+        except json.JSONDecodeError:
+            parsed = {}
+    if not isinstance(parsed, dict):
+        parsed = {}
+    mandate = result.setdefault("mandate", {})
+
+    mappings = {
+        "sectors": ("preferredSectors",),
+        "stage_focus": ("preferredStages",),
+        "geography": ("geographyPreferences",),
+        "exclusions": ("excludedSectorList", "excludedSectors"),
+        "check_size_min": ("checkSizeMin",),
+        "check_size_max": ("checkSizeMax",),
+        "ownership_target": ("ownershipTarget",),
+    }
+    for parsed_key, target_keys in mappings.items():
+        if parsed_key not in parsed:
+            continue
+        value = parsed[parsed_key]
+        if parsed_key in {"sectors", "stage_focus", "geography", "exclusions"}:
+            value = [str(item).strip() for item in value or [] if str(item).strip()]
+        for target_key in target_keys:
+            mandate[target_key] = value
+    if "risk_profile" in parsed:
+        result.setdefault("risk", {})["sensitivity"] = str(parsed["risk_profile"] or "balanced")
+    for parsed_key, target_key in (
+        ("score_bands", "scoreBands"),
+        ("scoring_weights", "scoringWeights"),
+        ("rubric", "rubric"),
+        ("thresholds", "thresholds"),
+    ):
+        if parsed_key in parsed and isinstance(parsed[parsed_key], (dict, list)):
+            result[target_key] = parsed[parsed_key]
+    if isinstance(version_number, int) or (isinstance(version_number, str) and version_number.isdigit()):
+        number = int(version_number)
+        result["version"] = number
+        result["versionLabel"] = f"Fund Thesis v{number}"
+    if version_id:
+        result["activePolicyVersionId"] = str(version_id)
+    # Only use an explicitly supplied thesis-text field. Historical raw_text
+    # values often contain the generated structured summary and would duplicate
+    # itself if written into the UI's free-text field.
+    explicit_text = parsed.get("thesis_text") or parsed.get("thesisText")
+    if isinstance(explicit_text, str) and explicit_text.strip():
+        mandate["thesisText"] = explicit_text.strip()
+    return result
+
+
+async def save_settings(
+    settings: dict,
+    user_id: Optional[str] = None,
+    *,
+    repository: SettingsRepository | None = None,
+) -> None:
+    """Replace the persisted settings document for a user."""
     key = _settings_key(user_id, for_save=True)
     if not key:
         raise ValueError("user_id required to save settings")
-    doc_set(_SETTINGS_TABLE, settings, key, user_id=key)
+    if repository is None:
+        raise RuntimeError("save_settings requires an explicit SettingsRepository")
+    await repository.upsert(key, settings, key=key)
     _SETTINGS_CACHE.pop(key, None)
     logger.info("settings_save user_id=%s sections=%s", key[:24], sorted(settings.keys()))
 
 
-def get_fund_config(user_id: Optional[str] = None, *, use_cache: bool = True) -> dict:
-    fc = load_settings(user_id, use_cache=use_cache).get("fund_config")
+async def get_fund_config(
+    user_id: Optional[str] = None,
+    *,
+    repository: SettingsRepository | None = None,
+    use_cache: bool = True,
+) -> dict:
+    fc = (await load_settings(user_id, repository=repository, use_cache=use_cache)).get("fund_config")
     return dict(fc) if isinstance(fc, dict) else {}
 
 
@@ -401,38 +508,38 @@ def recommendation_for_score_from_fund_config(score_0_to_10: float, fund_config:
     return "PASS"
 
 
-def is_scouts_enabled(user_id: Optional[str] = None) -> bool:
+async def is_scouts_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     # Always read fresh for stage gate checks to avoid stale toggles.
-    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("scouts_enabled", False)
+    return (await load_settings(user_id, repository=repository, use_cache=False)).get("agent_config", {}).get("scouts_enabled", False)
 
 
-def is_reviewers_enabled(user_id: Optional[str] = None) -> bool:
+async def is_reviewers_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     # Always read fresh for stage gate checks to avoid stale toggles.
-    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("reviewers_enabled", False)
+    return (await load_settings(user_id, repository=repository, use_cache=False)).get("agent_config", {}).get("reviewers_enabled", False)
 
 
-def is_partners_enabled(user_id: Optional[str] = None) -> bool:
+async def is_partners_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     # Always read fresh for stage gate checks to avoid stale toggles.
-    return load_settings(user_id, use_cache=False).get("agent_config", {}).get("partners_enabled", False)
+    return (await load_settings(user_id, repository=repository, use_cache=False)).get("agent_config", {}).get("partners_enabled", False)
 
 
-def _agent_config_safe(user_id: Optional[str] = None) -> dict:
+async def _agent_config_safe(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> dict:
     """Return agent_config or {} if settings cannot be loaded (callers use .get with defaults)."""
     try:
-        ac = load_settings(user_id).get("agent_config")
+        ac = (await load_settings(user_id, repository=repository)).get("agent_config")
         return dict(ac) if isinstance(ac, dict) else {}
     except Exception:
         return {}
 
 
-def is_thesis_reprocess_agents_enabled(user_id: Optional[str] = None) -> bool:
+async def is_thesis_reprocess_agents_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     """Fund-thesis backfill re-runs reviewer + partner only."""
-    ac = _agent_config_safe(user_id)
+    ac = await _agent_config_safe(user_id, repository=repository)
     return bool(ac.get("reviewers_enabled", False) and ac.get("partners_enabled", False))
 
 
-def is_cost_budget_enabled(user_id: Optional[str] = None) -> bool:
-    return bool(load_settings(user_id).get("cost_budget", {}).get("enabled", False))
+async def is_cost_budget_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
+    return bool((await load_settings(user_id, repository=repository)).get("cost_budget", {}).get("enabled", False))
 
 
 def _non_negative_number(value, default: float) -> float:
@@ -474,38 +581,38 @@ def runtime_limits_from_settings(settings: dict) -> dict:
     }
 
 
-def get_runtime_limits(user_id: Optional[str] = None) -> dict:
+async def get_runtime_limits(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> dict:
     """Runtime limits saved from Settings > Operations."""
-    return runtime_limits_from_settings(load_settings(user_id))
+    return runtime_limits_from_settings(await load_settings(user_id, repository=repository))
 
 
-def get_scout_region(user_id: Optional[str] = None) -> str:
-    region = load_settings(user_id).get("agent_config", {}).get("scout_region", "europe")
+async def get_scout_region(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> str:
+    region = (await load_settings(user_id, repository=repository)).get("agent_config", {}).get("scout_region", "europe")
     if region not in ("europe", "global"):
         return "europe"
     return region
 
 
-def is_scout_grounded_citations_enabled(user_id: Optional[str] = None) -> bool:
+async def is_scout_grounded_citations_enabled(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     return bool(
-        load_settings(user_id).get("agent_config", {}).get("scout_grounded_citations_enabled", True)
+        (await load_settings(user_id, repository=repository)).get("agent_config", {}).get("scout_grounded_citations_enabled", True)
     )
 
 
-def is_scout_fail_closed_on_empty_retrieval(user_id: Optional[str] = None) -> bool:
+async def is_scout_fail_closed_on_empty_retrieval(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     """Whether generation is skipped when retrieval returns no sources at all.
 
     Independent of citation allowlist enforcement — see
     `is_scout_citation_allowlist_enforced`.
     """
     return bool(
-        load_settings(user_id)
+        (await load_settings(user_id, repository=repository))
         .get("agent_config", {})
         .get("scout_fail_closed_on_empty_retrieval", True)
     )
 
 
-def is_scout_citation_allowlist_enforced(user_id: Optional[str] = None) -> bool:
+async def is_scout_citation_allowlist_enforced(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> bool:
     """Whether cited URLs must come from the retrieved source pack.
 
     Fail-closed by default and independent of whether generation is permitted
@@ -513,18 +620,18 @@ def is_scout_citation_allowlist_enforced(user_id: Optional[str] = None) -> bool:
     cite anything else.
     """
     return bool(
-        load_settings(user_id)
+        (await load_settings(user_id, repository=repository))
         .get("agent_config", {})
         .get("scout_citation_allowlist_enforced", True)
     )
 
 
-def get_canonical_website_hostname(user_id: Optional[str] = None) -> Optional[str]:
+async def get_canonical_website_hostname(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> Optional[str]:
     try:
         from utils.reference_verify import hostname_from_user_hint
     except ImportError:
         return None
-    raw = (load_settings(user_id).get("fund_identity") or {}).get("canonical_website")
+    raw = ((await load_settings(user_id, repository=repository)).get("fund_identity") or {}).get("canonical_website")
     return hostname_from_user_hint(raw) if raw else None
 
 

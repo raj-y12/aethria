@@ -1,6 +1,6 @@
 """
 ScoutReweighter — adjusts scout run frequencies based on performance.
-Backed by Supabase meta_scout_weights and meta_mutation_log (explicit user_id).
+Backed by provider-neutral meta_scout_weights and meta_mutation_log.
 """
 import logging
 import os
@@ -8,7 +8,7 @@ from typing import Dict, Any, List
 from datetime import datetime
 from utils.timeutil import utcnow
 
-from supabase_doc_store import doc_get, doc_set, list_append_only
+from batch1.store import doc_get, doc_set, list_append_only
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ MIN_DELTA_THRESHOLD = 0.03
 
 
 def load_weights(user_id: str) -> Dict[str, float]:
-    """Load current scout weights from Supabase for this tenant."""
+    """Load current scout weights from the tenant's PostgreSQL snapshot."""
     data = doc_get(_WEIGHTS_TABLE, user_id=user_id)
     if isinstance(data, dict) and data:
         return data

@@ -105,7 +105,7 @@ export default function ProposalReviewDrawer({
         <div>
           <p className="type-label-section">Proposal review</p>
           <h3 className="mt-phi-2 font-display text-2xl font-medium text-oxford">{proposal.pattern_summary}</h3>
-          <p className="type-body mt-phi-2 text-oxford/55">
+          <p className="type-body mt-phi-2 text-oxford/65">
             {proposal.sample_size} attributed signals · {Math.round(proposal.confidence * 100)}% pattern confidence
           </p>
         </div>
@@ -114,24 +114,24 @@ export default function ProposalReviewDrawer({
 
       <div className="border-t border-oxford/10 px-phi-5 py-phi-5">
         {detail.data ? (
-          <p className="type-meta mb-phi-3 text-oxford/50">
+          <p className="type-meta mb-phi-3 text-oxford/65">
             {detail.data.signals.length} linked learning signals
           </p>
         ) : null}
         <div className="grid gap-phi-5 lg:grid-cols-2">
           <div>
             <p className="type-label-section">Proposed policy patch</p>
-            <pre className="mt-phi-2 max-h-64 overflow-auto border-l border-oxford/15 pl-phi-3 font-mono text-xs leading-relaxed text-oxford/60">{JSON.stringify(proposal.proposed_policy_patch, null, 2)}</pre>
+            <pre className="mt-phi-2 max-h-64 overflow-auto border-l border-oxford/15 pl-phi-3 font-mono text-xs leading-relaxed text-oxford/65">{JSON.stringify(proposal.proposed_policy_patch, null, 2)}</pre>
           </div>
           <div>
             <p className="type-label-section">Limitations</p>
-            {proposal.limitations.length ? <ul className="mt-phi-2 space-y-phi-2">{proposal.limitations.map((item) => <li key={item} className="type-body text-oxford/60">{item}</li>)}</ul> : <p className="type-body mt-phi-2 text-oxford/55">No limitations were recorded.</p>}
+            {proposal.limitations.length ? <ul className="mt-phi-2 space-y-phi-2">{proposal.limitations.map((item) => <li key={item} className="type-body text-oxford/65">{item}</li>)}</ul> : <p className="type-body mt-phi-2 text-oxford/65">No limitations were recorded.</p>}
           </div>
         </div>
 
         <div className="mt-phi-6 border-y border-oxford/10 py-phi-4">
           <div className="flex flex-wrap items-center justify-between gap-phi-3">
-            <div><p className="type-label-section">Impact preview</p><p className="type-body mt-1 text-oxford/55">Bounded replay only; it does not rescore or change production.</p></div>
+            <div><p className="type-label-section">Impact preview</p><p className="type-body mt-1 text-oxford/65">Bounded replay only; it does not rescore or change production.</p></div>
             <button type="button" onClick={() => preview.mutate()} disabled={preview.isPending || action !== 'edit_and_accept' || Boolean(configError)} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Run impact preview</button>
           </div>
           {preview.isSuccess ? <p role="status" className="type-body mt-phi-3 text-oxford/65">Preview complete · {previewCount} opportunities affected · automatic rescore disabled.</p> : null}

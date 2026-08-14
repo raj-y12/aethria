@@ -3,14 +3,11 @@ from portfolio.cost_control import CostController
 
 def _controller(monkeypatch, tmp_path, *, enforce_limits):
     monkeypatch.setattr("portfolio.cost_control.env_config.use_supabase_storage", lambda: False)
-    monkeypatch.setattr(
-        "portfolio.cost_control.load_settings",
-        lambda user_id: {"cost_budget": {"enabled": enforce_limits}},
-    )
     return CostController(
         budget_file=str(tmp_path / f"budgets-{enforce_limits}.json"),
         user_id="cost-user",
         enforce_limits=enforce_limits,
+        settings={"cost_budget": {"enabled": enforce_limits}},
     )
 
 

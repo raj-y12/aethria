@@ -87,8 +87,6 @@ def test_call_llm_records_retrieval_no_results_separately_from_model_failure(mon
         api_key="test-key",
         tenant_user_id="user_test_123",
     )
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
@@ -127,9 +125,7 @@ def test_empty_retrieval_gate_is_independent_of_citation_enforcement(monkeypatch
         api_key="test-key",
         tenant_user_id="user_test_123",
     )
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: False)
-    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: True)
+    scout._settings["agent_config"]["scout_fail_closed_on_empty_retrieval"] = False
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
@@ -166,9 +162,7 @@ def test_empty_retrieval_still_skips_generation_when_fail_closed(monkeypatch):
         api_key="test-key",
         tenant_user_id="user_test_123",
     )
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: False)
+    scout._settings["agent_config"]["scout_fail_closed_on_empty_retrieval"] = True
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
@@ -192,8 +186,6 @@ def test_call_llm_records_validation_failure_when_retrieval_succeeded(monkeypatc
         api_key="test-key",
         tenant_user_id="user_test_123",
     )
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
     monkeypatch.setattr(
         "scout.base.retrieve_source_pack_merged",
         lambda **kwargs: {
@@ -361,8 +353,6 @@ def test_postprocess_fail_closed_still_enforces_allowlist(monkeypatch):
 
 def test_company_lookup_includes_explicit_website_in_citable_sources(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: False)
     monkeypatch.setattr(
         DummyScout,
         "_fetch_explicit_website_snippet",

@@ -1,6 +1,6 @@
 """
 MetaAnalyser — reads all performance signal and produces a structured summary.
-Backed by Supabase for agent_metrics, memory, scout_weights, mutation_log, concentration.
+Batch 1 state is provider-neutral; excluded legacy signals retain their own boundary.
 """
 import json
 import logging
@@ -10,7 +10,9 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from collections import Counter
 
-from supabase_doc_store import doc_get, list_get_all
+from batch1.store import doc_get, list_get_all
+from batch2.store import metrics_get_all
+from batch2.store import rejection_patterns_get
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +46,9 @@ _REJECTION_PATTERNS_KEY = "rejection_patterns"
 class MetaAnalyser:
     """Reads all available signal sources and produces a structured SignalSummary."""
 
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, *, memory_snapshot: Optional[Dict[str, Any]] = None):
         self.user_id = user_id
+        self.memory_snapshot = memory_snapshot if isinstance(memory_snapshot, dict) else {}
         self.logger = logging.getLogger("meta.analyser")
         self.cooldown_cycles = int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES", "3"))
 
@@ -98,10 +101,10 @@ class MetaAnalyser:
         }
 
     def _read_agent_metrics(self) -> Any:
-        return list_get_all("portfolio_agent_metrics", user_id=self.user_id)
+        return metrics_get_all(user_id=self.user_id)
 
     def _read_rejection_patterns(self) -> Dict:
-        data = doc_get("memory", _REJECTION_PATTERNS_KEY, user_id=self.user_id)
+        data = rejection_patterns_get(user_id=self.user_id)
         if isinstance(data, dict) and data:
             return data
         path = _BACKEND_DIR / "data" / "portfolio" / "rejection_patterns.json"
@@ -109,8 +112,7 @@ class MetaAnalyser:
         return legacy if isinstance(legacy, dict) else {}
 
     def _read_memory(self) -> Dict:
-        data = doc_get("memory", user_id=self.user_id)
-        return data if isinstance(data, dict) else {}
+        return dict(self.memory_snapshot)
 
     def _read_scout_weights(self) -> Dict[str, float]:
         data = doc_get("meta_scout_weights", user_id=self.user_id)

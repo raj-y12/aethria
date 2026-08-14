@@ -26,19 +26,30 @@ Three deployable units and one shared database:
                  │  + agent pipeline│        │ DuckDuckGo             │
                  └────────┬─────────┘        │ (web retrieval chain)  │
                           │                  └────────────────────────┘
-                          │ service-role client / direct DSN
+                          │ provider-neutral asyncpg pool / direct DSN
                           ▼
                  ┌──────────────────────────────────┐
-                 │ Supabase PostgreSQL              │
-                 │  · startups + projections        │
+                 │ PostgreSQL                        │
+                 │  · startups (canonical authority) │
+                 │  · startup_id_aliases             │
                  │  · agent_jobs (durable queue)    │
                  │  · canonical identity/evidence   │
                  │  · governed policy versions      │
                  └──────────────────────────────────┘
 ```
 
-The frontends never touch Supabase directly — all persistence goes through the
-backend using the service-role client ([ADR-0003](docs/adr/0003-supabase-row-level-storage.md)).
+The frontends never touch Supabase directly. Normal backend persistence uses
+provider-neutral asyncpg repositories over the shared PostgreSQL pool. Supabase
+client/storage modules remain only behind explicit development, test, import,
+or historical compatibility boundaries while the final SDK/config cleanup is
+deferred.
+
+Startup authority is explicit: `public.startups` is the sole runtime source of
+startup rows. `startup_id_aliases` is the tenant-scoped bridge for approved
+legacy identifiers. The live Supabase `portfolio_startups` table is preserved
+historical data only; it is not read or written during normal execution and is
+intentionally absent from the provider-neutral migrations. Deleting or
+archiving that live table is a separate operational decision.
 
 ---
 
@@ -51,8 +62,9 @@ Aethria is multi-tenant with **no implicit tenant anywhere**.
 - `backend/tenant_context.py` provides `TenantContext` and `require_user_id()`.
   Every engine constructor and every pipeline entry point calls it, so a missing
   tenant raises at construction rather than silently reading the wrong data.
-- Every Supabase query filters on `user_id`; migrations add row-level security
-  policies for the tables reached with a non-service role.
+- Every PostgreSQL repository query filters on `user_id`; tenant isolation is
+  enforced by repository contracts and database constraints. Historical
+  Supabase RLS policies are not runtime requirements for the portable database.
 
 This is the single most load-bearing invariant in the codebase.
 See [ADR-0001](docs/adr/0001-explicit-tenancy.md).
@@ -81,10 +93,18 @@ and gated on the active fund thesis.
 
 ### 3.2 The fund thesis gate
 
-`backend/fund_thesis.py` holds the per-user investment mandate.
-`get_active_thesis(user_id)` bootstraps a default on first access and is cached
-briefly (`FUND_THESIS_CACHE_TTL_SECONDS`). If no complete active thesis exists,
-the **periodic** cycle logs a warning and returns without running any stage.
+`backend/fund_thesis.py` holds the per-user investment mandate. Runtime periodic
+evaluation reads an existing thesis through the shared asyncpg pool via
+`backend/fund_thesis_repository.py`; the repository is tenant-scoped and
+read-only. The short-lived per-user cache remains in `fund_thesis.py`
+(`FUND_THESIS_CACHE_TTL_SECONDS`, default 10 seconds). PostgreSQL publication,
+activation, bootstrap/repair, and embedding upsert invalidate it only after the
+transaction commits. Bootstrap and mutation paths remain on the legacy
+Supabase compatibility boundary until the thesis write cutover. The portable
+schema does not recreate the legacy `fund_policy_versions` authority.
+
+If no complete active thesis exists, the **periodic** cycle logs a warning and
+returns without running any stage.
 
 On-demand lookup is deliberately different: it is *mandate-aware* (the thesis
 shapes scoring when present) but never thesis-blocked, because a user asking
@@ -111,8 +131,18 @@ Python. See [ADR-0002](docs/adr/0002-versioned-decision-policy.md).
 
 The governed path goes further: `backend/services/scoring/` compiles a fund
 configuration into a policy, previews it, and publishes it as an immutable
-`governed_policy_version` row bound to a content hash, with legacy settings
-projected idempotently through an outbox.
+`governed_policy_version` row bound to a content hash. The governed row and
+its settings pointers are written in one tenant-serialized PostgreSQL
+transaction; the outbox carries the canonical publication event and does not
+recreate a second policy authority. The historical `fund_policy_versions`
+store remains a compatibility boundary until the separately scoped 5D cleanup.
+
+Security counters, short-lived locks, and stage cadence claims use the shared
+provider-neutral asyncpg pool. `security_limits` is the atomic rate-limit/lock
+store; locks carry opaque owner tokens so only the holder can release them.
+`agent_job_schedules` remains a cadence gate for Meta and Portfolio, distinct
+from the durable `agent_jobs` work queue. Historical Supabase RPCs for these
+domains are compatibility-only and are not used by API or pipeline runtime.
 
 ---
 
@@ -129,7 +159,7 @@ POST /api/startups/lookup ─┤
 POST /api/opportunities/  ─┘
      manual-lookup
                            │
-      USE_SUPABASE_STORAGE=1 (production)      USE_SUPABASE_STORAGE unset (dev)
+      DATABASE_URL configured (local, Cloud SQL, or Supabase Postgres)      DATABASE_URL absent (compatibility/dev only)
                            │                                 │
                            ▼                                 ▼
          ┌───────────────────────────────┐      ┌───────────────────────────┐
@@ -171,7 +201,8 @@ parsed hello frame (not HTTP 200) as the health signal and refetches on each
 `startups_changed` nudge. Timed polling remains as a slow backstop.
 
 `backend/event_bus.py` is process-local by default. For multi-instance
-deployments, `EVENT_BUS_BACKPLANE=postgres` plus a direct `DATABASE_URL` adds
+deployments, `EVENT_BUS_BACKPLANE=postgres` plus a direct `DATABASE_URL` (or
+legacy `SUPABASE_DB_URL`) adds
 `LISTEN`/`NOTIFY` fan-out between instances. **Production fails closed**: booting
 with `ENVIRONMENT=production` and neither a backplane nor an explicit
 `ALLOW_PROCESS_LOCAL_STATE=true` raises at startup, so a silently-broken
@@ -215,15 +246,16 @@ See [ADR-0006](docs/adr/0006-canonical-identity-layer.md).
 
 | Concern | Implementation |
 |---|---|
-| Startup CRUD | `backend/supabase_storage.py` — targeted column updates preserve TOAST pointers; `replace_all` is upsert-first, prune-after. Detects schema drift at startup and logs it loudly, because the write path otherwise tolerates missing columns by dropping fields. |
-| Key-value documents | `backend/supabase_doc_store.py` — settings, meta state, prompt library, calibration. |
+| Startup CRUD | `backend/startup_repository.py` over asyncpg; `supabase_storage.py` is compatibility-only. |
+| Key-value documents | Domain repositories and Batch 1–4 state snapshots over asyncpg; `supabase_doc_store.py` is compatibility-only. |
 | Portfolio artefacts | `backend/portfolio/store.py` + `repository.py`. |
 | Durable jobs & canonical domain | Direct PostgreSQL via `asyncpg` (`backend/jobs/postgres.py`), pooled and lease-aware. |
-| Dev fallback | `backend/utils/storage.py` — local JSON under `backend/data/`. **Dev only**; the production pipeline requires `USE_SUPABASE_STORAGE=1`. |
+| Dev fallback | `backend/utils/storage.py` — local JSON under `backend/data/`. **Dev only**; production requires the shared PostgreSQL pool. |
 
-Schema lives in `supabase/migrations/`, applied in timestamp order and never
-edited after the fact. `supabase/clear_all_tables.sql` is a destructive local
-reset helper, not part of any automated path.
+Provider-neutral schema lives in `db/migrations/`, applied append-only through
+`app_migrations.schema_migrations`. Historical `supabase/migrations/` files are
+immutable source material. `supabase/clear_all_tables.sql` is not part of any
+automated path.
 
 ---
 
@@ -303,8 +335,8 @@ pipeline re-reads settings each cycle and tests monkeypatch after import.
 See [ADR-0008](docs/adr/0008-env-registry.md).
 
 Per-user configuration (fund identity, agent toggles, cost budget, portfolio
-settings) lives in Supabase and is loaded with `load_settings(user_id)` — never
-from a global config file.
+settings) lives in provider-neutral PostgreSQL repositories and is loaded with
+`load_settings(user_id)` — never from a global config file.
 
 ---
 
@@ -312,7 +344,7 @@ from a global config file.
 
 - `GET /health` — liveness.
 - `GET /api/system/status` and `GET /api/analytics/system-health` — readiness
-  diagnostics: worker state, Supabase/OpenAI configuration, thesis readiness.
+  diagnostics: worker state, PostgreSQL/OpenAI configuration, thesis readiness.
 - `GET /metrics` — process and pipeline counters (`backend/metrics.py`).
 - `GET /api/agents/status`, `GET /api/agents/loop-status` — per-tenant agent state.
 - RSS and event-loop-lag samplers run as background tasks and warn above

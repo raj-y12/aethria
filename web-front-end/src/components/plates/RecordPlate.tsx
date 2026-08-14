@@ -18,8 +18,15 @@ export default function RecordPlate() {
   const [rootRef, active] = useInView<HTMLDivElement>(reduce, 0.3);
 
   return (
-    <Plate id="record" index="02 — 08" title="The Record" capLeft="The Record — Plate 02" capRight="One verdict · five dimensions">
+    <Plate id="record" index="02 — 08" title="The Record" capLeft="Institutional memory / specimen" capRight="One verdict · five dimensions" tone="oxford-intelligence">
       <div ref={rootRef} className="record">
+        <div className="record-evidence-rail reveal d1" aria-label="Decision evidence path">
+          <span>Fund thesis</span>
+          <span aria-hidden="true">→</span>
+          <span>Evidence trail</span>
+          <span aria-hidden="true">→</span>
+          <span>Human decision</span>
+        </div>
         <div className="record-top reveal d2">
           <div className="record-name">Meridian Compute</div>
           <div className="record-verdict">Invest</div>

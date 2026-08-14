@@ -22,6 +22,8 @@ from utils.traction_extraction import render_traction_facts
 from utils.recency import reviewer_recency_directive
 from utils.scoring import DEFAULT_SCORE_SOURCE
 from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
+from regulatory_context import apply_regulatory_grounding_guard
+from founder_context import apply_founder_grounding_guard
 
 
 logger = logging.getLogger(__name__)
@@ -413,28 +415,33 @@ Be honest and critical. Most ideas should score in the 4-7 range.
 Only truly exceptional opportunities should score 8+. Output ONLY valid JSON; no text before or after."""
 
 
-def _format_scout_context_extras(scout_output: Dict[str, Any]) -> str:
+def _format_scout_context_extras(
+    scout_output: Dict[str, Any],
+    *,
+    canonical_criteria: set[str] | None = None,
+) -> str:
     """Compact factual scout fields for the reviewer user message (matches ReviewerEngine payload)."""
     from urllib.parse import urlparse
 
     lines: list[str] = []
+    covered = {str(item).strip().casefold() for item in (canonical_criteria or set())}
     st = scout_output.get("scout_type")
     if st:
         lines.append(f"Scout type: {st}")
     fs = scout_output.get("funding_stage")
-    if fs:
+    if fs and "funding" not in covered:
         lines.append(f"Funding stage (scout): {fs}")
     loc = scout_output.get("location")
     if loc:
         lines.append(f"Location (scout): {loc}")
     et = scout_output.get("est_tam")
-    if et:
+    if et and "market" not in covered:
         lines.append(f"Est. TAM (scout): {et}")
     # Firmographics read verbatim out of retrieved evidence. Without this the
     # reviewer could not see traction the pipeline had already paid to retrieve,
     # and flagged it as missing.
     traction = render_traction_facts(scout_output.get("traction_facts"))
-    if traction:
+    if traction and "traction" not in covered:
         lines.append(f"Traction (from retrieved evidence): {traction}")
     refs = scout_output.get("references")
     if isinstance(refs, list) and refs:
@@ -503,6 +510,9 @@ class Reviewer(ABC):
         self.executor = ThreadPoolExecutor(max_workers=1)
         self.model = model
         self._last_token_usage = 0
+        self._last_regulatory_context_chars = 0
+        self._last_founder_context_chars = 0
+        self._last_prompt_chars = 0
         self._tenant_user_id = (tenant_user_id or "").strip()
         self._use_resource_fund_thesis_fallback = bool(use_resource_fund_thesis_fallback)
         self._structured_scoring_enabled = bool(structured_scoring_enabled)
@@ -544,8 +554,7 @@ class Reviewer(ABC):
 
     def _load_prompt_from_library(self) -> None:
         """Load promoted prompt from Supabase when enabled; else latest local library file."""
-        use_sb = env_config.use_supabase_storage()
-        if use_sb and self._tenant_user_id:
+        if self._tenant_user_id:
             try:
                 from meta.prompt_gating import load_prompt_active, load_prompt_library
 
@@ -559,10 +568,10 @@ class Reviewer(ABC):
                     and library[key].get("prompt")
                 ):
                     self.SYSTEM_PROMPT = str(library[key]["prompt"])
-                    self.logger.info("Loaded promoted reviewer prompt from Supabase: %s", key)
+                    self.logger.info("Loaded promoted reviewer prompt from PostgreSQL state: %s", key)
                     return
             except Exception as e:
-                self.logger.debug("Could not load reviewer prompt from Supabase: %s", e)
+                self.logger.debug("Could not load promoted reviewer prompt: %s", e)
         try:
             lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
             if not lib_path.exists():
@@ -639,7 +648,21 @@ Target Users: {scout_output.get('target_users', 'N/A')}
 Why Now: {scout_output.get('why_now', 'N/A')}
 Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
 """
-            scout_text += _format_scout_context_extras(scout_output)
+            canonical_context = scout_output.get("_canonical_context")
+            canonical_contexts = (
+                canonical_context.get("contexts", {})
+                if isinstance(canonical_context, dict)
+                else {}
+            )
+            canonical_criteria = {
+                str(criterion).strip().casefold()
+                for criterion, packet in canonical_contexts.items()
+                if isinstance(packet, dict) and packet.get("has_canonical_coverage")
+            }
+            scout_text += _format_scout_context_extras(
+                scout_output,
+                canonical_criteria=canonical_criteria,
+            )
             # Hypothesis fields: include when present; otherwise omit or show N/A
             primary_thesis = scout_output.get("primary_thesis")
             key_assumptions = scout_output.get("key_assumptions")
@@ -661,6 +684,78 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     "verify this is the same company before trusting).\n"
                     + supplement_raw.strip()
                     + "\n---\n"
+                )
+
+            regulatory_context = scout_output.get("_canonical_regulatory_context")
+            if isinstance(regulatory_context, dict):
+                regulatory_text = str(regulatory_context.get("text") or "").strip()
+            else:
+                regulatory_text = str(regulatory_context or "").strip()
+            self._last_regulatory_context_chars = len(regulatory_text)
+            if regulatory_text:
+                supplement_block += (
+                    "\n\n---\nCANONICAL REGULATORY EVIDENCE (bounded, tenant-scoped, decision-time context; "
+                    "use only for regulatory and execution feasibility reasoning).\n"
+                    + regulatory_text
+                    + "\n---\n"
+                )
+                self.logger.info(
+                    "reviewer_regulatory_context_chars=%d reviewer_type=%s",
+                    self._last_regulatory_context_chars,
+                    self.reviewer_type,
+                )
+
+            founder_context = scout_output.get("_canonical_founder_context")
+            if isinstance(founder_context, dict):
+                founder_text = str(founder_context.get("text") or "").strip()
+            else:
+                founder_text = str(founder_context or "").strip()
+            self._last_founder_context_chars = len(founder_text)
+            if founder_text:
+                supplement_block += (
+                    "\n\n---\nCANONICAL FOUNDER EVIDENCE (bounded, tenant-scoped, provenance-preserving context; "
+                    "use it for Founder-Market Fit reasoning only. Separate evidenced history, "
+                    "unknowns, and conflicts; do not infer founder quality from missing data.)\n"
+                    + founder_text
+                    + "\n---\n"
+                )
+                self.logger.info(
+                    "reviewer_founder_context_chars=%d reviewer_type=%s",
+                    self._last_founder_context_chars,
+                    self.reviewer_type,
+                )
+
+            canonical_contexts = (
+                canonical_context.get("contexts", {})
+                if isinstance(canonical_context, dict)
+                else {}
+            )
+            legacy_criterion_contexts = set()
+            if regulatory_text:
+                legacy_criterion_contexts.add("regulatory")
+            if founder_text:
+                legacy_criterion_contexts.add("founder")
+            canonical_lines = []
+            for criterion in sorted(canonical_contexts):
+                if criterion in legacy_criterion_contexts:
+                    continue
+                packet = canonical_contexts[criterion]
+                text = str(packet.get("text") or "").strip()
+                if text:
+                    canonical_lines.append(f"[{criterion}]\n{text}")
+            canonical_text = "\n\n".join(canonical_lines)
+            self._last_canonical_context_chars = len(canonical_text)
+            if canonical_text:
+                supplement_block += (
+                    "\n\n---\nCANONICAL CRITERION CONTEXT (bounded, tenant-scoped, source-linked; "
+                    "use only for the named criterion and preserve unknowns/conflicts).\n"
+                    + canonical_text
+                    + "\n---\n"
+                )
+                self.logger.info(
+                    "reviewer_canonical_context_chars=%d reviewer_type=%s",
+                    self._last_canonical_context_chars,
+                    self.reviewer_type,
                 )
 
             prior_review = scout_output.get("_prior_review")
@@ -805,6 +900,47 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "thesis_deviation_points": ["string"], // concise bullets: where it diverges
   "thesis_alignment_confidence": number // 0.0-1.0 confidence in alignment judgment
 }'''
+
+            # Skeptical and Opportunist must still produce independent evidence
+            # judgments, risks, and verdicts, but their long narrative sections
+            # are not the primary payload consumed by Partner or the memo. Keep
+            # the legacy shape after parsing via the defaults below; ask these
+            # personas only for the fields that affect scoring and divergence.
+            is_primary_persona = self.reviewer_type == "default"
+            if not is_primary_persona:
+                json_schema = '''{
+  "structured_signals": {
+    "market": {"tam": {}, "growth_rate": {}, "urgency": {}, "timing": {}, "competition": {}},
+    "execution": {"traction": {}, "growth_velocity": {}, "gtm_effectiveness": {}, "team_execution": {}, "operational_velocity": {}},
+    "product": {"value_prop": {}, "pain_alignment": {}, "differentiation": {}, "ux": {}, "retention": {}},
+    "technical": {"complexity": {}, "engineering_quality": {}, "scalability": {}, "data_advantage": {}, "architecture": {}},
+    "defensibility": {"network_effects": {}, "switching_costs": {}, "proprietary_data": {}, "barriers": {}, "brand": {}}
+  },
+  "overall_summary": "one concise persona-specific read",
+  "key_risks": ["persona-specific risks"],
+  "verdict": "STRONG" | "MEDIUM" | "WEAK",
+  "diligence_red_flags": ["policy labels only"],
+  "assumption_feedback": ["critical unknowns and assumption challenges"]
+}'''
+
+            persona_detail_directive = (
+                "Populate team_analysis, competition_analysis, business_model_analysis, "
+                "investment_thesis, and risk_mitigation when you can; use empty lists when info is absent. "
+                "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
+                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation."
+                if is_primary_persona
+                else (
+                    "For this non-primary persona, do not generate the long qualitative sections or per-dimension prose. "
+                    "Keep the persona-specific judgment in structured_signals, key_risks, diligence_red_flags, "
+                    "assumption_feedback, and verdict."
+                )
+            )
+            dimension_detail_directive = (
+                "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
+                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation."
+                if is_primary_persona
+                else ""
+            )
             
             grounding_clause = (
                 "Use the Scout memo and supplemental web snippets above when snippets clearly refer to the same company; "
@@ -812,6 +948,19 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 "Do not invent facts unsupported by these sources."
                 if supplement_block
                 else "Use only information provided in the Scout memo or defined in resources; do not hallucinate missing data."
+            )
+            if regulatory_text:
+                grounding_clause += (
+                    " The canonical regulatory packet is the authoritative company-specific evidence for "
+                    "regulatory feasibility; the generic supplemental-snippet preference does not override it."
+                )
+            regulatory_clause = (
+                " For regulatory/execution feasibility, prefer company-specific verified evidence over generic "
+                "category assumptions; distinguish current operation from future expansion risk. "
+                "If canonical evidence is contradictory or insufficient, express uncertainty rather than a "
+                "categorical current-feasibility impossibility."
+                if regulatory_text
+                else ""
             )
 
             if omit_llm_scores:
@@ -835,17 +984,16 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 + "\n\n"
                 + f"Evaluate this startup idea discovered by a Scout:\n\n{scout_text}{supplement_block}{resource_thesis_block}{thesis_block}\n\n"
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
-                f"{grounding_clause} "
+                f"{grounding_clause}{regulatory_clause} "
                 f"{score_directive}"
                 "structured_signals must be COMPLETE: include all 5 dimensions and all 25 components (no empty objects). "
                 "For each component provide either label or value, plus reasoning and evidence grounded in the provided startup text. "
                 "If evidence is unavailable, set value to null with confidence <= 0.2 and explain what is missing in reasoning. "
                 "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores. "
-                "Emphasize team execution; if team/founder data is missing, say so plainly and leave team_analysis as an empty list. "
-                "Populate team_analysis, competition_analysis, business_model_analysis, investment_thesis, and risk_mitigation when you can; use empty lists when info is absent. "
+                "Emphasize team execution; if team/founder data is missing, say so plainly. "
+                f"{persona_detail_directive} "
                 f"{score_reasoning_directive}"
-                "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
-                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation.\n\n"
+                f"{dimension_detail_directive}\n\n"
                 f"Output ONLY valid JSON matching this exact schema:\n\n{json_schema}\n\n"
                 "If founding team, revenue, competitors, or valuation data is missing, add the exact red-flag labels to diligence_red_flags. "
                 "Do not include any text before or after the JSON. Output only the JSON object."
@@ -899,6 +1047,33 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             
             # Parse JSON
             data = json.loads(content)
+            if isinstance(regulatory_context, dict) and regulatory_text:
+                for field in (
+                    "overall_summary",
+                    "key_risks",
+                    "diligence_red_flags",
+                    "assumption_feedback",
+                    "execution_reasoning",
+                    "execution_weaknesses",
+                    "technical_reasoning",
+                    "technical_weaknesses",
+                ):
+                    if field in data:
+                        data[field] = apply_regulatory_grounding_guard(data[field], regulatory_context)
+            if isinstance(founder_context, dict) and founder_text:
+                for field in (
+                    "overall_summary",
+                    "key_risks",
+                    "diligence_red_flags",
+                    "assumption_feedback",
+                    "team_analysis",
+                    "execution_reasoning",
+                    "execution_weaknesses",
+                    "investment_thesis",
+                ):
+                    if field in data:
+                        data[field] = apply_founder_grounding_guard(data[field], founder_context)
+            self._last_prompt_chars = len(user_content)
             
             # Default optional fields
             if "structured_signals" not in data or not isinstance(data.get("structured_signals"), dict):
@@ -981,6 +1156,10 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                         "yes",
                     )
             
+            # Keep the persisted prompt identity aligned with the construction
+            # identity captured by the pipeline. The response schema is a
+            # runtime output contract; the governed prompt identity is the
+            # persona's constructed system prompt.
             data["prompt_version"] = hash_prompt(self.SYSTEM_PROMPT)
             
             return data

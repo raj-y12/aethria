@@ -2,9 +2,9 @@
 Cost & Token Discipline Enforcement.
 
 Tracks and enforces budgets, token limits, and cooldowns.
-Uses Supabase `portfolio_budgets` when configured with tenant context;
-uses the local file only in explicit local/dev mode. Remote failures are
-surfaced instead of creating a divergent local budget ledger.
+Uses the provider-neutral `portfolio_budgets` document when a PostgreSQL
+snapshot is supplied; uses the local file only in explicit local/dev mode.
+Remote failures are surfaced instead of creating a divergent local budget ledger.
 """
 import json
 import logging
@@ -15,8 +15,9 @@ from utils.timeutil import utcnow, ensure_aware
 from collections import defaultdict
 import os
 
-from supabase_doc_store import doc_get, doc_set
-from utils.settings_loader import load_settings, runtime_limits_from_settings
+from batch1.store import doc_get, doc_set
+from batch1.context import get_state as get_batch1_state
+from utils.settings_loader import runtime_limits_from_settings
 import env_config
 
 logger = logging.getLogger(__name__)
@@ -33,22 +34,20 @@ class CostController:
         user_id: Optional[str] = None,
         *,
         enforce_limits: bool = True,
+        settings: Optional[Dict[str, Any]] = None,
     ):
         self.budget_file = Path(budget_file)
         self.logger = logging.getLogger("cost.controller")
         self.user_id = (user_id or "").strip() or None
         self.enforce_limits = bool(enforce_limits)
-        remote_configured = (
-            env_config.use_supabase_storage() and env_config.supabase_configured()
+        self.settings = settings if isinstance(settings, dict) else {}
+        postgres_configured = bool(
+            self.user_id and (get_batch1_state() is not None or env_config.is_production_env())
         )
-        if remote_configured and not self.user_id:
-            raise RuntimeError("CostController requires explicit user_id when Supabase storage is enabled")
-        if env_config.use_supabase_storage() and env_config.is_production_env():
-            env_config.require_supabase_configured("CostController")
-        elif not env_config.local_fallback_allowed() and not remote_configured:
+        if not env_config.local_fallback_allowed() and not postgres_configured:
             raise RuntimeError(
                 "CostController: local_storage_disabled_in_production; "
-                "enable Supabase storage or explicitly use a non-production environment"
+                "configure the shared PostgreSQL repository or explicitly use a non-production environment"
             )
         self.budget_file.parent.mkdir(parents=True, exist_ok=True)
         self.default_budgets = {
@@ -75,7 +74,7 @@ class CostController:
         if not self.user_id:
             return
         try:
-            limits = runtime_limits_from_settings(load_settings(self.user_id))
+            limits = runtime_limits_from_settings(self.settings)
         except Exception as e:
             self.logger.warning("Saved runtime limits unavailable; using defaults: %s", e)
             return
@@ -89,16 +88,19 @@ class CostController:
         self.daily_cost_ceiling = float(limits.get("daily_cost_ceiling", 0.0) or 0.0)
         self.weekly_cost_ceiling = float(limits.get("weekly_cost_ceiling", 0.0) or 0.0)
 
-    def _using_supabase(self) -> bool:
+    def _using_postgres(self) -> bool:
         return bool(
             self.user_id
-            and env_config.use_supabase_storage()
-            and env_config.supabase_configured()
+            and (get_batch1_state() is not None or env_config.is_production_env())
         )
+
+    # Compatibility name for isolated tests and old imports.
+    def _using_supabase(self) -> bool:
+        return self._using_postgres()
     
     def _load_budgets(self):
-        """Load budget state from Supabase (preferred) or file fallback."""
-        if self._using_supabase():
+        """Load budget state from the preloaded PostgreSQL document or file."""
+        if self._using_postgres():
             try:
                 data = doc_get("portfolio_budgets", user_id=self.user_id)
                 if isinstance(data, dict):
@@ -108,7 +110,7 @@ class CostController:
                 return
             except Exception as e:
                 self.logger.error(
-                    "cost_storage_unavailable operation=load_budget backend=supabase error=%s",
+                    "cost_storage_unavailable operation=load_budget backend=postgres error=%s",
                     e,
                 )
                 if not env_config.is_production_env():
@@ -129,14 +131,14 @@ class CostController:
             self.budgets = {}
     
     def _save_budgets(self):
-        """Save budget state to Supabase (preferred) or file fallback."""
-        if self._using_supabase():
+        """Save budget state to the preloaded PostgreSQL document or file."""
+        if self._using_postgres():
             try:
                 doc_set("portfolio_budgets", self.budgets, user_id=self.user_id)
                 return
             except Exception as e:
                 self.logger.error(
-                    "cost_storage_unavailable operation=save_budget backend=supabase error=%s",
+                    "cost_storage_unavailable operation=save_budget backend=postgres error=%s",
                     e,
                 )
                 if env_config.is_production_env():

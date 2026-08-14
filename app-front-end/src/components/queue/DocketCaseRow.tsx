@@ -94,7 +94,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         >
           <div className="min-w-0 flex-1">
             {isSelected && startup.scout.location?.trim() ? (
-              <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/60">
+              <p className="mb-1.5 type-meta uppercase tracking-[0.12em] text-oxford/65">
                 {startup.scout.location.trim()}
               </p>
             ) : null}
@@ -132,12 +132,12 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             transition={selectTransition}
           >
             {sectorStage ? (
-              <p className="type-meta uppercase tracking-[0.06em] text-oxford/60">{sectorStage}</p>
+              <p className="type-meta uppercase tracking-[0.06em] text-oxford/65">{sectorStage}</p>
             ) : null}
             {showDateMeta ? (
               <>
                 {metaSep(Boolean(sectorStage))}
-                <span className="type-meta tracking-[0.06em] text-oxford/60">
+                <span className="type-meta tracking-[0.06em] text-oxford/65">
                   {formatRowDate(sortKeyValue)}
                 </span>
               </>
@@ -152,7 +152,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               <>
                 {metaSep(Boolean(sectorStage || showDateMeta || showAttentionBadge))}
                 <span
-                  className="type-meta uppercase tracking-[0.08em] text-oxford/60"
+                  className="type-meta uppercase tracking-[0.08em] text-oxford/65"
                   title="Company Resolver: identity evidence is incomplete — open the memo to see what was found and what's missing."
                 >
                   {resolutionBadge}

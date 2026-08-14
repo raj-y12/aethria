@@ -13,8 +13,9 @@ function focusContainer(container: HTMLElement) {
 }
 
 /**
- * Trap focus inside container when enabled. Focus first focusable on mount.
- * Wrap Tab/Shift+Tab within container.
+ * Trap focus inside container when enabled. Focus first focusable on mount,
+ * wrap Tab/Shift+Tab within container, and restore focus to whatever was
+ * focused before the trap opened so keyboard users land back where they were.
  */
 export function useFocusTrap(
   enabled: boolean,
@@ -23,6 +24,7 @@ export function useFocusTrap(
   useEffect(() => {
     if (!enabled || !containerRef.current) return;
     const el = containerRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     const focusables = getFocusables(el);
     if (focusables.length === 0) {
       focusContainer(el);
@@ -63,6 +65,11 @@ export function useFocusTrap(
     };
 
     document.addEventListener('keydown', handle);
-    return () => document.removeEventListener('keydown', handle);
+    return () => {
+      document.removeEventListener('keydown', handle);
+      // Only restore if the trigger is still in the document — a row that was
+      // removed while the dialog was open must not steal focus back.
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
   }, [enabled, containerRef]);
 }

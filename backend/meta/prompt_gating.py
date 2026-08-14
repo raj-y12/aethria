@@ -1,9 +1,9 @@
-"""Shared keys and helpers for gated meta prompt library (Supabase meta_prompt_library)."""
+"""Shared keys and helpers for the provider-neutral prompt library."""
 
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, FrozenSet, List, Optional
 
-from supabase_doc_store import doc_get, doc_set
+from batch1.store import doc_get, doc_set
 
 from meta.analyser import REVIEWER_AGENT_NAMES, SCOUT_AGENT_NAMES
 

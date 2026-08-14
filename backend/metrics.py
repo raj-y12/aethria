@@ -109,6 +109,12 @@ if ENABLED:
         buckets=(0, 1, 2, 5, 10, 25, 50, 100),
         registry=REGISTRY,
     )
+    RETRIEVAL_CACHE_EVENTS = Counter(
+        "aethria_retrieval_cache_events_total",
+        "Durable retrieval-cache events.",
+        ["event"],
+        registry=REGISTRY,
+    )
     # TEMPORARY: Exa discovery quality, to judge whether semantic search actually
     # surfaces companies rather than articles before it becomes the sole primary.
     EXA_DISCOVERY_REQUESTS = Counter(
@@ -365,6 +371,17 @@ def observe_retrieval_provider(
             RETRIEVAL_PROVIDER_CREDITS.labels(**labels).observe(max(0, int(credits)))
     except Exception as e:  # pragma: no cover
         logger.debug("observe_retrieval_provider failed: %s", e)
+
+
+def observe_retrieval_cache(event: str) -> None:
+    if not ENABLED:
+        return
+    try:
+        RETRIEVAL_CACHE_EVENTS.labels(
+            event=_allowlisted(event, {"hit", "miss", "stale_refresh", "provider_call_avoided", "duplicate_suppressed", "failure"})
+        ).inc()
+    except Exception as e:  # pragma: no cover
+        logger.debug("observe_retrieval_cache failed: %s", e)
 
 
 _EXA_QUERY_TYPES = {

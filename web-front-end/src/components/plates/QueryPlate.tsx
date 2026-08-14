@@ -5,10 +5,23 @@ import Plate from '../Plate';
 
 const CHAR_MIN_MS = 60;
 const CHAR_MAX_MS = 90;
-const MEMO_DELAY_MS = 500;
+const STAGE_DELAY_MS = 820;
+const MEMO_DELAY_MS = 520;
+const STAGES = ['Scouting', 'Reviewing', 'Deciding'] as const;
+type QueryStage = (typeof STAGES)[number];
+type QueryStatus = QueryStage | 'pending' | 'complete';
 
-// Command phrasing, like the mockup ("look up  anthropic") — double space after "up" is intentional.
-const TYPED_QUERY = `${DEMO_LOOKUP_QUERY.toLowerCase()}`;
+const TYPED_QUERY = DEMO_LOOKUP_QUERY;
+
+function stageState(status: QueryStatus, stage: QueryStage) {
+  if (status === 'complete') return 'complete';
+  if (status === 'pending') return 'pending';
+  const currentIndex = STAGES.indexOf(status);
+  const stageIndex = STAGES.indexOf(stage);
+  if (stageIndex < currentIndex) return 'complete';
+  if (stageIndex === currentIndex) return 'active';
+  return 'pending';
+}
 
 /** Plate 06 — place a query: the real on-demand lookup, reused from product-chrome. */
 export default function QueryPlate() {
@@ -23,6 +36,7 @@ export default function QueryPlate() {
   const [typed, setTyped] = useState(TYPED_QUERY);
   const [memoIn, setMemoIn] = useState(true);
   const [caretOn, setCaretOn] = useState(false);
+  const [status, setStatus] = useState<QueryStatus>('complete');
 
   useEffect(() => {
     if (reduce) return;
@@ -33,6 +47,7 @@ export default function QueryPlate() {
     setTyped('');
     setMemoIn(false);
     setCaretOn(true);
+    setStatus('pending');
 
     const runSequence = () => {
       if (started.current) return;
@@ -45,7 +60,22 @@ export default function QueryPlate() {
         if (i < TYPED_QUERY.length) {
           timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
         } else {
-          timeoutRef.current = window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);
+          timeoutRef.current = window.setTimeout(() => {
+            setCaretOn(false);
+            let stageIndex = 0;
+            const advanceStage = () => {
+              const stage = STAGES[stageIndex];
+              if (!stage) {
+                setStatus('complete');
+                timeoutRef.current = window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);
+                return;
+              }
+              setStatus(stage);
+              stageIndex += 1;
+              timeoutRef.current = window.setTimeout(advanceStage, STAGE_DELAY_MS);
+            };
+            advanceStage();
+          }, MEMO_DELAY_MS);
         }
       };
       timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
@@ -83,14 +113,28 @@ export default function QueryPlate() {
       id="query"
       index="06 — 08"
       title="Place a Query"
-      capLeft="Place a Query — Plate 06"
+      capLeft="On-demand intelligence / lookup"
       capRight="Any name · a sourced record"
+      tone="product-evidence"
     >
-      <div ref={rootRef} className="query reveal d2" aria-hidden>
+      <div
+        ref={rootRef}
+        className="query reveal d2"
+        data-query-flow="dispatch-sequence"
+        aria-label="Aethria lookup sequence"
+      >
         <div className="query-bar">
           <span className="p">›</span>
           <span className="query-text">{typed}</span>
           {caretOn ? <span className="query-caret" /> : null}
+          <span className="query-submit" aria-hidden="true">↵</span>
+        </div>
+        <div className="query-pipeline" aria-live="polite" aria-label="Lookup stages">
+          {STAGES.map((stage) => (
+            <span className={`query-stage ${stageState(status, stage)}`} key={stage}>
+              {stage}
+            </span>
+          ))}
         </div>
         <div className={`memo-reveal${memoIn ? ' in' : ''}`}>
           <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />

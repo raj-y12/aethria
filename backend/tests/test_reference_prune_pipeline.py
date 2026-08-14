@@ -107,7 +107,7 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
             }
         },
     )
-    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda user_id: storage)
+    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda user_id, settings=None: storage)
     monkeypatch.setattr(pipeline_runner, "_load_active_thesis_sync", lambda user_id: Thesis())
     monkeypatch.setattr(pipeline_runner, "_build_pipeline_engines", lambda **kwargs: engines)
     monkeypatch.setattr(pipeline_runner, "_count_startups_sync", lambda user_id: 0)

@@ -67,3 +67,57 @@ async def test_list_positions_rejects_missing_tenant():
     repository = PortfolioRepository(_Pool(_Connection([])))
     with pytest.raises(RuntimeError):
         await repository.list_positions(user_id="", limit=10)
+
+
+@pytest.mark.asyncio
+async def test_list_decision_history_includes_canonical_and_unlinked_legacy_rulings():
+    connection = _Connection([
+        {
+            "history_id": "canonical:ruling-1",
+            "startup_id": "startup-1",
+            "opportunity_id": "opportunity-1",
+            "canonical_name": "Acme",
+            "decision": "monitor",
+            "rationale": "Track retention.",
+            "decided_at": "2026-08-10T10:00:00Z",
+            "recommended_state": "monitor",
+            "source": "canonical",
+        },
+        {
+            "history_id": "legacy:startup-2",
+            "startup_id": "startup-2",
+            "opportunity_id": None,
+            "canonical_name": "CloudNC",
+            "decision": "invest",
+            "rationale": "Portfolio Company",
+            "decided_at": "2026-06-25T10:58:52Z",
+            "recommended_state": None,
+            "source": "legacy",
+        },
+        {
+            "history_id": "partner:decision-1",
+            "startup_id": "startup-3",
+            "opportunity_id": None,
+            "canonical_name": "Older Company",
+            "decision": "pass",
+            "rationale": "Aethria's partner decision.",
+            "decided_at": "2026-06-17T08:23:21Z",
+            "recommended_state": "pass",
+            "source": "partner",
+            "decision_kind": "partner",
+        },
+    ])
+    repository = PortfolioRepository(_Pool(connection))
+
+    rows = await repository.list_decision_history(user_id="user-a", limit=50)
+
+    assert [row["canonical_name"] for row in rows] == ["Acme", "CloudNC", "Older Company"]
+    assert rows[1]["decision"] == "invest"
+    assert rows[1]["source"] == "legacy"
+    assert rows[2]["decision_kind"] == "partner"
+    sql, args = connection.calls[0][1], connection.calls[0][2]
+    assert "public.human_rulings" in sql
+    assert "public.startups" in sql
+    assert "public.portfolio_decisions" in sql
+    assert "o.legacy_startup_id" in sql
+    assert args[0] == "user-a"

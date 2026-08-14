@@ -17,7 +17,7 @@ import re
 import ssl
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -68,6 +68,8 @@ _TRUSTED_SOURCE_SUFFIXES = (
     "globenewswire.com",
     "linkedin.com",
     "github.com",
+    "fortune.com",
+    "ucd.ie",
 )
 
 
@@ -380,6 +382,104 @@ def _reference_company_match(ref: str, *, company_name: Optional[str], host: str
     return False
 
 
+def _identity_context_values(identity_context: Optional[Mapping[str, Any]]) -> tuple[set[str], set[str], set[str]]:
+    """Return canonical names, identity tokens, and verified domains from explicit context."""
+    if not isinstance(identity_context, Mapping):
+        return set(), set(), set()
+    names: set[str] = set()
+    for key in ("canonical_name", "canonical_names", "aliases"):
+        value = identity_context.get(key)
+        values = value if isinstance(value, (list, tuple, set)) else [value]
+        names.update(str(item).strip() for item in values if str(item or "").strip())
+
+    domains: set[str] = set()
+    for key in ("website", "canonical_domain"):
+        value = identity_context.get(key)
+        if isinstance(value, str) and (domain := hostname_from_user_hint(value)):
+            domains.add(domain)
+    for key in ("verified_domains", "domains"):
+        value = identity_context.get(key)
+        if isinstance(value, (list, tuple, set)):
+            for item in value:
+                if isinstance(item, Mapping):
+                    if str(item.get("verification_status") or "verified").lower() != "verified":
+                        continue
+                    item = item.get("normalized_value") or item.get("value")
+                if isinstance(item, str) and (domain := hostname_from_user_hint(item)):
+                    domains.add(domain)
+    identifiers = identity_context.get("identifiers")
+    if isinstance(identifiers, (list, tuple)):
+        for item in identifiers:
+            if not isinstance(item, Mapping):
+                continue
+            if str(item.get("identifier_type") or "").lower() != "domain":
+                continue
+            if str(item.get("verification_status") or "verified").lower() != "verified":
+                continue
+            value = item.get("normalized_value") or item.get("raw_value")
+            if isinstance(value, str) and (domain := hostname_from_user_hint(value)):
+                domains.add(domain)
+
+    identity_tokens = set()
+    for name in names:
+        identity_tokens.update(_company_tokens(name))
+    return names, identity_tokens, domains
+
+
+def _reference_matches_identity_context(
+    ref: str,
+    *,
+    company_name: Optional[str],
+    host: str,
+    identity_context: Optional[Mapping[str, Any]],
+) -> bool:
+    names, identity_tokens, domains = _identity_context_values(identity_context)
+    if not names and not domains:
+        return False
+    normalized_host = (host or "").lower().removeprefix("www.").strip(".")
+    if any(normalized_host == domain or normalized_host.endswith("." + domain) for domain in domains):
+        return True
+
+    urls = extract_http_urls(ref)
+    path_tokens: set[str] = set()
+    if urls:
+        try:
+            path_tokens = _text_tokens(urlparse(urls[0]).path)
+        except Exception:
+            path_tokens = set()
+    trusted_third_party = any(
+        normalized_host == suffix or normalized_host.endswith("." + suffix)
+        for suffix in _TRUSTED_SOURCE_SUFFIXES
+    )
+    if not trusted_third_party:
+        return False
+
+    reference_tokens = _text_tokens(ref)
+    title_tokens = _text_tokens(re.sub(r"https?://\S+", " ", ref))
+    # A title/snippet or a URL slug containing a complete canonical alias is a
+    # stronger signal than the legacy user-facing name alone.
+    for name in names:
+        name_tokens = set(_company_tokens(name))
+        if name_tokens and len(name_tokens) >= 2 and name_tokens.issubset(reference_tokens):
+            return True
+        # A single-token canonical brand is sufficient when it appears in
+        # descriptive title/snippet text, but never when it appears only in a
+        # URL path. The latter is too easy to spoof with a coincidental slug.
+        if (
+            len(name_tokens) == 1
+            and name_tokens.issubset(title_tokens)
+            and bool(title_tokens - name_tokens)
+        ):
+            return True
+
+    # URL-only news citations need more than one shared token: this accepts
+    # Manna's "drone delivery ... Manna" articles but rejects coincidental
+    # paths such as /manna-competitor-funding/.
+    user_tokens = set(_company_tokens(company_name))
+    shared_path_tokens = path_tokens.intersection(identity_tokens.union(user_tokens))
+    return len(shared_path_tokens) >= 2
+
+
 def _reference_support_note(ref: str, company_name: Optional[str]) -> str:
     lowered = ref.lower()
     if any(x in lowered for x in ("funding", "raised", "series", "seed", "investor")):
@@ -423,6 +523,7 @@ def filter_references_by_company_relevance(
     *,
     company_name: Optional[str],
     anchor_hostname: Optional[str],
+    identity_context: Optional[Mapping[str, Any]] = None,
 ) -> List[str]:
     tokens = _company_tokens(company_name)
     seen: set[str] = set()
@@ -455,7 +556,13 @@ def filter_references_by_company_relevance(
             hh = host.removeprefix("www.")
             anchor_match = hh == ah or hh.endswith("." + ah)
         token_match = _reference_company_match(ref, company_name=company_name, host=host)
-        if not (anchor_match or token_match):
+        identity_match = _reference_matches_identity_context(
+            ref,
+            company_name=company_name,
+            host=host,
+            identity_context=identity_context,
+        )
+        if not (anchor_match or identity_match or token_match):
             logger.warning(
                 "reference_verify: dropped company-irrelevant reference company=%s ref=%s",
                 (company_name or "")[:80],
@@ -531,6 +638,7 @@ def finalize_scout_references(
     *,
     anchor_hostname: Optional[str] = None,
     company_name: Optional[str] = None,
+    identity_context: Optional[Mapping[str, Any]] = None,
     probe_timeout: float = 4.0,
     lenient: bool = False,
 ) -> Dict[str, Any]:
@@ -556,6 +664,7 @@ def finalize_scout_references(
         cleaned,
         company_name=company_name or output.get("name"),
         anchor_hostname=anchor_hostname,
+        identity_context=identity_context or output.get("company_resolution"),
     )
     output["references"] = cleaned
     output = filter_references_by_url_probe(output, timeout=probe_timeout, lenient=lenient)

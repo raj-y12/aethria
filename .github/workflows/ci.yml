@@ -13,7 +13,6 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   OPENAI_API_KEY: sk-ci-placeholder-not-a-real-key
-  USE_SUPABASE_STORAGE: "0"
   SKIP_REFERENCE_URL_VERIFY: "1"
   RESUME_AGENT_LOOPS_ON_STARTUP: "false"
 
@@ -133,6 +132,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r backend/requirements.lock pytest pytest-asyncio
+          pip install -r backend/requirements-legacy.txt
 
       - name: Dependency audit
         run: |
@@ -193,6 +193,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.lock pytest pytest-asyncio
+          pip install -r requirements-legacy.txt
 
       - name: Run tests
         run: python -m pytest tests/ -v -o asyncio_mode=auto
@@ -223,7 +224,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -r backend/requirements.lock pytest pytest-asyncio
+        run: |
+          pip install -r backend/requirements.lock pytest pytest-asyncio
+          pip install -r backend/requirements-legacy.txt
       - name: Apply institutional migrations
         run: |
           psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -c "create role anon; create role authenticated; create role service_role;"
@@ -256,10 +259,18 @@ jobs:
             supabase/migrations/20260725130000_triage_assessments.sql \
             supabase/migrations/20260804000001_security_limits_privilege_hardening.sql \
             supabase/migrations/20260804000002_legacy_tenant_tables_rls.sql \
-            supabase/migrations/20260804000003_portfolio_startups_feed_cache_rejection_patterns.sql
+            supabase/migrations/20260804000003_portfolio_startups_feed_cache_rejection_patterns.sql \
+            supabase/migrations/20260812000001_durable_retrieval_cache.sql \
+            supabase/migrations/20260812000002_evaluation_judgment_audit.sql \
+            supabase/migrations/20260812000003_canonical_people.sql \
+            supabase/migrations/20260812000004_external_entity_mappings.sql \
+            supabase/migrations/20260812000005_canonical_competition.sql \
+            supabase/migrations/20260814000007_rls_auto_enable_privilege_hardening.sql
           do
             psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
           done
+      - name: Apply provider-neutral migrations
+        run: python backend/scripts/migrate_postgres.py --database-url "$TEST_DATABASE_URL"
       - name: Run migrated PostgreSQL scenarios
         working-directory: backend
         run: >-
@@ -267,6 +278,7 @@ jobs:
           tests/jobs/test_job_repository_postgres.py
           tests/identity/test_identity_repository_postgres.py
           tests/fund_intelligence/test_fund_intelligence_postgres.py
+          tests/thesis/test_repository_postgres.py
           -v -o asyncio_mode=auto
 
   backend-docker:

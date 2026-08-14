@@ -275,10 +275,10 @@ def test_lookup_status_api_selects_attempt_disposition_without_stale_terminal_in
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setattr(api, "latest_lookup_attempt", lambda *_args, **_kwargs: outcome)
 
-    response = api.lookup_job_status(
+    response = asyncio.run(api.lookup_job_status(
         SimpleNamespace(state=SimpleNamespace(user_id="user-a")),
         lookup_id="lookup-contract-1",
-    )
+    ))
 
     assert response["lookup_id"] == "lookup-contract-1"
     for key, value in expected.items():
@@ -303,10 +303,10 @@ def test_lookup_status_api_explicitly_fails_when_outcome_store_is_unavailable(mo
     )
 
     with pytest.raises(api.HTTPException) as exc:
-        api.lookup_job_status(
+        asyncio.run(api.lookup_job_status(
             SimpleNamespace(state=SimpleNamespace(user_id="user-a")),
             lookup_id="lookup-contract-1",
-        )
+        ))
 
     assert exc.value.status_code == 503
     assert exc.value.detail["reason"] == "lookup_outcome_store_unavailable"

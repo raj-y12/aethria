@@ -134,7 +134,7 @@ export default function SettingsActionDialog({
             initial={reduceMotion ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
-            className="mb-phi-8 mt-phi-3 max-w-[42ch] text-center type-body text-oxford/60"
+            className="mb-phi-8 mt-phi-3 max-w-[42ch] text-center type-body text-oxford/65"
           >
             {description}
           </motion.p>

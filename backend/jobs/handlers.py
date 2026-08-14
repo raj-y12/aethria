@@ -88,6 +88,7 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
             manual_one_shot=payload.manual_one_shot,
             pipeline_run_id=job.pipeline_run_id,
             identity_repository=IdentityRepository(repository.pool),
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
             evaluation_prerequisites=evaluation_prerequisites,
             ownership_check=_runtime_authority_fence,
         )
@@ -241,6 +242,7 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
             checkpoint=checkpoint,
             ownership_check=lambda: _raise_if_cancelled(repository, job),
             evaluation_prerequisites=evaluation_prerequisites,
+            fund_intelligence_repository=FundIntelligenceRepository(repository.pool),
             institutional_context={
                 "observation_id": admission.observation_id,
                 "company_id": admission.company_id,

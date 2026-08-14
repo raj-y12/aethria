@@ -23,12 +23,12 @@ export function verdictTextClass(decision: PartnerDecision, onDark = false): str
   }
   switch (decision) {
     case 'PASS':
-      return 'text-oxford/60';
+      return 'text-oxford/65';
     case 'MONITOR':
-      return 'text-oxford/60';
+      return 'text-oxford/65';
     case 'INVEST':
       return 'text-oxford/80';
     default:
-      return 'text-oxford/60';
+      return 'text-oxford/65';
   }
 }

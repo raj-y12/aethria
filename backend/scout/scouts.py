@@ -3,8 +3,6 @@ Individual Scout implementations.
 Each Scout has a distinct cognitive strategy for finding real companies.
 """
 from scout.base import Scout
-from utils.settings_loader import get_scout_region
-
 _SCOUT_QUANT_TRACTION_GUIDANCE = """
 
 DOWNSTREAM SIGNALS (only when sources support — never invent numbers):
@@ -30,8 +28,8 @@ REFERENCES — strict (sources must be about THIS specific company):
 - Prefer fewer, company-specific references over padding. If you cannot find a source about the company, return no references rather than generic content."""
 
 
-def _region_label_for(tenant_user_id: str) -> str:
-    r = get_scout_region(tenant_user_id)
+def _region_label_for(settings: dict) -> str:
+    r = (settings.get("agent_config") or {}).get("scout_region", "europe")
     if r == "europe":
         return "Europe (EU/UK and broader European ecosystem)"
     return "global markets (no region filter)"
@@ -45,8 +43,8 @@ class _PersonaScout(Scout):
 
     SCOUT_TYPE: str = ""
 
-    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = ""):
-        rl = _region_label_for(tenant_user_id)
+    def __init__(self, api_key: str, model: str = "gpt-5-nano", tenant_user_id: str = "", settings: dict | None = None):
+        rl = _region_label_for(settings or {})
         prompt = (
             self.SYSTEM_PROMPT.format(_REGION_LABEL=rl)
             + _SCOUT_QUANT_TRACTION_GUIDANCE
@@ -59,6 +57,7 @@ class _PersonaScout(Scout):
             api_key=api_key,
             model=model,
             tenant_user_id=tenant_user_id,
+            settings=settings,
         )
 
 

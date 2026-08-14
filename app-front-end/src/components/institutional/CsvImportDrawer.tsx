@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { importCsv, type ImportResult, type ImportSource } from '../../api/channelsOutcomes';
 import { transitionOrReduced } from '../../design-system/motion';
 import { usePrefersReducedMotion } from '../../hooks';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 const MAX_IMPORT_ROWS = 500;
 
@@ -80,6 +81,17 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
   const [preview, setPreview] = useState<CsvPreview | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [idempotencyKey, setIdempotencyKey] = useState<string | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(open, panelRef);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   const commit = useMutation({
     mutationFn: () => importCsv({
@@ -131,12 +143,13 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
             exit={{ x: 32 }}
             transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
             className="flex h-full w-full max-w-3xl flex-col border-l border-oxford/10 bg-paper shadow-2xl"
+            ref={panelRef}
           >
             <header className="flex items-start justify-between gap-phi-5 border-b border-oxford/10 px-phi-6 py-phi-5">
               <div>
                 <p className="type-label-section">Cross-channel intake</p>
                 <h2 className="mt-phi-2 font-display text-3xl font-medium text-oxford">Import observed companies</h2>
-                <p className="type-body mt-phi-2 max-w-xl text-oxford/60">Preview a bounded batch before it enters canonical identity resolution. Raw unmapped fields are not retained.</p>
+                <p className="type-body mt-phi-2 max-w-xl text-oxford/65">Preview a bounded batch before it enters canonical identity resolution. Raw unmapped fields are not retained.</p>
               </div>
               <button type="button" onClick={onClose} className="type-action border-b border-oxford/15">Close</button>
             </header>
@@ -154,7 +167,7 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
                 <label className="type-action">Domain field
                   <input aria-label="Domain field" value={domainField} onChange={(event) => { setDomainField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-transparent px-3 py-2" />
                 </label>
-                <label className="type-action">External ID field <span className="text-oxford/45">optional</span>
+                <label className="type-action">External ID field <span className="text-oxford/65">optional</span>
                   <input aria-label="External ID field" value={externalIdField} onChange={(event) => { setExternalIdField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-transparent px-3 py-2" />
                 </label>
               </div>

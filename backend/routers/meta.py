@@ -12,9 +12,8 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from routers.deps import get_storage as _get_storage
-from supabase_client import get_service_client
-from supabase_doc_store import list_get_all
+from routers.deps import get_startup_repository as _get_startup_repository
+from batch1.store import list_get_all
 from meta.prompt_gating import (
     VALID_PROMOTE_AGENT_TARGETS,
     REVIEWER_EVAL_AGENT_TARGETS,
@@ -33,21 +32,48 @@ from meta.calibrator import load_calibration_state
 from reviewer.engine import ReviewerEngine
 from fund_thesis import (
     FundThesisIncompleteError,
-    _bootstrap_default_thesis_or_raise,
-    get_active_thesis,
+    bootstrap_default_thesis_with_repository,
+    get_active_thesis_from_repository,
 )
+from batch1.context import reset_state, set_state
+from batch1.repository import Batch1Repository
+from startup_repository import StartupReadStorageAdapter
 
 logger = logging.getLogger("api.meta")
 router = APIRouter()
 
 
+async def _batch1_call(request: Request, fn, *args, **kwargs):
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    if pool is None:
+        return await asyncio.to_thread(fn, *args, **kwargs)
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(request.state.user_id)
+    token = set_state(state)
+    try:
+        return await asyncio.to_thread(fn, *args, **kwargs)
+    finally:
+        try:
+            if not api_local_snapshot_read_only(request):
+                await repository.persist_state(state)
+        finally:
+            reset_state(token)
+
+
+def api_local_snapshot_read_only(request: Request) -> bool:
+    """Avoid state writes when Meta read routes inspect an imported snapshot."""
+    import env_config
+
+    return not env_config.is_production_env() and env_config.get_bool("LOCAL_SNAPSHOT_READ_ONLY")
+
+
 @router.get("/api/meta/reports")
-def get_meta_reports(request: Request):
+async def get_meta_reports(request: Request):
     """
-    Return the last 10 Meta-Agent cycle reports for the authenticated user (Supabase meta_reports).
+    Return the last 10 Meta-Agent cycle reports for the authenticated user.
     """
     uid = request.state.user_id
-    reports = list_get_all("meta_reports", user_id=uid)
+    reports = await _batch1_call(request, list_get_all, "meta_reports", user_id=uid)
     if not isinstance(reports, list):
         return []
     reports = sorted(
@@ -59,12 +85,12 @@ def get_meta_reports(request: Request):
 
 
 @router.get("/api/meta/insights")
-def get_meta_insights(request: Request):
+async def get_meta_insights(request: Request):
     """
     Latest meta cycle: what changed (mutations, weights, calibration) and why (no_action_reasons).
     """
     uid = request.state.user_id
-    reports = list_get_all("meta_reports", user_id=uid)
+    reports = await _batch1_call(request, list_get_all, "meta_reports", user_id=uid)
     if not isinstance(reports, list) or not reports:
         return {
             "latest": None,
@@ -95,11 +121,11 @@ def get_meta_insights(request: Request):
 
 
 @router.get("/api/meta/prompt-library")
-def get_meta_prompt_library(request: Request):
+async def get_meta_prompt_library(request: Request):
     """
-    Return the full prompt library used by the Meta-Agent (Supabase meta_prompt_library).
+    Return the full prompt library used by the Meta-Agent.
     """
-    lib = load_prompt_library(request.state.user_id)
+    lib = await _batch1_call(request, load_prompt_library, request.state.user_id)
     return lib if isinstance(lib, dict) else {}
 
 
@@ -127,7 +153,7 @@ def _summarize_library_entry(
 
 
 @router.get("/api/meta/prompt-state")
-def get_meta_prompt_state(
+async def get_meta_prompt_state(
     request: Request,
     include_prompt: Optional[str] = Query(
         default=None,
@@ -138,8 +164,10 @@ def get_meta_prompt_state(
     Active and pending meta prompt proposals (metadata only; full text for one key via include_prompt).
     """
     uid = request.state.user_id
-    library = load_prompt_library(uid)
-    active = load_prompt_active(uid)
+    library, active = await asyncio.gather(
+        _batch1_call(request, load_prompt_library, uid),
+        _batch1_call(request, load_prompt_active, uid),
+    )
     if not isinstance(library, dict):
         library = {}
 
@@ -209,8 +237,8 @@ async def post_meta_prompt_promote(request: Request):
     if not library_key.startswith(f"{agent_target}:"):
         raise HTTPException(status_code=400, detail="library_key does not match agent_target")
 
-    # Sync Supabase reads/writes off the event loop.
-    return await asyncio.to_thread(_promote_prompt_sync, uid, agent_target, library_key)
+    # Snapshot reads/writes run off the event loop; PostgreSQL I/O is flushed at the boundary.
+    return await _batch1_call(request, _promote_prompt_sync, uid, agent_target, library_key)
 
 
 def _promote_prompt_sync(uid: str, agent_target: str, library_key: str):
@@ -255,7 +283,7 @@ def _promote_prompt_sync(uid: str, agent_target: str, library_key: str):
     save_prompt_active(uid, active)
 
     try:
-        from supabase_doc_store import list_append_only
+        from batch1.store import list_append_only
 
         list_append_only(
             "meta_mutation_log",
@@ -286,8 +314,8 @@ async def post_meta_prompt_reset(request: Request):
     if not agent_target or agent_target not in VALID_PROMOTE_AGENT_TARGETS:
         raise HTTPException(status_code=400, detail="invalid agent_target")
 
-    # Sync Supabase reads/writes off the event loop.
-    return await asyncio.to_thread(_reset_prompt_sync, uid, agent_target)
+    # Snapshot reads/writes run off the event loop; PostgreSQL I/O is flushed at the boundary.
+    return await _batch1_call(request, _reset_prompt_sync, uid, agent_target)
 
 
 def _reset_prompt_sync(uid: str, agent_target: str):
@@ -308,7 +336,7 @@ def _reset_prompt_sync(uid: str, agent_target: str):
     save_prompt_active(uid, active)
 
     try:
-        from supabase_doc_store import list_append_only
+        from batch1.store import list_append_only
 
         list_append_only(
             "meta_mutation_log",
@@ -327,10 +355,10 @@ def _reset_prompt_sync(uid: str, agent_target: str):
 
 
 @router.get("/api/meta/eval-set")
-def get_meta_eval_set(request: Request):
+async def get_meta_eval_set(request: Request):
     """Fixed startup ids used for reviewer prompt shadow evaluation."""
     uid = request.state.user_id
-    ids = load_eval_startup_ids(uid)
+    ids = await _batch1_call(request, load_eval_startup_ids, uid)
     try:
         max_n = int(os.getenv("META_PROMPT_EVAL_SET_MAX", "50"))
     except ValueError:
@@ -353,9 +381,23 @@ async def put_meta_eval_set(request: Request):
         max_n = int(os.getenv("META_PROMPT_EVAL_SET_MAX", "50"))
     except ValueError:
         max_n = 50
-    # Up to max_n sync Supabase point reads + a write: off the event loop.
-    storage = _get_storage(request)
-    return await asyncio.to_thread(_put_eval_set_sync, uid, raw, max_n, storage)
+    startup_repository = _get_startup_repository(request)
+    validated: List[str] = []
+    missing: List[str] = []
+    seen: set[str] = set()
+    for value in raw:
+        sid = str(value).strip()
+        if not sid or sid in seen:
+            continue
+        seen.add(sid)
+        if len(validated) >= max_n:
+            break
+        if await startup_repository.exists(uid, sid):
+            validated.append(sid)
+        else:
+            missing.append(sid)
+    payload = await _batch1_call(request, save_eval_startup_ids, uid, validated, max_n=max_n)
+    return {"ok": True, **payload, "missing_startup_ids": missing[:30]}
 
 
 def _put_eval_set_sync(uid: str, raw: List[Any], max_n: int, storage):
@@ -401,60 +443,68 @@ async def post_meta_prompt_evaluate(request: Request):
     if not api_key:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for evaluation")
 
-    storage = _get_storage(request)
+    startup_repository = _get_startup_repository(request)
+    storage = StartupReadStorageAdapter(None, await startup_repository.load_snapshot(uid))
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    repository = Batch1Repository(pool) if pool is not None else None
+    state = await repository.load_state(uid) if repository is not None else None
+    token = set_state(state) if state is not None else None
     try:
-        # Sync Supabase thesis reads (and possible bootstrap write) off the event loop.
-        thesis_ctx = await asyncio.to_thread(_load_thesis_ctx_sync, uid)
+        intelligence = getattr(request.app.state, "fund_intelligence_repository", None)
+        thesis_repository = getattr(intelligence, "thesis_repository", None)
+        if thesis_repository is None:
+            raise HTTPException(status_code=503, detail="PostgreSQL thesis repository is unavailable")
+        thesis = await get_active_thesis_from_repository(thesis_repository, uid)
+        if thesis is None:
+            await bootstrap_default_thesis_with_repository(thesis_repository, uid)
+            thesis = await get_active_thesis_from_repository(thesis_repository, uid)
+        thesis_ctx = thesis.as_engine_context() if thesis else None
+        reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
+        reviewer_engine = ReviewerEngine(
+            api_key=api_key,
+            storage=storage,
+            tenant_user_id=uid,
+            model=reviewer_model,
+            active_thesis=thesis_ctx,
+            startup_repository=startup_repository,
+        )
+        override_ids = body.get("startup_ids")
+        sid_list: Optional[List[str]] = None
+        if isinstance(override_ids, list):
+            sid_list = [str(x).strip() for x in override_ids if str(x).strip()]
+        result = await run_prompt_evaluation(
+            user_id=uid,
+            agent_target=agent_target,
+            library_key=library_key,
+            storage=storage,
+            reviewer_engine=reviewer_engine,
+            startup_ids=sid_list,
+        )
+        return result
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
-
-    reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
-    reviewer_engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        tenant_user_id=uid,
-        model=reviewer_model,
-        active_thesis=thesis_ctx,
-    )
-    override_ids = body.get("startup_ids")
-    sid_list: Optional[List[str]] = None
-    if isinstance(override_ids, list):
-        sid_list = [str(x).strip() for x in override_ids if str(x).strip()]
-
-    result = await run_prompt_evaluation(
-        user_id=uid,
-        agent_target=agent_target,
-        library_key=library_key,
-        storage=storage,
-        reviewer_engine=reviewer_engine,
-        startup_ids=sid_list,
-    )
-    return result
-
-
-def _load_thesis_ctx_sync(uid: str):
-    client = get_service_client()
-    active = get_active_thesis(client, uid)
-    if active is None:
-        _bootstrap_default_thesis_or_raise(client, uid)
-        active = get_active_thesis(client, uid)
-    return active.as_engine_context() if active else None
+    finally:
+        if repository is not None and state is not None:
+            try:
+                await repository.persist_state(state)
+            finally:
+                reset_state(token)
 
 
 @router.get("/api/meta/weights")
-def get_meta_weights(request: Request):
+async def get_meta_weights(request: Request):
     """
     Return current scout weights used by the Meta-Agent reweighter.
     """
-    return load_weights(request.state.user_id)
+    return await _batch1_call(request, load_weights, request.state.user_id)
 
 
 @router.get("/api/meta/calibration")
-def get_meta_calibration(request: Request):
+async def get_meta_calibration(request: Request):
     """
     Return current calibration state for reviewer thresholds.
     """
-    state = load_calibration_state(request.state.user_id)
+    state = await _batch1_call(request, load_calibration_state, request.state.user_id)
     if not isinstance(state, dict):
         return {}
     return state

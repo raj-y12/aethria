@@ -30,7 +30,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
       <section className="w-full max-w-[460px] border border-oxford/[0.08] bg-paper/80 px-8 py-10">
         <p className="type-label-section">Aethria Admin</p>
         <h1 className="mt-4 font-display text-[40px] leading-none text-oxford">Master Access</h1>
-        <p className="mt-5 type-body text-oxford/60">
+        <p className="mt-5 type-body text-oxford/65">
           Enter the backend admin secret to view global user, session, and agent telemetry.
         </p>
 
@@ -41,7 +41,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
               type="password"
               value={secret}
               onChange={(event) => setSecret(event.target.value)}
-              className="bg-transparent border-0 border-b border-oxford/15 rounded-none outline-none focus:border-oxford/45 transition-colors duration-300 type-body text-oxford py-3 placeholder:text-oxford/45"
+              className="bg-transparent border-0 border-b border-oxford/15 rounded-none outline-none focus:border-oxford/45 transition-colors duration-300 type-body text-oxford py-3 placeholder:text-oxford/65"
               placeholder="Enter master secret"
               autoComplete="current-password"
               autoFocus

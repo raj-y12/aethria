@@ -50,8 +50,9 @@ export default function MarketPlate() {
       id="market"
       index="01 — 08"
       title="The Market"
-      capLeft="The Market — Plate 01"
+      capLeft="Market intelligence / live field"
       capRight="Every company scanned · the few that fit"
+      tone="image-led"
     >
       <div ref={rootRef}>
         <div className="market-stage reveal d2">

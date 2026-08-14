@@ -66,6 +66,54 @@ async def test_resolves_exact_active_thesis_and_legacy_published_policy():
 
 
 @pytest.mark.asyncio
+async def test_resolves_thesis_from_shared_postgres_repository_without_supabase(monkeypatch):
+    import evaluation_v2.prerequisites as module
+
+    class ThesisRepository:
+        pass
+
+    async def resolve(repository, user_id):
+        assert repository is ThesisRepository
+        assert user_id == "user-a"
+        return type(
+            "ActiveThesis",
+            (),
+            {
+                "version_id": "version-a",
+                "as_engine_context": lambda self: {
+                    "thesis_id": "thesis-a",
+                    "version_id": self.version_id,
+                    "alignment_mode": "embedding",
+                },
+            },
+        )()
+
+    monkeypatch.setattr(module, "get_active_thesis_from_repository", resolve)
+    monkeypatch.setattr(
+        module,
+        "get_service_client",
+        lambda: pytest.fail("Postgres thesis read must not construct Supabase client"),
+    )
+
+    class FundIntelligence:
+        pool = "shared-pool"
+        thesis_repository = ThesisRepository
+
+        async def get_active_published_policy(self, *, user_id):
+            raise LookupError(user_id)
+
+    prerequisites = await load_evaluation_prerequisites(
+        user_id="user-a",
+        fund_intelligence_repository=FundIntelligence(),
+        load_policy=lambda _user_id: _compiled_policy(),
+        load_partner_rules=_partner_rules,
+    )
+
+    assert prerequisites.thesis_version_id == "version-a"
+    assert prerequisites.thesis_context["alignment_mode"] == "embedding"
+
+
+@pytest.mark.asyncio
 async def test_prerequisites_retain_exact_tenant_bound_execution_inputs():
     thesis_context = {
         "thesis_id": "thesis-a",

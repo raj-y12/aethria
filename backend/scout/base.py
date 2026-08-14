@@ -46,10 +46,7 @@ from utils.retrieval_grounding import (
     retrieve_source_pack_merged,
 )
 from utils.settings_loader import (
-    get_canonical_website_hostname,
-    is_scout_citation_allowlist_enforced,
-    is_scout_fail_closed_on_empty_retrieval,
-    is_scout_grounded_citations_enabled,
+    DEFAULT_SETTINGS,
 )
 
 
@@ -96,6 +93,7 @@ class Scout(ABC):
         api_key: str,
         model: str = "gpt-5-nano",
         tenant_user_id: str = "",
+        settings: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize a Scout.
@@ -104,6 +102,7 @@ class Scout(ABC):
             tenant_user_id: Clerk user id for retrieval and settings (explicit tenant).
         """
         self._tenant_user_id = require_user_id(tenant_user_id, context=f"Scout.{scout_type}")
+        self._settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
         self.scout_type = scout_type
         self.system_prompt = system_prompt
         self.client = build_openai_client(api_key)
@@ -207,8 +206,7 @@ class Scout(ABC):
         Load promoted prompt for this Scout: Supabase meta_prompt_library + prompt_active
         when USE_SUPABASE_STORAGE; else latest key from local data/meta/prompt_library.json.
         """
-        use_sb = env_config.use_supabase_storage()
-        if use_sb and self._tenant_user_id:
+        if self._tenant_user_id:
             try:
                 from meta.prompt_gating import load_prompt_active, load_prompt_library
 
@@ -222,10 +220,10 @@ class Scout(ABC):
                     and library[key].get("prompt")
                 ):
                     self.system_prompt = str(library[key]["prompt"])
-                    self.logger.info("Loaded promoted scout prompt from Supabase: %s", key)
+                    self.logger.info("Loaded promoted scout prompt from PostgreSQL state: %s", key)
                     return
             except Exception as e:
-                self.logger.debug("Could not load scout prompt from Supabase: %s", e)
+                self.logger.debug("Could not load promoted scout prompt: %s", e)
         try:
             lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
             if not lib_path.exists():
@@ -271,7 +269,8 @@ class Scout(ABC):
             h = hostname_from_user_hint(cand if isinstance(cand, str) else None)
             if h:
                 return h
-        return get_canonical_website_hostname(self._tenant_user_id)
+        raw = (self._settings.get("fund_identity") or {}).get("canonical_website")
+        return hostname_from_user_hint(raw) if isinstance(raw, str) and raw else None
 
     def _apply_allowlist(self, data: Dict[str, Any], allowlist_urls: set[str]) -> Dict[str, Any]:
         refs = data.get("references")
@@ -496,6 +495,7 @@ class Scout(ABC):
             out,
             anchor_hostname=anchor,
             company_name=str(out.get("name") or ""),
+            identity_context=out.get("company_resolution"),
             # On-demand lookups are user-intentional: prefer verified citations but never
             # drop the company purely because external URL probes failed or retrieval was dark.
             lenient=for_lookup,
@@ -912,12 +912,12 @@ class Scout(ABC):
         try:
             self._last_token_usage = 0
             self.last_discovery_diagnostic = None
-            grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
+            grounded_enabled = bool((self._settings.get("agent_config") or {}).get("scout_grounded_citations_enabled", True))
             # Two independent gates: one decides whether an EMPTY retrieval may
             # still produce a payload, the other decides whether cited URLs must
             # come from the retrieved sources.
-            fail_closed_on_empty = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
-            enforce_citation_allowlist = is_scout_citation_allowlist_enforced(self._tenant_user_id)
+            fail_closed_on_empty = bool((self._settings.get("agent_config") or {}).get("scout_fail_closed_on_empty_retrieval", True))
+            enforce_citation_allowlist = bool((self._settings.get("agent_config") or {}).get("scout_citation_allowlist_enforced", True))
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 lens = self.scout_type.replace("_", " ")
@@ -1107,12 +1107,12 @@ class Scout(ABC):
         self.last_discovery_diagnostic = None
         try:
             self._last_token_usage = 0
-            grounded_enabled = is_scout_grounded_citations_enabled(self._tenant_user_id)
+            grounded_enabled = bool((self._settings.get("agent_config") or {}).get("scout_grounded_citations_enabled", True))
             # Two independent gates: one decides whether an EMPTY retrieval may
             # still produce a payload, the other decides whether cited URLs must
             # come from the retrieved sources.
-            fail_closed_on_empty = is_scout_fail_closed_on_empty_retrieval(self._tenant_user_id)
-            enforce_citation_allowlist = is_scout_citation_allowlist_enforced(self._tenant_user_id)
+            fail_closed_on_empty = bool((self._settings.get("agent_config") or {}).get("scout_fail_closed_on_empty_retrieval", True))
+            enforce_citation_allowlist = bool((self._settings.get("agent_config") or {}).get("scout_citation_allowlist_enforced", True))
             source_pack = {"provider": "none", "sources": [], "url_allowlist": set()}
             if grounded_enabled:
                 nq = company
@@ -1282,6 +1282,11 @@ class Scout(ABC):
             data = json.loads(content)
             if site:
                 data["lookup_website"] = site
+            # Reference finalization needs the resolver's explicit identity
+            # context before it evaluates company relevance. Attach it before
+            # the first normalization pass; the later attachment preserves the
+            # same persisted contract after finalization.
+            data = self._attach_resolution(data, resolution)
             finalized = self._finalize_scout_payload_from_llm(
                 data,
                 source_pack,

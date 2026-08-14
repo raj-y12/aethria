@@ -4,6 +4,7 @@ Split out of api.py. Read-only aggregations plus the activity-seen marker. The
 shared read/system-health helpers live in routers/deps.py.
 """
 import asyncio
+import inspect
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -13,18 +14,22 @@ from fastapi.responses import JSONResponse
 
 import env_config
 from security.request_guards import require_authenticated_user
-from supabase_client import get_service_client
 from portfolio.rejection import RejectionAnalyzer
 from routers.deps import (
     enforce_rate_limits as _enforce_rate_limits,
     SETTINGS_MUTATION_POLICY as _SETTINGS_MUTATION_POLICY,
     get_root as _get_root,
-    get_storage as _get_storage,
     get_portfolio_store as _get_portfolio_store,
-    startup_name_index as _startup_name_index,
     read_json_dict_file as _read_json_dict_file,
     get_system_health as _get_system_health,
 )
+from user_state.repository import UserStateRepository
+from utils.settings_loader import load_settings
+from settings_repository import SettingsRepository
+from batch1.context import reset_state, set_state
+from batch1.repository import Batch1Repository
+from batch4a.repository import Batch4ARepository
+from startup_repository import StartupRepository
 
 logger = logging.getLogger("api.analytics")
 router = APIRouter()
@@ -54,7 +59,7 @@ def _aggregate_activity_totals(
     return totals
 
 @router.get("/api/signals")
-def get_signals(request: Request):
+async def get_signals(request: Request):
     """
     Return the last 50 portfolio signals sorted by detected_at descending.
     Startup names come from request-scoped storage (Supabase) so they are user-correct.
@@ -63,8 +68,13 @@ def get_signals(request: Request):
     signals_file = store.files.get("signals")
     records = store._read_file(signals_file) if signals_file is not None else []
     # Attach startup names from request-scoped storage (user's startups)
-    storage = _get_storage(request)
-    startups_index = _startup_name_index(storage)
+    rows = await StartupRepository(getattr(request.app.state, "durable_job_pool", None)).list_projection(
+        request.state.user_id, limit=500, offset=0
+    )
+    startups_index = {
+        str(row.get("startup_id")): str(row.get("display_name") or (row.get("scout_info") or {}).get("name") or "")
+        for row in rows
+    }
     for r in records:
         if "startup_name" not in r:
             r["startup_name"] = startups_index.get(r.get("startup_id") or "", "")
@@ -78,11 +88,10 @@ def get_rejection_analytics(request: Request):
     Return rejection analytics summarising red flags, sectors, and scores (tenant-scoped).
     """
     root = _get_root()
-    use_supabase = env_config.use_supabase_storage()
     uid = request.state.user_id
     analyzer = RejectionAnalyzer(
         data_dir=str(root / "data" / "portfolio"),
-        user_id=uid if use_supabase else None,
+        user_id=uid,
     )
     patterns = analyzer.get_patterns()
     if not patterns:
@@ -133,7 +142,7 @@ def get_rejection_analytics(request: Request):
 
 
 @router.get("/api/analytics/watchlist")
-def get_watchlist_analytics(request: Request):
+async def get_watchlist_analytics(request: Request):
     """
     Return watchlist health analytics: total, stale, average days, and per-entry stats.
     Startup names come from request-scoped storage so they are user-correct.
@@ -160,8 +169,13 @@ def get_watchlist_analytics(request: Request):
         signal_counts[sid] = signal_counts.get(sid, 0) + 1
 
     # Startup names from request-scoped storage (user's startups)
-    storage = _get_storage(request)
-    startups_index = _startup_name_index(storage)
+    rows = await StartupRepository(getattr(request.app.state, "durable_job_pool", None)).list_projection(
+        request.state.user_id, limit=500, offset=0
+    )
+    startups_index = {
+        str(row.get("startup_id")): str(row.get("display_name") or (row.get("scout_info") or {}).get("name") or "")
+        for row in rows
+    }
 
     stale = 0
     days_total = 0
@@ -199,14 +213,25 @@ def get_watchlist_analytics(request: Request):
 
 
 @router.get("/api/analytics/concentration")
-def get_concentration_analytics(request: Request):
+async def get_concentration_analytics(request: Request):
     """
     Return sector concentration analytics from data/analytics/sector_concentration.json.
     """
     root = _get_root()
     path = root / "data" / "analytics" / "sector_concentration.json"
     user_id = getattr(request.state, "user_id", None)
-    data = _read_json_dict_file(path, user_id=user_id)
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    repository = Batch1Repository(pool) if pool is not None else None
+    state = await repository.load_state(user_id) if repository is not None else None
+    token = set_state(state) if state is not None else None
+    try:
+        data = _read_json_dict_file(path, user_id=user_id)
+    finally:
+        if repository is not None and state is not None:
+            try:
+                await repository.persist_state(state)
+            finally:
+                reset_state(token)
     if not data:
         return {
             "by_sector": {},
@@ -218,13 +243,34 @@ def get_concentration_analytics(request: Request):
 
 
 @router.get("/api/analytics/system-health")
-def get_system_health(request: Request):
+async def get_system_health(request: Request):
     """
     Aggregate system health metrics (calibration, queues, budgets, escalations).
     """
-    storage = _get_storage(request)
     user_id = getattr(request.state, "user_id", None)
-    return _get_system_health(storage, user_id=user_id)
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    startup_repository = StartupRepository(pool)
+    settings = await load_settings(
+        user_id, repository=SettingsRepository(pool)
+    )
+    repository = Batch1Repository(pool) if pool is not None else None
+    state = await repository.load_state(user_id) if repository is not None else None
+    token = set_state(state) if state is not None else None
+    try:
+        return _get_system_health(
+            None,
+            user_id=user_id,
+            settings=settings,
+            pending_escalations=len(await startup_repository.list_pending_escalations(user_id)),
+            unreviewed=await startup_repository.count_unreviewed(user_id),
+            undecided=await startup_repository.count_undecided(user_id),
+        )
+    finally:
+        if repository is not None and state is not None:
+            try:
+                await repository.persist_state(state)
+            finally:
+                reset_state(token)
 
 
 @router.get("/api/activity/summary")
@@ -237,10 +283,31 @@ async def get_activity_summary(request: Request):
     user_id: str = getattr(request.state, "user_id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    # Four sequential sync Supabase round trips: run them off the event loop.
-    # This is the first authenticated call after sign-in (the welcome screen
-    # waits on it), so it must never stall — or be stalled by — other requests.
-    totals, last_seen_at = await asyncio.to_thread(_activity_summary_totals_sync, user_id)
+    pool = getattr(getattr(request, "app", None), "state", None)
+    pool = getattr(pool, "durable_job_pool", None)
+    if pool is None:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unavailable",
+                "reason": "durable_job_store_unavailable",
+            },
+        )
+    try:
+        last_seen_value = await UserStateRepository(pool).get_last_seen_at(user_id)
+        last_seen_at = last_seen_value.isoformat() if last_seen_value is not None else None
+    except Exception:
+        last_seen_at = None
+
+    activity_rows = await Batch4ARepository(pool).list_pipeline_activity_since(user_id, last_seen_at)
+    since = last_seen_at or "1970-01-01T00:00:00Z"
+    startup_repository = StartupRepository(pool)
+    human_reviewed = await startup_repository.count_human_reviewed_since(user_id, since)
+    open_in_progress = await startup_repository.count_unresolved(user_id)
+    totals, last_seen_at = await asyncio.to_thread(
+        _activity_summary_totals_sync, user_id, last_seen_at, activity_rows,
+        human_reviewed, open_in_progress,
+    )
 
     logging.getLogger("api").info(
         "activity_summary user_id=%s since=%s agent_decided=%s human_reviewed=%s open_in_progress=%s",
@@ -255,67 +322,24 @@ async def get_activity_summary(request: Request):
     return JSONResponse(content=totals)
 
 
-def _activity_summary_totals_sync(user_id: str):
-    svc = get_service_client()
-
-    # 1. Read last_seen_at
-    try:
-        state_row = (
-            svc.table("user_state")
-            .select("last_seen_at")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-        last_seen_at = (state_row.data or {}).get("last_seen_at")
-    except Exception:
-        last_seen_at = None
-
+def _activity_summary_totals_sync(
+    user_id: str, last_seen_at: Optional[str], activity_rows: Optional[List[Dict[str, Any]]] = None,
+    human_reviewed_override: Optional[int] = None, open_in_progress_override: Optional[int] = None,
+):
+    # The user_state read is performed asynchronously by the route.
     if not last_seen_at:
         # First visit — include all historical pipeline activity
         last_seen_at = "1970-01-01T00:00:00Z"
 
-    # 2. Query pipeline_activity since last_seen_at
-    try:
-        rows = (
-            svc.table("pipeline_activity")
-            .select("startups_found,reviewed_count,decisions_made,escalations_count")
-            .eq("user_id", user_id)
-            .gt("timestamp", last_seen_at)
-            .execute()
-        )
-        activity_rows = rows.data or []
-    except Exception:
-        activity_rows = []
+    activity_rows = activity_rows or []
 
     # 3. Aggregate totals. "decided" is retained as a backwards-compatible
     # alias for agent_decided; human decisions are counted separately.
-    human_reviewed = 0
-    open_in_progress = 0
+    human_reviewed = int(human_reviewed_override or 0)
+    open_in_progress = int(open_in_progress_override or 0)
 
-    try:
-        human_rows = (
-            svc.table("startups")
-            .select("startup_id", count="exact")
-            .eq("user_id", user_id)
-            .gt("human_resolution->>resolved_at", last_seen_at)
-            .execute()
-        )
-        human_reviewed = int(getattr(human_rows, "count", None) or 0)
-    except Exception as e:
-        logging.getLogger("api").warning("activity human decision aggregation failed: %s", e)
-
-    try:
-        open_rows = (
-            svc.table("startups")
-            .select("startup_id", count="exact")
-            .eq("user_id", user_id)
-            .not_.is_("unresolved_at", "null")
-            .execute()
-        )
-        open_in_progress = int(getattr(open_rows, "count", None) or 0)
-    except Exception as e:
-        logging.getLogger("api").warning("activity open aggregation failed: %s", e)
+    # Startup counts are supplied by the async StartupRepository boundary.
+    # There is intentionally no synchronous Supabase fallback here.
 
     totals = _aggregate_activity_totals(
         activity_rows,
@@ -326,21 +350,21 @@ def _activity_summary_totals_sync(user_id: str):
 
 
 @router.post("/api/activity/seen")
-def mark_activity_seen(request: Request):
+async def mark_activity_seen(request: Request):
     """Mark the current time as the report boundary / start of an away window."""
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited_result = _enforce_rate_limits(
+        f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY]
+    )
+    limited = await limited_result if inspect.isawaitable(limited_result) else limited_result
     if limited is not None:
         return limited
-    svc = get_service_client()
     try:
-        svc.table("user_state").upsert(
-            {
-                "user_id": user_id,
-                "last_seen_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            },
-            on_conflict="user_id",
-        ).execute()
+        pool = getattr(getattr(request, "app", None), "state", None)
+        pool = getattr(pool, "durable_job_pool", None)
+        await UserStateRepository(pool).upsert_last_seen_at(
+            user_id, datetime.now(timezone.utc)
+        )
     except Exception as e:
         logging.getLogger("api").warning("Could not update user_state last_seen_at: %s", e)
         return JSONResponse(status_code=503, content={"ok": False, "detail": "activity marker unavailable"})

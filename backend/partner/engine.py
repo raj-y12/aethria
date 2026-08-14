@@ -15,10 +15,11 @@ from partner.decision import PartnerDecisionEngine
 from partner.schema import validate_partner_output
 from tenant_context import require_user_id
 from utils.storage import Storage
-from utils.settings_loader import get_runtime_limits, is_partners_enabled
+from utils.settings_loader import DEFAULT_SETTINGS, runtime_limits_from_settings
 from portfolio.store import PortfolioStore
 from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
+from compatibility_projection import project_scout_for_runtime
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from models import EvaluationManifestIdentity
 from pipeline_execution import StageExecutionResult
@@ -54,6 +55,8 @@ class PartnerEngine:
         evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
         model: Optional[str] = None,
         include_deal_context_digest: Optional[bool] = None,
+        settings: Optional[Dict[str, Any]] = None,
+        startup_repository: Any = None,
     ):
         """
         Initialize the Partner engine.
@@ -66,10 +69,12 @@ class PartnerEngine:
             inferred = (getattr(storage, "_user_id", None) or "").strip()
         self.tenant_user_id = require_user_id(inferred, context="PartnerEngine")
         self.storage = storage
+        self.startup_repository = startup_repository
         self.interval_seconds = interval_seconds
         self.agent_id = agent_id
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
+        self.settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
         api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.decision_engine = PartnerDecisionEngine(
             use_llm_fallback=use_llm_fallback,
@@ -80,6 +85,7 @@ class PartnerEngine:
             evaluation_prerequisites=evaluation_prerequisites,
             model=model,
             include_deal_context_digest=include_deal_context_digest,
+            settings=self.settings,
         )
         if evaluation_prerequisites is not None:
             evaluation_prerequisites.require_tenant(
@@ -149,10 +155,8 @@ class PartnerEngine:
             return None
         scout_info = startup.scout_info
         review_info = startup.review_info
-        handoff_quality = handoff_quality_from_trace(getattr(startup, "agent_trace", None))
-        return {
-            "id": startup.startup_id,
-            "scout": {
+        scout_runtime = project_scout_for_runtime(
+            {
                 "id": startup.startup_id,
                 "name": scout_info.name,
                 "one_line": scout_info.one_line,
@@ -167,10 +171,21 @@ class PartnerEngine:
                 "biggest_unknown": getattr(scout_info, "biggest_unknown", None),
                 "funding_stage": getattr(scout_info, "funding_stage", None),
                 "est_tam": getattr(scout_info, "est_tam", None),
+                "traction_facts": getattr(scout_info, "traction_facts", None),
                 "references": getattr(scout_info, "references", None) or [],
                 "lookup_website": getattr(scout_info, "lookup_website", None),
                 "field_provenance": getattr(scout_info, "field_provenance", None),
             },
+            getattr(review_info, "canonical_context_snapshot", None),
+        )
+        # Keep the public Partner handoff shape unchanged; the adapter's
+        # bookkeeping and traction source object are runtime-only.
+        scout_runtime.pop("canonical_runtime_fields", None)
+        scout_runtime.pop("traction_facts", None)
+        handoff_quality = handoff_quality_from_trace(getattr(startup, "agent_trace", None))
+        return {
+            "id": startup.startup_id,
+            "scout": scout_runtime,
             "review": {
                 "market_score": review_info.market_score,
                 "product_score": review_info.product_score,
@@ -203,6 +218,8 @@ class PartnerEngine:
                 "structured_signals": getattr(review_info, "structured_signals", None),
                 "resolution_notes": getattr(review_info, "resolution_notes", None),
                 "disagreement_summary": getattr(review_info, "disagreement_summary", None),
+                "contradiction_guard": getattr(review_info, "contradiction_guard", None),
+                "canonical_context_snapshot": getattr(review_info, "canonical_context_snapshot", None),
                 "aethria_view": (
                     review_info.aethria_view.model_dump(mode="json")
                     if getattr(review_info, "aethria_view", None) is not None
@@ -313,6 +330,14 @@ class PartnerEngine:
             review_output,
             fund_thesis=self.fund_thesis,
         )
+        from contradiction_gate import apply_contradiction_gate
+        partner_guard = apply_contradiction_gate(
+            user_id=(getattr(self, "tenant_user_id", None) or uid or ""),
+            review=decision,
+            canonical_context=review_output.get("canonical_context_snapshot"),
+        )
+        decision = dict(partner_guard["guarded_review"])
+        decision["contradiction_guard"] = partner_guard
         persisted_prompt_version = str(decision.get("prompt_version") or "").strip()
         captured_prompt_version = str(
             partner_execution_prompt_version or ""
@@ -406,6 +431,7 @@ class PartnerEngine:
 
         partner_info = partner_output_to_partner_info(decision)
         partner_info.partner_agent_id = self.agent_id
+        partner_info.contradiction_guard = partner_guard
 
         try:
             persist_kwargs: Dict[str, Any] = {"pipeline_run_id": pr}
@@ -416,12 +442,19 @@ class PartnerEngine:
                 persist_kwargs["partner_execution_prompt_version"] = (
                     partner_execution_prompt_version
                 )
-            success = await asyncio.to_thread(
-                self.storage.add_partner_decision,
-                entry_id,
-                partner_info,
-                **persist_kwargs,
-            )
+            if getattr(self, "startup_repository", None) is not None:
+                success = await self.startup_repository.update_partner(
+                    self.tenant_user_id, entry_id, partner_info,
+                    investment_memo_markdown=persist_kwargs.get("investment_memo_markdown"),
+                    pipeline_run_id=pr,
+                    evaluation_manifest_identity=persist_kwargs.get("evaluation_manifest_identity"),
+                    partner_execution_prompt_version=persist_kwargs.get("partner_execution_prompt_version"),
+                    settings=self.settings,
+                )
+            else:
+                success = await asyncio.to_thread(
+                    self.storage.add_partner_decision, entry_id, partner_info, **persist_kwargs
+                )
         except Exception as e:
             self.logger.error("Partner persist failed for %s: %s", entry_id, e, exc_info=True)
             if pr and client and uid:
@@ -455,7 +488,7 @@ class PartnerEngine:
         Returns a typed, lossless account of every candidate attempted.
         """
         self.logger.info(f"Starting decision cycle at {utcnow().isoformat()}")
-        if not is_partners_enabled(self.tenant_user_id):
+        if not (self.settings.get("agent_config") or {}).get("partners_enabled", False):
             self.logger.info("Decision cycle skipped (partners disabled in settings)")
             return StageExecutionResult.skipped_result(
                 stage="partner",
@@ -468,7 +501,7 @@ class PartnerEngine:
         # every in-flight API response and SSE stream.
         undecided_count = await asyncio.to_thread(self.storage.count_undecided)
         try:
-            cycle_limit = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", self.batch_max))
+            cycle_limit = int(runtime_limits_from_settings(self.settings).get("max_agents_per_run", self.batch_max))
         except Exception as e:
             self.logger.warning("Partner runtime limits unavailable, using batch max: %s", e)
             cycle_limit = self.batch_max
@@ -545,7 +578,7 @@ class PartnerEngine:
 
                     if self.deal_memory and recommendation == "INVEST":
                         try:
-                            self.deal_memory.record_successful_thesis(
+                            await self.deal_memory.record_successful_thesis(
                                 scout_output.get("primary_thesis", "")
                             )
                         except Exception as e:
@@ -650,7 +683,7 @@ class PartnerEngine:
         if startup.partner_info is not None and not force_rerun:
             self.logger.info("Startup already has partner decision: %s", startup_id)
             return True
-        if not bypass_agent_enabled_gate and not is_partners_enabled(self.tenant_user_id):
+        if not bypass_agent_enabled_gate and not (self.settings.get("agent_config") or {}).get("partners_enabled", False):
             self.logger.info("run_startup skipped (partners disabled in settings): %s", startup_id)
             return False
         entry = self._entry_from_startup(startup)

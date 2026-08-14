@@ -1,0 +1,45 @@
+{
+  "database": "aethria_prod_snapshot",
+  "migration_head": "20260814000002",
+  "table_counts": {
+    "admin_audit_log": 910,
+    "agent_job_checkpoints": 341,
+    "agent_jobs": 76,
+    "companies": 19,
+    "criterion_assessments": 5,
+    "domain_outbox": 417,
+    "evaluation_runs": 1,
+    "fund_thesis": 11,
+    "fund_thesis_embeddings": 58,
+    "fund_thesis_pipeline_link": 60,
+    "fund_thesis_versions": 58,
+    "governed_policy_versions": 13,
+    "human_rulings": 6,
+    "identity_resolution_cases": 210,
+    "meta_reports": 866,
+    "opportunities": 17,
+    "pipeline_activity": 878,
+    "portfolio_agent_metrics": 1268,
+    "portfolio_budgets": 8,
+    "portfolio_decisions": 59,
+    "portfolio_rejections": 39,
+    "portfolio_watchlist": 20,
+    "recommendations": 1,
+    "security_limits": 41,
+    "settings": 10,
+    "source_observations": 230,
+    "startup_id_aliases": 133,
+    "startup_pipeline_state": 225,
+    "startups": 225,
+    "user_state": 6,
+    "workflow_actions": 8
+  },
+  "startup_created_at": {
+    "min": "2026-04-17T14:33:20.083714+00:00",
+    "max": "2026-08-10T21:36:02.135987+00:00"
+  },
+  "startup_updated_at": {
+    "min": "2026-04-17T14:35:11.532594+00:00",
+    "max": "2026-08-11T13:06:12.699289+00:00"
+  }
+}

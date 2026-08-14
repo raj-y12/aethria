@@ -49,7 +49,7 @@ function ViewKey({
   const idle =
     tone === 'escalation'
       ? 'text-escalation/80 hover:bg-oxford/[0.04] hover:text-escalation'
-      : 'text-oxford/60 hover:bg-oxford/[0.04] hover:text-oxford/80';
+      : 'text-oxford/65 hover:bg-oxford/[0.04] hover:text-oxford/80';
   return (
     <button
       type="button"
@@ -230,7 +230,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: tokens.motion.ease }}
           className="mx-auto flex min-h-[32px] flex-none items-center gap-x-phi-5 bg-surface-canvas/95 backdrop-blur-[2px]"
         >
-          <p className="type-action flex min-w-0 flex-1 items-center gap-phi-2 text-oxford/50">
+          <p className="type-action flex min-w-0 flex-1 items-center gap-phi-2 text-oxford/65">
             <span
               aria-hidden
               className={`h-[6px] w-[6px] shrink-0 ${urgent ? 'bg-escalation' : 'bg-oxford/25'}`}
@@ -284,7 +284,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
             <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
               The pipeline is filling.
             </h2>
-            <p className="type-note mt-phi-3 max-w-[36ch] text-oxford/60">
+            <p className="type-note mt-phi-3 max-w-[36ch] text-oxford/65">
               Scouts are searching against your mandate. New matters appear here as they land.
             </p>
             <button
@@ -293,7 +293,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
               className={`mt-phi-6 gap-phi-2 ${productInteraction.rulingChoiceIdle}`}
             >
               Dispatch a lookup
-              <span className="font-normal text-oxford/60" aria-hidden>⌘K</span>
+              <span className="font-normal text-oxford/65" aria-hidden>⌘K</span>
             </button>
           </div>
         ) : (

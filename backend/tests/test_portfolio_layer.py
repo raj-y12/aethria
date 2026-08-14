@@ -38,6 +38,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+
 @pytest.mark.skip(reason="Integration test — requires live Supabase with UUID-compatible startup ids (run directly: python tests/test_portfolio_layer.py)")
 async def test_portfolio_layer():
     """Test all portfolio layer components."""
@@ -176,9 +177,12 @@ if __name__ == "__main__":
 
 def test_cost_controller_uses_saved_runtime_limits(monkeypatch, tmp_path):
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
-    monkeypatch.setattr(
-        "portfolio.cost_control.load_settings",
-        lambda user_id=None, use_cache=True: {
+    monkeypatch.setenv("AETHRIA_TOKEN_COST_PER_1K_USD", "1")
+
+    cost_controller = CostController(
+        budget_file=str(tmp_path / "budgets.json"),
+        user_id="user_settings",
+        settings={
             "cost_budget": {
                 "enabled": True,
                 "max_tokens_per_run": 100,
@@ -187,12 +191,6 @@ def test_cost_controller_uses_saved_runtime_limits(monkeypatch, tmp_path):
             },
             "agent_config": {"max_agents_per_run": 3},
         },
-    )
-    monkeypatch.setenv("AETHRIA_TOKEN_COST_PER_1K_USD", "1")
-
-    cost_controller = CostController(
-        budget_file=str(tmp_path / "budgets.json"),
-        user_id="user_settings",
     )
 
     allowed, reason = cost_controller.can_make_call("scout", "scout_test", estimated_tokens=101)
@@ -221,6 +219,7 @@ def _portfolio_entry(
     recommendation,
     human_review_required=False,
     human_resolution=None,
+    decision=None,
 ):
     entry = {
         "scout_info": {
@@ -250,6 +249,8 @@ def _portfolio_entry(
             "human_review_required": human_review_required,
         },
     }
+    if decision is not None:
+        entry["partner_info"]["decision"] = decision
     if human_resolution is not None:
         entry["human_resolution"] = human_resolution
     return entry
@@ -283,6 +284,30 @@ async def test_portfolio_engine_routes_partner_recommendations(monkeypatch, tmp_
     assert [r["startup_id"] for r in store.get_all_portfolio()] == ["invest-startup"]
     assert [r["startup_id"] for r in store.get_all_watchlist()] == ["monitor-startup"]
     assert [r["startup_id"] for r in store.get_all_rejections()] == ["pass-startup"]
+
+
+@pytest.mark.asyncio
+async def test_portfolio_engine_routes_imported_style_canonical_decision(monkeypatch, tmp_path):
+    monkeypatch.delenv("USE_SUPABASE_STORAGE", raising=False)
+    monkeypatch.delenv("SUPABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_SERVICE_ROLE_KEY", raising=False)
+
+    store = PortfolioStore(data_dir=str(tmp_path / "portfolio"))
+    discovery_storage = _FakeDiscoveryStorage(
+        [_portfolio_entry("imported-monitor", "MONITOR", decision="MONITOR")]
+    )
+    engine = PortfolioEngine(
+        discovery_storage=discovery_storage,
+        portfolio_store=store,
+        execution_interval=0,
+        signal_interval=999999,
+        feedback_interval=999999,
+        health_interval=999999,
+    )
+
+    await engine._run_execution()
+
+    assert [r["startup_id"] for r in store.get_all_watchlist()] == ["imported-monitor"]
 
 
 @pytest.mark.asyncio
@@ -396,19 +421,14 @@ def test_stale_watchlist_warning_is_idempotent_within_same_day():
     assert writes == [("watch-1", {"stale_warning": True, "days_on_watchlist": 40})]
 
 
-def test_get_all_signals_routes_through_supabase_backend(monkeypatch):
-    calls = []
+def test_get_all_signals_routes_through_provider_neutral_snapshot():
+    from batch3.repository import Batch3State
+
     store = object.__new__(PortfolioStore)
     store.files = {"signals": Path("signals.json")}
-    store._supabase_tables = {"signals": "portfolio_signals"}
     store._tenant_user_id = "user-signals"
-    store._using_supabase = lambda: True
-    store._supabase_uid = lambda: "user-signals"
-    monkeypatch.setattr(
-        "portfolio.store.list_get_all",
-        lambda table, *, user_id: calls.append((table, user_id))
-        or [{"startup_id": "startup-1"}],
+    store.batch3_state = Batch3State(
+        "user-signals", {"portfolio_signals": [{"id": "sig-1", "startup_id": "startup-1"}]}
     )
 
-    assert store.get_all_signals() == [{"startup_id": "startup-1"}]
-    assert calls == [("portfolio_signals", "user-signals")]
+    assert store.get_all_signals() == [{"id": "sig-1", "startup_id": "startup-1"}]

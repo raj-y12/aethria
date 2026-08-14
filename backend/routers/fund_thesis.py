@@ -9,7 +9,9 @@ import os
 from typing import Any, Dict, Optional
 
 import httpx
+import env_config
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from routers.deps import (
@@ -19,25 +21,41 @@ from routers.deps import (
     SETTINGS_MUTATION_POLICY as _SETTINGS_MUTATION_POLICY,
 )
 from security.request_guards import require_authenticated_user
-from supabase_client import get_service_client
 from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisQueryError,
     _bootstrap_default_thesis_or_raise,
+    bootstrap_default_thesis_with_repository,
     compute_thesis_alignment_stats,
     get_active_thesis,
     get_active_thesis_metadata,
     thesis_has_embeddings,
 )
 from fund_thesis_ops import (
-    activate_fund_thesis_version,
-    backfill_thesis_embeddings,
-    create_fund_thesis_version_for_user,
+    activate_fund_thesis_version_with_repository,
+    backfill_thesis_embeddings_with_repository,
+    create_fund_thesis_version_with_repository,
 )
 from pipeline_runner import reprocess_startups_missing_fund_thesis
 from pipeline_execution import PipelineExecutionState
+from startup_repository import StartupRepository
 
 router = APIRouter()
+
+
+def get_service_client():
+    """Legacy dev/test seam; normal thesis routes require PostgreSQL."""
+    from supabase_client import get_service_client as _get_service_client
+
+    return _get_service_client()
+
+
+def _get_thesis_repository(request: Request) -> Any:
+    app = getattr(request, "app", None)
+    state = getattr(app, "state", None)
+    intelligence = getattr(state, "fund_intelligence_repository", None)
+    repository = getattr(intelligence, "thesis_repository", None)
+    return repository
 
 
 def _is_retryable_thesis_transport_error(err: Exception) -> bool:
@@ -58,16 +76,15 @@ def _is_retryable_thesis_transport_error(err: Exception) -> bool:
 
 
 @router.get("/api/fund-thesis")
-def api_get_fund_thesis(request: Request):
+async def api_get_fund_thesis(request: Request):
     """Active thesis, version list metadata, embedding status, recent pipeline links."""
-    _require_supabase_for_thesis()
     uid = request.state.user_id
-    client = get_service_client()
+    repository = _get_thesis_repository(request)
     try:
-        active = get_active_thesis(client, uid)
+        active = await repository.get_active(uid)
         if active is None:
-            _bootstrap_default_thesis_or_raise(client, uid)
-            active = get_active_thesis(client, uid)
+            await bootstrap_default_thesis_with_repository(repository, uid)
+            active = await repository.get_active(uid)
         if active is None:
             raise HTTPException(status_code=404, detail="No fund thesis yet. POST /api/fund-thesis/versions with raw_text.")
     except FundThesisQueryError as e:
@@ -77,59 +94,23 @@ def api_get_fund_thesis(request: Request):
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-    vr_rows = _safe_table_execute(
-        lambda: (
-            client.table("fund_thesis_versions")
-            .select("id,version_number,is_active,created_at")
-            .eq("user_id", uid)
-            .eq("thesis_id", active.thesis_id)
-            .order("version_number", desc=True)
-            .limit(50)
-            .execute()
-        ),
-        default_data=[],
-        warn_label=f"[{uid[:12]}] fund-thesis versions query",
-    )
-    versions = getattr(vr_rows, "data", None) or []
-
-    er_resp = _safe_table_execute(
-        lambda: (
-            client.table("fund_thesis_embeddings")
-            .select("model,created_at")
-            .eq("version_id", active.version_id)
-            .eq("user_id", uid)
-            .limit(1)
-            .execute()
-        ),
-        default_data=[],
-        warn_label=f"[{uid[:12]}] fund-thesis embeddings query",
-    )
-    erows = getattr(er_resp, "data", None) or []
-    emb_row = erows[0] if erows else {}
-
-    lr_resp = _safe_table_execute(
-        lambda: (
-            client.table("fund_thesis_pipeline_link")
-            .select("id,thesis_version_id,pipeline_run_id,affected_startups_count,created_at")
-            .eq("user_id", uid)
-            .order("created_at", desc=True)
-            .limit(20)
-            .execute()
-        ),
-        default_data=[],
-        warn_label=f"[{uid[:12]}] fund-thesis pipeline links query",
-    )
-
-    has_emb = thesis_has_embeddings(active)
+    versions = await repository.list_versions(uid, thesis_id=active["thesis_id"], limit=50)
+    versions = [
+        {"id": row["version_id"], "version_number": row["version_number"], "is_active": row["is_active"], "created_at": row["created_at"]}
+        for row in versions
+    ]
+    emb_row = await repository.get_embedding(uid, active["version_id"]) or {}
+    links = await repository.get_pipeline_links(uid, limit=20)
+    has_emb = bool(active.get("embedding"))
     emb_status = "ready" if has_emb else "pending"
-    emb_model = active.embedding_model if has_emb else "none"
-    dim = len(active.embedding)
+    emb_model = active.get("embedding_model") if has_emb else "none"
+    dim = len(active.get("embedding") or [])
     return {
-        "thesis_id": active.thesis_id,
-        "active_version_id": active.version_id,
-        "active_version_number": active.version_number,
-        "parsed_json": active.parsed_json,
-        "raw_text": active.raw_text[:50000],
+        "thesis_id": active["thesis_id"],
+        "active_version_id": active["version_id"],
+        "active_version_number": active["version_number"],
+        "parsed_json": active["parsed_json"],
+        "raw_text": str(active["raw_text"] or "")[:50000],
         "mode": "embedding" if has_emb else "rule_based",
         "embedding": {
             "status": emb_status,
@@ -139,15 +120,15 @@ def api_get_fund_thesis(request: Request):
             "created_at": emb_row.get("created_at"),
         },
         "versions": versions,
-        "recent_pipeline_links": getattr(lr_resp, "data", None) or [],
+        "recent_pipeline_links": links,
     }
 
 
 @router.get("/api/fund-thesis/runtime")
-def get_fund_thesis_runtime(request: Request):
+async def get_fund_thesis_runtime(request: Request):
     """Lightweight thesis runtime (mode / embeddings) for System panel; alignment extras without parsed_json."""
     try:
-        return _get_fund_thesis_runtime_impl(request)
+        return await _get_fund_thesis_runtime_impl(request)
     except FundThesisQueryError:
         raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from None
     except OSError as e:
@@ -161,14 +142,56 @@ def get_fund_thesis_runtime(request: Request):
         raise
 
 
-def _get_fund_thesis_runtime_impl(request: Request):
-    _require_supabase_for_thesis()
+async def _get_fund_thesis_runtime_impl(request: Request):
     uid = request.state.user_id
-    client = get_service_client()
+    repository = _get_thesis_repository(request)
+    if repository is None:
+        # Test/dev compatibility only. Production is fenced at the PostgreSQL
+        # repository boundary and never enters this branch.
+        _require_supabase_for_thesis()
+        client = get_service_client()
+        try:
+            legacy = get_active_thesis_metadata(client, uid)
+            if legacy is None:
+                return JSONResponse(status_code=200, content={"mode": "missing", "embedding_status": "pending", "has_embeddings": False})
+            timeline_response = (
+                client.table("fund_thesis_versions")
+                .select("id,version_number,is_active,created_at")
+                .eq("user_id", uid)
+                .eq("thesis_id", legacy.thesis_id)
+                .order("version_number", desc=True)
+                .limit(15)
+                .execute()
+            )
+            timeline = getattr(timeline_response, "data", None) or []
+            stats = compute_thesis_alignment_stats(
+                client, uid, active_version_id=legacy.version_id,
+                previous_version_id=None, startup_rows=[],
+            )
+            dim = legacy.embedding_dim
+            return JSONResponse(status_code=200, content=jsonable_encoder({
+                "thesis_version_id": legacy.version_id,
+                "mode": "embedding" if legacy.has_embeddings else "rule_based",
+                "embedding_status": "ready" if legacy.has_embeddings else "pending",
+                "embedding_model": legacy.embedding_model if legacy.has_embeddings else "none",
+                "has_embeddings": legacy.has_embeddings,
+                "thesis_ready": True,
+                "active_version_id": legacy.version_id,
+                "active_version_number": legacy.version_number,
+                "fund_thesis_updated_at": getattr(legacy, "thesis_updated_at", None),
+                "thesis_mode": "embedding" if legacy.has_embeddings else "rule_based",
+                "embedding": {"status": "ready" if legacy.has_embeddings else "pending", "model": legacy.embedding_model, "dimension": dim},
+                "embedding_dimensions": dim,
+                "alignment_stats": stats,
+                "version_timeline": timeline,
+                "parsed_json": legacy.parsed_json,
+            }))
+        except Exception as exc:
+            if _is_retryable_thesis_transport_error(exc):
+                raise HTTPException(status_code=503, detail="Thesis query failed; please retry") from exc
+            raise
     try:
-        # Metadata-only: never re-pulls the ~1536-float embedding_vector on this
-        # high-frequency poll; only mode / dimension / version info is needed here.
-        active = get_active_thesis_metadata(client, uid)
+        active = await repository.get_active(uid)
         if active is None:
             return JSONResponse(
                 status_code=200,
@@ -194,72 +217,62 @@ def _get_fund_thesis_runtime_impl(request: Request):
             },
         )
 
-    has_emb = active.has_embeddings
+    has_emb = bool(active.get("embedding"))
     mode = "embedding" if has_emb else "rule_based"
     embedding_status = "ready" if has_emb else "pending"
     emb_model = (
-        (active.embedding_model or "").strip()
+        str(active.get("embedding_model") or "").strip()
         if has_emb
         else "none"
     )
     if has_emb and not emb_model:
         emb_model = "none"
 
-    # Fetch the version timeline once and reuse it: the immediately-previous version
-    # (for drift) is almost always present here (active is the newest version), so we
-    # derive prev_id from this result instead of issuing a separate point query.
-    tl_r = (
-        client.table("fund_thesis_versions")
-        .select("id,version_number,is_active,created_at")
-        .eq("user_id", uid)
-        .eq("thesis_id", active.thesis_id)
-        .order("version_number", desc=True)
-        .limit(15)
-        .execute()
-    )
-    version_timeline = getattr(tl_r, "data", None) or []
+    timeline_rows = await repository.list_versions(uid, thesis_id=active["thesis_id"], limit=15)
+    version_timeline = [
+        {"id": row["version_id"], "version_number": row["version_number"], "is_active": row["is_active"], "created_at": row["created_at"]}
+        for row in timeline_rows
+    ]
 
     prev_id: Optional[str] = None
-    if active.version_number > 1:
+    if active["version_number"] > 1:
         for row in version_timeline:
-            if row.get("version_number") == active.version_number - 1:
+            if row.get("version_number") == active["version_number"] - 1:
                 prev_id = str(row.get("id") or "") or None
                 break
-        # Fallback only if the predecessor fell outside the 15-row timeline window.
         if prev_id is None:
-            pr = (
-                client.table("fund_thesis_versions")
-                .select("id")
-                .eq("user_id", uid)
-                .eq("thesis_id", active.thesis_id)
-                .eq("version_number", active.version_number - 1)
-                .limit(1)
-                .execute()
-            )
-            prow = getattr(pr, "data", None) or []
-            if prow:
-                prev_id = str(prow[0].get("id") or "") or None
+            predecessor = await repository.list_versions(uid, thesis_id=active["thesis_id"], limit=500)
+            for row in predecessor:
+                if row["version_number"] == active["version_number"] - 1:
+                    prev_id = row["version_id"]
+                    break
 
-    stats = compute_thesis_alignment_stats(
-        client,
+    startup_repository = StartupRepository(getattr(request.app.state, "durable_job_pool", None))
+    startup_rows = await startup_repository.list_thesis_alignment(
         uid,
-        active_version_id=active.version_id,
+        limit=int(os.getenv("FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT", "500")),
+    )
+    stats = compute_thesis_alignment_stats(
+        None,
+        uid,
+        active_version_id=active["version_id"],
         previous_version_id=prev_id,
         row_limit=int(os.getenv("FUND_THESIS_RUNTIME_ALIGNMENT_ROW_LIMIT", "500")),
+        startup_rows=startup_rows,
     )
 
-    dim = active.embedding_dim
+    dim = len(active.get("embedding") or [])
     payload: Dict[str, Any] = {
-        "thesis_version_id": active.version_id,
+        "thesis_version_id": active["version_id"],
         "mode": mode,
         "embedding_status": embedding_status,
         "embedding_model": emb_model,
         "has_embeddings": has_emb,
         # Backward-compatible fields for SystemIntelligence / clients
         "thesis_ready": True,
-        "active_version_id": active.version_id,
-        "active_version_number": active.version_number,
-        "fund_thesis_updated_at": active.thesis_updated_at,
+        "active_version_id": active["version_id"],
+        "active_version_number": active["version_number"],
+        "fund_thesis_updated_at": active.get("thesis_updated_at"),
         "thesis_mode": mode,
         "embedding": {
             "status": embedding_status,
@@ -269,15 +282,15 @@ def _get_fund_thesis_runtime_impl(request: Request):
         "embedding_dimensions": dim,
         "alignment_stats": stats,
         "version_timeline": version_timeline,
-        "parsed_json": active.parsed_json,
+        "parsed_json": active["parsed_json"],
     }
-    return JSONResponse(status_code=200, content=payload)
+    return JSONResponse(status_code=200, content=jsonable_encoder(payload))
 
 
 @router.post("/api/fund-thesis/versions")
 async def api_post_fund_thesis_version(request: Request):
     """Create a new thesis version (parse + embed + activate). Optional skip_embedding + parsed_json avoids OpenAI."""
-    _require_supabase_for_thesis()
+    repository = _get_thesis_repository(request)
     body = await request.json()
     raw_text = str(body.get("raw_text") or "").strip()
     if not raw_text:
@@ -293,11 +306,11 @@ async def api_post_fund_thesis_version(request: Request):
             detail="OPENAI_API_KEY required unless both parsed_json and skip_embedding are set",
         )
     uid = request.state.user_id
+    startup_repository = StartupRepository(getattr(request.app.state, "durable_job_pool", None))
+    affected_startups_count = await startup_repository.count_tenant(uid)
     try:
-        # Sync Supabase writes + optional OpenAI embedding call: off the event loop.
-        out = await asyncio.to_thread(
-            create_fund_thesis_version_for_user,
-            get_service_client(),
+        out = await create_fund_thesis_version_with_repository(
+            repository,
             user_id=uid,
             raw_text=raw_text,
             api_key=api_key,
@@ -305,6 +318,7 @@ async def api_post_fund_thesis_version(request: Request):
             pipeline_run_id=pipeline_run_id,
             skip_embedding=skip_embedding,
             skip_if_unchanged=True,
+            affected_startups_count=affected_startups_count,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -317,20 +331,22 @@ async def api_post_fund_thesis_version(request: Request):
 @router.patch("/api/fund-thesis/active")
 async def api_patch_fund_thesis_active(request: Request):
     """Activate an existing version (embeddings optional)."""
-    _require_supabase_for_thesis()
+    repository = _get_thesis_repository(request)
     body = await request.json()
     version_id = str(body.get("version_id") or "").strip()
     if not version_id:
         raise HTTPException(status_code=422, detail="version_id is required")
     pipeline_run_id = str(body.get("pipeline_run_id") or "").strip() or None
     uid = request.state.user_id
+    startup_repository = StartupRepository(getattr(request.app.state, "durable_job_pool", None))
+    affected_startups_count = await startup_repository.count_tenant(uid)
     try:
-        await asyncio.to_thread(
-            activate_fund_thesis_version,
-            get_service_client(),
+        await activate_fund_thesis_version_with_repository(
+            repository,
             user_id=uid,
             version_id=version_id,
             pipeline_run_id=pipeline_run_id,
+            affected_startups_count=affected_startups_count,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e)) from e
@@ -346,7 +362,11 @@ async def api_post_fund_thesis_reprocess_missing(
     Re-run reviewer + partner for startups that have reviews but no fund_thesis_version_id
     on review_info. Does not run scout or create new startups.
     """
-    _require_supabase_for_thesis()
+    if getattr(request.app.state, "durable_job_pool", None) is None and env_config.is_production_env():
+        raise HTTPException(
+            status_code=503,
+            detail="The shared PostgreSQL repository is required for thesis reprocessing",
+        )
     uid = request.state.user_id
     result = await reprocess_startups_missing_fund_thesis(
         uid,
@@ -394,19 +414,17 @@ async def api_post_fund_thesis_backfill_embeddings(
     / model 'none'). Idempotent and tenant-scoped. Useful after a thesis was
     bootstrapped before OPENAI_API_KEY was configured.
     """
-    _require_supabase_for_thesis()
+    repository = _get_thesis_repository(request)
     uid = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited:
         return limited
-    client = get_service_client()
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not dry_run and not api_key:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY required to backfill embeddings")
     try:
-        result = await asyncio.to_thread(
-            backfill_thesis_embeddings,
-            client,
+        result = await backfill_thesis_embeddings_with_repository(
+            repository,
             uid,
             api_key=api_key,
             only_active=only_active,

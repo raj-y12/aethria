@@ -195,9 +195,11 @@ async def test_reprocess_dry_run_uses_shared_gate_once_and_returns_typed_counts(
     storage = SimpleNamespace(get_startups_missing_thesis=lambda *, limit: ["one", "two"])
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.setattr(pipeline_runner, "load_evaluation_prerequisites", load)
-    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _user_id: storage)
+    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _user_id, settings=None: storage)
     monkeypatch.setattr(
-        pipeline_runner, "is_thesis_reprocess_agents_enabled", lambda _user_id: True
+        pipeline_runner,
+        "load_settings",
+        lambda _user_id: {"agent_config": {"reviewers_enabled": True, "partners_enabled": True}},
     )
 
     result = await pipeline_runner.reprocess_startups_missing_fund_thesis(
@@ -224,7 +226,8 @@ async def test_reprocess_no_work_is_skipped_without_requiring_model_runtime(monk
     storage = SimpleNamespace(get_startups_missing_thesis=lambda *, limit: [])
     monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _user_id: storage)
+    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _user_id, settings=None: storage)
+    monkeypatch.setattr(pipeline_runner, "load_settings", lambda _user_id: {})
 
     result = await pipeline_runner.reprocess_startups_missing_fund_thesis(
         "user-a", evaluation_prerequisites=_Prerequisites()
@@ -293,6 +296,7 @@ def _scout_for_stage(
     engine.cost_controller = cost_controller
     engine.deal_memory = deal_memory
     engine.model = "test-model"
+    engine.settings = {"agent_config": {"scouts_enabled": True}, "cost_budget": {"enabled": False}}
     engine.backpressure_threshold = 10
     engine.scout_ramp_threshold = 5
     engine.scout_ramp_max_waves = 1
@@ -333,10 +337,6 @@ async def test_scout_periodic_result_accounts_for_every_persona(
 ):
     import scout.engine as scout_module
 
-    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
-    monkeypatch.setattr(
-        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
-    )
     result = await _scout_for_stage(results).run_cycle(persist_discoveries=False)
 
     assert isinstance(result, ScoutCycleResult)
@@ -359,10 +359,6 @@ async def test_scout_periodic_result_accounts_for_every_persona(
 async def test_scout_periodic_budget_denial_is_blocked(monkeypatch):
     import scout.engine as scout_module
 
-    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
-    monkeypatch.setattr(
-        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
-    )
     controller = SimpleNamespace(
         check_budget=lambda *_args, **_kwargs: (False, "budget exhausted")
     )
@@ -381,10 +377,6 @@ async def test_scout_periodic_budget_denial_is_blocked(monkeypatch):
 async def test_scout_periodic_persistence_failure_is_not_a_success(monkeypatch):
     import scout.engine as scout_module
 
-    monkeypatch.setattr(scout_module, "is_scouts_enabled", lambda _uid: True)
-    monkeypatch.setattr(
-        scout_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 10}
-    )
     storage = SimpleNamespace(
         count_unreviewed=lambda: 0,
         add_discovery=lambda *_args, **_kwargs: (_ for _ in ()).throw(
@@ -419,6 +411,7 @@ def _reviewer_for_stage(storage, *, cost_controller=None, persona_failure=False)
     engine.active_thesis = None
     engine.deal_memory = None
     engine.agent_id = "reviewer-test"
+    engine.settings = {"agent_config": {"reviewers_enabled": True}, "cost_budget": {"enabled": False}}
     engine.model = "test-model"
     engine._sync_thesis_to_reviewers = lambda: None
     engine._build_scout_output_payload = lambda startup: {
@@ -465,7 +458,6 @@ def _reviewer_for_stage(storage, *, cost_controller=None, persona_failure=False)
 async def test_reviewer_periodic_result_reports_no_work_and_budget_block(monkeypatch):
     import reviewer.engine as reviewer_module
 
-    monkeypatch.setattr(reviewer_module, "is_reviewers_enabled", lambda _uid: True)
     no_work = await _reviewer_for_stage(_StageStorage()).run_cycle()
 
     cost_controller = SimpleNamespace(
@@ -505,15 +497,6 @@ async def test_reviewer_periodic_result_accounts_for_candidate_outcomes(
     import reviewer.engine as reviewer_module
     import utils.adapters as adapters_module
 
-    monkeypatch.setattr(reviewer_module, "is_reviewers_enabled", lambda _uid: True)
-    monkeypatch.setattr(
-        reviewer_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 5}
-    )
-    monkeypatch.setattr(
-        reviewer_module,
-        "load_settings",
-        lambda _uid: {"agent_config": {"confidence_threshold": 0.2}},
-    )
     monkeypatch.setattr(
         reviewer_module, "enrich_scout_for_reviewer_llm", lambda payload, _uid: payload
     )
@@ -560,6 +543,7 @@ def _partner_for_stage(entries, *, cost_controller=None, outcome=(True, None)):
     engine.batch_max = 20
     engine.last_cycle_escalations = 0
     engine.deal_memory = None
+    engine.settings = {"agent_config": {"partners_enabled": True}, "cost_budget": {"enabled": False}}
     engine._get_undecided_entries = lambda *, limit=None: list(entries)[:limit]
 
     async def decide(*_args, **_kwargs):
@@ -611,10 +595,6 @@ async def test_partner_periodic_result_accounts_for_every_candidate(
 ):
     import partner.engine as partner_module
 
-    monkeypatch.setattr(partner_module, "is_partners_enabled", lambda _uid: True)
-    monkeypatch.setattr(
-        partner_module, "get_runtime_limits", lambda _uid: {"max_agents_per_run": 20}
-    )
 
     result = await _partner_for_stage(
         entries, cost_controller=cost_controller, outcome=outcome
@@ -656,7 +636,7 @@ async def _run_periodic_with_stage_results(
         count_unreviewed=lambda: reviewer_result.attempted,
         count_undecided=lambda: partner_result.attempted,
     )
-    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _uid: storage)
+    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda _uid, settings=None: storage)
 
     class Scout:
         scouts = []
@@ -933,7 +913,6 @@ async def test_standalone_loops_consume_typed_results_without_type_errors(
                 discoveries=[{"scout_type": "market_driven", "name": "Co", "one_line": "One"}],
             )
 
-        monkeypatch.setattr(module, "is_scouts_enabled", lambda _uid: True)
     elif engine_name == "reviewer":
         import reviewer.engine as module
         from reviewer.engine import ReviewerEngine
@@ -946,7 +925,6 @@ async def test_standalone_loops_consume_typed_results_without_type_errors(
             engine.running = False
             return completed
 
-        monkeypatch.setattr(module, "is_reviewers_enabled", lambda _uid: True)
     else:
         import partner.engine as module
         from partner.engine import PartnerEngine
@@ -957,9 +935,9 @@ async def test_standalone_loops_consume_typed_results_without_type_errors(
             engine.running = False
             return completed
 
-        monkeypatch.setattr(module, "is_partners_enabled", lambda _uid: True)
 
     engine.tenant_user_id = "user-a"
+    engine.settings = {"agent_config": {"scouts_enabled": True, "reviewers_enabled": True, "partners_enabled": True}}
     engine.interval_seconds = 1
     engine.logger = logger
     engine.run_cycle = run_cycle

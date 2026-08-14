@@ -47,6 +47,24 @@ export interface OpportunityDecisionView extends Opportunity {
   principal_risks?: string[];
   missing_information?: string[];
   change_conditions?: string[];
+  current_ruling_rationale?: string | null;
+  current_ruling_created_at?: string | null;
+  ruling_history?: CanonicalRulingRecord[];
+}
+
+export type CanonicalRulingDecision = 'advance' | 'monitor' | 'pass' | 'invest';
+
+export interface CanonicalRulingRecord {
+  ruling_id: string;
+  recommendation_id?: string | null;
+  decision: CanonicalRulingDecision | string;
+  rationale?: string | null;
+  risk_acknowledgement?: string | null;
+  mandate_exception?: string | null;
+  investor_confidence?: number | null;
+  actor_id?: string | null;
+  prior_ruling_id?: string | null;
+  created_at?: string | null;
 }
 
 export interface SourceObservation {

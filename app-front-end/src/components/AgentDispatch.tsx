@@ -54,7 +54,7 @@ function phaseState(lookupPhase: LookupPhase, phase: Phase) {
 function LookupPhaseLine({ lookupPhase, className = '' }: { lookupPhase: LookupPhase; className?: string }) {
   if (!lookupPhase) return null;
   return (
-    <p className={`type-meta text-oxford/60 ${className}`} aria-live="polite">
+    <p className={`type-meta text-oxford/65 ${className}`} aria-live="polite">
       {PHASES.map((phase, i) => {
         const { isCurrentPhase, isPast } = phaseState(lookupPhase, phase);
         return (
@@ -62,7 +62,7 @@ function LookupPhaseLine({ lookupPhase, className = '' }: { lookupPhase: LookupP
             {i > 0 ? <span className="text-oxford/[0.18]"> · </span> : null}
             <span
               className={
-                isCurrentPhase ? 'text-oxford/60' : isPast ? 'text-oxford/60' : 'text-oxford/[0.22]'
+                isCurrentPhase ? 'text-oxford/65' : isPast ? 'text-oxford/65' : 'text-oxford/[0.22]'
               }
             >
               {phase}
@@ -107,8 +107,8 @@ function DispatchPanelBody({
   const [focused, setFocused] = useState(false);
 
   const inputCls = embedded
-    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed'
-    : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/60 outline-none disabled:cursor-not-allowed';
+    ? 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-2 font-medium font-sans text-[13px] leading-[1.5] text-oxford placeholder:text-oxford/65 outline-none disabled:cursor-not-allowed'
+    : 'min-w-0 flex-1 bg-transparent border-0 px-0 py-phi-3 font-sans font-medium text-[1rem] text-oxford placeholder:text-oxford/65 outline-none disabled:cursor-not-allowed';
   const showStatusSlot = isBusy || !!lookupMessage;
   const statusSlotCls = embedded
     ? `mt-phi-2 grid content-start gap-phi-1${showStatusSlot ? ' min-h-[44px]' : ''}`
@@ -118,7 +118,7 @@ function DispatchPanelBody({
     if (lookupMessage) {
       const msgCls = embedded
         ? `${railEditorial.body} flex items-center gap-phi-2 min-w-0 flex-1 text-oxford/70`
-        : 'type-meta text-oxford/60 flex items-center gap-phi-2 min-w-0 flex-1';
+        : 'type-meta text-oxford/65 flex items-center gap-phi-2 min-w-0 flex-1';
       return (
         <>
           <p className={msgCls}>
@@ -151,7 +151,7 @@ function DispatchPanelBody({
         aria-label="Pipeline dispatch"
       >
         {embedded ? (
-          <span className="shrink-0 select-none font-mono text-[15px] font-medium leading-none text-oxford/60" aria-hidden>
+          <span className="shrink-0 select-none font-mono text-[15px] font-medium leading-none text-oxford/65" aria-hidden>
             &gt;
           </span>
         ) : null}
@@ -179,7 +179,7 @@ function DispatchPanelBody({
           type="button"
           onClick={isBusy ? onCancel : onSubmit}
           disabled={isBusy ? !onCancel : !input.trim()}
-          className={isBusy ? `${runBtnCls} text-oxford/60 hover:text-oxford/70 disabled:opacity-100` : runBtnCls}
+          className={isBusy ? `${runBtnCls} text-oxford/65 hover:text-oxford/70 disabled:opacity-100` : runBtnCls}
         >
           {isBusy ? 'Cancel' : (
             <>
@@ -248,7 +248,7 @@ export default function AgentDispatch({
               <span className="h-1.5 w-1.5 shrink-0 bg-oxford/40 pulse-fast" aria-hidden />
             )}
             <span
-              className={`type-meta transition-colors ${isRunning ? 'text-oxford/60' : hasStatus ? 'text-oxford/60' : 'text-oxford/45'}`}
+              className={`type-meta transition-colors ${isRunning ? 'text-oxford/65' : hasStatus ? 'text-oxford/65' : 'text-oxford/65'}`}
             >
               {isRunning ? 'Running' : hasStatus ? 'Status' : 'Ready'}
             </span>

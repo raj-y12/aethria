@@ -36,7 +36,10 @@ class SignalTracker:
         """
         self.store = portfolio_store
         self.agent_id = agent_id
-        self.feed_fetcher = FeedFetcher(user_id=getattr(portfolio_store, "_tenant_user_id", None))
+        self.feed_fetcher = FeedFetcher(
+            user_id=getattr(portfolio_store, "_tenant_user_id", None),
+            batch2_state=getattr(portfolio_store, "batch2_state", None),
+        )
         self.logger = logging.getLogger("signals.tracker")
     
     def check_watchlist_entries(self) -> List[str]:

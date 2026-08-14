@@ -7,6 +7,7 @@ On-demand lookup uses a separate queue/worker so it is not blocked by full scout
 """
 import asyncio
 import gc
+import inspect
 import json
 import logging
 import os
@@ -40,13 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from utils.storage import Storage
-from security.rate_limiter import (
-    FixedWindowRateLimiter,
-    RateLimitPolicy,
-    build_security_store,
-    rate_limit_exceeded,
-    security_event_detail,
-)
+from security.rate_limiter import RateLimitPolicy, rate_limit_exceeded, security_event_detail
 from security.request_guards import require_authenticated_user, validate_route_id
 from utils.settings_loader import (
     DEFAULT_SETTINGS,
@@ -66,13 +61,14 @@ from routers.deps import (
     enforce_rate_limits as _enforce_rate_limits,
     acquire_security_lock as _acquire_security_lock,
     release_security_lock as _release_security_lock,
-    get_security_store as _get_security_store,
+    configure_security_repository as _configure_security_repository,
     client_host as _client_host,
     is_production_env as _is_production_env,
     now_iso as _now_iso,
     get_root as _get_root,
     get_portfolio_store as _get_portfolio_store,
-    get_storage as _get_storage,
+    get_storage as _get_storage,  # legacy test/authority seam; no normal caller
+    get_startup_repository as _get_startup_repository,
     require_supabase_for_thesis as _require_supabase_for_thesis,
     safe_table_execute as _safe_table_execute,
     read_json_list as _read_json_list,
@@ -92,8 +88,6 @@ from routers.deps import (
 from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
 from admin_audit import record_admin_audit_event
 from admin_service import build_admin_overview
-from supabase_client import get_service_client
-from supabase_storage import SupabaseStartupsStorage
 from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
 from meta.reweighter import load_weights
@@ -113,6 +107,175 @@ from meta.prompt_gating import (
 from meta.evaluator import run_prompt_evaluation
 from reviewer.engine import ReviewerEngine
 from reviewer.aethria_view import polish_aethria_view_for_api
+from user_state.repository import UserStateRepository
+from settings_repository import SettingsRepository
+from batch1.context import reset_state, set_state
+from batch1.repository import Batch1Repository
+from startup_repository import StartupRepository, startup_dict
+from db.migration_runner import inspect_migration_head
+
+
+_PORTABLE_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migrations"
+
+
+def get_service_client():
+    """Load the legacy Supabase client only when a compatibility path needs it."""
+    from supabase_client import get_service_client as _get_service_client
+
+    return _get_service_client()
+
+
+def _is_supabase_storage(value: Any) -> bool:
+    """Identify the legacy adapter without making it a normal runtime import."""
+    from supabase_storage import SupabaseStartupsStorage
+
+    return isinstance(value, SupabaseStartupsStorage)
+
+
+def _local_snapshot_read_only() -> bool:
+    """Return the explicit local imported-snapshot write guard."""
+    return env_config.get_bool("LOCAL_SNAPSHOT_READ_ONLY")
+
+
+async def _ensure_portable_migrations(pool: Any) -> Any:
+    """Refuse durable work until the packaged PostgreSQL schema is current."""
+    if not _PORTABLE_MIGRATIONS_DIR.is_dir():
+        raise RuntimeError("portable_migrations_missing_from_runtime_image")
+    status = await inspect_migration_head(pool, _PORTABLE_MIGRATIONS_DIR)
+    if not status.ready:
+        missing = ",".join(status.missing_versions) or "migration_ledger_missing"
+        raise RuntimeError(f"migration_head_behind:{missing}")
+    return status
+
+
+async def _append_batch1_record(
+    request: Request, table: str, record: Dict[str, Any], user_id: str
+) -> str:
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    if pool is None:
+        raise RuntimeError("Batch 1 PostgreSQL pool is unavailable")
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(user_id)
+    token = set_state(state)
+    try:
+        from batch1.store import list_append_only
+
+        return list_append_only(table, record, user_id=user_id)
+    finally:
+        try:
+            await repository.persist_state(state)
+        finally:
+            reset_state(token)
+
+
+async def _record_admin_audit_event(request: Request, **kwargs: Any) -> None:
+    """Write admin audit data through the shared async PostgreSQL pool.
+
+    The awaitable check keeps existing test seams compatible while production
+    uses the async repository implementation.
+    """
+    result = record_admin_audit_event(
+        pool=getattr(request.app.state, "durable_job_pool", None),
+        **kwargs,
+    )
+    if inspect.isawaitable(result):
+        await result
+
+
+def _settings_repository(request: Request) -> SettingsRepository:
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    if pool is None:
+        raise RuntimeError("PostgreSQL settings repository is unavailable")
+    return SettingsRepository(pool)
+
+
+def _settings_repository_for_app() -> SettingsRepository:
+    if _durable_job_pool is None:
+        raise RuntimeError("PostgreSQL settings repository is unavailable")
+    return SettingsRepository(_durable_job_pool)
+
+
+async def _load_settings_for_request(
+    request: Request, user_id: str, *, use_cache: bool = True
+) -> dict:
+    try:
+        repository = _settings_repository(request)
+    except RuntimeError:
+        repository = None
+    if inspect.iscoroutinefunction(load_settings):
+        result = load_settings(user_id, repository=repository, use_cache=use_cache)
+    else:
+        try:
+            result = await asyncio.to_thread(
+                load_settings,
+                user_id,
+                repository=repository,
+                use_cache=use_cache,
+            )
+        except TypeError:
+            try:
+                result = await asyncio.to_thread(
+                    load_settings, user_id, use_cache=use_cache
+                )
+            except TypeError:
+                result = await asyncio.to_thread(load_settings, user_id)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+async def _save_settings_for_request(
+    request: Request, settings: dict, user_id: str
+) -> None:
+    try:
+        result = save_settings(
+            settings, user_id, repository=_settings_repository(request)
+        )
+    except RuntimeError:
+        result = save_settings(settings, user_id)
+    if inspect.isawaitable(result):
+        await result
+
+
+async def _load_settings_for_pool(
+    user_id: str, pool: Any, *, use_cache: bool = True
+) -> dict:
+    repository = SettingsRepository(pool) if pool is not None else None
+    if inspect.iscoroutinefunction(load_settings):
+        result = load_settings(user_id, repository=repository, use_cache=use_cache)
+    else:
+        try:
+            result = await asyncio.to_thread(
+                load_settings,
+                user_id,
+                repository=repository,
+                use_cache=use_cache,
+            )
+        except TypeError:
+            try:
+                result = await asyncio.to_thread(
+                    load_settings, user_id, use_cache=use_cache
+                )
+            except TypeError:
+                result = await asyncio.to_thread(load_settings, user_id)
+    if inspect.isawaitable(result):
+        return await result
+    return result
+
+
+async def _save_settings_for_pool(settings: dict, user_id: str, pool: Any) -> None:
+    repository = SettingsRepository(pool) if pool is not None else None
+    if inspect.iscoroutinefunction(save_settings):
+        result = save_settings(settings, user_id, repository=repository)
+    else:
+        try:
+            result = await asyncio.to_thread(
+                save_settings, settings, user_id, repository=repository
+            )
+        except TypeError:
+            result = await asyncio.to_thread(save_settings, settings, user_id)
+    if inspect.isawaitable(result):
+        await result
 from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
 from services.scoring.presentation_layer import serialize_scoring_presentation
 from portfolio.store import PortfolioStore
@@ -123,8 +286,6 @@ from jobs.lookup_outcomes import (
     LookupAttemptOutcome,
     LookupOutcomeCorrupt,
     LookupOutcomeStoreUnavailable,
-    latest_lookup_attempt,
-    record_lookup_attempt,
 )
 from jobs.models import (
     AgentJob,
@@ -134,7 +295,7 @@ from jobs.models import (
     PipelineCyclePayload,
 )
 from jobs.outbox import OutboxPublisher
-from jobs.postgres import create_pool as create_durable_job_pool
+from jobs.postgres import create_pool as create_durable_job_pool, database_dsn
 from jobs.repository import DurableJobRepository
 from jobs.worker import DurableJobWorker
 from authority.repository import AuthorityRepository, AuthorityBlocked
@@ -171,14 +332,23 @@ from fund_thesis import (
     get_active_thesis,
     get_active_thesis_metadata,
     thesis_has_embeddings,
+    bootstrap_default_thesis_with_repository,
 )
-from fund_thesis_ops import sync_fund_config_to_active_thesis
+from fund_thesis_ops import (
+    sync_fund_config_to_active_thesis,
+    sync_fund_config_to_active_thesis_with_repository,
+)
+from fund_thesis_repository import FundThesisRepository
 from models import FundConfig, FundMemory, Startup, UserPreferences
 from conviction_state import build_conviction_patch
 from core import policy_resolver
 from utils.scoring import compute_overall_score, enrich_scores, score_to_label
 from utils.score_semantics import rubric_band_for_numeric
-from utils.partner_codes import LEGACY_TO_RECOMMENDATION, recommendation_from_legacy
+from utils.partner_codes import (
+    LEGACY_TO_RECOMMENDATION,
+    legacy_ruling_from_institutional,
+    recommendation_from_legacy,
+)
 
 _agent_queue: Optional[asyncio.Queue[Dict[str, Any]]] = None
 _agent_worker_task: Optional[asyncio.Task] = None
@@ -238,8 +408,13 @@ def _mark_lookup_cancelled(user_id: str, lookup_id: str) -> None:
 
 
 def _durable_jobs_required() -> bool:
-    """Production storage accepts work only after PostgreSQL commits the job."""
-    return env_config.use_supabase_storage()
+    """Require durable services whenever a direct PostgreSQL runtime is configured.
+
+    ``USE_SUPABASE_STORAGE`` only selects the legacy compatibility adapter. It
+    must never disable the canonical PostgreSQL runtime when ``DATABASE_URL``
+    is present.
+    """
+    return bool(database_dsn()) or env_config.use_supabase_storage()
 
 
 def _durable_store_unavailable() -> JSONResponse:
@@ -469,7 +644,7 @@ async def _agent_worker() -> None:
                 _logger_agents.exception("Pipeline cycle error for user %s: %s", user_id[:12] if user_id else "?", e)
                 await _update_agent_run_status(user_id, "error")
             finally:
-                _release_security_lock(str(job.get("lock_key") or "").strip() or None)
+                await _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _agent_queue.task_done()
         except asyncio.CancelledError:
             break
@@ -579,17 +754,29 @@ async def _lookup_worker() -> None:
                             lookup_id,
                         )
             finally:
-                _release_security_lock(str(job.get("lock_key") or "").strip() or None)
+                await _release_security_lock(str(job.get("lock_key") or "").strip() or None)
                 _lookup_queue.task_done()
         except asyncio.CancelledError:
             break
 
 
-async def _persist_legacy_lookup_attempt(
-    outcome: LookupAttemptOutcome,
-) -> LookupAttemptOutcome:
+async def _persist_legacy_lookup_attempt(outcome: LookupAttemptOutcome) -> LookupAttemptOutcome:
     """Central outcome service adapter for the compatibility queue worker."""
-    return await asyncio.to_thread(record_lookup_attempt, outcome)
+    repository = _durable_job_repository
+    if repository is None:
+        raise LookupOutcomeStoreUnavailable(
+            "Durable lookup outcome store is unavailable"
+        )
+    return await repository.record_lookup_outcome(outcome)
+
+
+async def latest_lookup_attempt(user_id: str, lookup_id: str):
+    repository = _durable_job_repository
+    if repository is None:
+        raise LookupOutcomeStoreUnavailable(
+            "Durable lookup outcome store is unavailable"
+        )
+    return await repository.latest_lookup_attempt(user_id=user_id, lookup_id=lookup_id)
 
 
 def _lookup_worker_count() -> int:
@@ -606,7 +793,9 @@ def _lookup_worker_count() -> int:
 async def _is_user_agents_enabled(user_id: str) -> bool:
     """Check agent enablement without running settings I/O on the event loop."""
     try:
-        s = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+        s = await _load_settings_for_pool(
+            user_id, _durable_job_pool, use_cache=False
+        )
         ac = s.get("agent_config") or {}
         return bool(ac.get("scouts_enabled") or ac.get("reviewers_enabled") or ac.get("partners_enabled"))
     except Exception:
@@ -635,7 +824,7 @@ async def _update_agent_run_status(
 ) -> None:
     """Best-effort: write agents_status (and last_started_at when running) into settings doc."""
     try:
-        s = await asyncio.to_thread(load_settings, user_id)
+        s = await _load_settings_for_pool(user_id, _durable_job_pool)
         ac = s.setdefault("agent_config", {})
         ac["agents_status"] = status
         if execution_result is not None:
@@ -644,7 +833,7 @@ async def _update_agent_run_status(
             )
         if status == "running":
             ac["agents_last_started_at"] = datetime.now(timezone.utc).isoformat()
-        await asyncio.to_thread(save_settings, s, user_id)
+        await _save_settings_for_pool(s, user_id, _durable_job_pool)
     except Exception as e:
         _logger_agents.debug("[%s] Could not update agent status: %s", user_id[:12], e)
 
@@ -877,9 +1066,7 @@ async def _resume_all_user_loops() -> None:
     if not use_supabase:
         return
     try:
-        client = get_service_client()
-        rows_resp = client.table("settings").select("user_id,data").execute()
-        rows = getattr(rows_resp, "data", None) or []
+        rows = await _settings_repository_for_app().list_all()
         resumed = 0
         for row in rows:
             if MAX_RESUMED_AGENT_LOOPS and resumed >= MAX_RESUMED_AGENT_LOOPS:
@@ -929,6 +1116,8 @@ async def _start_durable_job_services(app: FastAPI) -> None:
 
     try:
         _durable_job_pool = await create_durable_job_pool()
+        await _ensure_portable_migrations(_durable_job_pool)
+        _configure_security_repository(_durable_job_pool)
         _durable_job_repository = DurableJobRepository(_durable_job_pool)
         _durable_job_worker = DurableJobWorker(
             _durable_job_repository,
@@ -951,8 +1140,8 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         _logger_agents.info("Durable agent job worker and outbox publisher started")
     except Exception as exc:
         error_name = type(exc).__name__
-        _logger_agents.error(
-            "Durable job store unavailable; accepted-work endpoints will fail closed: %s",
+        _logger_agents.exception(
+            "Durable job store unavailable; refusing to start the API: %s",
             error_name,
         )
         try:
@@ -963,6 +1152,7 @@ async def _start_durable_job_services(app: FastAPI) -> None:
                 type(cleanup_exc).__name__,
             )
         _durable_job_error = error_name
+        raise RuntimeError(f"durable_job_store_unavailable:{error_name}") from exc
     app.state.durable_job_repository = _durable_job_repository
     app.state.durable_job_error = _durable_job_error
     app.state.durable_job_pool = _durable_job_pool
@@ -1053,6 +1243,7 @@ async def _stop_durable_job_services(app: FastAPI) -> None:
         await _durable_outbox_publisher.stop()
     if _durable_job_pool is not None:
         await _durable_job_pool.close()
+    _configure_security_repository(None)
     _durable_job_pool = None
     _durable_job_repository = None
     _durable_job_worker = None
@@ -1322,10 +1513,6 @@ async def clerk_auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-def _save_settings(data: dict, user_id: str) -> None:
-    save_settings(data, user_id)
-
-
 def _validate_settings(body: dict) -> list[str]:
     errors = []
     fc = body.get("fund_config")
@@ -1456,6 +1643,18 @@ def _is_after(left: Any, right: Any) -> bool:
     return ldt > rdt
 
 
+def _human_resolution_to_frontend(raw: Any) -> Any:
+    """Project institutional ruling codes into the legacy frontend contract."""
+    if not isinstance(raw, dict):
+        return raw
+    decision = str(raw.get("decision") or "").strip().upper()
+    if decision in {"ADVANCE", "MONITOR", "PASS", "INVEST"}:
+        projected = dict(raw)
+        projected["decision"] = legacy_ruling_from_institutional(decision).value
+        return projected
+    return raw
+
+
 def _startup_has_human_ruling(raw: Dict[str, Any]) -> bool:
     hr = raw.get("human_resolution")
     return isinstance(hr, dict) and bool(hr.get("resolved_at") or hr.get("decision"))
@@ -1500,19 +1699,15 @@ def _default_priority_reason(raw: Dict[str, Any]) -> str:
     return " · ".join(parts)
 
 
-def _get_user_last_seen_at(user_id: Optional[str]) -> Optional[str]:
+async def _get_user_last_seen_at(user_id: Optional[str]) -> Optional[str]:
     if not user_id:
         return None
     try:
-        row = (
-            get_service_client()
-            .table("user_state")
-            .select("last_seen_at")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-        return (row.data or {}).get("last_seen_at")
+        pool = _durable_job_pool
+        if pool is None:
+            return None
+        value = await UserStateRepository(pool).get_last_seen_at(user_id)
+        return value.isoformat() if value is not None else None
     except Exception as e:
         logging.getLogger("api").debug("Could not load user_state last_seen_at: %s", e)
         return None
@@ -1832,7 +2027,7 @@ def _list_projection_to_frontend(
             "source_evidence": [],
         },
         "timestamps": timestamps,
-        "human_resolution": row.get("human_resolution"),
+        "human_resolution": _human_resolution_to_frontend(row.get("human_resolution")),
         "conviction_state": row.get("conviction_state"),
         "unresolved_at": _to_iso(row.get("unresolved_at")) if row.get("unresolved_at") else None,
         "is_new_to_user": row.get("acknowledged_at") is None and not has_human_ruling,
@@ -1974,25 +2169,11 @@ async def get_startups(
     limit = max(1, min(int(limit or DEFAULT_STARTUPS_LIST_LIMIT), MAX_STARTUPS_LIST_LIMIT))
     offset = max(0, int(offset or 0))
     await _reject_uncertified_canonical_legacy_read(request)
-    storage = _get_storage(request)
-    last_seen_at = _get_user_last_seen_at(getattr(request.state, "user_id", None))
-    if isinstance(storage, SupabaseStartupsStorage):
-        rows = storage.get_list_projection_rows(limit=limit, offset=offset)
-        if rows is not None:
-            return [_list_projection_to_frontend(r, last_seen_at=last_seen_at) for r in rows]
-        # Projection returned None -> the query failed (e.g. transient EAGAIN). Do NOT
-        # fall back to a full-row select("*") fetch: this endpoint is polled heavily
-        # (~1/s during a lookup), and pulling full memo/review/scout/partner JSON for
-        # every row on each poll spikes egress and RSS until the instance OOMs. Signal a
-        # transient failure so the client keeps its last data and retries the next poll.
-        raise HTTPException(
-            status_code=503,
-            detail="Startup list temporarily unavailable; retry shortly.",
-            headers={"Retry-After": "2"},
-        )
-    raw_list = storage.get_all()
-    full = [_backend_to_frontend(r, last_seen_at=last_seen_at) for r in raw_list]
-    return [_thin_list_from_full_frontend(x) for x in full]
+    user_id = request.state.user_id
+    startup_repository = _get_startup_repository(request)
+    last_seen_at = await _get_user_last_seen_at(user_id)
+    rows = await startup_repository.list_projection(user_id, limit=limit, offset=offset)
+    return [_list_projection_to_frontend(r, last_seen_at=last_seen_at) for r in rows]
 
 
 async def _sse_event_source(queue, *, keepalive_seconds, on_close=None):
@@ -2072,7 +2253,7 @@ async def event_stream(request: Request):
 
 
 @app.get("/api/startups/lookup-status")
-def lookup_job_status(request: Request, lookup_id: str = ""):
+async def lookup_job_status(request: Request, lookup_id: str = ""):
     """
     Return the lossless lookup execution state and actionable terminal metadata.
     """
@@ -2084,7 +2265,8 @@ def lookup_job_status(request: Request, lookup_id: str = ""):
             detail="lookup_id query parameter must be 8-128 characters [a-zA-Z0-9_-]",
         )
     try:
-        outcome = latest_lookup_attempt(uid, raw)
+        loaded = latest_lookup_attempt(uid, raw)
+        outcome = await loaded if inspect.isawaitable(loaded) else loaded
     except LookupOutcomeStoreUnavailable as exc:
         raise HTTPException(
             status_code=503,
@@ -2138,11 +2320,13 @@ async def get_startup_detail(request: Request, startup_id: str):
     """Full scout/review/partner JSON for one startup (on-demand; not used for grid polling)."""
     validate_route_id(startup_id, field_name="startup_id")
     await _reject_uncertified_canonical_legacy_read(request)
-    storage = _get_storage(request)
-    raw = storage.get_by_id(startup_id)
+    user_id = request.state.user_id
+    startup_repository = _get_startup_repository(request)
+    raw = await startup_repository.get_startup(user_id, startup_id)
     if not raw:
         raise HTTPException(status_code=404, detail="Startup not found")
-    return _backend_to_frontend(raw, last_seen_at=_get_user_last_seen_at(getattr(request.state, "user_id", None)))
+    last_seen_at = await _get_user_last_seen_at(user_id)
+    return _backend_to_frontend(raw, last_seen_at=last_seen_at)
 
 
 @app.post("/api/startups/{startup_id}/acknowledge")
@@ -2150,32 +2334,19 @@ async def acknowledge_startup(request: Request, startup_id: str):
     """Mark a startup as seen by the current user when they open the memo."""
     validate_route_id(startup_id, field_name="startup_id")
     await _reject_direct_legacy_startup_write(request)
-    # Several sequential sync Supabase round trips: keep them off the event loop.
-    return await asyncio.to_thread(_acknowledge_startup_sync, request, startup_id)
-
-
-def _acknowledge_startup_sync(request: Request, startup_id: str):
-    storage = _get_storage(request)
-    existing = storage.get_by_id(startup_id)
+    user_id = request.state.user_id
+    startup_repository = _get_startup_repository(request)
+    existing = await startup_repository.get_startup(user_id, startup_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Startup not found")
-    seen_at = _now_iso()
-    ok = storage.update_startup_partial(
-        startup_id,
-        {
-            "acknowledged_at": seen_at,
-            "last_seen_by_user_at": seen_at,
-        },
-    )
-    if not ok:
+    seen_at = datetime.now(timezone.utc)
+    if not await startup_repository.acknowledge_startup(user_id, startup_id, seen_at):
         raise HTTPException(status_code=404, detail="Startup not found")
-    updated = storage.get_by_id(startup_id)
+    updated = await startup_repository.get_startup(user_id, startup_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Startup not found")
-    return _backend_to_frontend(
-        updated,
-        last_seen_at=_get_user_last_seen_at(getattr(request.state, "user_id", None)),
-    )
+    last_seen_at = await _get_user_last_seen_at(user_id)
+    return _backend_to_frontend(updated, last_seen_at=last_seen_at)
 
 
 async def _reject_direct_legacy_startup_write(request: Request) -> None:
@@ -2216,14 +2387,14 @@ async def get_startup_memo(request: Request, startup_id: str):
     await _reject_uncertified_canonical_legacy_read(request)
     storage = _get_storage(request)
     uid = request.state.user_id
-    if isinstance(storage, SupabaseStartupsStorage):
+    if _is_supabase_storage(storage):
         startup = storage.get_startup_for_memo(startup_id)
     else:
         startup = storage.get_startup(startup_id)
     if not startup:
         raise HTTPException(status_code=404, detail="Startup not found")
 
-    if isinstance(storage, SupabaseStartupsStorage):
+    if _is_supabase_storage(storage):
         row = get_pipeline_state_row(storage._client, user_id=uid, startup_id=startup_id)
         state_status = row.get("status") if row else None
         pr_from_row = row.get("pipeline_run_id") if row else None
@@ -2469,13 +2640,14 @@ def _clear_admin_login_failures(request: Request) -> None:
 
 
 @app.post("/api/admin/login")
-def admin_login(request: Request, body: dict):
+async def admin_login(request: Request, body: dict):
     """Exchange the configured master admin secret for a short-lived admin token."""
     if not _admin_dashboard_enabled():
         raise HTTPException(status_code=404, detail="Not found")
-    limited = _enforce_rate_limits(f"admin_login:ip:{_client_host(request)}", [_ADMIN_LOGIN_POLICY])
+    limited = await _enforce_rate_limits(f"admin_login:ip:{_client_host(request)}", [_ADMIN_LOGIN_POLICY])
     if limited is not None:
-        record_admin_audit_event(
+        await _record_admin_audit_event(
+            request,
             event="admin_login",
             success=False,
             client_host=_admin_login_key(request),
@@ -2483,7 +2655,8 @@ def admin_login(request: Request, body: dict):
         )
         return limited
     if _admin_login_is_limited(request):
-        record_admin_audit_event(
+        await _record_admin_audit_event(
+            request,
             event="admin_login",
             success=False,
             client_host=_admin_login_key(request),
@@ -2493,7 +2666,8 @@ def admin_login(request: Request, body: dict):
     secret = str(body.get("secret") or "")
     if not validate_admin_secret(secret):
         _record_admin_login_failure(request)
-        record_admin_audit_event(
+        await _record_admin_audit_event(
+            request,
             event="admin_login",
             success=False,
             client_host=_admin_login_key(request),
@@ -2501,7 +2675,8 @@ def admin_login(request: Request, body: dict):
         )
         raise HTTPException(status_code=401, detail="Invalid admin secret")
     _clear_admin_login_failures(request)
-    record_admin_audit_event(
+    await _record_admin_audit_event(
+        request,
         event="admin_login",
         success=True,
         client_host=_admin_login_key(request),
@@ -2515,22 +2690,24 @@ def admin_login(request: Request, body: dict):
 
 
 @app.get("/api/admin/overview")
-def admin_overview(request: Request):
+async def admin_overview(request: Request):
     """Cross-tenant admin overview. Guarded by the separate admin token."""
     if not _admin_dashboard_enabled():
         raise HTTPException(status_code=404, detail="Not found")
     claims = _require_admin_claims(request)
     rate_key = f"admin_overview:token:{claims.get('jti') or _client_host(request)}"
-    limited = _enforce_rate_limits(rate_key, [_ADMIN_OVERVIEW_POLICY])
+    limited = await _enforce_rate_limits(rate_key, [_ADMIN_OVERVIEW_POLICY])
     if limited is not None:
-        record_admin_audit_event(
+        await _record_admin_audit_event(
+            request,
             event="admin_overview",
             success=False,
             client_host=_admin_login_key(request),
             detail=security_event_detail(reason="rate_limited", jti=claims.get("jti")),
         )
         return limited
-    record_admin_audit_event(
+    await _record_admin_audit_event(
+        request,
         event="admin_overview",
         success=True,
         client_host=_admin_login_key(request),
@@ -2540,7 +2717,17 @@ def admin_overview(request: Request):
         user_id: task is not None and not task.done()
         for user_id, task in _per_user_loops.items()
     }
-    return build_admin_overview(loop_status_by_user=loop_status_by_user)
+    from batch4a.repository import Batch4ARepository
+    pool = getattr(request.app.state, "durable_job_pool", None)
+    if pool is None:
+        return build_admin_overview(loop_status_by_user=loop_status_by_user)
+    startup_rows = await StartupRepository(pool).list_admin_summary()
+    pipeline_rows = await Batch4ARepository(pool).list_all_pipeline_activity()
+    return build_admin_overview(
+        loop_status_by_user=loop_status_by_user,
+        pipeline_rows=pipeline_rows,
+        startup_rows=startup_rows,
+    )
 
 
 @app.get("/api/me")
@@ -2550,10 +2737,10 @@ def get_me(request: Request):
 
 
 @app.get("/api/settings")
-def get_settings(request: Request):
+async def get_settings(request: Request):
     """Return current user's settings (control plane)."""
     user_id = request.state.user_id
-    settings = load_settings(user_id)
+    settings = await _load_settings_for_request(request, user_id)
     # Surface Meta-Agent configuration derived from environment variables
     # so the front-end can display current meta-control knobs.
     meta_agent = get_meta_agent_settings()
@@ -2561,8 +2748,15 @@ def get_settings(request: Request):
     settings["meta_agent"] = meta_agent
 
     # Embed latest system health snapshot inline so the front-end can avoid extra calls.
-    storage = _get_storage(request)
-    settings["system_health"] = _get_system_health(storage, user_id=user_id)
+    startup_repository = _get_startup_repository(request)
+    settings["system_health"] = _get_system_health(
+        None,
+        user_id=user_id,
+        settings=settings,
+        pending_escalations=len(await startup_repository.list_pending_escalations(user_id)),
+        unreviewed=await startup_repository.count_unreviewed(user_id),
+        undecided=await startup_repository.count_undecided(user_id),
+    )
     return settings
 
 
@@ -2570,15 +2764,30 @@ def get_settings(request: Request):
 async def patch_settings(request: Request, body: dict):
     """Update current user's settings. Validates server-side; returns 422 on validation errors."""
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
         return limited
     errors = _validate_settings(body)
     if errors:
         raise HTTPException(status_code=422, detail={"message": "Validation failed", "errors": errors})
-    # Sync Supabase reads/writes (+ optional OpenAI thesis sync) off the event loop.
+    # Settings persistence is owned by this async endpoint boundary.
     try:
-        current = await asyncio.to_thread(_patch_settings_sync, user_id, body)
+        current = await _load_settings_for_request(request, user_id)
+        current = await asyncio.to_thread(_patch_settings_sync, user_id, body, current)
+        await _save_settings_for_request(request, current, user_id)
+        if isinstance(body.get("fund_config"), dict):
+            fc = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
+            if fund_config_raw_text(fc).strip():
+                startup_repository = _get_startup_repository(request)
+                affected_startups_count = await startup_repository.count_tenant(user_id)
+                if _durable_job_pool is None:
+                    raise RuntimeError("PostgreSQL thesis repository is required")
+                await sync_fund_config_to_active_thesis_with_repository(
+                    FundThesisRepository(_durable_job_pool),
+                    user_id=user_id,
+                    fund_config=fc,
+                    affected_startups_count=affected_startups_count,
+                )
     except RuntimeError as exc:
         raise HTTPException(
             status_code=503,
@@ -2605,8 +2814,7 @@ async def patch_settings(request: Request, body: dict):
     return current
 
 
-def _patch_settings_sync(user_id: str, body: dict) -> dict:
-    current = load_settings(user_id)
+def _patch_settings_sync(user_id: str, body: dict, current: dict) -> dict:
     for section in ("fund_config", "user_preferences", "fund_memory", "fund_identity", "cost_budget", "agent_config", "portfolio"):
         if section in body and isinstance(body[section], dict):
             if section not in current:
@@ -2633,52 +2841,21 @@ def _patch_settings_sync(user_id: str, body: dict) -> dict:
             else:
                 for k, v in body[section].items():
                     current[section][k] = v
-    _save_settings(current, user_id)
-
-    if isinstance(body.get("fund_config"), dict):
-        fc = current.get("fund_config") if isinstance(current.get("fund_config"), dict) else {}
-        if fund_config_raw_text(fc).strip():
-            try:
-                api_key = os.getenv("OPENAI_API_KEY", "").strip()
-                sync_out = sync_fund_config_to_active_thesis(
-                    get_service_client(),
-                    user_id=user_id,
-                    fund_config=fc,
-                    api_key=api_key,
-                )
-                if sync_out.get("skipped"):
-                    _logger_agents.debug(
-                        "[%s] fund_config thesis sync skipped (unchanged)",
-                        user_id[:12],
-                    )
-                else:
-                    _logger_agents.info(
-                        "[%s] Synced fund_config to fund thesis v%s",
-                        user_id[:12],
-                        sync_out.get("version_number"),
-                    )
-            except Exception as e:
-                _logger_agents.warning("[%s] fund_config thesis sync failed: %s", user_id[:12], e)
-                # Do not report a successful settings deployment when the
-                # active thesis could not be updated.  The settings document
-                # remains durable and the client can safely retry this step.
-                raise RuntimeError("Fund thesis sync failed; settings were saved but are not active") from e
-
     return current
 
 
 @app.post("/api/settings/policy/preview")
-def preview_settings_policy(request: Request, body: dict | None = None):
+async def preview_settings_policy(request: Request, body: dict | None = None):
     """Compile the current or supplied fund_config draft without persisting it."""
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
         return limited
     payload = body if isinstance(body, dict) else {}
     if isinstance(payload.get("fund_config"), dict):
         fund_config = payload["fund_config"]
     else:
-        settings = load_settings(user_id, use_cache=False)
+        settings = await _load_settings_for_request(request, user_id, use_cache=False)
         fund_config = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
     policy = compile_policy_from_fund_config(fund_config)
     return {"policy": policy, "warnings": policy.get("warnings", [])}
@@ -2688,14 +2865,14 @@ def preview_settings_policy(request: Request, body: dict | None = None):
 async def publish_settings_policy(request: Request, body: dict | None = None):
     """Publish the current or supplied fund_config draft as an immutable scoring policy version."""
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
         return limited
     payload = body if isinstance(body, dict) else {}
     fund_config = payload.get("fund_config") if isinstance(payload.get("fund_config"), dict) else None
     try:
         if fund_config is None:
-            settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+            settings = await _load_settings_for_request(request, user_id, use_cache=False)
             fund_config = (
                 settings.get("fund_config")
                 if isinstance(settings.get("fund_config"), dict)
@@ -2765,16 +2942,30 @@ async def agents_status(request: Request):
         and os.getenv("SUPABASE_URL")
         and os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     )
+    database_configured = bool(database_dsn())
+    runtime_store_configured = database_configured or supabase_configured
     openai_configured = bool(os.getenv("OPENAI_API_KEY", "").strip())
-    # Sync Supabase reads (thesis + settings) off the event loop.
+    # Settings are loaded asynchronously first; thesis reads use the shared pool.
     user_id = request.state.user_id
+    settings = await _load_settings_for_pool(user_id, _durable_job_pool)
+    agent_config = settings.get("agent_config") or {}
+    user_agents_enabled = bool(
+        agent_config.get("scouts_enabled")
+        or agent_config.get("reviewers_enabled")
+        or agent_config.get("partners_enabled")
+    )
     (
         thesis_ready,
         mandate_published,
         active_thesis_version_id,
         thesis_error,
         user_agents_enabled,
-    ) = await asyncio.to_thread(_agents_status_reads_sync, user_id, supabase_configured)
+    ) = await _agents_status_reads(
+        user_id,
+        supabase_configured,
+        user_agents_enabled,
+        pool=_durable_job_pool,
+    )
     durable_counts: Dict[str, int] = {}
     durable_status_error: Optional[str] = None
     if _durable_job_repository is not None:
@@ -2796,10 +2987,16 @@ async def agents_status(request: Request):
         else _lookup_queue is not None
     )
     agents_infrastructure_ready = bool(
-        supabase_configured and openai_configured and worker_ready and not durable_status_error
+        runtime_store_configured
+        and openai_configured
+        and worker_ready
+        and not durable_status_error
     )
     lookup_infrastructure_ready = bool(
-        supabase_configured and openai_configured and lookup_worker_ready and not durable_status_error
+        runtime_store_configured
+        and openai_configured
+        and lookup_worker_ready
+        and not durable_status_error
     )
     execution_prerequisites_ready = False
     published_policy_ready = False
@@ -2807,7 +3004,7 @@ async def agents_status(request: Request):
     execution_prerequisite_code: Optional[str] = None
     execution_prerequisite_detail: Optional[str] = None
     execution_prerequisite_recovery_action: Optional[str] = None
-    if supabase_configured:
+    if runtime_store_configured:
         try:
             prerequisites = await load_evaluation_prerequisites(
                 user_id=user_id,
@@ -2888,7 +3085,30 @@ async def agents_status(request: Request):
     }
 
 
-def _agents_status_reads_sync(user_id: str, supabase_configured: bool):
+async def _agents_status_reads(
+    user_id: str,
+    supabase_configured: bool,
+    user_agents_enabled: bool,
+    *,
+    pool: Any = None,
+):
+    if pool is not None:
+        thesis = await FundThesisRepository(pool).get_active(user_id)
+        if thesis is None:
+            return False, False, None, "missing", user_agents_enabled
+        return (
+            True,
+            not bool((thesis.get("parsed_json") or {}).get("is_default")),
+            thesis["version_id"],
+            None,
+            user_agents_enabled,
+        )
+    return _agents_status_reads_sync(user_id, supabase_configured, user_agents_enabled)
+
+
+def _agents_status_reads_sync(
+    user_id: str, supabase_configured: bool, user_agents_enabled: bool
+):
     thesis_ready = False
     mandate_published = False
     active_thesis_version_id: Optional[str] = None
@@ -2908,18 +3128,6 @@ def _agents_status_reads_sync(user_id: str, supabase_configured: bool):
             thesis_error = "incomplete"
         except Exception as e:
             thesis_error = type(e).__name__
-    # Check user-level agent toggles so the status field reflects actual intent.
-    user_agents_enabled = False
-    try:
-        user_settings = load_settings(user_id)
-        ac = user_settings.get("agent_config") or {}
-        user_agents_enabled = bool(
-            ac.get("scouts_enabled", False)
-            or ac.get("reviewers_enabled", False)
-            or ac.get("partners_enabled", False)
-        )
-    except Exception as e:
-        _logger_agents.debug("Could not compute user_agents_enabled: %s", e)
     return thesis_ready, mandate_published, active_thesis_version_id, thesis_error, user_agents_enabled
 
 
@@ -2941,20 +3149,19 @@ async def trigger_agents(request: Request):
             return JSONResponse(status_code=409, content={
                 "detail": {"code": "AUTHORITY_CANONICAL_ONLY", "message": str(exc)}
             })
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase:
+    if not (database_dsn() or env_config.use_supabase_storage()):
         _logger_agents.info(
-            "trigger_agents skipped user=%s reason=supabase_required",
+            "trigger_agents skipped user=%s reason=database_required",
             user_id[:12],
         )
         return JSONResponse(
             status_code=200,
-            content={"status": "skipped", "reason": "supabase_required"},
+            content={"status": "skipped", "reason": "database_required"},
         )
     try:
         # This endpoint fires on every login: keep its sync Supabase reads off
         # the event loop so they can't stall concurrent first-paint fetches.
-        settings = await asyncio.to_thread(load_settings, user_id)
+        settings = await _load_settings_for_pool(user_id, _durable_job_pool)
     except Exception as e:
         _logger_agents.warning(
             "trigger_agents skipped user=%s reason=settings_unavailable error=%s",
@@ -3003,27 +3210,36 @@ async def trigger_agents(request: Request):
             content={"status": "unavailable", "reason": "worker_not_ready"},
         )
     lock_key = f"user:{user_id}:agent_trigger"
-    if not _acquire_security_lock(lock_key, ttl_seconds=_AGENT_TRIGGER_LOCK_TTL_SECONDS):
+    if not await _acquire_security_lock(lock_key, ttl_seconds=_AGENT_TRIGGER_LOCK_TTL_SECONDS):
         return JSONResponse(
             status_code=202,
             content={"status": "already_queued", "user_id": user_id},
         )
-    limited = _enforce_rate_limits(f"user:{user_id}:agent_trigger", [_AGENT_TRIGGER_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:agent_trigger", [_AGENT_TRIGGER_POLICY])
     if limited is not None:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         return limited
     try:
-        svc = await asyncio.to_thread(get_service_client)
-        thesis = await asyncio.to_thread(get_active_thesis, svc, user_id)
-        if thesis is None:
-            await asyncio.to_thread(_bootstrap_default_thesis_or_raise, svc, user_id)
+        if _durable_job_pool is None:
+            # Compatibility only for local/dev and legacy tests. Production
+            # startup requires the shared PostgreSQL pool before this endpoint.
+            svc = await asyncio.to_thread(get_service_client)
             thesis = await asyncio.to_thread(get_active_thesis, svc, user_id)
+            if thesis is None:
+                _bootstrap_default_thesis_or_raise(svc, user_id)
+                thesis = await asyncio.to_thread(get_active_thesis, svc, user_id)
+        else:
+            thesis_repository = FundThesisRepository(_durable_job_pool)
+            thesis = await thesis_repository.get_active(user_id)
+            if thesis is None:
+                await bootstrap_default_thesis_with_repository(thesis_repository, user_id)
+                thesis = await thesis_repository.get_active(user_id)
         if thesis is None:
             _logger_agents.info(
                 "trigger_agents skipped user=%s reason=thesis_required",
                 user_id[:12],
             )
-            _release_security_lock(lock_key)
+            await _release_security_lock(lock_key)
             return JSONResponse(
                 status_code=200,
                 content={"status": "skipped", "reason": "thesis_required"},
@@ -3033,13 +3249,13 @@ async def trigger_agents(request: Request):
             "trigger_agents skipped user=%s reason=thesis_required_incomplete",
             user_id[:12],
         )
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         return JSONResponse(
             status_code=200,
             content={"status": "skipped", "reason": "thesis_required"},
         )
     except Exception:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         raise
     if _durable_jobs_required():
         try:
@@ -3054,9 +3270,9 @@ async def trigger_agents(request: Request):
                 user_id[:12],
                 type(exc).__name__,
             )
-            _release_security_lock(lock_key)
+            await _release_security_lock(lock_key)
             return _durable_store_unavailable()
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         loop_status = None
         if agents_enabled:
             started = await _ensure_user_loop(user_id)
@@ -3074,7 +3290,7 @@ async def trigger_agents(request: Request):
         return JSONResponse(status_code=202, content=content)
 
     if agents_enabled:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         started = await _ensure_user_loop(user_id)
         status = "loop_started" if started else "loop_running"
         _logger_agents.info("trigger_agents %s user=%s", status, user_id[:12])
@@ -3115,7 +3331,7 @@ async def toggle_agents(request: Request):
       - Loop naturally stops after the active cycle finishes or the sleep is woken.
     """
     user_id = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
         return limited
 
@@ -3128,7 +3344,7 @@ async def toggle_agents(request: Request):
     enabled = bool(body.get("enabled", False))
 
     try:
-        s = await asyncio.to_thread(load_settings, user_id)
+        s = await _load_settings_for_request(request, user_id)
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Could not load settings: {e}") from e
 
@@ -3153,7 +3369,7 @@ async def toggle_agents(request: Request):
         ac["agents_status"] = "stopped"
 
     try:
-        await asyncio.to_thread(save_settings, s, user_id)
+        await _save_settings_for_pool(s, user_id, _durable_job_pool)
     except Exception as e:
         _logger_agents.warning("toggle_agents: could not save settings for user %s: %s", user_id[:12], e)
         raise HTTPException(status_code=503, detail="Could not save agent state") from e
@@ -3180,7 +3396,7 @@ async def toggle_agents(request: Request):
 
 
 @app.get("/api/agents/loop-status")
-def get_loop_status(request: Request):
+async def get_loop_status(request: Request):
     """
     Return the live persistent-loop state for the current user.
     Used by the frontend to show accurate 'agents running' state.
@@ -3190,7 +3406,7 @@ def get_loop_status(request: Request):
     loop_alive = task is not None and not task.done()
 
     try:
-        s = load_settings(user_id)
+        s = await _load_settings_for_request(request, user_id)
         ac = s.get("agent_config") or {}
     except Exception:
         ac = {}
@@ -3253,7 +3469,7 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
             content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
         )
     lock_key = f"user:{user_id}:lookup:{lookup_id}"
-    if not _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
+    if not await _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
         return JSONResponse(
             status_code=202,
             content={
@@ -3263,9 +3479,9 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
                 "mode": "on_demand_lookup",
             },
         )
-    limited = _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
     if limited is not None:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         return limited
     resolution = _consume_lookup_resolution(
         user_id,
@@ -3289,9 +3505,9 @@ async def lookup_startup(request: Request, body: Dict[str, Any]):
                 user_id[:12],
                 type(exc).__name__,
             )
-            _release_security_lock(lock_key)
+            await _release_security_lock(lock_key)
             return _durable_store_unavailable()
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         job_fields = _job_response_fields(accepted_job)
     else:
         await _lookup_queue.put(
@@ -3355,9 +3571,8 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
         raise HTTPException(status_code=422, detail="additional_context is too long (max 2000 chars)")
     user_id = require_authenticated_user(request)
     lookup_id = _coerce_lookup_id(body.get("lookup_id"))
-    storage = _get_storage(request)
-    # Sync Supabase round trip — keep it off the event loop (async handler).
-    raw = await asyncio.to_thread(storage.get_by_id, startup_id)
+    startup_repository = _get_startup_repository(request)
+    raw = await startup_repository.get_startup(user_id, startup_id)
     if not raw:
         raise HTTPException(status_code=404, detail="Startup not found")
     scout_info = raw.get("scout_info") or {}
@@ -3377,7 +3592,7 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
             content={"status": "unavailable", "reason": "lookup_worker_not_ready"},
         )
     lock_key = f"user:{user_id}:lookup:{lookup_id}"
-    if not _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
+    if not await _acquire_security_lock(lock_key, ttl_seconds=_LOOKUP_LOCK_TTL_SECONDS):
         return JSONResponse(
             status_code=202,
             content={
@@ -3387,9 +3602,9 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
                 "mode": "on_demand_rerun",
             },
         )
-    limited = _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY])
     if limited is not None:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         return limited
     if _durable_jobs_required():
         try:
@@ -3409,9 +3624,9 @@ async def rerun_startup_lookup(request: Request, startup_id: str, body: Dict[str
                 user_id[:12],
                 type(exc).__name__,
             )
-            _release_security_lock(lock_key)
+            await _release_security_lock(lock_key)
             return _durable_store_unavailable()
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         job_fields = _job_response_fields(accepted_job)
     else:
         await _lookup_queue.put(
@@ -3457,7 +3672,7 @@ async def resolve_lookup_candidates(request: Request, body: Dict[str, Any]):
         raise HTTPException(status_code=422, detail="lookup_input is too long")
     user_id = require_authenticated_user(request)
     # Own bucket: a cheap resolve must not consume the expensive queue's budget.
-    limited = _enforce_rate_limits(f"user:{user_id}:resolve", [_RESOLVE_MINUTE_POLICY])
+    limited = await _enforce_rate_limits(f"user:{user_id}:resolve", [_RESOLVE_MINUTE_POLICY])
     if limited is not None:
         return limited
 
@@ -3516,12 +3731,8 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
     cancelled_job_ids: List[str] = []
     conflicts: List[Dict[str, str]] = []
     restored_startup_ids: List[str] = []
-    storage = None
-    if env_config.use_supabase_storage():
-        try:
-            storage = _get_storage(request)
-        except Exception as e:
-            _logger_agents.warning("lookup cancel: storage restore unavailable: %s", e)
+    pool = getattr(getattr(request.app, "state", None), "durable_job_pool", None)
+    startup_repository = StartupRepository(pool) if pool is not None else None
     for raw in raw_ids[:16]:
         lookup_id = _coerce_lookup_id(raw)
         if _durable_job_repository is not None:
@@ -3569,8 +3780,8 @@ async def cancel_lookup(request: Request, body: Dict[str, Any]):
                 continue
         _mark_lookup_cancelled(user_id, lookup_id)
         cancelled.append(lookup_id)
-        if isinstance(storage, SupabaseStartupsStorage):
-            restored = await asyncio.to_thread(storage.mark_existing_rerun_cancelled, lookup_id)
+        if startup_repository is not None:
+            restored = await startup_repository.mark_existing_rerun_cancelled(user_id, lookup_id)
             if restored:
                 restored_startup_ids.append(restored)
                 _notify_startups_changed(user_id, "lookup_cancelled")
@@ -3603,21 +3814,32 @@ async def trigger_meta_cycle(request: Request):
     """
     uid = require_authenticated_user(request)
     lock_key = f"user:{uid}:meta_trigger"
-    if not _acquire_security_lock(lock_key, ttl_seconds=_META_TRIGGER_LOCK_TTL_SECONDS):
+    if not await _acquire_security_lock(lock_key, ttl_seconds=_META_TRIGGER_LOCK_TTL_SECONDS):
         return JSONResponse(status_code=202, content={"status": "already_running", "cycle_number": 0})
-    limited = _enforce_rate_limits(f"user:{uid}:meta_trigger", [_META_TRIGGER_POLICY])
+    limited = await _enforce_rate_limits(f"user:{uid}:meta_trigger", [_META_TRIGGER_POLICY])
     if limited is not None:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
         return limited
     try:
-        agent = MetaAgent(user_id=uid)
-        report = await agent.run_cycle(force=True)
+        pool = getattr(request.app.state, "durable_job_pool", None)
+        repository = Batch1Repository(pool) if pool is not None else None
+        state = await repository.load_state(uid) if repository is not None else None
+        token = set_state(state) if state is not None else None
+        try:
+            agent = MetaAgent(user_id=uid, batch1_repository=repository)
+            report = await agent.run_cycle(force=True)
+        finally:
+            if repository is not None and state is not None:
+                try:
+                    await repository.persist_state(state)
+                finally:
+                    reset_state(token)
         if not report:
             return {"status": "no-op", "cycle_number": 0}
         cycle_number = int(report.get("cycle_number", 0))
         return {"status": "ok", "cycle_number": cycle_number}
     finally:
-        _release_security_lock(lock_key)
+        await _release_security_lock(lock_key)
 
 
 @app.get("/api/escalations")
@@ -3627,8 +3849,8 @@ async def get_escalations(request: Request):
     Shapes each result as EscalationItem (frontend type) with nested scout/review/partner.
     """
     await _reject_uncertified_canonical_legacy_read(request)
-    storage = _get_storage(request)
-    pending_raw = _get_pending_escalations(storage)
+    startup_repository = _get_startup_repository(request)
+    pending_raw = await startup_repository.list_pending_escalations(request.state.user_id)
     items: List[Dict[str, Any]] = []
     for item in pending_raw:
         fe = _backend_to_frontend(item)
@@ -3724,7 +3946,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
     """
     validate_route_id(startup_id, field_name="startup_id")
     uid = require_authenticated_user(request)
-    limited = _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
+    limited = await _enforce_rate_limits(f"user:{uid}:settings_mutation", [_SETTINGS_MUTATION_POLICY])
     if limited is not None:
         return limited
     decision = str(body.get("decision", "")).upper()
@@ -3758,11 +3980,11 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                 authority=authority,
             )
 
-    storage = _get_storage(request)
-    existing = storage.get_by_id(startup_id)
+    startup_repository = _get_startup_repository(request)
+    existing = await startup_repository.get_startup(uid, startup_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Startup not found")
-    settings = load_settings(request.state.user_id)
+    settings = await _load_settings_for_request(request, request.state.user_id)
     fund_config = settings.get("fund_config") if isinstance(settings.get("fund_config"), dict) else {}
     config_version = fund_config.get("versionLabel")
     if fund_config.get("version") is not None:
@@ -3780,7 +4002,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
     )
     patch["unresolved_at"] = None
     try:
-        ok = storage.update_startup_partial(startup_id, patch)
+        ok = await startup_repository.apply_human_resolution(uid, startup_id, patch)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to resolve escalation: {e}") from e
 
@@ -3789,16 +4011,15 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
 
     # Feed analyst decisions into meta-agent signal (mutation log; type human_decision)
     try:
-        from supabase_doc_store import list_append_only
-
         ai_rec = None
         try:
-            st = storage.get_startup(startup_id)
+            st = await startup_repository.get_startup(uid, startup_id)
             if st and st.partner_info is not None:
                 ai_rec = st.partner_info.recommendation
         except Exception as e:
             _logger_agents.debug("Could not read AI recommendation for escalation: %s", e)
-        list_append_only(
+        await _append_batch1_record(
+            request,
             "meta_mutation_log",
             {
                 "type": "human_decision",
@@ -3814,13 +4035,13 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
                 "mandate_exception": mandate_exception,
                 "resolved_at": resolved_at,
             },
-            user_id=request.state.user_id,
+            request.state.user_id,
         )
     except Exception as e:
         _logger_agents.debug("Could not persist escalation resolution: %s", e)
 
     try:
-        current = load_settings(request.state.user_id)
+        current = await _load_settings_for_request(request, request.state.user_id)
         fund_memory = current.setdefault("fund_memory", {})
         historical = fund_memory.setdefault("historical_decisions", [])
         history = (patch.get("conviction_state") or {}).get("decision_history") or []
@@ -3831,7 +4052,7 @@ async def resolve_escalation(request: Request, startup_id: str, body: Dict[str, 
             latest["funding_stage"] = (existing.get("scout_info") or {}).get("funding_stage")
             historical.append(latest)
             fund_memory["historical_decisions"] = historical[-200:]
-            save_settings(current, request.state.user_id)
+            await _save_settings_for_request(request, current, request.state.user_id)
     except Exception as e:
         _logger_agents.debug("Could not append decision to fund memory: %s", e)
 
