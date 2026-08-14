@@ -31,7 +31,7 @@ const checks = [
   ['reviewer dims present', () =>
     ['Market', 'Product', 'Technical', 'Execution', 'Defensibility'].every((d) => html.includes(d))],
   ['query dispatch sequence present', () =>
-    ['data-query-flow="dispatch-sequence"', 'Scouting', 'Reviewing', 'Deciding'].every((marker) => html.includes(marker))],
+    ['data-query-flow="dispatch-sequence"', 'data-dispatch-stages="Identify Discover Review Decide"'].every((marker) => html.includes(marker))],
   ['home drops repeated plate furniture', () =>
     !['The Market — Plate 01', 'The Record — Plate 02', 'The Review — Plate 03', 'The Newsroom — Plate 04'].some(
       (marker) => html.includes(marker)

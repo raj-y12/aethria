@@ -7,19 +7,19 @@ const CHAR_MIN_MS = 60;
 const CHAR_MAX_MS = 90;
 const STAGE_DELAY_MS = 820;
 const MEMO_DELAY_MS = 520;
-const STAGES = ['Scouting', 'Reviewing', 'Deciding'] as const;
-type QueryStage = (typeof STAGES)[number];
-type QueryStatus = QueryStage | 'pending' | 'complete';
+const STEPS = ['Identify', 'Discover', 'Review', 'Decide'] as const;
+type QueryStep = (typeof STEPS)[number];
+type QueryStatus = QueryStep | 'pending';
+type QueryFlow = 'input' | 'analysis' | 'snapshot';
 
 const TYPED_QUERY = DEMO_LOOKUP_QUERY;
 
-function stageState(status: QueryStatus, stage: QueryStage) {
-  if (status === 'complete') return 'complete';
+function stepState(status: QueryStatus, step: QueryStep) {
   if (status === 'pending') return 'pending';
-  const currentIndex = STAGES.indexOf(status);
-  const stageIndex = STAGES.indexOf(stage);
-  if (stageIndex < currentIndex) return 'complete';
-  if (stageIndex === currentIndex) return 'active';
+  const currentIndex = STEPS.indexOf(status);
+  const stepIndex = STEPS.indexOf(step);
+  if (stepIndex < currentIndex) return 'complete';
+  if (stepIndex === currentIndex) return 'active';
   return 'pending';
 }
 
@@ -34,9 +34,9 @@ export default function QueryPlate() {
   // matches SSR output and the reduced-motion experience. Only the effect below (client-only,
   // motion allowed) resets to empty on mount and types it back out once the plate scrolls into view.
   const [typed, setTyped] = useState(TYPED_QUERY);
-  const [memoIn, setMemoIn] = useState(true);
+  const [flow, setFlow] = useState<QueryFlow>('snapshot');
   const [caretOn, setCaretOn] = useState(false);
-  const [status, setStatus] = useState<QueryStatus>('complete');
+  const [status, setStatus] = useState<QueryStatus>('pending');
 
   useEffect(() => {
     if (reduce) return;
@@ -45,7 +45,7 @@ export default function QueryPlate() {
     // observer fires, so the visible transition is "scrolls in already empty → types", never
     // a flash of the settled memo blinking out.
     setTyped('');
-    setMemoIn(false);
+    setFlow('input');
     setCaretOn(true);
     setStatus('pending');
 
@@ -62,19 +62,19 @@ export default function QueryPlate() {
         } else {
           timeoutRef.current = window.setTimeout(() => {
             setCaretOn(false);
-            let stageIndex = 0;
-            const advanceStage = () => {
-              const stage = STAGES[stageIndex];
-              if (!stage) {
-                setStatus('complete');
-                timeoutRef.current = window.setTimeout(() => setMemoIn(true), MEMO_DELAY_MS);
+            setFlow('analysis');
+            let stepIndex = 0;
+            const advanceStep = () => {
+              const step = STEPS[stepIndex];
+              if (!step) {
+                timeoutRef.current = window.setTimeout(() => setFlow('snapshot'), MEMO_DELAY_MS);
                 return;
               }
-              setStatus(stage);
-              stageIndex += 1;
-              timeoutRef.current = window.setTimeout(advanceStage, STAGE_DELAY_MS);
+              setStatus(step);
+              stepIndex += 1;
+              timeoutRef.current = window.setTimeout(advanceStep, STAGE_DELAY_MS);
             };
-            advanceStage();
+            advanceStep();
           }, MEMO_DELAY_MS);
         }
       };
@@ -115,30 +115,50 @@ export default function QueryPlate() {
       title="Place a Query"
       capLeft="On-demand intelligence / lookup"
       capRight="Any name · a sourced record"
-      tone="product-evidence"
+      tone="stock-editorial"
     >
       <div
         ref={rootRef}
         className="query reveal d2"
         data-query-flow="dispatch-sequence"
+        data-dispatch-stages="Identify Discover Review Decide"
         aria-label="Aethria lookup sequence"
       >
-        <div className="query-bar">
-          <span className="p">›</span>
-          <span className="query-text">{typed}</span>
-          {caretOn ? <span className="query-caret" /> : null}
-          <span className="query-submit" aria-hidden="true">↵</span>
-        </div>
-        <div className="query-pipeline" aria-live="polite" aria-label="Lookup stages">
-          {STAGES.map((stage) => (
-            <span className={`query-stage ${stageState(status, stage)}`} key={stage}>
-              {stage}
-            </span>
-          ))}
-        </div>
-        <div className={`memo-reveal${memoIn ? ' in' : ''}`}>
-          <LookupResultSnapshot {...DEMO_LOOKUP_RESULT} />
-        </div>
+        {flow === 'input' ? (
+          <div className="query-state query-input-state" aria-label="Company lookup input">
+            <div className="query-bar active">
+              <span className="p">&gt;</span>
+              <span className="query-text">{typed}</span>
+              {caretOn ? <span className="query-caret" /> : null}
+              <span className="query-submit" aria-hidden="true">↵</span>
+            </div>
+          </div>
+        ) : null}
+        {flow === 'analysis' ? (
+          <div className="query-state query-analysis-state" aria-label="Analysis progress">
+            <h3 className="query-company-name">{TYPED_QUERY}</h3>
+            <div className="query-progress" aria-live="polite">
+              {STEPS.map((step, index) => (
+                <div className="query-progress-step" key={step}>
+                  {index > 0 ? <span className="query-progress-connector" aria-hidden="true" /> : null}
+                  <span className="query-progress-item">
+                    <span className={`query-progress-dot ${stepState(status, step)}`} aria-hidden="true" />
+                    <span className={`query-progress-label ${stepState(status, step)}`}>{step}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+        {flow === 'snapshot' ? (
+          <div className="query-state query-snapshot-state memo-reveal in">
+            <LookupResultSnapshot
+              {...DEMO_LOOKUP_RESULT}
+              size="lg"
+              className="query-dispatch-snapshot"
+            />
+          </div>
+        ) : null}
       </div>
       <p className="caption reveal d3">
         On-demand lookup turns any company name into a sourced investment record in seconds — benchmarked against
