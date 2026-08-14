@@ -66,6 +66,25 @@ export default function AnimatedRoutes() {
   }, []);
 
   useEffect(() => {
+    if (location.hash) return;
+
+    const lenis = (
+      window as unknown as {
+        __lenis?: {
+          scrollTo: (target: number, options?: { immediate?: boolean }) => void;
+        };
+      }
+    ).__lenis;
+
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+      return;
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname, location.hash]);
+
+  useEffect(() => {
     animateEntrances = true;
   }, []);
 

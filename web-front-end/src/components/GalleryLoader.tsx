@@ -21,13 +21,13 @@ export default function GalleryLoader({ onLift, onDone }: { onLift: () => void; 
     document.body.style.overflow = 'hidden';
 
     // ponytail: fixed timers matching the CSS sequence exactly (loader-lift's
-    // 1200ms delay + the shared base duration in index.css) rather than wiring up
+    // 1600ms delay + its 800ms duration in index.css) rather than wiring up
     // animationend listeners for a one-shot, non-interactive overlay.
     // onLift fires the instant the dissolve begins, so the hero starts
     // settling in BEHIND the still-fading overlay (single continuous entrance,
     // not visible → hidden → animate-in).
-    const liftTimer = window.setTimeout(onLift, 1200);
-    const doneTimer = window.setTimeout(onDone, 1800);
+    const liftTimer = window.setTimeout(onLift, 1600);
+    const doneTimer = window.setTimeout(onDone, 2450);
 
     return () => {
       window.clearTimeout(liftTimer);
