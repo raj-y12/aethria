@@ -21,6 +21,8 @@ const checks = [
   ['lede present', () => html.includes('Private-market judgment, on the record')],
   ['reviewer dims present', () =>
     ['Market', 'Product', 'Technical', 'Execution', 'Defensibility'].every((d) => html.includes(d))],
+  ['query dispatch sequence present', () =>
+    ['data-query-flow="dispatch-sequence"', 'data-dispatch-stages="Identify Discover Review Decide"'].every((marker) => html.includes(marker))],
   ['JSON-LD present', () => html.includes('application/ld+json')],
   ['no fonts.googleapis.com', () => !html.includes('fonts.googleapis.com')],
   ['theme-color grey stock', () => /theme-color" content="#D9D7D4/i.test(html)],
