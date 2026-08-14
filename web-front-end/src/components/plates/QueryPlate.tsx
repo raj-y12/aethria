@@ -6,7 +6,7 @@ import Plate from '../Plate';
 const CHAR_MIN_MS = 60;
 const CHAR_MAX_MS = 90;
 const STAGE_DELAY_MS = 820;
-const MEMO_DELAY_MS = 500;
+const MEMO_DELAY_MS = 520;
 const STEPS = ['Identify', 'Discover', 'Review', 'Decide'] as const;
 type QueryStep = (typeof STEPS)[number];
 type QueryStatus = QueryStep | 'pending';
@@ -30,8 +30,9 @@ export default function QueryPlate() {
   const started = useRef(false);
   const timeoutRef = useRef<number | null>(null);
 
-  // SSR settles on the snapshot. Motion-enabled clients replay the dispatch sequence when the
-  // plate enters the viewport; reduced-motion clients keep the settled snapshot immediately.
+  // Initial state is the settled, fully-rendered look (query typed, memo visible, no caret) —
+  // matches SSR output and the reduced-motion experience. Only the effect below (client-only,
+  // motion allowed) resets to empty on mount and types it back out once the plate scrolls into view.
   const [typed, setTyped] = useState(TYPED_QUERY);
   const [flow, setFlow] = useState<QueryFlow>('snapshot');
   const [caretOn, setCaretOn] = useState(false);
@@ -40,6 +41,9 @@ export default function QueryPlate() {
   useEffect(() => {
     if (reduce) return;
 
+    // Reset to empty immediately on mount (plate is off-screen — 06 of 08), not when the
+    // observer fires, so the visible transition is "scrolls in already empty → types", never
+    // a flash of the settled memo blinking out.
     setTyped('');
     setFlow('input');
     setCaretOn(true);
@@ -54,10 +58,7 @@ export default function QueryPlate() {
         i += 1;
         setTyped(TYPED_QUERY.slice(0, i));
         if (i < TYPED_QUERY.length) {
-          timeoutRef.current = window.setTimeout(
-            typeChar,
-            CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS),
-          );
+          timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
         } else {
           timeoutRef.current = window.setTimeout(() => {
             setCaretOn(false);
@@ -77,10 +78,7 @@ export default function QueryPlate() {
           }, MEMO_DELAY_MS);
         }
       };
-      timeoutRef.current = window.setTimeout(
-        typeChar,
-        CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS),
-      );
+      timeoutRef.current = window.setTimeout(typeChar, CHAR_MIN_MS + Math.random() * (CHAR_MAX_MS - CHAR_MIN_MS));
     };
 
     const clearPendingTimeout = () => {
@@ -115,8 +113,9 @@ export default function QueryPlate() {
       id="query"
       index="06 — 08"
       title="Place a Query"
-      capLeft="Place a Query — Plate 06"
+      capLeft="On-demand intelligence / lookup"
       capRight="Any name · a sourced record"
+      tone="stock-editorial"
     >
       <div
         ref={rootRef}

@@ -10,7 +10,7 @@ const HOLDINGS = [
 /** Plate 07 — holdings, a specimen slice of the portfolio table. */
 export default function HoldingsPlate() {
   return (
-    <Plate id="holdings" index="07 — 08" title="Holdings" capLeft="Holdings — Plate 07" capRight="What the fund carries">
+      <Plate id="holdings" index="07 — 08" title="Holdings" capLeft="Portfolio memory / watchlist" capRight="What the fund carries" tone="stock-editorial">
       <table className="holdings reveal d2">
         <thead>
           <tr>

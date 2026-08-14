@@ -7,8 +7,9 @@ export default function NewsroomPlate() {
       id="method"
       index="04 — 08"
       title="The Newsroom"
-      capLeft="The Newsroom — Plate 04"
+      capLeft="Research desk / operating method"
       capRight="Who works the story"
+      tone="stock-editorial"
     >
       <div className="newsroom-flow reveal d2" aria-label="Pipeline order">
         <span>Mandate</span>
@@ -28,8 +29,9 @@ export default function NewsroomPlate() {
         <span>Portfolio</span>
       </div>
       <div className="staff reveal d2">
-        <div className="col">
+        <div className="col staff-lead">
           <h4>Scouts — source the field</h4>
+          <p className="staff-lead-copy">The field is searched from the active mandate, then handed forward with its source intact.</p>
           <div className="row">
             <span>Market-Driven</span>
             <span className="role">web + exa</span>
@@ -47,7 +49,7 @@ export default function NewsroomPlate() {
             <span className="role">web + exa</span>
           </div>
         </div>
-        <div className="col">
+        <div className="col staff-support">
           <h4>Reviewers — score the mandate</h4>
           <div className="row">
             <span>Default</span>

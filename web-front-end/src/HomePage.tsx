@@ -48,7 +48,7 @@ export default function HomePage() {
 
   return (
     <div
-      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
+      className="home-page relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
       style={{ backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)' }}
     >
       {showLoader && (
@@ -57,10 +57,10 @@ export default function HomePage() {
           onDone={() => setShowLoader(false)}
         />
       )}
-      <GalleryFrame enter={entered} />
+      <GalleryFrame active="home" enter={entered} />
       <HeroPlate enter={entered} />
 
-      <div className="gallery">
+      <div className="gallery home-gallery">
         <MarketPlate />
         <RecordPlate />
         <ReviewPlate />

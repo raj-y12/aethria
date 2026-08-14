@@ -1,125 +1,169 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AccessModal from './components/AccessModal';
 import GalleryFrame from './components/GalleryFrame';
-import GithubActivityGrid from './components/GithubActivityGrid';
-import Plate from './components/Plate';
 
 const LINKEDIN = 'https://www.linkedin.com/in/raj-dhanush-yendamuri/';
 const GITHUB = 'https://github.com/raj-y12';
+const FOUNDER_IMAGE = '/raj-yendamuri.jpg';
 
-/** Links carry the accent and a proper underline offset — the plate has no other link affordance. */
-const linkStyle = {
-  color: 'var(--accent)',
-  textDecoration: 'underline',
-  textDecorationThickness: '1px',
-  textUnderlineOffset: '0.25em',
-} as const;
+const principles = [
+  {
+    title: 'Show the source',
+    body: 'Sources, assumptions, and gaps stay visible before a recommendation becomes a decision.',
+  },
+  {
+    title: 'Keep the person in charge',
+    body: 'Aethria prepares the record and preserves the debate. The final investment decision stays with the people responsible for it.',
+  },
+  {
+    title: 'Make every decision useful later',
+    body: 'Each decision becomes context for the next one, so a fund can improve how it thinks over time.',
+  },
+];
 
-/**
- * Team/about page — verifiable founder and company info per Google Cloud Startups
- * review requirements, filed in the same record format the product itself produces.
- */
 export default function TeamPage() {
   const [accessOpen, setAccessOpen] = useState(false);
 
-  return (
-    <div
-      className="relative flex min-h-[100dvh] w-full flex-col overflow-x-hidden"
-      style={{ backgroundColor: 'var(--surface-base)', color: 'var(--text-primary)' }}
-    >
-      <GalleryFrame onAccess={() => setAccessOpen(true)} />
-      <div className="gallery">
-        <Plate id="team" index="01 — 02" title="The Team" capLeft="The Team — Plate 01" capRight="Who builds Aethria">
-          <div className="record">
-            <div className="record-top reveal d2">
-              <div className="record-name">Raj Yendamuri</div>
-              <div className="record-verdict">Founder</div>
-            </div>
-            <p className="review-statement reveal d2" style={{ margin: 0, maxWidth: '42ch' }}>
-              Raj built Aethria end-to-end: a decision pipeline that sources private-market opportunities, argues
-              them against a fund&rsquo;s mandate, and files a ruling with its evidence intact.
-            </p>
-            <div className="record-reasoning reveal d3">
-              <div>
-                <h5>The conviction</h5>
-                <p>
-                  Venture judgment fails at the unglamorous layer — queue discipline, risk controls, audit trail,
-                  decision memory — and that layer is an engineering problem.
-                </p>
-              </div>
-              <div>
-                <h5>Verify</h5>
-                <p>
-                  <a href={LINKEDIN} target="_blank" rel="noopener noreferrer" style={linkStyle}>
-                    LinkedIn
-                  </a>
-                  <span style={{ margin: '0 0.6rem', color: 'var(--ink-4)' }}>·</span>
-                  <a href={GITHUB} target="_blank" rel="noopener noreferrer" style={linkStyle}>
-                    GitHub
-                  </a>
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="reveal d3" style={{ marginTop: '2.5rem' }}>
-            <GithubActivityGrid username="raj-y12" />
-          </div>
-        </Plate>
+  useEffect(() => {
+    document.title = 'Aethria — Venture judgment, on the record';
+    document.querySelector('meta[name="description"]')?.setAttribute(
+      'content',
+      'Aethria keeps venture judgment on the record for funds that want their reasoning to compound.',
+    );
+    document.querySelector('meta[property="og:title"]')?.setAttribute(
+      'content',
+      'Aethria — Venture judgment, on the record',
+    );
+    document.querySelector('meta[property="og:description"]')?.setAttribute(
+      'content',
+      'A more deliberate decision layer for venture teams.',
+    );
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', 'https://aethria.co/team');
+    const canonical = document.querySelector('link[rel="canonical"]') ?? document.createElement('link');
+    canonical.setAttribute('rel', 'canonical');
+    canonical.setAttribute('href', 'https://aethria.co/team');
+    if (!canonical.parentNode) document.head.append(canonical);
+  }, []);
 
-        <Plate
-          id="house"
-          index="02 — 02"
-          title="The House"
-          capLeft="The House — Plate 02"
-          capRight="Where we stand · how we rule"
-        >
-          <div className="reveal d2">
-            <div className="tenet">
-              <span className="mark">Traceability</span>
+  return (
+    <div className="team-page">
+      <GalleryFrame active="team" quiet onAccess={() => setAccessOpen(true)} />
+      <main className="team-main">
+        <section className="team-hero surface-image-led" aria-labelledby="team-title">
+          <div className="team-hero-copy">
+            <p className="team-kicker">Founder-led / Dublin / 2026</p>
+            <h1 id="team-title">Aethria keeps venture judgment on the record.</h1>
+            <p className="team-hero-lede">
+              Raj Yendamuri is building the decision layer for funds that want their reasoning to hold up over time.
+            </p>
+            <a className="team-text-link" href="#story">
+              Read the story <span aria-hidden="true">↘</span>
+            </a>
+          </div>
+
+          <aside className="team-founder-card" aria-label="Founder profile">
+            <div className="team-photo-frame" data-image-slot="founder">
+              <span className="team-photo-bracket team-photo-bracket-left" aria-hidden="true" />
+              <div className="team-photo-circle">
+                <img src={FOUNDER_IMAGE} alt="Raj Yendamuri" width="427" height="427" />
+              </div>
+              <span className="team-photo-bracket team-photo-bracket-right" aria-hidden="true" />
+            </div>
+            <div className="team-founder-details">
               <div>
-                <p className="claim">Every score and decision carries the evidence that produced it.</p>
-                <p className="gloss">
-                  A verdict arrives with its sources, the policy version it was judged under, and the stage that
-                  issued it. A ruling you cannot audit is not a ruling.
-                </p>
+                <p className="team-founder-name">Raj Yendamuri</p>
+                <p className="team-founder-role">Founder, Aethria</p>
+              </div>
+              <div className="team-founder-links">
+                <a href={LINKEDIN} target="_blank" rel="noopener noreferrer">
+                  LinkedIn
+                </a>
+                <a href={GITHUB} target="_blank" rel="noopener noreferrer">
+                  GitHub
+                </a>
               </div>
             </div>
-            <div className="tenet">
-              <span className="mark">Fail closed</span>
-              <div>
-                <p className="claim">Thin evidence blocks the decision, by name.</p>
-                <p className="gloss">
-                  Missing mandate, ambiguous identity, or evidence too thin to stand returns a named block rather
-                  than a plausible guess — the judgment it declines to make is part of the judgment.
-                </p>
+          </aside>
+        </section>
+
+        <section id="story" className="team-section team-slice team-story-section" aria-labelledby="story-title">
+          <div className="team-section-label">Why it exists</div>
+          <div className="team-section-body">
+            <h2 id="story-title">Most investment decisions disappear into the process.</h2>
+            <p>
+              The evidence is somewhere, the reasoning is somewhere else, and the next similar decision starts from
+              scratch. That makes judgment difficult to inspect and even harder to improve.
+            </p>
+            <p>
+              Raj built Aethria end-to-end to bring a fund thesis, a sourced opportunity, the evidence behind it, and
+              the human decision that follows into one durable record.
+            </p>
+
+            <div className="team-record" aria-label="Aethria decision record">
+              <div className="team-record-top">
+                <span>Decision record</span>
+                <span>Sample / 001</span>
               </div>
-            </div>
-            <div className="tenet">
-              <span className="mark">The ruling</span>
-              <div>
-                <p className="claim">A person rules, and that ruling is the record.</p>
-                <p className="gloss">
-                  Reviewers argue a company from opposing briefs and the disagreement is kept, not averaged away.
-                  The pipeline recommends and escalates; the authoritative decision stays human.
-                </p>
+              <div className="team-record-flow" aria-label="Fund thesis to evidence to human decision">
+                <span>FUND THESIS</span>
+                <span className="team-record-arrow" aria-hidden="true">→</span>
+                <span>EVIDENCE</span>
+                <span className="team-record-arrow" aria-hidden="true">→</span>
+                <span>HUMAN DECISION</span>
               </div>
+              <p>Context stays attached to the call, so the next decision has somewhere to begin.</p>
             </div>
           </div>
-          <div className="house-facts reveal d3">
-            <span>
-              Founded <strong>2026</strong>
-            </span>
-            <span>
-              Based <strong>Dublin, Ireland</strong>
-            </span>
-            <span>
-              <a href="mailto:raj@aethria.co" style={linkStyle}>
-                raj@aethria.co
+        </section>
+
+        <section className="team-section team-slice team-principles-section" aria-labelledby="principles-title">
+          <div className="team-section-label">How we work</div>
+          <div className="team-section-body">
+            <h2 id="principles-title">A clear process leaves room for judgment.</h2>
+            <div className="team-principles">
+              {principles.map((principle) => (
+                <article className="team-principle" key={principle.title}>
+                  <p className="team-principle-mark">Working principle</p>
+                  <h3>{principle.title}</h3>
+                  <p>{principle.body}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="team-section team-slice team-today-section" aria-labelledby="today-title">
+          <div className="team-section-label">The invitation</div>
+          <div className="team-section-body">
+            <h2 id="today-title">Built for funds that want their judgment to compound.</h2>
+            <p>
+              Aethria is a founder-led product from Dublin for venture teams building a more deliberate investment
+              process.
+            </p>
+            <dl className="team-facts">
+              <div>
+                <dt>Founder</dt>
+                <dd>Raj Yendamuri</dd>
+              </div>
+              <div>
+                <dt>Based</dt>
+                <dd>Dublin, Ireland</dd>
+              </div>
+              <div>
+                <dt>Contact</dt>
+                <dd>
+                  <a href="mailto:raj@aethria.co">raj@aethria.co</a>
+                </dd>
+              </div>
+            </dl>
+            <div className="team-final-cta">
+              <a className="team-primary-cta" href="mailto:raj@aethria.co">
+                Start a conversation <span aria-hidden="true">→</span>
               </a>
-            </span>
+            </div>
           </div>
-        </Plate>
-      </div>
+        </section>
+      </main>
 
       <AccessModal open={accessOpen} onClose={() => setAccessOpen(false)} />
     </div>

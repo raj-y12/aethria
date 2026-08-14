@@ -11,9 +11,13 @@ import { scrollToAnchor } from '../lib/scrollToAnchor';
  */
 export default function GalleryFrame({
   enter = true,
+  active,
+  quiet = false,
   onAccess,
 }: {
   enter?: boolean;
+  active?: 'home' | 'team';
+  quiet?: boolean;
   /** When set, Access opens this instead of seeking an access plate on the page. */
   onAccess?: () => void;
 }) {
@@ -48,7 +52,7 @@ export default function GalleryFrame({
   const frameCx = (side: string) => (enter ? `frame ${side} frame-in` : `frame ${side}`);
 
   return (
-    <>
+    <div className={`frame-system${quiet ? ' frame-quiet' : ''}`}>
       <div className="grain" />
 
       <div className={frameCx('tl')}>
@@ -58,10 +62,12 @@ export default function GalleryFrame({
       </div>
 
       <div className={frameCx('tr')}>
-        <a href="#market" onClick={(e) => goToPlate(e, '#market')}>
-          Index
+        <a href="#market" onClick={(e) => goToPlate(e, '#market')} aria-current={active === 'home' ? 'page' : undefined}>
+          Product
         </a>
-        <Link to="/team">Team</Link>
+        <Link to="/team" aria-current={active === 'team' ? 'page' : undefined}>
+          Team
+        </Link>
         <a
           href="#access"
           onClick={(e) => {
@@ -73,7 +79,7 @@ export default function GalleryFrame({
             onAccess();
           }}
         >
-          Access
+          Request access
         </a>
       </div>
 
@@ -88,6 +94,6 @@ export default function GalleryFrame({
       </div>
 
       <div className={frameCx('br')}>Specimen Edition &middot; No. {edition ?? '—'}</div>
-    </>
+    </div>
   );
 }

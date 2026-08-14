@@ -11,8 +11,9 @@ export default function CorrectionsPlate() {
       id="corrections"
       index="05 — 08"
       title="Corrections & Revisions"
-      capLeft="Corrections & Revisions — Plate 05"
+      capLeft="Corrections / versioned learning"
       capRight="Every revision, versioned and logged"
+      tone="quiet-transition"
     >
       <div className="corrections reveal d2">
         <h4>Meta-Agent — daily pass</h4>
