@@ -1,0 +1,6 @@
+/* Demo only. The sample-data notice is fixed to the bottom of the viewport;
+   shrink the console by exactly its measured height so the notice never covers
+   the console's own controls — the memo's ruling action sits low in the pane. */
+.demo-notice-open .h-\[100dvh\] {
+  height: calc(100dvh - var(--demo-notice-h, 0px));
+}
