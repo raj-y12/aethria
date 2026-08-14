@@ -7,6 +7,12 @@ from utils import settings_loader
 from settings_repository import SettingsRepository
 
 
+pytestmark = pytest.mark.skipif(
+    not os.getenv("TEST_DATABASE_URL"),
+    reason="TEST_DATABASE_URL is required for settings PostgreSQL contract tests",
+)
+
+
 class Repository:
     def __init__(self, value=None):
         self.value = value

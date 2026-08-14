@@ -139,11 +139,14 @@ async def test_target_postgres_uses_canonical_startup_authority_and_alias_bridge
             where table_schema = 'public'
               and table_name = any($1::text[])
             """,
-            ["startups", "startup_id_aliases", "portfolio_startups"],
+            ["startups", "startup_id_aliases"],
         )
     finally:
         await connection.close()
 
+    # The contract job applies the institutional compatibility migrations first,
+    # so legacy portfolio tables may still exist. Canonical authority is proven
+    # by the provider-neutral startups table and its explicit alias bridge.
     assert {row["table_name"] for row in rows} == {
         "startups",
         "startup_id_aliases",

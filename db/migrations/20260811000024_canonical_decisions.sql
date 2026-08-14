@@ -66,10 +66,14 @@ create table if not exists public.workflow_actions (
 create index if not exists workflow_actions_queue_idx
   on public.workflow_actions (user_id, status, due_at, created_at);
 
-alter table public.opportunities
-  add constraint opportunities_current_ruling_fk
-  foreign key (user_id, current_ruling_id)
-  references public.human_rulings (user_id, ruling_id);
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'opportunities_current_ruling_fk') then
+    alter table public.opportunities add constraint opportunities_current_ruling_fk
+      foreign key (user_id, current_ruling_id)
+      references public.human_rulings (user_id, ruling_id);
+  end if;
+end $$;
 
 create or replace function public.prevent_ruling_mutation()
 returns trigger language plpgsql security invoker set search_path = public as $$

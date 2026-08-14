@@ -76,14 +76,19 @@ create table if not exists public.recommendations (
 create index if not exists recommendations_opportunity_idx
   on public.recommendations (user_id, opportunity_id, created_at desc);
 
-alter table public.opportunities
-  add constraint opportunities_current_evaluation_fk
-  foreign key (user_id, current_evaluation_id)
-  references public.evaluation_runs (user_id, evaluation_id);
-alter table public.opportunities
-  add constraint opportunities_current_recommendation_fk
-  foreign key (user_id, current_recommendation_id)
-  references public.recommendations (user_id, recommendation_id);
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'opportunities_current_evaluation_fk') then
+    alter table public.opportunities add constraint opportunities_current_evaluation_fk
+      foreign key (user_id, current_evaluation_id)
+      references public.evaluation_runs (user_id, evaluation_id);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'opportunities_current_recommendation_fk') then
+    alter table public.opportunities add constraint opportunities_current_recommendation_fk
+      foreign key (user_id, current_recommendation_id)
+      references public.recommendations (user_id, recommendation_id);
+  end if;
+end $$;
 
 create or replace function public.prevent_completed_evaluation_mutation()
 returns trigger language plpgsql security invoker set search_path = public as $$
