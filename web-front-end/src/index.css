@@ -3466,7 +3466,8 @@ hr.doc-section-separator::before {
   top: 50%;
   bottom: auto;
   height: var(--portrait-size);
-  width: 14%;
+  width: 14px;
+  border-color: var(--line-2);
   transform: translateY(-50%);
 }
 
