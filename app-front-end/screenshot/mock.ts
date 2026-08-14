@@ -8,9 +8,11 @@ import type { Startup, SingleReview } from '../src/types/startup';
 const NOW = Date.now();
 const hoursAgo = (h: number) => new Date(NOW - h * 3600_000).toISOString();
 
-function reviewers(scores: Array<[number, number, number, number, number, 'STRONG' | 'MEDIUM' | 'WEAK', string]>): SingleReview[] {
+function reviewers(
+  scores: Array<[number, number, number, number, number, 'STRONG' | 'MEDIUM' | 'WEAK', string, string[]?]>,
+): SingleReview[] {
   const types = ['DefaultReviewer', 'SkepticalReviewer', 'OpportunistReviewer'] as const;
-  return scores.map(([market, product, technical, execution, defensibility, verdict, summary], i) => ({
+  return scores.map(([market, product, technical, execution, defensibility, verdict, summary, risks], i) => ({
     reviewer_type: types[i],
     market_score: market,
     product_score: product,
@@ -19,10 +21,17 @@ function reviewers(scores: Array<[number, number, number, number, number, 'STRON
     defensibility_score: defensibility,
     verdict,
     overall_summary: summary,
-    key_risks: [],
+    key_risks: risks ?? DEFAULT_REVIEWER_RISKS[types[i]],
     prompt_version: 'v1',
   }));
 }
+
+/** Every reviewer states its own risks; an empty risk list reads as an unfinished review. */
+const DEFAULT_REVIEWER_RISKS: Record<string, string[]> = {
+  DefaultReviewer: ['Commercial evidence is thinner than the score implies', 'Concentration in a single design partner'],
+  SkepticalReviewer: ['Sales cycle may outlast the current runway', 'No independent verification of the retention claim'],
+  OpportunistReviewer: ['Entry price re-rates quickly if the category proves out', 'Round may be unavailable at this stage next quarter'],
+};
 
 let n = 0;
 function startup(partial: Record<string, unknown>): Startup {
@@ -30,10 +39,104 @@ function startup(partial: Record<string, unknown>): Startup {
   return { id: `demo-${n}`, ...partial } as unknown as Startup;
 }
 
+
+/** Fund intelligence — what the meta layer has observed, and what it will not yet claim. */
+const FUND_OBSERVATIONS = [
+  {
+    observation_id: 'obs-1', observation_type: 'criterion_weight_drift', observation_family: 'scoring',
+    segment: { sector: 'B2B SaaS', stage: 'Seed' },
+    supporting_case_ids: ['demo-2', 'demo-4', 'demo-6', 'demo-8'], contradictory_case_ids: ['demo-7'],
+    sample_size: 31, time_window: { from: hoursAgo(24 * 180), to: hoursAgo(12) },
+    thesis_versions: ['v2', 'v3'], mandate_versions: ['v3'], policy_versions: ['partner_rules_v1'],
+    metric: { mean_execution_at_invest: 7.4, mean_execution_at_pass: 5.1, separation: 2.3 },
+    sufficiency: 'moderate', descriptive_confidence: 0.71,
+    limitations: ['Descriptive only — no causal claim', 'Single mandate version dominates the window'],
+    direction: 'execution weighted above stated mandate weight',
+    involved_criteria: ['execution', 'defensibility'], involved_factors: ['founder-led sales', 'reference customers'],
+    interpretation_as_of: 'latest_retrospective', interpretation_provenance: [],
+  },
+  {
+    observation_id: 'obs-2', observation_type: 'segment_conversion', observation_family: 'coverage',
+    segment: { geography: 'UK/Ireland', stage: 'Pre-seed' },
+    supporting_case_ids: ['demo-1', 'demo-4'], contradictory_case_ids: [],
+    sample_size: 14, time_window: { from: hoursAgo(24 * 120), to: hoursAgo(30) },
+    thesis_versions: ['v3'], mandate_versions: ['v3'], policy_versions: ['partner_rules_v1'],
+    metric: { escalation_rate: 0.36, fund_wide_escalation_rate: 0.19 },
+    sufficiency: 'emerging', descriptive_confidence: 0.54,
+    limitations: ['Sample below the threshold for a stable rate', 'Window overlaps a single sourcing push'],
+    direction: 'escalates roughly twice as often as the fund average',
+    involved_criteria: ['thesis_alignment'], involved_factors: ['geography', 'stage'],
+    interpretation_as_of: 'latest_retrospective', interpretation_provenance: [],
+  },
+  {
+    observation_id: 'obs-3', observation_type: 'reviewer_disagreement', observation_family: 'process',
+    segment: { sector: 'Climate · Energy software' },
+    supporting_case_ids: ['demo-2', 'demo-3'], contradictory_case_ids: ['demo-5'],
+    sample_size: 22, time_window: { from: hoursAgo(24 * 150), to: hoursAgo(18) },
+    thesis_versions: ['v2', 'v3'], mandate_versions: ['v3'], policy_versions: ['partner_rules_v1'],
+    metric: { disagreement_rate: 0.48, mean_spread: 2.1 },
+    sufficiency: 'moderate', descriptive_confidence: 0.66,
+    limitations: ['Disagreement is measured on verdict, not on reasoning'],
+    direction: 'skeptical and opportunist reviewers split most often here',
+    involved_criteria: ['market', 'defensibility'], involved_factors: ['regulatory timing'],
+    interpretation_as_of: 'latest_retrospective', interpretation_provenance: [],
+  },
+];
+
+const FUND_HYPOTHESES = [
+  {
+    hypothesis_id: 'hyp-1', hypothesis_family: 'scoring',
+    statement: 'The fund rules on execution evidence more heavily than the published mandate weighting implies.',
+    source_observation_ids: ['obs-1'], source_observation_types: ['criterion_weight_drift'],
+    segment: { sector: 'B2B SaaS', stage: 'Seed' },
+    supporting_case_ids: ['demo-2', 'demo-4', 'demo-6', 'demo-8'], contradictory_case_ids: ['demo-7'],
+    sample_size: 31, sufficiency: 'moderate', descriptive_confidence: 0.71,
+    mandate_versions: ['v3'], thesis_versions: ['v2', 'v3'], policy_versions: ['partner_rules_v1'],
+    time_window: { from: hoursAgo(24 * 180), to: hoursAgo(12) },
+    limitations: ['Descriptive pattern, not a demonstrated cause of outcome quality'],
+    status: 'open',
+  },
+  {
+    hypothesis_id: 'hyp-2', hypothesis_family: 'coverage',
+    statement: 'Pre-seed UK/Ireland cases reach the human more often than the mandate intends.',
+    source_observation_ids: ['obs-2'], source_observation_types: ['segment_conversion'],
+    segment: { geography: 'UK/Ireland', stage: 'Pre-seed' },
+    supporting_case_ids: ['demo-1', 'demo-4'], contradictory_case_ids: [],
+    sample_size: 14, sufficiency: 'emerging', descriptive_confidence: 0.54,
+    mandate_versions: ['v3'], thesis_versions: ['v3'], policy_versions: ['partner_rules_v1'],
+    time_window: { from: hoursAgo(24 * 120), to: hoursAgo(30) },
+    limitations: ['Sample size below the fund threshold for acting on this'],
+    status: 'insufficient_basis',
+  },
+];
+
 export const STARTUPS: Startup[] = [
   startup({
     scout: {
-      id: 's1', scout_type: 'PainPointScout', name: 'Hexigone Inhibitors Limited',
+      id: 's1', scout_type: 'PainPointScout', name: 'Calderwell Materials',
+      company_resolution: {
+        query: 'Calderwell Materials', canonical_name: 'Calderwell Materials',
+        website: 'https://calderwellmaterials.com', linkedin_url: 'https://www.linkedin.com/company/calderwell-materials',
+        crunchbase_url: 'https://www.crunchbase.com/organization/calderwell-materials',
+        founder_names: ['Elin Vaughan'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Calderwell Materials funding', 'Calderwell Materials founders'],
+        evidence_sources: [
+          { url: 'https://calderwellmaterials.com', title: 'Calderwell Materials — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/calderwell-materials', title: 'Calderwell Materials — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Calderwell Materials', website: 'https://calderwellmaterials.com',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Elin Vaughan', role: 'Founder & CSO', location: 'West Wales, United Kingdom',
+          previous_employment: ['Coatings formulation lead, industrial chemicals'], education: ['PhD Materials Chemistry, Swansea'], confidence: 0.9,
+          evidence: [{ url: 'https://calderwellmaterials.com/team', title: 'Calderwell Materials — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Smart-release corrosion inhibitors replacing chromate coatings for industrial steel.',
       sector: 'Industrial chemicals & coatings', funding_stage: 'Seed', location: 'West Wales, United Kingdom',
       problem: 'Chromate-based anti-corrosion coatings are being banned across the EU, leaving heavy industry without a proven replacement.',
@@ -42,7 +145,7 @@ export const STARTUPS: Startup[] = [
       why_now: 'REACH restrictions force chromate phase-out by 2027; formulators are qualifying replacements now.',
       confidence: 0.58, est_tam: '$2.1B', primary_thesis: 'Regulatory forcing-function creates a rare wedge into a conservative supply chain.',
       biggest_unknown: 'Qualification cycles with tier-one formulators are 18–24 months; no public design win yet.',
-      references: ['hexigone.com', 'Innovate UK grant record', 'European Coatings Journal coverage'],
+      references: ['calderwellmaterials.com', 'Innovate UK grant record', 'European Coatings Journal coverage'],
     },
     review: {
       overall_score: 6.8, thesis_alignment_score: 0.72, reviewer_disagreement: true, consensus_verdict: 'MEDIUM',
@@ -82,7 +185,35 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's2', scout_type: 'MarketDrivenScout', name: 'Lumen Grid',
+      id: 's2', scout_type: 'MarketDrivenScout', name: 'Wickfield Grid',
+      company_resolution: {
+        query: 'Wickfield Grid', canonical_name: 'Wickfield Grid',
+        website: 'https://wickfieldgrid.com', linkedin_url: 'https://www.linkedin.com/company/wickfield-grid',
+        crunchbase_url: 'https://www.crunchbase.com/organization/wickfield-grid',
+        founder_names: ['Sanne de Vries', 'Thomas Bakker'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Wickfield Grid funding', 'Wickfield Grid founders'],
+        evidence_sources: [
+          { url: 'https://wickfieldgrid.com', title: 'Wickfield Grid — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/wickfield-grid', title: 'Wickfield Grid — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Wickfield Grid', website: 'https://wickfieldgrid.com',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Sanne de Vries', role: 'Co-founder & CEO', location: 'Amsterdam, Netherlands',
+          previous_employment: ['Grid flexibility trading'], education: ['MSc Energy Systems, TU Delft'], confidence: 0.9,
+          evidence: [{ url: 'https://wickfieldgrid.com/team', title: 'Wickfield Grid — team', source_type: 'company_site', supports: 'role' }],
+        },
+        {
+          name: 'Thomas Bakker', role: 'Co-founder & CTO', location: 'Amsterdam, Netherlands',
+          previous_employment: ['Distributed systems, energy markets'], education: ['BSc Computer Science, Utrecht'], confidence: 0.9,
+          evidence: [{ url: 'https://wickfieldgrid.com/team', title: 'Wickfield Grid — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Grid-edge orchestration software for commercial battery fleets.',
       sector: 'Climate · Energy software', funding_stage: 'Seed', location: 'Amsterdam, Netherlands',
       why_now: 'Negative electricity pricing events tripled in 2025; batteries without orchestration lose money.',
@@ -104,10 +235,34 @@ export const STARTUPS: Startup[] = [
       snapshot: { one_liner: 'Battery fleet orchestration', key_signal: '130% NRR at seed' },
     },
     timestamps: { discovered_at: hoursAgo(70), reviewed_at: hoursAgo(66), partnered_at: hoursAgo(60), first_seen_at: hoursAgo(70) },
+    human_resolution: { decision: 'YES', notes: 'Ruled in. Retention evidence held up under reference checks; entered at seed.', resolved_at: hoursAgo(52) },
   }),
   startup({
     scout: {
-      id: 's3', scout_type: 'BuilderTechnicalScout', name: 'Biasol',
+      id: 's3', scout_type: 'BuilderTechnicalScout', name: 'Kilbride Systems',
+      company_resolution: {
+        query: 'Kilbride Systems', canonical_name: 'Kilbride Systems',
+        website: 'https://kilbridesystems.dk', linkedin_url: 'https://www.linkedin.com/company/kilbride-systems',
+        crunchbase_url: 'https://www.crunchbase.com/organization/kilbride-systems',
+        founder_names: ['Mads Lindqvist'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Kilbride Systems funding', 'Kilbride Systems founders'],
+        evidence_sources: [
+          { url: 'https://kilbridesystems.dk', title: 'Kilbride Systems — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/kilbride-systems', title: 'Kilbride Systems — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Kilbride Systems', website: 'https://kilbridesystems.dk',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Mads Lindqvist', role: 'Founder & CEO', location: 'Copenhagen, Denmark',
+          previous_employment: ['Process automation, food manufacturing'], education: ['MEng Mechanical, DTU'], confidence: 0.9,
+          evidence: [{ url: 'https://kilbridesystems.dk/team', title: 'Kilbride Systems — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Industrial HVAC heat-recovery retrofits financed as a service.',
       sector: 'Industrial equipment', funding_stage: 'Pre-seed', location: 'Copenhagen, Denmark',
       why_now: 'EU industrial energy-efficiency directive mandates audits from 2026.',
@@ -132,7 +287,30 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's4', scout_type: 'ContrarianScout', name: 'Fergal',
+      id: 's4', scout_type: 'ContrarianScout', name: 'Corrib Analytics',
+      company_resolution: {
+        query: 'Corrib Analytics', canonical_name: 'Corrib Analytics',
+        website: 'https://corribanalytics.ie', linkedin_url: 'https://www.linkedin.com/company/corrib-analytics',
+        crunchbase_url: 'https://www.crunchbase.com/organization/corrib-analytics',
+        founder_names: ['Aoife Brennan'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Corrib Analytics funding', 'Corrib Analytics founders'],
+        evidence_sources: [
+          { url: 'https://corribanalytics.ie', title: 'Corrib Analytics — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/corrib-analytics', title: 'Corrib Analytics — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Corrib Analytics', website: 'https://corribanalytics.ie',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Aoife Brennan', role: 'Co-founder & CEO', location: 'Dublin, Ireland',
+          previous_employment: ['Payments infrastructure'], education: ['BA Computer Science, Trinity College Dublin'], confidence: 0.9,
+          evidence: [{ url: 'https://corribanalytics.ie/team', title: 'Corrib Analytics — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Agentic compliance filing for cross-border B2B SaaS.',
       sector: 'B2B SaaS · AI', funding_stage: 'Seed', location: 'Dublin, Ireland',
       why_now: 'E-invoicing mandates arrive in 14 EU states through 2027.',
@@ -156,7 +334,35 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's5', scout_type: 'MarketDrivenScout', name: 'Veeve',
+      id: 's5', scout_type: 'MarketDrivenScout', name: 'Rheinlab',
+      company_resolution: {
+        query: 'Rheinlab', canonical_name: 'Rheinlab',
+        website: 'https://rheinlab.de', linkedin_url: 'https://www.linkedin.com/company/rheinlab',
+        crunchbase_url: 'https://www.crunchbase.com/organization/rheinlab',
+        founder_names: ['Jonas Feldmann', 'Lena Hoffmann'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Rheinlab funding', 'Rheinlab founders'],
+        evidence_sources: [
+          { url: 'https://rheinlab.de', title: 'Rheinlab — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/rheinlab', title: 'Rheinlab — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Rheinlab', website: 'https://rheinlab.de',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Jonas Feldmann', role: 'Co-founder & CEO', location: 'Berlin, Germany',
+          previous_employment: ['Field-service operations software'], education: ['MSc Informatik, TU Berlin'], confidence: 0.9,
+          evidence: [{ url: 'https://rheinlab.de/team', title: 'Rheinlab — team', source_type: 'company_site', supports: 'role' }],
+        },
+        {
+          name: 'Lena Hoffmann', role: 'Co-founder & CTO', location: 'Berlin, Germany',
+          previous_employment: ['Speech systems research'], education: ['PhD Computational Linguistics, Heidelberg'], confidence: 0.9,
+          evidence: [{ url: 'https://rheinlab.de/team', title: 'Rheinlab — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Realtime voice agents for field-service dispatch.',
       sector: 'AI · Vertical SaaS', funding_stage: 'Seed', location: 'Berlin, Germany',
       why_now: 'Field-service labour shortage meets sub-300ms voice latency.',
@@ -180,7 +386,30 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's6', scout_type: 'PainPointScout', name: 'Northcache',
+      id: 's6', scout_type: 'PainPointScout', name: 'Boreal Cache',
+      company_resolution: {
+        query: 'Boreal Cache', canonical_name: 'Boreal Cache',
+        website: 'https://borealcache.fi', linkedin_url: 'https://www.linkedin.com/company/boreal-cache',
+        crunchbase_url: 'https://www.crunchbase.com/organization/boreal-cache',
+        founder_names: ['Aino Virtanen'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Boreal Cache funding', 'Boreal Cache founders'],
+        evidence_sources: [
+          { url: 'https://borealcache.fi', title: 'Boreal Cache — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/boreal-cache', title: 'Boreal Cache — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Boreal Cache', website: 'https://borealcache.fi',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Aino Virtanen', role: 'Founder & CTO', location: 'Helsinki, Finland',
+          previous_employment: ['Edge caching, CDN infrastructure'], education: ['MSc Computer Science, Aalto'], confidence: 0.9,
+          evidence: [{ url: 'https://borealcache.fi/team', title: 'Boreal Cache — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'Sovereign edge caching for regulated EU workloads.',
       sector: 'Infrastructure', funding_stage: 'Pre-seed', location: 'Helsinki, Finland',
       why_now: 'EU data-sovereignty rulings push regulated workloads off US CDNs.',
@@ -191,7 +420,30 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's7', scout_type: 'BuilderTechnicalScout', name: 'Mighty Buildings',
+      id: 's7', scout_type: 'BuilderTechnicalScout', name: 'Claybourne Build',
+      company_resolution: {
+        query: 'Claybourne Build', canonical_name: 'Claybourne Build',
+        website: 'https://claybournebuild.com', linkedin_url: 'https://www.linkedin.com/company/claybourne-build',
+        crunchbase_url: 'https://www.crunchbase.com/organization/claybourne-build',
+        founder_names: ['Marcus Reyes'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Claybourne Build funding', 'Claybourne Build founders'],
+        evidence_sources: [
+          { url: 'https://claybournebuild.com', title: 'Claybourne Build — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/claybourne-build', title: 'Claybourne Build — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Claybourne Build', website: 'https://claybournebuild.com',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Marcus Reyes', role: 'Co-founder & CEO', location: 'Oakland, United States',
+          previous_employment: ['Modular construction delivery'], education: ['BArch, California Polytechnic'], confidence: 0.9,
+          evidence: [{ url: 'https://claybournebuild.com/team', title: 'Claybourne Build — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: '3D-printed prefab panels for low-carbon housing.',
       sector: 'Climate · Construction', funding_stage: 'Series A', location: 'Oakland, United States',
       why_now: 'Housing shortage plus embodied-carbon rules in CA/EU.',
@@ -215,7 +467,30 @@ export const STARTUPS: Startup[] = [
   }),
   startup({
     scout: {
-      id: 's8', scout_type: 'ContrarianScout', name: 'Pry Financials',
+      id: 's8', scout_type: 'ContrarianScout', name: 'Sablefield Financial',
+      company_resolution: {
+        query: 'Sablefield Financial', canonical_name: 'Sablefield Financial',
+        website: 'https://sablefield.co', linkedin_url: 'https://www.linkedin.com/company/sablefield-financial',
+        crunchbase_url: 'https://www.crunchbase.com/organization/sablefield-financial',
+        founder_names: ['Priya Raman'],
+        confidence: 0.94, resolution_status: 'FOUND', missing_fields: [],
+        queries_used: ['Sablefield Financial funding', 'Sablefield Financial founders'],
+        evidence_sources: [
+          { url: 'https://sablefield.co', title: 'Sablefield Financial — company site', source_type: 'company_site', match_score: 0.97, supports: 'identity' },
+          { url: 'https://www.crunchbase.com/organization/sablefield-financial', title: 'Sablefield Financial — funding profile', source_type: 'funding_db', match_score: 0.91, supports: 'funding' },
+        ],
+      },
+      founder_resolution: {
+        company: 'Sablefield Financial', website: 'https://sablefield.co',
+        resolution_status: 'FOUND', confidence: 0.9, missing_fields: [],
+        founders: [
+        {
+          name: 'Priya Raman', role: 'Founder & CEO', location: 'London, United Kingdom',
+          previous_employment: ['Treasury operations, commercial banking'], education: ['MSc Finance, LSE'], confidence: 0.9,
+          evidence: [{ url: 'https://sablefield.co/team', title: 'Sablefield Financial — team', source_type: 'company_site', supports: 'role' }],
+        },
+        ],
+      },
       one_line: 'CFO copilot for seed-stage startups.',
       sector: 'B2B SaaS · Fintech', funding_stage: 'Seed', location: 'London, United Kingdom',
       why_now: 'Fractional CFO costs rising; founders self-serve.',
@@ -242,10 +517,21 @@ export const STARTUPS: Startup[] = [
 
 export const MOCK_SYSTEM_DATA: SystemData = {
   startups: STARTUPS,
-  escalations: [],
+  escalations: [
+    {
+      startup_id: 'demo-1', startup_name: 'Calderwell Materials',
+      reason: 'Reviewer disagreement above threshold on a mandate-aligned case',
+      recommendation: 'MONITOR', confidence: 0.62, escalated_at: hoursAgo(6),
+    },
+    {
+      startup_id: 'demo-5', startup_name: 'Rheinlab',
+      reason: 'Conviction sits inside the partner review band',
+      recommendation: 'MONITOR', confidence: 0.58, escalated_at: hoursAgo(20),
+    },
+  ] as never,
   signals: [
-    { id: 'sig1', startup_id: 'demo-2', signal_type: 'funding_round', description: 'Lumen Grid named in Tech.eu as raising a competitive seed extension.', detected_at: hoursAgo(6), tracker_agent_id: 'PortfolioTracker' },
-    { id: 'sig2', startup_id: 'demo-1', signal_type: 'regulatory', description: 'ECHA confirms chromate authorisation sunset date — accelerates Hexigone’s wedge.', detected_at: hoursAgo(11), tracker_agent_id: 'PortfolioTracker' },
+    { id: 'sig1', startup_id: 'demo-2', signal_type: 'funding_round', description: 'Wickfield Grid named in Tech.eu as raising a competitive seed extension.', detected_at: hoursAgo(6), tracker_agent_id: 'PortfolioTracker' },
+    { id: 'sig2', startup_id: 'demo-1', signal_type: 'regulatory', description: 'ECHA confirms chromate authorisation sunset date — accelerates Calderwell’s wedge.', detected_at: hoursAgo(11), tracker_agent_id: 'PortfolioTracker' },
     { id: 'sig3', startup_id: 'demo-5', signal_type: 'competitor', description: 'Salesloft announces field-service voice agent pilot.', detected_at: hoursAgo(28), tracker_agent_id: 'PortfolioTracker' },
   ],
   metaReports: [
@@ -258,17 +544,17 @@ export const MOCK_SYSTEM_DATA: SystemData = {
       { flag: 'capex_intensity', count: 5 },
       { flag: 'single_product_dependence', count: 4 },
     ],
-    rejection_by_sector: {},
-    avg_scores_at_rejection: {},
-    most_common_fail_dimensions: [],
+    rejection_by_sector: { 'B2B SaaS': 34, 'AI · Vertical SaaS': 21, 'Climate · Energy software': 18, Infrastructure: 12, 'B2B SaaS · Fintech': 9 },
+    avg_scores_at_rejection: { market: 5.4, product: 5.1, technical: 5.8, execution: 4.6, defensibility: 4.9 },
+    most_common_fail_dimensions: ['execution', 'defensibility', 'product'],
   } as never,
   watchlistAnalytics: {
     total: 4, stale: 1, avg_days: 9,
     entries: [
-      { startup_id: 'demo-1', startup_name: 'Hexigone Inhibitors Limited', days_on_watchlist: 4, stale_warning: false, signal_count: 1 },
-      { startup_id: 'demo-3', startup_name: 'Biasol', days_on_watchlist: 2, stale_warning: false, signal_count: 0 },
-      { startup_id: 'demo-5', startup_name: 'Veeve', days_on_watchlist: 6, stale_warning: false, signal_count: 1 },
-      { startup_id: 'demo-7', startup_name: 'Mighty Buildings', days_on_watchlist: 16, stale_warning: true, signal_count: 0 },
+      { startup_id: 'demo-1', startup_name: 'Calderwell Materials', days_on_watchlist: 4, stale_warning: false, signal_count: 1 },
+      { startup_id: 'demo-3', startup_name: 'Kilbride Systems', days_on_watchlist: 2, stale_warning: false, signal_count: 0 },
+      { startup_id: 'demo-5', startup_name: 'Rheinlab', days_on_watchlist: 6, stale_warning: false, signal_count: 1 },
+      { startup_id: 'demo-7', startup_name: 'Claybourne Build', days_on_watchlist: 16, stale_warning: true, signal_count: 0 },
     ],
   } as never,
   concentrationAnalytics: {
@@ -301,7 +587,10 @@ export const MOCK_SYSTEM_DATA: SystemData = {
     calibration_warning: null,
     pending_escalations: 2,
     queue_depths: { unreviewed: 1, undecided: 0, watchlist: 4 },
-    budget_status: [],
+    budget_status: [
+    { name: 'LLM spend', used: 41.28, limit: 120, unit: 'USD', window: 'month' },
+    { name: 'Retrieval calls', used: 1840, limit: 5000, unit: 'calls', window: 'month' },
+  ] as never,
   } as never,
   metaInsights: null,
   fundThesisRuntime: {
@@ -374,13 +663,37 @@ export function installMockApi() {
       return json({ found: 12, reviewed: 8, decided: 5, agent_decided: 5, human_reviewed: 1, escalations: 2 });
     }
     if (url.includes('/api/activity/seen')) return json({});
-    if (url.includes('/api/escalations')) return json([]);
+    if (url.includes('/api/escalations')) return json(MOCK_SYSTEM_DATA.escalations);
     if (/\/api\/startups\/[^/]+\/memo/.test(url)) return json({ status: 'ready' });
     const detail = url.match(/\/api\/startups\/([^/?]+)$/);
     if (detail) {
       const found = STARTUPS.find((s) => s.id === decodeURIComponent(detail[1]));
       if (found) return json(found);
     }
+    if (url.includes('/api/outcomes/coverage')) {
+      return json({
+        eligible_opportunity_count: 18, observed_opportunity_count: 11, coverage_ratio: 0.61,
+        outcomes_by_valence: { positive: 5, neutral: 4, negative: 2 },
+        causal_inference_supported: false,
+        limitations: ['Coverage is descriptive; outcomes are not attributed to the decision that preceded them.'],
+      });
+    }
+    if (url.includes('/api/portfolio/positions')) {
+      return json({
+        positions: [
+          {
+            position_id: 'pos-1', opportunity_id: 'opp-2', company_id: 'co-2', ruling_id: 'rul-2',
+            status: 'active', legacy_startup_id: 'demo-2',
+            canonical_name: 'Wickfield Grid', canonical_domain: 'wickfieldgrid.com',
+            entry_rationale: 'Grid-flexibility software with contracted revenue and a defensible data position.',
+            investor_confidence: 0.78, entered_at: hoursAgo(52),
+          },
+        ],
+      });
+    }
+    if (url.includes('/api/fund-intelligence/observations')) return json({ observations: FUND_OBSERVATIONS });
+    if (url.includes('/api/fund-intelligence/hypotheses')) return json({ hypotheses: FUND_HYPOTHESES });
+    if (url.includes('/api/fund-intelligence/counterfactual-proposals')) return json({ proposals: [] });
     if (url.includes('/api/settings')) return json(MOCK_SYSTEM_DATA.settings);
     if (url.includes('/api/')) return json({});
     return realFetch(input as RequestInfo, init);
