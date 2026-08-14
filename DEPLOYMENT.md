@@ -78,10 +78,9 @@ count — and if you run more than one instance, configure the event backplane
 OPENAI_API_KEY=sk-...
 EXA_API_KEY=...
 FIRECRAWL_API_KEY=...
-USE_SUPABASE_STORAGE=1
-SUPABASE_URL=https://<project>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
-DATABASE_URL=postgresql://...            # direct DSN: durable jobs + event backplane
+# DATABASE_URL is the runtime PostgreSQL DSN (the physical host may still be Supabase).
+DATABASE_URL=postgresql://...
+# Supabase compatibility variables are not required by normal runtime.
 CLERK_JWKS_URL=https://<app>.clerk.accounts.dev/.well-known/jwks.json
 CLERK_ISSUER=https://<app>.clerk.accounts.dev
 ALLOWED_ORIGINS=https://app.yourdomain.com,https://yourdomain.com
@@ -129,16 +128,33 @@ that session. Raise the instance size before raising these numbers. Background:
 
 ## Database
 
-Migrations in `supabase/migrations/` are the schema source of truth. Apply them
-**before** deploying code that depends on new tables or columns.
+`DATABASE_URL` is the canonical runtime connection. It may point to local
+PostgreSQL, Cloud SQL, Supabase Postgres, or another supported PostgreSQL
+provider. The application-owned runner applies `db/migrations/` and records
+versions in `app_migrations.schema_migrations`; the backend refuses to start
+durable workers when that ledger is missing or behind.
 
-The backend logs a `SCHEMA DRIFT` warning at startup listing any columns it
-expects but cannot find. Treat that warning as a deploy failure signal: the write
-path silently drops unknown fields, so drift degrades data quietly.
+`supabase/migrations/` is a compatibility/security overlay for the legacy
+Supabase Data API path. It is not the source of truth for canonical runtime
+tables. Supabase deployments apply the provider-neutral migrations first and
+then the role/RLS overlay required by the Data API. Local/direct PostgreSQL
+deployments apply only `db/migrations/` and use explicit tenant predicates in
+repositories.
 
-Rollback note: because the storage layer tolerates missing columns on write,
-rolling code back without rolling migrations back is generally safe; the reverse
-is not.
+Cloud Build runs the provider-neutral migration runner before Cloud Run deploy.
+The `_APPLY_SUPABASE_OVERLAYS` substitution defaults to `true` for the current
+Supabase-backed service; set it to `false` for Cloud SQL or another ordinary
+PostgreSQL deployment. Local Docker Compose runs only the provider-neutral
+runner before the backend starts.
+
+On the first run against the existing Supabase project, the runner performs a
+guarded adoption of the already-applied legacy schema into
+`app_migrations.schema_migrations`. It does not replay equivalent historical
+DDL, delete tenant rows, or rewrite existing data. Only missing additive
+migrations and the Supabase RLS overlays are then applied. Historical orphaned
+pipeline-state rows are preserved; their new foreign key is installed as
+`NOT VALID` so future writes are protected while reconciliation remains an
+explicit, separate operation. Later Cloud Build runs are repeatable.
 
 ---
 
@@ -160,9 +176,9 @@ every PR. More in [docs/operations/docker.md](docs/operations/docker.md).
 ## Release checklist
 
 1. CI green on the pull request (all eight jobs).
-2. Migrations applied to the target Supabase project.
-3. Backend deployed; check `GET /health`, then `GET /api/system/status`, then the
-   logs for `SCHEMA DRIFT`.
+2. Provider-neutral migrations applied to the target PostgreSQL database.
+3. Backend deployed; check `GET /health`, then `GET /api/system/status`, and
+   confirm the shared PostgreSQL pool and migration ledger are healthy.
 4. Frontends deployed **with** the backend when an API contract changed — the
    console and API are versioned together, not independently.
 5. Smoke: sign in, confirm the deal grid paints, dispatch a lookup, confirm the

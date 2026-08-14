@@ -81,92 +81,124 @@ def test_failed_stage_records_retryability_without_losing_pipeline_metadata(
     assert outcome.startup_id == "startup-1"
 
 
-def test_latest_attempt_uses_attempt_before_timestamp_and_never_old_terminal_state(
-    monkeypatch,
-):
-    import jobs.lookup_outcomes as outcomes
+@pytest.mark.asyncio
+async def test_lookup_outcome_storage_is_owned_by_the_async_durable_repository():
+    from jobs.repository import DurableJobRepository
 
-    now = utcnow()
-    old_terminal = outcomes.LookupAttemptOutcome.from_pipeline_result(
-        _job(attempt=1),
-        PipelineExecutionResult.stage_failure(
-            stage="scout",
-            code="scout_lookup_failed",
-            detail="Scout failed.",
-            recovery_action="Retry.",
-        ),
-    ).model_copy(update={"recorded_at": now})
-    new_accepted = outcomes.LookupAttemptOutcome.accepted_for_job(
-        _job(attempt=2)
-    ).model_copy(update={"recorded_at": now - timedelta(days=1)})
-    monkeypatch.setattr(
-        outcomes,
-        "list_get_all_strict",
-        lambda *_args, **_kwargs: [
-            old_terminal.model_dump(mode="json"),
-            new_accepted.model_dump(mode="json"),
-        ],
-    )
-    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
+    class Connection:
+        def __init__(self):
+            self.data = []
 
-    latest = outcomes.latest_lookup_attempt("user-a", "lookup-acme-1")
+        async def execute(self, *_args):
+            self.data.append(_args)
 
-    assert latest == new_accepted
+        async def fetch(self, *_args):
+            import json
+
+            return [{"data": json.loads(value[3])} for value in self.data]
+
+    class Acquire:
+        def __init__(self, connection):
+            self.connection = connection
+
+        async def __aenter__(self):
+            return self.connection
+
+        async def __aexit__(self, *_args):
+            return None
+
+    connection = Connection()
+    class Pool:
+        def acquire(self):
+            return Acquire(connection)
+
+    repository = DurableJobRepository(Pool())
+    from jobs.lookup_outcomes import LookupAttemptOutcome
+
+    outcome = LookupAttemptOutcome.accepted_for_job(_job())
+    await repository.record_lookup_outcome(outcome)
+    assert await repository.latest_lookup_attempt(
+        user_id="user-a", lookup_id="lookup-acme-1"
+    ) == outcome
 
 
-def test_store_write_unavailability_is_never_swallowed(monkeypatch):
-    import jobs.lookup_outcomes as outcomes
+@pytest.mark.asyncio
+async def test_durable_lookup_write_failure_is_explicit():
+    from jobs.lookup_outcomes import LookupAttemptOutcome, LookupOutcomeStoreUnavailable
+    from jobs.repository import DurableJobRepository
 
-    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
-    monkeypatch.setattr(
-        outcomes,
-        "list_upsert",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ConnectionError("down")),
-    )
+    class Connection:
+        async def execute(self, *_args):
+            raise ConnectionError("down")
 
-    with pytest.raises(outcomes.LookupOutcomeStoreUnavailable, match="write"):
-        outcomes.record_lookup_attempt(
-            outcomes.LookupAttemptOutcome.accepted_for_job(_job())
+    class Acquire:
+        async def __aenter__(self):
+            return Connection()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class Pool:
+        def acquire(self):
+            return Acquire()
+
+    with pytest.raises(LookupOutcomeStoreUnavailable, match="write"):
+        await DurableJobRepository(Pool()).record_lookup_outcome(
+            LookupAttemptOutcome.accepted_for_job(_job())
         )
 
 
-def test_store_read_unavailability_is_never_coerced_to_missing(monkeypatch):
-    import jobs.lookup_outcomes as outcomes
+@pytest.mark.asyncio
+async def test_durable_lookup_read_failure_is_explicit():
+    from jobs.lookup_outcomes import LookupOutcomeStoreUnavailable
+    from jobs.repository import DurableJobRepository
 
-    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
-    monkeypatch.setattr(
-        outcomes,
-        "list_get_all_strict",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(ConnectionError("down")),
-    )
+    class Connection:
+        async def fetch(self, *_args):
+            raise ConnectionError("down")
 
-    with pytest.raises(outcomes.LookupOutcomeStoreUnavailable, match="read"):
-        outcomes.latest_lookup_attempt("user-a", "lookup-acme-1")
+    class Acquire:
+        async def __aenter__(self):
+            return Connection()
 
+        async def __aexit__(self, *_args):
+            return None
 
-def test_latest_attempt_rejects_data_tenant_that_disagrees_with_storage_scope(
-    monkeypatch,
-):
-    import jobs.lookup_outcomes as outcomes
+    class Pool:
+        def acquire(self):
+            return Acquire()
 
-    mismatched = outcomes.LookupAttemptOutcome.accepted_for_job(
-        _job().model_copy(
-            update={
-                "user_id": "user-b",
-                "payload": CompanyLookupPayload(
-                    user_id="user-b",
-                    company_name="Acme",
-                    lookup_id="lookup-acme-1",
-                ),
-            }
+    with pytest.raises(LookupOutcomeStoreUnavailable, match="read"):
+        await DurableJobRepository(Pool()).latest_lookup_attempt(
+            user_id="user-a", lookup_id="lookup-acme-1"
         )
-    )
-    monkeypatch.setenv("USE_SUPABASE_STORAGE", "1")
-    monkeypatch.setattr(
-        outcomes,
-        "list_get_all_strict",
-        lambda *_args, **_kwargs: [mismatched.model_dump(mode="json")],
+
+
+@pytest.mark.asyncio
+async def test_durable_lookup_read_rejects_cross_tenant_data():
+    from jobs.lookup_outcomes import LookupAttemptOutcome, LookupOutcomeCorrupt
+    from jobs.repository import DurableJobRepository
+
+    mismatched = LookupAttemptOutcome.accepted_for_job(
+        _job().model_copy(update={"user_id": "user-b"})
     )
 
-    with pytest.raises(outcomes.LookupOutcomeCorrupt, match="tenant"):
-        outcomes.latest_lookup_attempt("user-a", "lookup-acme-1")
+    class Connection:
+        async def fetch(self, *_args):
+            return [{"data": mismatched.model_dump(mode="json")}]
+
+    class Acquire:
+        async def __aenter__(self):
+            return Connection()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class Pool:
+        def acquire(self):
+            return Acquire()
+
+    with pytest.raises(LookupOutcomeCorrupt, match="tenant"):
+        await DurableJobRepository(Pool()).latest_lookup_attempt(
+            user_id="user-a", lookup_id="lookup-acme-1"
+        )

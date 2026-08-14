@@ -32,8 +32,9 @@ def validate_route_id(value: Any, *, field_name: str = "id") -> str:
 
 
 def require_supabase_enabled_for_pipeline() -> None:
-    if not env_config.use_supabase_storage():
-        raise HTTPException(status_code=503, detail="Supabase storage is required for this operation")
+    """Compatibility guard retained until the final configuration cleanup."""
+    if env_config.is_production_env() and not os.getenv("DATABASE_URL", "").strip():
+        raise HTTPException(status_code=503, detail="PostgreSQL is required for this operation")
 
 
 def require_openai_enabled_for_ai_route() -> None:

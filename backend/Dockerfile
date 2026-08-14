@@ -11,6 +11,7 @@ RUN pip install --no-cache-dir -r backend/requirements.lock
 
 COPY backend/ backend/
 COPY resources/ resources/
+COPY db/ db/
 
 WORKDIR /app/backend
 

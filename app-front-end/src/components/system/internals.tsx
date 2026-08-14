@@ -107,7 +107,7 @@ export function FundIntelligenceSummary({ startups, fundConfiguration }: { start
             <div key={item.label} className="flex flex-col gap-phi-1">
               <span className="type-data text-[clamp(22px,2vw,30px)] leading-none text-oxford">{item.value}</span>
               <span className="type-label-section">{item.label}</span>
-              {item.detail ? <span className="type-meta text-oxford/60">{item.detail}</span> : null}
+              {item.detail ? <span className="type-meta text-oxford/65">{item.detail}</span> : null}
             </div>
           ))}
         </div>
@@ -118,12 +118,12 @@ export function FundIntelligenceSummary({ startups, fundConfiguration }: { start
             {snapshot.commonRiskThemes.map((item) => (
               <li key={item.theme} className="flex items-baseline justify-between gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0">
                 <span className="type-note text-oxford/[0.68]">{item.theme}</span>
-                <span className="type-data text-oxford/60">{item.count}</span>
+                <span className="type-data text-oxford/65">{item.count}</span>
               </li>
             ))}
           </ul>
         ) : (
-          <p className="type-note text-oxford/60 leading-relaxed max-w-xl">
+          <p className="type-note text-oxford/65 leading-relaxed max-w-xl">
             No recurring risk themes are extractable from the current resolved set.
           </p>
         )}
@@ -179,7 +179,7 @@ export function AnalyticsTab({ rejection }: {
               <div key={rf.flag} className="flex flex-col gap-phi-2">
                 <div className="flex justify-between items-baseline">
                   <span className="type-label-section">{rf.flag.replace(/_/g, ' ')}</span>
-                  <span className="type-data text-oxford/60">{rf.count}</span>
+                  <span className="type-data text-oxford/65">{rf.count}</span>
                 </div>
                 <TacticalBar pct={(rf.count / maxRedFlag) * 100} delay={i * 0.05} />
               </div>
@@ -198,7 +198,7 @@ export function MandateSpecRow({ label, value }: { label: string; value: string 
       {value ? (
         <p className="type-body-sm leading-relaxed text-oxford/[0.78]">{value}</p>
       ) : (
-        <p className="type-body-sm text-oxford/60">Not specified</p>
+        <p className="type-body-sm text-oxford/65">Not specified</p>
       )}
     </div>
   );
@@ -287,7 +287,7 @@ export function InstitutionalMandateTab({
         {notes.length > 0 ? (
           <div className="mt-phi-3 flex max-w-[38rem] flex-col gap-phi-1">
             {notes.map((line) => (
-              <p key={line} className="type-body-sm leading-relaxed text-oxford/60">
+              <p key={line} className="type-body-sm leading-relaxed text-oxford/65">
                 {line}
               </p>
             ))}
@@ -313,11 +313,11 @@ export function InstitutionalMandateTab({
                 key={v.id}
                 className="flex flex-wrap items-baseline justify-between gap-phi-3 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0"
               >
-                <span className={`type-meta ${v.is_active ? 'text-oxford/80' : 'text-oxford/60'}`}>
+                <span className={`type-meta ${v.is_active ? 'text-oxford/80' : 'text-oxford/65'}`}>
                   v{v.version_number}
                   {v.is_active ? ' · active' : ''}
                 </span>
-                <span className="type-meta tabular-nums text-oxford/60">
+                <span className="type-meta tabular-nums text-oxford/65">
                   {formatDate(v.created_at)}
                 </span>
               </li>
@@ -410,7 +410,7 @@ export function LearningTab({
               : ''}
           </p>
         ) : (
-          <p className="type-body-sm text-oxford/60">
+          <p className="type-body-sm text-oxford/65">
             No attributed human-feedback sample was recorded for this cycle.
           </p>
         )}
@@ -427,7 +427,7 @@ export function LearningTab({
                 <p className="type-body-sm text-oxford/75">
                   Refine {readableAgentName(change.agent_target)}
                 </p>
-                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/60">{change.reasoning}</p> : null}
+                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/65">{change.reasoning}</p> : null}
               </div>
             ))}
             {weightChanges.map((change, index) => (
@@ -435,7 +435,7 @@ export function LearningTab({
                 <p className="type-body-sm text-oxford/75">
                   Rebalance {readableAgentName(change.agent_target)}
                 </p>
-                <p className="type-note mt-phi-1 tabular-nums text-oxford/60">
+                <p className="type-note mt-phi-1 tabular-nums text-oxford/65">
                   {Math.round(change.previous_weight * 100)}% → {Math.round(change.new_weight * 100)}%
                 </p>
               </div>
@@ -446,7 +446,7 @@ export function LearningTab({
                   {change.parameter.replace(/_/g, ' ')}
                   {change.direction ? ` · ${change.direction}` : ''}
                 </p>
-                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/60">{change.reasoning}</p> : null}
+                {change.reasoning ? <p className="type-note mt-phi-1 leading-relaxed text-oxford/65">{change.reasoning}</p> : null}
               </div>
             ))}
           </div>
@@ -457,7 +457,7 @@ export function LearningTab({
         <TabSection title="Why no further change" label="Evidence threshold">
           <div className="flex max-w-[44rem] flex-col gap-phi-2 border-l border-oxford/20 pl-phi-4">
             {why.map((line, index) => (
-              <p key={index} className="type-note leading-relaxed text-oxford/60">{line}</p>
+              <p key={index} className="type-note leading-relaxed text-oxford/65">{line}</p>
             ))}
           </div>
         </TabSection>
@@ -588,7 +588,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           {lastReport?.analysis_only === false ? 'Governed promotion recorded' : 'Analysis only · production unchanged'}
         </p>
         {humanFbLine && (
-          <p className="type-note max-w-2xl mt-phi-3 text-oxford/60">{humanFbLine}</p>
+          <p className="type-note max-w-2xl mt-phi-3 text-oxford/65">{humanFbLine}</p>
         )}
       </AnimatedTabBlock>
       <AnimatedTabBlock className="border-b border-oxford/[0.06] px-phi-4 py-phi-5">
@@ -608,18 +608,18 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           {useInsight && whatChangedTotal > 0 && (
             <div className="mt-phi-3 flex max-w-[44rem] flex-col">
               {insightMutations.map((m, i) => (
-                <p key={`mut-${m.agent_target}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p key={`mut-${m.agent_target}-${i}`} className="type-note text-oxford/65 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                   <span className="text-oxford/70">{m.agent_target}</span>
                   {m.reasoning ? ` — ${m.reasoning}` : ''}
                 </p>
               ))}
               {insightWeights.map((w, i) => (
-                <p key={`wt-${w.agent_target}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0 tabular-nums">
+                <p key={`wt-${w.agent_target}-${i}`} className="type-note text-oxford/65 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0 tabular-nums">
                   {w.agent_target}: {Math.round((w.previous_weight ?? 0) * 100)}% → {Math.round((w.new_weight ?? 0) * 100)}%
                 </p>
               ))}
               {insightCalibrations.map((c, i) => (
-                <p key={`cal-${c.parameter}-${i}`} className="type-note text-oxford/60 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+                <p key={`cal-${c.parameter}-${i}`} className="type-note text-oxford/65 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                   <span className="text-oxford/70">{c.parameter.replace(/_/g, ' ')}</span>
                   {c.direction ? ` (${c.direction})` : ''}
                   {c.reasoning ? ` — ${c.reasoning}` : ''}
@@ -631,7 +631,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
             <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-2 border-l border-oxford/20 pl-phi-4">
               <span className="type-label-section">Why no further action</span>
               {whyLines.map((line, i) => (
-                <p key={i} className="type-note text-oxford/60">{line}</p>
+                <p key={i} className="type-note text-oxford/65">{line}</p>
               ))}
             </div>
           )}
@@ -656,12 +656,12 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           <span className="type-action hidden group-open:inline">Hide</span>
         </summary>
         <div className="flex flex-col pb-phi-2">
-        <p className="type-body text-oxford/60 leading-relaxed px-phi-4 pt-phi-3 max-w-2xl">
+        <p className="type-body text-oxford/65 leading-relaxed px-phi-4 pt-phi-3 max-w-2xl">
           You can ignore this unless the correction cycle has produced <span className="text-oxford/75">pending prompt drafts</span> and you want to test or turn them on.
           Day-to-day deal work and your Invest / Pass / Monitor confirmations do not depend on anything here—the product runs on built-in prompts until you explicitly promote a draft.
         </p>
       <TabSection title="Bench list" label="For Evaluate only">
-        <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">
+        <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">
           Paste internal startup IDs from your pipeline (one per line, up to {metaEvalSet.max}). When you press <span className="text-oxford/65">Evaluate</span> on a pending <em>reviewer</em> prompt, the system re-runs that reviewer on these deals with the proposed instructions and compares to saved scores—cheap guardrail before going live. Each ID is one extra model call.
         </p>
         <textarea
@@ -694,32 +694,32 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           >
             Save bench list
           </button>
-          <span className="type-meta text-oxford/60">Saved: {metaEvalSet.count}</span>
+          <span className="type-meta text-oxford/65">Saved: {metaEvalSet.count}</span>
         </div>
-        {evalSaveNote && <p className="type-meta text-oxford/60 mt-phi-2">{evalSaveNote}</p>}
+        {evalSaveNote && <p className="type-meta text-oxford/65 mt-phi-2">{evalSaveNote}</p>}
       </TabSection>
 
       <TabSection title="Prompt drafts" label="Active vs pending">
-        <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">
+        <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">
           The meta cycle can propose new instructions for scouts/reviewers. <span className="text-oxford/65">Active</span> is what runs today (empty = product defaults).
           <span className="text-oxford/65"> Pending</span> is queued proposals—use <span className="text-oxford/65">Promote</span> to make one live, or <span className="text-oxford/65">Reset</span> to drop back to defaults.
           Your org may require a passing <span className="text-oxford/65">Evaluate</span> before Promote for reviewers.
         </p>
         {promptState.restart_note && (
-          <p className="type-note mb-phi-3 max-w-2xl text-oxford/60">{promptState.restart_note}</p>
+          <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">{promptState.restart_note}</p>
         )}
         <div className="flex flex-col gap-phi-4">
           <div>
             <span className="type-status mb-phi-2 block">Active (live)</span>
             {Object.keys(promptState.active).length === 0 ? (
-              <p className="type-meta text-oxford/60">None—using built-in prompts.</p>
+              <p className="type-meta text-oxford/65">None—using built-in prompts.</p>
             ) : (
               <div className="flex flex-col divide-y divide-oxford/[0.06] border-y border-oxford/[0.06]">
                 {Object.entries(promptState.active).map(([agent, libKey]) => (
                   <div key={agent} className="flex flex-wrap items-center justify-between gap-phi-3 py-phi-3">
                     <div className="min-w-0">
                       <span className="type-meta text-oxford/70">{agent}</span>
-                      <p className="type-meta text-oxford/60 truncate max-w-xl" title={libKey}>{libKey}</p>
+                      <p className="type-meta text-oxford/65 truncate max-w-xl" title={libKey}>{libKey}</p>
                     </div>
                     <button
                       type="button"
@@ -747,7 +747,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           <div>
             <span className="type-status mb-phi-2 block">Pending (not live yet)</span>
             {promptState.pending.length === 0 ? (
-              <p className="type-meta text-oxford/60">Nothing queued—defaults or only active prompts.</p>
+              <p className="type-meta text-oxford/65">Nothing queued—defaults or only active prompts.</p>
             ) : (
               <div className="flex flex-col divide-y divide-oxford/[0.06] border-y border-oxford/[0.06] max-h-[280px] overflow-y-auto">
                 {promptState.pending.map((p) => {
@@ -757,11 +757,11 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                     <div key={p.library_key} className="flex flex-wrap items-start justify-between gap-phi-3 py-phi-3">
                       <div className="min-w-0 flex-1">
                         <span className="type-meta text-oxford/70">{agent}</span>
-                        <p className="type-meta text-oxford/60 break-all">{p.library_key}</p>
+                        <p className="type-meta text-oxford/65 break-all">{p.library_key}</p>
                         {p.reasoning && (
-                          <p className="type-meta text-oxford/60 mt-phi-1 line-clamp-2">{p.reasoning}</p>
+                          <p className="type-meta text-oxford/65 mt-phi-1 line-clamp-2">{p.reasoning}</p>
                         )}
-                        <p className="type-meta text-oxford/60 mt-phi-1">
+                        <p className="type-meta text-oxford/65 mt-phi-1">
                           {p.prompt_char_count != null ? `${p.prompt_char_count} chars` : ''}
                           {p.created_at ? ` · ${formatDateTime(p.created_at)}` : ''}
                         </p>
@@ -820,7 +820,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
           <div className="mt-phi-4 max-w-3xl border-t border-oxford/[0.08] pt-phi-3">
             <span className="type-label-section mb-phi-2 block">Last evaluation</span>
             {!evalResult.ok && evalResult.error && (
-              <p className="type-meta text-oxford/60">{evalResult.error}</p>
+              <p className="type-meta text-oxford/65">{evalResult.error}</p>
             )}
             {evalResult.summary && (
               <div className="flex flex-col gap-phi-2 type-meta text-oxford/65">
@@ -836,14 +836,14 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                   mean |Δscore| {evalResult.summary.mean_abs_score_delta}
                 </p>
                 {evalResult.truncated && (
-                  <p className="text-oxford/60">Truncated to {evalResult.max_startups} startups.</p>
+                  <p className="text-oxford/65">Truncated to {evalResult.max_startups} startups.</p>
                 )}
               </div>
             )}
             {evalResult.rows && evalResult.rows.length > 0 && (
               <details className="mt-phi-3">
-                <summary className="type-meta text-oxford/60 cursor-pointer">Per startup</summary>
-                <ul className="mt-phi-2 space-y-phi-1 type-meta text-oxford/60 max-h-40 overflow-y-auto">
+                <summary className="type-meta text-oxford/65 cursor-pointer">Per startup</summary>
+                <ul className="mt-phi-2 space-y-phi-1 type-meta text-oxford/65 max-h-40 overflow-y-auto">
                   {evalResult.rows.map((row) => (
                     <li key={row.startup_id}>
                       {row.startup_id.slice(0, 8)}… {row.status}
@@ -873,7 +873,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
             <div key={name} className="flex flex-col gap-phi-2">
               <div className="flex justify-between items-baseline">
                 <span className="type-label-section">{name}</span>
-                <span className="type-data text-oxford/60">{Math.round(w * 100)}%</span>
+                <span className="type-data text-oxford/65">{Math.round(w * 100)}%</span>
               </div>
               <TacticalBar pct={w * 100} delay={i * 0.1} />
             </div>
@@ -890,14 +890,14 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
               <div key={i} className="grid grid-cols-[110px_1fr] items-start gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
                 <span
                   className={`type-status ${
-                    h.direction === 'tightened' ? 'text-escalation/85' : 'text-oxford/60'
+                    h.direction === 'tightened' ? 'text-escalation/85' : 'text-oxford/65'
                   }`}
                 >
                   {h.direction}
                 </span>
                 <div className="flex min-w-0 flex-col gap-phi-1">
                   <span className="type-meta text-oxford/70">{h.parameter.replace(/_/g, ' ')}</span>
-                  <p className="type-meta leading-relaxed text-oxford/60">{h.reasoning}</p>
+                  <p className="type-meta leading-relaxed text-oxford/65">{h.reasoning}</p>
                 </div>
               </div>
             ))}

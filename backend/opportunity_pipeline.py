@@ -29,6 +29,12 @@ from identity.models import IdentityAdmission, SourceObservationInput
 from tenant_context import require_user_id
 from triage.models import TriageDisposition
 from agents.canonical import DeterministicPartner, EvidenceReviewer
+from regulatory_context import (
+    assemble_regulatory_context,
+    deduplicate_references,
+    derive_regulatory_claims,
+)
+from canonical_scout_claims import derive_scout_claims
 
 
 @dataclass(frozen=True)
@@ -74,12 +80,20 @@ class OpportunityPipeline:
         trigger: str = "manual_lookup",
         references: Iterable[Dict[str, Any]] = (),
         claims: Iterable[Dict[str, Any]] = (),
+        scout_output: Optional[Dict[str, Any]] = None,
+        judgment_audit: Optional[Dict[str, Any]] = None,
     ) -> PipelineResult:
         uid = require_user_id(user_id, context="OpportunityPipeline.process")
         if observation.user_id != uid:
             raise ValueError("observation tenant does not match pipeline tenant")
-        references = list(references)
+        references = deduplicate_references(references)
         claims = list(claims)
+        if scout_output is not None:
+            existing_claim_types = {str(raw.get("claim_type") or "") for raw in claims}
+            claims.extend(
+                raw for raw in derive_scout_claims(scout_output)
+                if raw.get("claim_type") not in existing_claim_types
+            )
         admission: IdentityAdmission = await self.identity_service.admit(observation)
         if admission.blocks_evaluation or not admission.opportunity_id or not admission.company_id:
             return PipelineResult(
@@ -113,6 +127,7 @@ class OpportunityPipeline:
 
         artifact_ids: list[str] = []
         evidence_item_ids: list[str] = []
+        reference_items: list[list[Any]] = []
         for ref in references:
             uri = str(ref.get("url") or ref.get("source_uri") or "").strip()
             if not uri:
@@ -127,7 +142,8 @@ class OpportunityPipeline:
                     source_uri=uri, title=ref.get("title"),
                     content_hash=hashlib.sha256(content.encode()).hexdigest(),
                     trust_class=TrustClass.OFFICIAL if ref.get("official") else TrustClass.UNKNOWN,
-                    access_class=AccessClass.PUBLIC, untrusted_input=True,
+                    access_class=AccessClass(str(ref.get("access_class") or AccessClass.PUBLIC.value)),
+                    untrusted_input=True,
                     prompt_injection_detected=detect_prompt_injection(content),
                     effective_at=ref.get("effective_at"),
                 ),
@@ -146,17 +162,55 @@ class OpportunityPipeline:
                 str(item.evidence_item_id) for item in items
                 if getattr(item, "evidence_item_id", None)
             )
+            reference_items.append(list(items))
 
         # Claims are supplied by a bounded extractor; arbitrary model prose is
         # never converted into a decision implicitly.
-        for raw in claims:
-            linked_ids = raw.get("evidence_item_ids") or evidence_item_ids
+        existing_claim_types = {str(raw.get("claim_type") or "") for raw in claims}
+        regulatory_claims = [
+            raw for raw in derive_regulatory_claims(references)
+            if raw.get("claim_type") not in existing_claim_types
+        ]
+        pending_claims = claims + regulatory_claims
+        persisted_claims: list[dict[str, Any]] = []
+        persisted_links: list[dict[str, Any]] = []
+        evidence_details = {
+            str(item.evidence_item_id): {
+                "display_excerpt": getattr(item, "display_excerpt", ""),
+                "source_locator": getattr(item, "source_locator", ""),
+            }
+            for items in reference_items
+            for item in items
+            if getattr(item, "evidence_item_id", None)
+        }
+        for raw in pending_claims:
+            supporting_ids = [
+                str(item.evidence_item_id)
+                for index in raw.get("_supporting_indexes", [])
+                if 0 <= index < len(reference_items)
+                for item in reference_items[index]
+                if getattr(item, "evidence_item_id", None)
+            ]
+            contradicting_ids = [
+                str(item.evidence_item_id)
+                for index in raw.get("_contradicting_indexes", [])
+                if 0 <= index < len(reference_items)
+                for item in reference_items[index]
+                if getattr(item, "evidence_item_id", None)
+            ]
+            linked_ids = raw.get("evidence_item_ids") or supporting_ids or evidence_item_ids
             links = [ClaimEvidenceLinkInput(
                 user_id=uid, evidence_item_id=str(item_id),
                 relationship=EvidenceRelationship.SUPPORTS,
                 support_strength=float(raw.get("support_strength") or 0),
             ) for item_id in linked_ids]
-            await self.evidence_repository.create_claim(
+            links.extend(ClaimEvidenceLinkInput(
+                user_id=uid, evidence_item_id=item_id,
+                relationship=EvidenceRelationship.CONTRADICTS,
+                support_strength=float(raw.get("support_strength") or 0),
+                rationale="Decision-time regulatory evidence conflicts with this claim.",
+            ) for item_id in contradicting_ids if item_id not in linked_ids)
+            persisted = await self.evidence_repository.create_claim(
                 ClaimInput(
                     user_id=uid, company_id=admission.company_id,
                     opportunity_id=admission.opportunity_id,
@@ -169,14 +223,31 @@ class OpportunityPipeline:
                 ),
                 links=links, created_by=actor_id or uid,
             )
+            claim_id = str(persisted.get("claim_id") or "")
+            persisted_claims.append({**persisted, "claim_id": claim_id})
+            persisted_links.extend(
+                {
+                    "claim_id": claim_id,
+                    **link.model_dump(mode="json"),
+                    **evidence_details.get(link.evidence_item_id, {}),
+                }
+                for link in links
+            )
 
         evaluation = await self.evaluation_repository.evaluate(
             user_id=uid, opportunity_id=admission.opportunity_id,
             actor_id=actor_id or uid, trigger_type=trigger,
             policy=prerequisites.policy,
             thesis_version_id=prerequisites.thesis_version_id,
+            judgment_audit=judgment_audit,
         )
-        evidence_review = EvidenceReviewer().review(evaluation)
+        regulatory_context = assemble_regulatory_context(
+            claims=persisted_claims,
+            evidence=persisted_links,
+        )
+        evidence_review = EvidenceReviewer().review(
+            evaluation, regulatory_context=regulatory_context
+        )
         partner_route = DeterministicPartner().route(evaluation, evidence_review)
         return PipelineResult(
             status="completed", code="opportunity_evaluated", user_id=uid,
@@ -186,5 +257,7 @@ class OpportunityPipeline:
                 "artifact_ids": artifact_ids,
                 "evidence_review": evidence_review.model_dump(mode="json"),
                 "partner_route": partner_route.model_dump(mode="json"),
+                "regulatory_context": regulatory_context,
+                "legacy_compatibility": True,
             },
         )

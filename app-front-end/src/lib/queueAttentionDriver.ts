@@ -113,8 +113,8 @@ export function getConvictionTier(pct: number | null): ConvictionTier {
 
 /** Queue docket — monochrome conviction (no tier colour ramp). */
 export const QUEUE_CONVICTION_CLASS = {
-  ambient: 'text-oxford/60 font-normal tabular-nums',
-  prominent: 'text-oxford/60 font-normal tabular-nums',
+  ambient: 'text-oxford/65 font-normal tabular-nums',
+  prominent: 'text-oxford/65 font-normal tabular-nums',
 } as const;
 
 /** @deprecated Memo / rich UI only — queue uses QUEUE_CONVICTION_CLASS. */
@@ -122,8 +122,8 @@ export const CONVICTION_TIER_CLASS: Record<
   ConvictionTier,
   { ambient: string; prominent: string }
 > = {
-  none: { ambient: 'text-oxford/60 font-normal', prominent: 'text-oxford/60 font-normal' },
-  low: { ambient: 'text-oxford/60 font-normal', prominent: 'text-oxford/60 font-normal' },
+  none: { ambient: 'text-oxford/65 font-normal', prominent: 'text-oxford/65 font-normal' },
+  low: { ambient: 'text-oxford/65 font-normal', prominent: 'text-oxford/65 font-normal' },
   mid: { ambient: 'text-oxford/[0.68] font-medium', prominent: 'text-oxford/[0.72] font-medium' },
   high: { ambient: 'text-oxford/[0.88] font-semibold', prominent: 'text-oxford font-semibold' },
 };

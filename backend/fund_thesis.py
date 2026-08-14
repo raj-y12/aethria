@@ -677,6 +677,22 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
     logger.info("[FundThesis] Auto-created default thesis for user_id=%s", uid[:24])
 
 
+async def bootstrap_default_thesis_with_repository(repository: Any, uid: str) -> None:
+    """Bootstrap or repair the default thesis through the shared PostgreSQL repository."""
+    from tenant_context import require_user_id
+
+    user_id = require_user_id(uid, context="bootstrap_default_thesis_with_repository")
+    result = await repository.ensure_default(
+        user_id,
+        raw_text=generate_default_thesis_raw_text(),
+        parsed_json=dict(DEFAULT_THESIS_PARSED_JSON),
+    )
+    logger.info(
+        "[FundThesis] PostgreSQL bootstrap user_id=%s version=%s skipped=%s",
+        user_id[:24], result["version_number"], result["skipped"],
+    )
+
+
 def get_active_thesis(
     client: Any, user_id: str, *, use_cache: bool = True
 ) -> Optional[ActiveThesis]:
@@ -705,6 +721,43 @@ def get_active_thesis(
         raise  # never cache transient/unknown-state errors
     except FundThesisMissingError:
         result = None
+    if use_cache:
+        _cache_store_full(uid, result)
+    return result
+
+
+async def get_active_thesis_from_repository(
+    repository: Any,
+    user_id: str,
+    *,
+    use_cache: bool = True,
+) -> Optional[ActiveThesis]:
+    """Resolve the active thesis through a provider-neutral async repository."""
+    uid = require_user_id(user_id, context="get_active_thesis_from_repository")
+    if use_cache and _thesis_cache_ttl() > 0:
+        now = time.monotonic()
+        with _thesis_cache_lock:
+            hit = _thesis_full_cache.get(uid)
+        if hit is not None and hit[0] > now:
+            return hit[1]
+
+    row = await repository.get_active(uid, include_embedding=True)
+    if row is None:
+        return None
+    result = ActiveThesis(
+        thesis_id=str(row["thesis_id"]),
+        version_id=str(row["version_id"]),
+        version_number=int(row["version_number"]),
+        raw_text=str(row.get("raw_text") or ""),
+        parsed_json=dict(row.get("parsed_json") or {}),
+        embedding=[float(value) for value in row.get("embedding") or []],
+        embedding_model=str(row.get("embedding_model") or "none"),
+        thesis_updated_at=(
+            str(row["thesis_updated_at"])
+            if row.get("thesis_updated_at") is not None
+            else None
+        ),
+    )
     if use_cache:
         _cache_store_full(uid, result)
     return result
@@ -743,22 +796,6 @@ def get_active_thesis_metadata(
     if use_cache:
         _cache_store_meta(uid, meta)
     return meta
-
-
-def count_user_startups(client: Any, user_id: str) -> int:
-    uid = require_user_id(user_id, context="count_user_startups")
-    try:
-        r = (
-            client.table("startups")
-            .select("startup_id", count="exact")
-            .eq("user_id", uid)
-            .limit(1)
-            .execute()
-        )
-        return int(getattr(r, "count", None) or 0)
-    except Exception as e:
-        logger.warning("count_user_startups failed: %s", e)
-        return 0
 
 
 def insert_thesis_pipeline_link(
@@ -849,11 +886,10 @@ def compute_thesis_alignment_stats(
     active_version_id: str,
     previous_version_id: Optional[str] = None,
     row_limit: int = 2000,
+    startup_rows: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
-    Aggregate thesis alignment from startups.review_info (best-effort, bounded page size).
-    Uses a projected query (only the 3 thesis sub-fields) rather than fetching the full
-    review_info blob, to keep Supabase egress / response size small under polling load.
+    Aggregate thesis alignment from a bounded StartupRepository projection.
     """
     uid = require_user_id(user_id, context="compute_thesis_alignment_stats")
     active_version_id = active_version_id.strip()
@@ -864,25 +900,7 @@ def compute_thesis_alignment_stats(
     match_active = 0
     total_active = 0
     row_limit = max(1, min(int(row_limit), 2000))
-    try:
-        r = (
-            client.table("startups")
-            .select(_THESIS_ALIGNMENT_PROJECTION)
-            .eq("user_id", uid)
-            .not_.is_("review_info", "null")
-            .limit(row_limit)
-            .execute()
-        )
-        rows = getattr(r, "data", None) or []
-    except Exception as e:
-        logger.warning("compute_thesis_alignment_stats failed: %s", e)
-        return {
-            "reviewed_with_thesis_count": 0,
-            "pct_matching_thesis": None,
-            "avg_alignment_score": None,
-            "drift_vs_previous": None,
-            "embedding_dimensions": None,
-        }
+    rows = (startup_rows or [])[:row_limit]
 
     for row in rows:
         score, matches, vid = _projected_thesis_fields(row)

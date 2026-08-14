@@ -5,6 +5,7 @@ Used by the per-user agent queue: explicit user_id on every storage path (no run
 import asyncio
 import copy
 import gc
+import inspect
 import logging
 import os
 import re
@@ -53,17 +54,19 @@ from pipeline_execution import (
     StageExecutionState,
 )
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
-from utils.settings_loader import load_settings, is_thesis_reprocess_agents_enabled
-from supabase_client import get_service_client
-from supabase_storage import SupabaseStartupsStorage
+from utils.settings_loader import load_settings
 from pipeline_state import upsert_pipeline_state
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
+from people.repository import PeopleRepository
+from evidence.repository import EvidenceRepository
+from identity.repository import IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
 from portfolio.engine import PortfolioEngine
 from portfolio.cost_control import CostController
 from memory import DealMemory
+from settings_repository import SettingsRepository
 from meta.agent import MetaAgent
 from memo_generator import MemoGenerator
 from fund_thesis import (
@@ -76,11 +79,67 @@ from identity.acquisition import observation_from_scout_discovery
 from identity.projection import link_admission_projection
 from identity.service import IdentityService
 from jobs.models import JobLeaseLost
+
+
+# Compatibility seams for isolated legacy tests/imports. Normal runtime paths
+# never call these; production requires the asyncpg StartupRepository path.
+SupabaseStartupsStorage = None
+
+
+def get_service_client():
+    from supabase_client import get_service_client as _get_service_client
+
+    return _get_service_client()
 from utils.reference_validation import is_generic_reference
 from utils.prompt_version import hash_prompt
+from regulatory_context import CanonicalReviewerRegulatoryContextProvider
+from context_assembler import CanonicalContextProvider
+from identity.repository import IdentityRepository
+from evidence.repository import EvidenceRepository
+from batch1.context import reset_state, set_state
+from batch1.repository import Batch1Repository
+from batch2.context import reset_state as reset_batch2_state, set_state as set_batch2_state
+from batch2.repository import Batch2Repository
+from batch3.context import reset_state as reset_batch3_state, set_state as set_batch3_state
+from batch3.repository import Batch3Repository
+from batch4a.context import reset_state as reset_batch4a_state, set_state as set_batch4a_state, get_state as get_batch4a_state
+from batch4a.repository import Batch4ARepository
+from startup_repository import StartupReadStorageAdapter, StartupRepository
+from startup_id_alias_repository import StartupIdAliasRepository
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
+
+
+def _settings_repository_for(repository_owner: Any) -> SettingsRepository | None:
+    pool = getattr(repository_owner, "pool", None)
+    return SettingsRepository(pool) if pool is not None else None
+
+
+async def _load_settings_for_repository(
+    user_id: str,
+    repository: SettingsRepository | None,
+    *,
+    use_cache: bool = True,
+) -> dict:
+    if inspect.iscoroutinefunction(load_settings):
+        result = load_settings(user_id, repository=repository, use_cache=use_cache)
+    else:
+        try:
+            result = await asyncio.to_thread(
+                load_settings,
+                user_id,
+                repository=repository,
+                use_cache=use_cache,
+            )
+        except TypeError:
+            try:
+                result = await asyncio.to_thread(
+                    load_settings, user_id, use_cache=use_cache
+                )
+            except TypeError:
+                result = await asyncio.to_thread(load_settings, user_id)
+    return await result if inspect.isawaitable(result) else result
 
 DEFAULT_SCOUT_MODEL = "gpt-5-nano"
 DEFAULT_REVIEWER_MODEL = "gpt-5-nano"
@@ -185,12 +244,16 @@ def _capture_pipeline_manifest_identity(
 def _build_pipeline_engines(
     *,
     user_id: str,
-    storage: SupabaseStartupsStorage,
+    storage: Any,
     api_key: str,
     settings: Dict[str, Any],
     thesis_ctx=None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites] = None,
     use_resource_fund_thesis_fallback: bool = True,
+    postgres_pool: Optional[Any] = None,
+    startup_repository: Optional[StartupRepository] = None,
+    startup_snapshot: Any = None,
+    startup_aliases: Optional[Dict[str, str]] = None,
 ) -> _PipelineEngines:
     uid = require_user_id(user_id, context="_build_pipeline_engines")
     if evaluation_prerequisites is not None:
@@ -211,8 +274,13 @@ def _build_pipeline_engines(
     cost_controller = CostController(
         user_id=user_id,
         enforce_limits=cost_budget_enabled,
+        settings=settings,
     )
-    deal_memory = DealMemory(user_id=user_id)
+    deal_memory = (
+        DealMemory(user_id=user_id, pool=postgres_pool)
+        if postgres_pool is not None
+        else DealMemory(user_id=user_id)
+    )
     model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
     reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
     partner_model = os.getenv("PARTNER_MODEL", "gpt-5-nano")
@@ -231,6 +299,33 @@ def _build_pipeline_engines(
         deal_memory=deal_memory,
         tenant_user_id=user_id,
         active_thesis=copy.deepcopy(thesis_ctx),
+        settings=settings,
+        startup_repository=startup_repository,
+    )
+    regulatory_context_loader = (
+        CanonicalReviewerRegulatoryContextProvider(
+            IdentityRepository(postgres_pool),
+            EvidenceRepository(postgres_pool),
+        )
+        if postgres_pool is not None
+        else None
+    )
+    canonical_context_loader = (
+        CanonicalContextProvider(
+            IdentityRepository(postgres_pool),
+            EvidenceRepository(postgres_pool),
+        )
+        if postgres_pool is not None
+        else None
+    )
+    founder_persister = (
+        PeopleRepository(
+            postgres_pool,
+            identity_repository=IdentityRepository(postgres_pool),
+            evidence_repository=EvidenceRepository(postgres_pool),
+        ).persist_founder_resolution
+        if postgres_pool is not None
+        else None
     )
     reviewer_engine = ReviewerEngine(
         api_key=api_key,
@@ -244,9 +339,19 @@ def _build_pipeline_engines(
         active_thesis=copy.deepcopy(thesis_ctx),
         use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
         evaluation_prerequisites=evaluation_prerequisites,
+        regulatory_context_loader=regulatory_context_loader,
+        canonical_context_loader=canonical_context_loader,
+        founder_persister=founder_persister,
+        settings=settings,
+        startup_repository=startup_repository,
     )
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
-    portfolio_store = PortfolioStore(data_dir=portfolio_dir, user_id=user_id)
+    portfolio_store = PortfolioStore(
+        data_dir=portfolio_dir,
+        user_id=user_id,
+        canonical_startups=(startup_snapshot.rows if startup_snapshot is not None else None),
+        legacy_startup_aliases=startup_aliases,
+    )
     partner_engine = PartnerEngine(
         storage=storage,
         interval_seconds=30,
@@ -260,6 +365,8 @@ def _build_pipeline_engines(
         evaluation_prerequisites=evaluation_prerequisites,
         model=partner_model,
         include_deal_context_digest=include_deal_context_digest,
+        settings=settings,
+        startup_repository=startup_repository,
     )
     engines = _PipelineEngines(
         scout_engine=scout_engine,
@@ -288,6 +395,14 @@ def _build_pipeline_engines(
         bind_manifest_identity(manifest_identity)
         engines.evaluation_manifest_identity = manifest_identity
     return engines
+
+
+async def _initialize_deal_memory(engines: _PipelineEngines) -> None:
+    """Initialize direct-PostgreSQL memory after async pipeline construction."""
+    memory = getattr(engines.scout_engine, "deal_memory", None)
+    initialize = getattr(memory, "initialize", None)
+    if callable(initialize):
+        await initialize()
 
 
 def _close_pipeline_engines(*engines: object) -> None:
@@ -333,11 +448,14 @@ def _usage_snapshot(cost_controller: Optional[CostController]) -> Dict[str, Any]
     return cost_controller.snapshot_usage()
 
 
-def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
-    """Blocking client/storage construction; call via asyncio.to_thread."""
+def _build_storage_sync(user_id: str, settings: Optional[Dict[str, Any]] = None) -> Any:
+    """Legacy local-test fallback; production callers are fenced before entry."""
     from jobs.fencing import current_lease_fence
+    storage_type = SupabaseStartupsStorage
+    if storage_type is None:
+        from supabase_storage import SupabaseStartupsStorage as storage_type
 
-    storage = SupabaseStartupsStorage(get_service_client(), user_id)
+    storage = storage_type(get_service_client(), user_id, settings=settings)
     ownership_fence = current_lease_fence()
     if ownership_fence is not None:
         storage.bind_ownership_fence(ownership_fence)
@@ -347,6 +465,7 @@ def _build_storage_sync(user_id: str) -> SupabaseStartupsStorage:
 def _load_active_thesis_sync(user_id: str, *, tolerate_bootstrap_failure: bool = False):
     """Read (bootstrapping if absent) the active thesis. Blocking Supabase I/O;
     call via asyncio.to_thread. May raise FundThesisIncompleteError."""
+    from fund_thesis import get_active_thesis
     svc = get_service_client()
     active = get_active_thesis(svc, user_id)
     if active is None:
@@ -360,19 +479,16 @@ def _load_active_thesis_sync(user_id: str, *, tolerate_bootstrap_failure: bool =
     return active
 
 
+async def _count_startups(repository: StartupRepository, user_id: str) -> int:
+    return await repository.count_tenant(user_id)
+
+
 def _count_startups_sync(user_id: str) -> int:
-    """Blocking Supabase count; call via asyncio.to_thread."""
-    r = (
-        get_service_client()
-        .table("startups")
-        .select("startup_id", count="exact")
-        .eq("user_id", user_id)
-        .execute()
-    )
-    return int(getattr(r, "count", None) or 0)
+    """Removed runtime seam retained only for stale test monkeypatches."""
+    raise RuntimeError("StartupRepository PostgreSQL pool is required")
 
 
-def _safe_stage_count(storage: SupabaseStartupsStorage, method_name: str, user_id: str) -> Optional[int]:
+def _safe_stage_count(storage: Any, method_name: str, user_id: str) -> Optional[int]:
     """Best-effort counter for stage logging; never raise."""
     try:
         method = getattr(storage, method_name)
@@ -426,11 +542,16 @@ def _notify_startups_changed(user_id: str, reason: str) -> None:
 
 
 async def _prune_unreferenced_startups(
-    storage: SupabaseStartupsStorage,
+    storage: Any,
     user_id: str,
+    startup_repository: Optional[StartupRepository] = None,
 ) -> int:
     """Apply the mandatory reference gate without blocking the serving loop."""
-    removed = await asyncio.to_thread(storage.remove_startups_without_references)
+    removed = (
+        await startup_repository.remove_startups_without_references(user_id)
+        if startup_repository is not None
+        else await asyncio.to_thread(storage.remove_startups_without_references)
+    )
     if removed:
         logger.info("[%s] Reference gate pruned %s startup(s)", user_id[:12], removed)
         _notify_startups_changed(user_id, "reference_prune")
@@ -445,6 +566,9 @@ async def _admit_autonomous_discoveries(
     identity_repository: Any,
     identity_service: Optional[Any] = None,
     discoveries_are_persisted: bool = True,
+    startup_repository: Optional[StartupRepository] = None,
+    evidence_repository: Optional[Any] = None,
+    persisted_startup_ids: Optional[set[str]] = None,
 ) -> list[Any]:
     """Admit only reference-gated rows and quarantine ambiguous projections."""
 
@@ -461,7 +585,10 @@ async def _admit_autonomous_discoveries(
         if discoveries_are_persisted:
             # The reference prune is authoritative for compatibility survival. A
             # raw Scout result that no longer has a row must never create state.
-            if await asyncio.to_thread(storage.get_startup, startup_id) is None:
+            if (
+                startup_id not in (persisted_startup_ids or set())
+                and await asyncio.to_thread(storage.get_startup, startup_id) is None
+            ):
                 continue
         else:
             references = discovery.get("references")
@@ -490,12 +617,15 @@ async def _admit_autonomous_discoveries(
                     admission.identity_case_id,
                 )
                 continue
-            remover = getattr(storage, "remove_startup", None)
-            if not callable(remover):
-                raise RuntimeError(
-                    "Identity-blocked discovery cannot be removed from review queue"
-                )
-            await asyncio.to_thread(remover, startup_id)
+            if startup_repository is not None:
+                await startup_repository.remove_startup(user_id, startup_id)
+            else:
+                remover = getattr(storage, "remove_startup", None)
+                if not callable(remover):
+                    raise RuntimeError(
+                        "Identity-blocked discovery cannot be removed from review queue"
+                    )
+                await asyncio.to_thread(remover, startup_id)
             logger.info(
                 "[%s] Identity review blocked discovery startup_id=%s case_id=%s",
                 user_id[:12],
@@ -516,11 +646,67 @@ async def _admit_autonomous_discoveries(
             admission=admission,
             legacy_startup_id=startup_id,
         )
+        if evidence_repository is not None and admission.company_id and admission.opportunity_id:
+            from canonical_scout_claims import persist_scout_claims
+
+            bridge = await persist_scout_claims(
+                user_id=user_id,
+                company_id=admission.company_id,
+                opportunity_id=admission.opportunity_id,
+                observation_id=admission.observation_id,
+                scout_output=discovery,
+                evidence_repository=evidence_repository,
+            )
+            if bridge["claims_created"]:
+                logger.info(
+                    "[%s] canonical Scout bridge startup_id=%s claims=%d artifacts=%d",
+                    user_id[:12], startup_id, bridge["claims_created"], bridge["artifacts_ingested"],
+                )
     return admissions
 
 
+async def _admit_named_lookup_before_review(
+    *,
+    user_id: str,
+    startup_id: str,
+    scout_output: Dict[str, Any],
+    storage: Any,
+    identity_repository: Any,
+    evidence_repository: Optional[Any],
+    startup_repository: Optional[StartupRepository] = None,
+    founder_persister: Optional[Callable[..., Any]] = None,
+) -> Optional[Any]:
+    """Converge a persisted named lookup onto canonical authority before review."""
+    admissions = await _admit_autonomous_discoveries(
+        user_id=user_id,
+        discoveries=[scout_output],
+        storage=storage,
+        identity_repository=identity_repository,
+        discoveries_are_persisted=True,
+        startup_repository=startup_repository,
+        evidence_repository=evidence_repository,
+        persisted_startup_ids={startup_id},
+    )
+    if not admissions:
+        return None
+    admission = admissions[0]
+    if admission.blocks_evaluation or not admission.opportunity_id:
+        return admission
+
+    resolution_payload = scout_output.get("founder_resolution")
+    if resolution_payload and founder_persister is not None:
+        from resolver.founder_resolver import FounderResolution
+
+        await founder_persister(
+            user_id=user_id,
+            startup_id=startup_id,
+            resolution=FounderResolution.model_validate(resolution_payload),
+        )
+    return admission
+
+
 async def _mark_lookup_pipeline_failed(
-    storage: SupabaseStartupsStorage,
+    storage: Any,
     startup_id: Optional[str],
     pipeline_run_id: str,
     message: str,
@@ -554,11 +740,19 @@ async def run_one_pipeline_cycle(
 ) -> PipelineExecutionResult:
     """Run one cycle of scout, reviewer, partner, portfolio, and meta for the given user."""
     uid = require_user_id(user_id, context="run_one_pipeline_cycle")
+    settings_repository = _settings_repository_for(
+        fund_intelligence_repository or identity_repository
+    )
     try:
         if evaluation_prerequisites is None:
+            prerequisite_kwargs = {
+                "user_id": uid,
+                "fund_intelligence_repository": fund_intelligence_repository,
+            }
+            if settings_repository is not None:
+                prerequisite_kwargs["settings_repository"] = settings_repository
             evaluation_prerequisites = await load_evaluation_prerequisites(
-                user_id=uid,
-                fund_intelligence_repository=fund_intelligence_repository,
+                **prerequisite_kwargs
             )
         evaluation_prerequisites.require_tenant(
             uid, context="run_one_pipeline_cycle"
@@ -570,6 +764,10 @@ async def run_one_pipeline_cycle(
                 pipeline_run_id=pipeline_run_id,
                 identity_repository=identity_repository,
                 evaluation_prerequisites=evaluation_prerequisites,
+                fund_intelligence_repository=fund_intelligence_repository,
+                settings_repository=_settings_repository_for(
+                    fund_intelligence_repository or identity_repository
+                ),
                 ownership_check=ownership_check,
             )
     except EvaluationPrerequisiteError as exc:
@@ -582,11 +780,47 @@ async def run_one_pipeline_cycle(
 
 async def _run_one_pipeline_cycle_inner(
     user_id: str,
+    **kwargs: Any,
+) -> PipelineExecutionResult:
+    pool = getattr(kwargs.get("fund_intelligence_repository") or kwargs.get("identity_repository"), "pool", None)
+    if pool is None:
+        return await _run_one_pipeline_cycle_inner_impl(user_id, **kwargs)
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(user_id)
+    repository2 = Batch2Repository(pool)
+    state2 = await repository2.load_state(user_id)
+    repository3 = Batch3Repository(pool)
+    state3 = await repository3.load_state(user_id)
+    repository4a = Batch4ARepository(pool)
+    state4a = await repository4a.load_state(user_id)
+    token = set_state(state)
+    token2 = set_batch2_state(state2)
+    token3 = set_batch3_state(state3)
+    token4a = set_batch4a_state(state4a)
+    try:
+        return await _run_one_pipeline_cycle_inner_impl(user_id, **kwargs)
+    finally:
+        try:
+            await repository.persist_state(state)
+            await repository2.persist_state(state2)
+            await repository3.persist_state(state3)
+            await repository4a.persist_state(state4a)
+        finally:
+            reset_state(token)
+            reset_batch2_state(token2)
+            reset_batch3_state(token3)
+            reset_batch4a_state(token4a)
+
+
+async def _run_one_pipeline_cycle_inner_impl(
+    user_id: str,
     *,
     manual_one_shot: bool = False,
     pipeline_run_id: Optional[str] = None,
     identity_repository: Optional[Any] = None,
     evaluation_prerequisites: EvaluationPrerequisites,
+    fund_intelligence_repository: Optional[Any] = None,
+    settings_repository: Optional[SettingsRepository] = None,
     ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
 ) -> PipelineExecutionResult:
     evaluation_prerequisites.require_tenant(
@@ -602,19 +836,21 @@ async def _run_one_pipeline_cycle_inner(
         tenant.user_id[:24],
     )
 
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase:
-        logger.info("[%s] Skipping pipeline (USE_SUPABASE_STORAGE not set)", user_id[:12])
+    postgres_pool = getattr(fund_intelligence_repository, "pool", None)
+    if postgres_pool is None and not env_config.use_supabase_storage():
+        logger.info("[%s] Skipping pipeline (PostgreSQL repository not configured)", user_id[:12])
         return PipelineExecutionResult.blocked(
             code="supabase_storage_required",
-            detail="Pipeline execution requires Supabase storage.",
-            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+            detail="Pipeline execution requires the shared PostgreSQL repository.",
+            recovery_action="Configure the shared PostgreSQL pool and retry.",
         )
 
     try:
         # Read fresh settings at cycle boundaries so stage toggles apply immediately.
         # Blocking Supabase read — keep it off the serving event loop.
-        settings = await asyncio.to_thread(load_settings, user_id, use_cache=False)
+        settings = await _load_settings_for_repository(
+            user_id, settings_repository, use_cache=False
+        )
     except Exception as e:
         logger.warning("[%s] Pipeline skipped (settings unavailable): %s", user_id[:12], e)
         return PipelineExecutionResult.blocked(
@@ -660,7 +896,25 @@ async def _run_one_pipeline_cycle_inner(
         )
 
     try:
-        storage = await asyncio.to_thread(_build_storage_sync, user_id)
+        postgres_pool = getattr(fund_intelligence_repository or identity_repository, "pool", None)
+        startup_repository = StartupRepository(postgres_pool) if postgres_pool is not None else None
+        startup_snapshot = None
+        startup_aliases: Dict[str, str] = {}
+        if postgres_pool is not None:
+            startup_snapshot = await startup_repository.load_snapshot(user_id)
+            alias_rows = await StartupIdAliasRepository(postgres_pool).list_aliases_for_validation(user_id)
+            startup_aliases = {
+                str(row["legacy_startup_id"]): str(row["canonical_startup_id"])
+                for row in alias_rows
+                if row.get("verification_state") == "approved"
+            }
+            storage = StartupReadStorageAdapter(
+                None, startup_snapshot
+            )
+        else:
+            if env_config.is_production_env():
+                raise RuntimeError("StartupRepository PostgreSQL pool is required in production")
+            storage = await asyncio.to_thread(_build_storage_sync, user_id, settings)
     except Exception as e:
         logger.warning("[%s] Failed to create storage: %s", user_id[:12], e)
         return PipelineExecutionResult.blocked(
@@ -679,9 +933,8 @@ async def _run_one_pipeline_cycle_inner(
             recovery_action="Configure OPENAI_API_KEY and retry the pipeline cycle.",
         )
 
-    # Engine constructors do blocking I/O (DealMemory doc-store read,
-    # ReviewerEngine settings/policy load, CostController budget state) —
-    # one thread hop for the whole build.
+    # Engine constructors still do blocking settings/policy and budget reads;
+    # direct PostgreSQL DealMemory initialization happens after construction.
     try:
         engines = await asyncio.to_thread(
             _build_pipeline_engines,
@@ -690,7 +943,14 @@ async def _run_one_pipeline_cycle_inner(
             api_key=api_key,
             settings=settings,
             evaluation_prerequisites=evaluation_prerequisites,
+            postgres_pool=getattr(
+                fund_intelligence_repository or identity_repository, "pool", None
+            ),
+            startup_repository=startup_repository,
+            startup_snapshot=startup_snapshot,
+            startup_aliases=startup_aliases,
         )
+        await _initialize_deal_memory(engines)
     except EvaluationPrerequisiteError:
         raise
     except Exception as exc:
@@ -723,7 +983,9 @@ async def _run_one_pipeline_cycle_inner(
         _activity_startups_before = 0
         _activity_startups_found = 0
         try:
-            total_startups_before = await asyncio.to_thread(_count_startups_sync, user_id)
+            if postgres_pool is None:
+                raise RuntimeError("StartupRepository PostgreSQL pool is required")
+            total_startups_before = await _count_startups(StartupRepository(postgres_pool), user_id)
             _activity_startups_before = total_startups_before
         except Exception as e:
             logger.debug("[%s] startups_before count unavailable: %s", user_id[:12], e)
@@ -770,7 +1032,7 @@ async def _run_one_pipeline_cycle_inner(
         # external references must not reach reviewer/partner stages. Existing
         # on-demand lookup and resolution-status guards live in storage.
         await ensure_owned()
-        await _prune_unreferenced_startups(storage, user_id)
+        await _prune_unreferenced_startups(storage, user_id, startup_repository)
 
         if scouts_enabled and identity_repository is not None:
             await ensure_owned()
@@ -780,6 +1042,8 @@ async def _run_one_pipeline_cycle_inner(
                 storage=storage,
                 identity_repository=identity_repository,
                 discoveries_are_persisted=False,
+                startup_repository=startup_repository,
+                evidence_repository=EvidenceRepository(postgres_pool) if postgres_pool is not None else None,
             )
             _notify_startups_changed(user_id, "scout")
 
@@ -911,6 +1175,8 @@ async def _run_one_pipeline_cycle_inner(
             signal_interval=3600,
             feedback_interval=86400,
             health_interval=3600,
+            settings=settings,
+            startup_repository=startup_repository,
         )
         agents_executed += 1
         await ensure_owned()
@@ -920,10 +1186,21 @@ async def _run_one_pipeline_cycle_inner(
         stage_results["portfolio"] = portfolio_result
 
         current_stage = "meta"
+        deal_memory = getattr(engines.scout_engine, "deal_memory", None)
+        memory_snapshot = (
+            await deal_memory._read()
+            if deal_memory is not None and callable(getattr(deal_memory, "_read", None))
+            else {}
+        )
         meta_agent = MetaAgent(
             scout_engine=scout_engine,
             reviewer_engine=reviewer_engine,
             user_id=user_id,
+            settings=settings,
+            batch1_repository=Batch1Repository(
+                getattr(fund_intelligence_repository or identity_repository, "pool", None)
+            ) if getattr(fund_intelligence_repository or identity_repository, "pool", None) is not None else None,
+            memory_snapshot=memory_snapshot,
         )
         agents_executed += 1
         await ensure_owned()
@@ -935,22 +1212,24 @@ async def _run_one_pipeline_cycle_inner(
         # Persist activity metrics for the "While you were away" summary
         try:
             _startups_after = 0
-            total_startups_after = await asyncio.to_thread(_count_startups_sync, user_id)
+            if postgres_pool is None:
+                raise RuntimeError("StartupRepository PostgreSQL pool is required")
+            total_startups_after = await _count_startups(StartupRepository(postgres_pool), user_id)
             if scouts_enabled:
                 _startups_after = total_startups_after
             _activity_startups_found = max(0, _startups_after - _activity_startups_before)
 
-            def _insert_activity_sync() -> None:
-                get_service_client().table("pipeline_activity").insert({
-                    "user_id": user_id,
-                    "startups_found": _activity_startups_found,
-                    "reviewed_count": _activity_reviewed_count,
-                    "decisions_made": _activity_decided_count,
-                    "escalations_count": _activity_escalations_count,
-                }).execute()
-
             await ensure_owned()
-            await asyncio.to_thread(_insert_activity_sync)
+            state4a = get_batch4a_state()
+            if state4a is None:
+                raise RuntimeError("Batch4A state unavailable while recording pipeline activity")
+            state4a.append_activity({
+                "user_id": user_id,
+                "startups_found": _activity_startups_found,
+                "reviewed_count": _activity_reviewed_count,
+                "decisions_made": _activity_decided_count,
+                "escalations_count": _activity_escalations_count,
+            })
         except Exception as _act_err:
             logger.warning("[%s] Could not persist pipeline_activity: %s", user_id[:12], _act_err)
 
@@ -1018,6 +1297,41 @@ async def _run_one_pipeline_cycle_inner(
 
 async def run_on_demand_lookup(
     user_id: str,
+    *args: Any,
+    **kwargs: Any,
+) -> PipelineExecutionResult:
+    pool = getattr(kwargs.get("fund_intelligence_repository"), "pool", None)
+    if pool is None:
+        return await _run_on_demand_lookup_impl(user_id, *args, **kwargs)
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(user_id)
+    repository2 = Batch2Repository(pool)
+    state2 = await repository2.load_state(user_id)
+    repository3 = Batch3Repository(pool)
+    state3 = await repository3.load_state(user_id)
+    repository4a = Batch4ARepository(pool)
+    state4a = await repository4a.load_state(user_id)
+    token = set_state(state)
+    token2 = set_batch2_state(state2)
+    token3 = set_batch3_state(state3)
+    token4a = set_batch4a_state(state4a)
+    try:
+        return await _run_on_demand_lookup_impl(user_id, *args, **kwargs)
+    finally:
+        try:
+            await repository.persist_state(state)
+            await repository2.persist_state(state2)
+            await repository3.persist_state(state3)
+            await repository4a.persist_state(state4a)
+        finally:
+            reset_state(token)
+            reset_batch2_state(token2)
+            reset_batch3_state(token3)
+            reset_batch4a_state(token4a)
+
+
+async def _run_on_demand_lookup_impl(
+    user_id: str,
     company_name: str,
     website: Optional[str] = None,
     lookup_query: Optional[str] = None,
@@ -1059,9 +1373,17 @@ async def run_on_demand_lookup(
     try:
         if evaluation_prerequisites is None:
             try:
+                prerequisite_kwargs = {
+                    "user_id": uid,
+                    "fund_intelligence_repository": fund_intelligence_repository,
+                }
+                settings_repository = _settings_repository_for(
+                    fund_intelligence_repository
+                )
+                if settings_repository is not None:
+                    prerequisite_kwargs["settings_repository"] = settings_repository
                 evaluation_prerequisites = await load_evaluation_prerequisites(
-                    user_id=uid,
-                    fund_intelligence_repository=fund_intelligence_repository,
+                    **prerequisite_kwargs
                 )
             except EvaluationPrerequisiteError as exc:
                 if exc.code != "thesis_required":
@@ -1092,6 +1414,10 @@ async def run_on_demand_lookup(
                 ownership_check=ownership_check,
                 institutional_context=institutional_context,
                 evaluation_prerequisites=evaluation_prerequisites,
+                fund_intelligence_repository=fund_intelligence_repository,
+                settings_repository=_settings_repository_for(
+                    fund_intelligence_repository
+                ),
             )
         return result
     except EvaluationPrerequisiteError as exc:
@@ -1163,6 +1489,8 @@ async def _run_on_demand_lookup_inner(
     ownership_check: Optional[Callable[[], Awaitable[None]]] = None,
     institutional_context: Optional[Dict[str, Any]] = None,
     evaluation_prerequisites: Optional[EvaluationPrerequisites],
+    fund_intelligence_repository: Optional[Any] = None,
+    settings_repository: Optional[SettingsRepository] = None,
 ) -> PipelineExecutionResult:
     if evaluation_prerequisites is not None:
         evaluation_prerequisites.require_tenant(
@@ -1196,13 +1524,13 @@ async def _run_on_demand_lookup_inner(
             detail="The lookup was cancelled before evaluation started.",
         )
 
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase:
-        logger.info("[%s] Skipping lookup (USE_SUPABASE_STORAGE not set)", user_id[:12])
+    postgres_pool = getattr(fund_intelligence_repository, "pool", None)
+    if postgres_pool is None and not env_config.use_supabase_storage():
+        logger.info("[%s] Skipping lookup (PostgreSQL repository not configured)", user_id[:12])
         return PipelineExecutionResult.blocked(
             code="supabase_storage_required",
-            detail="On-demand lookup requires Supabase storage.",
-            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+            detail="On-demand lookup requires the shared PostgreSQL repository.",
+            recovery_action="Configure the shared PostgreSQL pool and retry.",
         )
     api_key = os.getenv("OPENAI_API_KEY", "")
     if not api_key:
@@ -1215,7 +1543,28 @@ async def _run_on_demand_lookup_inner(
         )
 
     try:
-        storage = await asyncio.to_thread(_build_storage_sync, user_id)
+        settings = await _load_settings_for_repository(
+            user_id, settings_repository
+        )
+        postgres_pool = getattr(fund_intelligence_repository, "pool", None)
+        startup_repository = StartupRepository(postgres_pool) if postgres_pool is not None else None
+        startup_snapshot = None
+        startup_aliases: Dict[str, str] = {}
+        if postgres_pool is not None:
+            startup_snapshot = await startup_repository.load_snapshot(user_id)
+            alias_rows = await StartupIdAliasRepository(postgres_pool).list_aliases_for_validation(user_id)
+            startup_aliases = {
+                str(row["legacy_startup_id"]): str(row["canonical_startup_id"])
+                for row in alias_rows
+                if row.get("verification_state") == "approved"
+            }
+            storage = StartupReadStorageAdapter(
+                None, startup_snapshot
+            )
+        else:
+            if env_config.is_production_env():
+                raise RuntimeError("StartupRepository PostgreSQL pool is required in production")
+            storage = await asyncio.to_thread(_build_storage_sync, user_id, settings)
     except Exception as e:
         logger.warning("[%s] Failed to create storage for lookup: %s", user_id[:12], e)
         return PipelineExecutionResult.blocked(
@@ -1234,15 +1583,6 @@ async def _run_on_demand_lookup_inner(
     if evaluation_prerequisites is not None:
         logger.info("[%s] Lookup will evaluate against certified thesis", user_id[:12])
 
-    try:
-        settings = await asyncio.to_thread(load_settings, user_id)
-    except Exception as e:
-        logger.warning("[%s] settings load failed during lookup: %s", user_id[:12], e)
-        return PipelineExecutionResult.blocked(
-            code="runtime_settings_unavailable",
-            detail="Tenant runtime settings could not be loaded for lookup.",
-            recovery_action="Restore the settings store and retry the lookup.",
-        )
     # Same blocking-constructor offload as the periodic cycle path.
     try:
         engines = await asyncio.to_thread(
@@ -1254,7 +1594,12 @@ async def _run_on_demand_lookup_inner(
             thesis_ctx=thesis_ctx,
             evaluation_prerequisites=evaluation_prerequisites,
             use_resource_fund_thesis_fallback=False,
+            postgres_pool=getattr(fund_intelligence_repository, "pool", None),
+            startup_repository=startup_repository,
+            startup_snapshot=startup_snapshot,
+            startup_aliases=startup_aliases,
         )
+        await _initialize_deal_memory(engines)
     except EvaluationPrerequisiteError:
         raise
     except Exception as exc:
@@ -1312,13 +1657,21 @@ async def _run_on_demand_lookup_inner(
                 _build_rerun_operator_context, additional_context
             )
             await ensure_owned()
-            startup_id = await asyncio.to_thread(
-                storage.prepare_rerun_startup,
-                replace_startup_id,
-                operator_context=operator_context,
-                lookup_id=lid,
-                pipeline_run_id=lookup_run_id,
-            )
+            if startup_repository is not None:
+                startup_id = await startup_repository.prepare_rerun(
+                    user_id, replace_startup_id,
+                    operator_context=operator_context,
+                    lookup_id=lid,
+                    pipeline_run_id=lookup_run_id,
+                )
+            else:
+                startup_id = await asyncio.to_thread(
+                    storage.prepare_rerun_startup,
+                    replace_startup_id,
+                    operator_context=operator_context,
+                    lookup_id=lid,
+                    pipeline_run_id=lookup_run_id,
+                )
             if not startup_id:
                 metrics.inc_lookup("not_found")
                 return PipelineExecutionResult.stage_failure(
@@ -1383,6 +1736,48 @@ async def _run_on_demand_lookup_inner(
                 code="lookup_cancelled",
                 detail="The lookup was cancelled after Scout completed.",
                 startup_id=startup_id,
+            )
+        if postgres_pool is not None and handoff_startup is not None:
+            canonical_scout_output = handoff_startup.scout_info.model_dump(mode="json")
+            canonical_scout_output["id"] = startup_id
+            canonical_scout_output["persisted_startup_id"] = startup_id
+            canonical_admission = await _admit_named_lookup_before_review(
+                user_id=user_id,
+                startup_id=startup_id,
+                scout_output=canonical_scout_output,
+                storage=storage,
+                identity_repository=IdentityRepository(postgres_pool),
+                evidence_repository=EvidenceRepository(postgres_pool),
+                startup_repository=startup_repository,
+                founder_persister=getattr(reviewer_engine, "founder_persister", None),
+            )
+            if canonical_admission is None:
+                return PipelineExecutionResult.blocked(
+                    code="identity_review_required",
+                    detail="Named lookup could not be admitted into canonical identity before review.",
+                    recovery_action="Resolve the company identity, then retry the lookup.",
+                    startup_id=startup_id,
+                )
+            if canonical_admission.blocks_evaluation or not canonical_admission.opportunity_id:
+                return PipelineExecutionResult.blocked(
+                    code="identity_review_required",
+                    detail="Company identity requires an operator ruling before evaluation.",
+                    recovery_action="Resolve the identity case, then retry this lookup.",
+                    startup_id=startup_id,
+                    projection_id=canonical_admission.opportunity_id,
+                )
+            await emit(
+                "identity",
+                "succeeded",
+                observation_id=canonical_admission.observation_id,
+                company_id=canonical_admission.company_id,
+                opportunity_id=canonical_admission.opportunity_id,
+            )
+            logger.info(
+                "[%s] Named lookup admitted before review startup_id=%s opportunity_id=%s",
+                user_id[:12],
+                startup_id,
+                canonical_admission.opportunity_id,
             )
         current_stage = "reviewer"
         review_is_current = bool(
@@ -1477,6 +1872,7 @@ async def _run_on_demand_lookup_inner(
             message = "Lookup review completed, but the partner decision could not complete after retrying."
             await ensure_owned()
             memo_ready = False
+            review_memo = None
             try:
                 reviewed_startup = await asyncio.to_thread(
                     storage.get_startup, startup_id
@@ -1490,11 +1886,12 @@ async def _run_on_demand_lookup_inner(
                         fund_thesis=thesis_ctx,
                     )
                     await ensure_owned()
+                if review_memo:
                     memo_ready = bool(
-                        await asyncio.to_thread(
-                            storage.update_startup_partial,
-                            startup_id,
-                            {"investment_memo_markdown": review_memo},
+                        await startup_repository.update_partner_memo(user_id, startup_id, review_memo)
+                        if startup_repository is not None
+                        else await asyncio.to_thread(
+                            storage.update_startup_partial, startup_id, {"investment_memo_markdown": review_memo}
                         )
                     )
             except Exception as exc:
@@ -1550,10 +1947,12 @@ async def _run_on_demand_lookup_inner(
                     fund_thesis=thesis_ctx,
                 )
                 await ensure_owned()
-                memo_saved = await asyncio.to_thread(
-                    storage.update_startup_partial,
-                    startup_id,
-                    {"investment_memo_markdown": regenerated_memo},
+                memo_saved = (
+                    await startup_repository.update_partner_memo(user_id, startup_id, regenerated_memo)
+                    if startup_repository is not None
+                    else await asyncio.to_thread(
+                        storage.update_startup_partial, startup_id, {"investment_memo_markdown": regenerated_memo}
+                    )
                 )
                 if not memo_saved:
                     raise RuntimeError("Regenerated memo could not be persisted")
@@ -1622,6 +2021,40 @@ async def _run_on_demand_lookup_inner(
 
 async def reprocess_startups_missing_fund_thesis(
     user_id: str,
+    **kwargs: Any,
+) -> PipelineExecutionResult:
+    pool = getattr(kwargs.get("fund_intelligence_repository"), "pool", None)
+    if pool is None:
+        return await _reprocess_startups_missing_fund_thesis_impl(user_id, **kwargs)
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(user_id)
+    repository2 = Batch2Repository(pool)
+    state2 = await repository2.load_state(user_id)
+    repository3 = Batch3Repository(pool)
+    state3 = await repository3.load_state(user_id)
+    repository4a = Batch4ARepository(pool)
+    state4a = await repository4a.load_state(user_id)
+    token = set_state(state)
+    token2 = set_batch2_state(state2)
+    token3 = set_batch3_state(state3)
+    token4a = set_batch4a_state(state4a)
+    try:
+        return await _reprocess_startups_missing_fund_thesis_impl(user_id, **kwargs)
+    finally:
+        try:
+            await repository.persist_state(state)
+            await repository2.persist_state(state2)
+            await repository3.persist_state(state3)
+            await repository4a.persist_state(state4a)
+        finally:
+            reset_state(token)
+            reset_batch2_state(token2)
+            reset_batch3_state(token3)
+            reset_batch4a_state(token4a)
+
+
+async def _reprocess_startups_missing_fund_thesis_impl(
+    user_id: str,
     *,
     dry_run: bool = False,
     limit: int = 1000,
@@ -1635,11 +2068,17 @@ async def reprocess_startups_missing_fund_thesis(
     uid = require_user_id(
         user_id, context="reprocess_startups_missing_fund_thesis"
     )
+    settings_repository = _settings_repository_for(fund_intelligence_repository)
     try:
         if evaluation_prerequisites is None:
+            prerequisite_kwargs = {
+                "user_id": uid,
+                "fund_intelligence_repository": fund_intelligence_repository,
+            }
+            if settings_repository is not None:
+                prerequisite_kwargs["settings_repository"] = settings_repository
             evaluation_prerequisites = await load_evaluation_prerequisites(
-                user_id=uid,
-                fund_intelligence_repository=fund_intelligence_repository,
+                **prerequisite_kwargs
             )
         evaluation_prerequisites.require_tenant(
             uid, context="reprocess_startups_missing_fund_thesis"
@@ -1651,20 +2090,27 @@ async def reprocess_startups_missing_fund_thesis(
             recovery_action=exc.recovery_action,
         )
 
-    use_supabase = env_config.use_supabase_storage()
-    if not use_supabase:
+    postgres_pool = getattr(fund_intelligence_repository, "pool", None)
+    if postgres_pool is None and not env_config.use_supabase_storage():
         return PipelineExecutionResult.blocked(
             code="supabase_storage_required",
-            detail="Thesis reprocessing requires Supabase storage.",
-            recovery_action="Set USE_SUPABASE_STORAGE=1 and configure Supabase, then retry.",
+            detail="Thesis reprocessing requires the shared PostgreSQL repository.",
+            recovery_action="Configure the shared PostgreSQL pool and retry.",
         )
 
     limit = max(1, min(int(limit), 1000))
     try:
-        storage = await asyncio.to_thread(_build_storage_sync, uid)
-        ids = await asyncio.to_thread(
-            storage.get_startups_missing_thesis, limit=limit
+        settings = await _load_settings_for_repository(
+            uid, settings_repository, use_cache=False
         )
+        postgres_pool = getattr(fund_intelligence_repository, "pool", None)
+        if postgres_pool is not None:
+            ids = await StartupRepository(postgres_pool).list_missing_thesis(uid, limit=limit)
+        else:
+            if env_config.is_production_env():
+                raise RuntimeError("StartupRepository PostgreSQL pool is required in production")
+            storage = await asyncio.to_thread(_build_storage_sync, uid, settings)
+            ids = await asyncio.to_thread(storage.get_startups_missing_thesis, limit=limit)
     except Exception as exc:
         logger.warning("[%s] Thesis reprocessing storage unavailable: %s", uid[:12], exc)
         return PipelineExecutionResult.blocked(
@@ -1674,7 +2120,11 @@ async def reprocess_startups_missing_fund_thesis(
         )
 
     if dry_run:
-        if not await asyncio.to_thread(is_thesis_reprocess_agents_enabled, uid):
+        agent_config = settings.get("agent_config") or {}
+        if not (
+            agent_config.get("reviewers_enabled", False)
+            and agent_config.get("partners_enabled", False)
+        ):
             return PipelineExecutionResult.skipped(
                 code="reprocess_agents_disabled",
                 detail="Thesis reprocessing is disabled because Reviewer and Partner are not enabled.",
@@ -1709,15 +2159,6 @@ async def reprocess_startups_missing_fund_thesis(
         )
 
     try:
-        settings = await asyncio.to_thread(load_settings, uid, use_cache=False)
-    except Exception as exc:
-        logger.warning("[%s] Thesis reprocessing settings unavailable: %s", uid[:12], exc)
-        return PipelineExecutionResult.blocked(
-            code="runtime_settings_unavailable",
-            detail="Tenant runtime settings could not be loaded for thesis reprocessing.",
-            recovery_action="Restore the settings store and retry thesis reprocessing.",
-        )
-    try:
         engines = await asyncio.to_thread(
             _build_pipeline_engines,
             user_id=uid,
@@ -1726,7 +2167,9 @@ async def reprocess_startups_missing_fund_thesis(
             settings=settings,
             evaluation_prerequisites=evaluation_prerequisites,
             use_resource_fund_thesis_fallback=False,
+            postgres_pool=getattr(fund_intelligence_repository, "pool", None),
         )
+        await _initialize_deal_memory(engines)
     except EvaluationPrerequisiteError as exc:
         return PipelineExecutionResult.blocked(
             code=exc.code,

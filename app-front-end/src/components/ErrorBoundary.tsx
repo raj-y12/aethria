@@ -52,11 +52,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
         className="flex min-h-[60dvh] w-full items-center justify-center px-phi-4 py-phi-6"
       >
         <div className="max-w-md text-center">
-          <p className="type-meta text-oxford/60">Something went wrong</p>
+          <p className="type-meta text-oxford/65">Something went wrong</p>
           <h2 className="mt-phi-2 font-display text-[1.4rem] text-oxford">
             This view hit an unexpected error.
           </h2>
-          <p className="mt-phi-3 type-meta text-oxford/60">
+          <p className="mt-phi-3 type-meta text-oxford/65">
             The rest of the app is still running. Try again, or reload if it persists.
           </p>
           <div className="mt-phi-5 flex items-center justify-center gap-phi-3">
@@ -70,7 +70,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             <button
               type="button"
               onClick={this.reload}
-              className="min-h-[36px] type-meta text-oxford/60 hover:text-oxford/70 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+              className="min-h-[36px] type-meta text-oxford/65 hover:text-oxford/70 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
             >
               Reload
             </button>

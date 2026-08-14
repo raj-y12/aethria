@@ -128,9 +128,8 @@ class _FakeThesis:
 
 
 async def test_slow_engine_construction_does_not_block_event_loop(monkeypatch):
-    """Engine constructors do blocking I/O (DealMemory doc-store read,
-    ReviewerEngine settings/policy load, CostController budget state); the cycle
-    must offload construction, not just per-call storage access."""
+    """Remaining blocking engine-construction reads stay off the event loop;
+    direct PostgreSQL DealMemory initialization happens after construction."""
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-real")
     monkeypatch.setattr(pipeline_runner.env_config, "use_supabase_storage", lambda: True)
     monkeypatch.setattr(
@@ -138,13 +137,13 @@ async def test_slow_engine_construction_does_not_block_event_loop(monkeypatch):
         "load_settings",
         lambda user_id, *, use_cache=True: {"agent_config": {"scouts_enabled": True}},
     )
-    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda user_id: object())
+    monkeypatch.setattr(pipeline_runner, "_build_storage_sync", lambda user_id, settings=None: object())
     monkeypatch.setattr(
         pipeline_runner, "_load_active_thesis_sync", lambda user_id, **kw: _FakeThesis()
     )
 
     def slow_build_engines(**kwargs):
-        time.sleep(BLOCK_S)  # simulates DealMemory/CostController/policy reads stalling
+        time.sleep(BLOCK_S)  # simulates CostController/policy reads stalling
         raise _EngineBuildReached()  # abort the cycle here; construction is the boundary under test
 
     monkeypatch.setattr(pipeline_runner, "_build_pipeline_engines", slow_build_engines)

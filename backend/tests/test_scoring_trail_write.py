@@ -1,9 +1,7 @@
-"""P7.1 — SupabaseStartupsStorage.record_scoring_trail appends a scoring trail row.
+"""P7.1 — scoring trails are buffered in the provider-neutral Batch 4A state."""
 
-Uses a recording fake client: asserts the insert targets the `scoring_trails` table,
-denormalizes the right columns, embeds the full trace, and never raises into the caller.
-"""
-from types import SimpleNamespace
+from batch4a.context import reset_state, set_state
+from batch4a.repository import Batch4AState
 
 from supabase_storage import SupabaseStartupsStorage
 
@@ -49,12 +47,18 @@ def _trace():
     }
 
 
-def test_record_scoring_trail_inserts_denormalized_row_and_full_trace():
-    store: dict = {}
-    storage = SupabaseStartupsStorage(_RecordingClient(store), "user-1")
+from supabase_storage import SupabaseStartupsStorage
 
-    assert storage.record_scoring_trail("s1", _trace()) is True
-    rows = store["scoring_trails"]
+
+def test_record_scoring_trail_inserts_denormalized_row_and_full_trace():
+    state = Batch4AState("user-1")
+    token = set_state(state)
+    try:
+        storage = SupabaseStartupsStorage(object(), "user-1")
+        assert storage.record_scoring_trail("s1", _trace()) is True
+    finally:
+        reset_state(token)
+    rows = state.appended_scoring_trails
     assert len(rows) == 1
     row = rows[0]
     assert row["user_id"] == "user-1"
@@ -68,8 +72,7 @@ def test_record_scoring_trail_inserts_denormalized_row_and_full_trace():
 
 
 def test_record_scoring_trail_swallows_errors_and_returns_false():
-    storage = SupabaseStartupsStorage(_RaisingClient(), "user-1")
-    # a missing table / DB error must never raise into the review pipeline
+    storage = SupabaseStartupsStorage(object(), "user-1")
     assert storage.record_scoring_trail("s1", _trace()) is False
 
 

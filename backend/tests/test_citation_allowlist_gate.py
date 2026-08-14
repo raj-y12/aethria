@@ -63,12 +63,24 @@ def test_the_two_settings_are_separate_keys():
     assert "scout_fail_closed_on_empty_retrieval" in agent_config
 
 
-def test_citations_are_fail_closed_by_default():
-    assert is_scout_citation_allowlist_enforced("user_test_123") is True
+@pytest.mark.asyncio
+async def test_citations_are_fail_closed_by_default():
+    class Repository:
+        async def get(self, *_args, **_kwargs):
+            return None
+
+    repository = Repository()
+    assert await is_scout_citation_allowlist_enforced("user_test_123", repository=repository) is True
 
 
-def test_empty_retrieval_is_fail_closed_by_default():
-    assert is_scout_fail_closed_on_empty_retrieval("user_test_123") is True
+@pytest.mark.asyncio
+async def test_empty_retrieval_is_fail_closed_by_default():
+    class Repository:
+        async def get(self, *_args, **_kwargs):
+            return None
+
+    repository = Repository()
+    assert await is_scout_fail_closed_on_empty_retrieval("user_test_123", repository=repository) is True
 
 
 # --------------------------------------------------------------------------- #
@@ -162,11 +174,13 @@ def test_empty_retrieval_gate_is_read_separately_from_the_citation_gate(
     monkeypatch, scout, enforce
 ):
     """Citation enforcement must not change whether empty retrieval blocks generation."""
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
-    monkeypatch.setattr(
-        "scout.base.is_scout_citation_allowlist_enforced", lambda user_id: enforce
-    )
+    scout._settings = {
+        "agent_config": {
+            "scout_grounded_citations_enabled": True,
+            "scout_fail_closed_on_empty_retrieval": True,
+            "scout_citation_allowlist_enforced": enforce,
+        }
+    }
     _patch_pack(monkeypatch, [])
 
     calls: list = []

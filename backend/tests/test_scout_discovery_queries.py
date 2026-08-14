@@ -138,9 +138,6 @@ def test_scout_sends_thesis_scoped_queries_to_retrieval(monkeypatch):
 
     captured = {}
 
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: True)
 
     def fake_retrieve(**kwargs):
         captured.update(kwargs)
@@ -176,9 +173,6 @@ def test_scout_without_a_thesis_keeps_the_original_queries(monkeypatch):
 
     captured = {}
 
-    monkeypatch.setattr("scout.base.is_scout_grounded_citations_enabled", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_fail_closed_on_empty_retrieval", lambda user_id: True)
-    monkeypatch.setattr("scout.base.is_scout_citation_allowlist_enforced", lambda user_id: True)
 
     def fake_retrieve(**kwargs):
         captured.update(kwargs)

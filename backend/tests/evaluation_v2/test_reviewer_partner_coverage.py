@@ -85,9 +85,6 @@ def _aggregate_traces(scored_dimensions: set[str]):
 
 
 def _partner(monkeypatch):
-    import partner.decision as decision_module
-
-    monkeypatch.setattr(decision_module, "load_settings", lambda _user_id: {})
     return PartnerDecisionEngine(
         use_llm_fallback=False,
         tenant_user_id="user-a",

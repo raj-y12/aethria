@@ -725,3 +725,9 @@ async def test_create_pool_requires_direct_dsn_and_uses_bounded_sizes(monkeypatc
             "command_timeout": 30.0,
         }
     ]
+
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("SUPABASE_DB_URL", "postgresql://supabase-host/db")
+    seen.clear()
+    assert await postgres.create_pool(create_pool_fn=create) == "pool"
+    assert seen[0]["dsn"] == "postgresql://supabase-host/db"

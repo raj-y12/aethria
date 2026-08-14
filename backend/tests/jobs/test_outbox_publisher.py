@@ -98,7 +98,7 @@ async def test_outbox_loop_retries_after_transient_claim_failure():
 
 
 @pytest.mark.asyncio
-async def test_governed_policy_projects_exact_config_before_marking_outbox(monkeypatch):
+async def test_governed_policy_outbox_does_not_project_to_legacy_policy_store(monkeypatch):
     outbox = importlib.import_module("jobs.outbox")
     policy_store = importlib.import_module("services.scoring.policy_store")
     projected = []
@@ -131,13 +131,13 @@ async def test_governed_policy_projects_exact_config_before_marking_outbox(monke
     publisher = outbox.OutboxPublisher(repository, publish=publish)
 
     assert await publisher.publish_once() == 1
-    assert projected == [("user-a", {"rubric": []})]
+    assert projected == []
     assert delivered == ["governed_policy_version.published"]
     assert repository.published == [{"event_id": "event-policy-1"}]
 
 
 @pytest.mark.asyncio
-async def test_stale_policy_event_projects_the_current_authoritative_version(monkeypatch):
+async def test_stale_policy_event_publishes_canonical_authoritative_version(monkeypatch):
     outbox = importlib.import_module("jobs.outbox")
     policy_store = importlib.import_module("services.scoring.policy_store")
     projected = []
@@ -164,9 +164,7 @@ async def test_stale_policy_event_projects_the_current_authoritative_version(mon
     )
 
     assert await outbox.OutboxPublisher(repository).publish_once() == 1
-    assert projected == [
-        {"scoringWeights": [{"key": "market", "weight": 30}]}
-    ]
+    assert projected == []
     assert repository.published == [{"event_id": "event-policy-old"}]
 
 

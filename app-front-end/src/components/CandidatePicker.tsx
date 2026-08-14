@@ -51,7 +51,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
       className="mt-phi-3 grid gap-phi-3"
       aria-label="Select the company you meant"
     >
-      <p className="type-meta text-oxford/60">
+      <p className="type-meta text-oxford/65">
         {heading ?? 'More than one company matches — choose the one you meant.'}
       </p>
 
@@ -68,13 +68,13 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
                   <h3 className="font-sans text-[14px] font-medium text-oxford">{candidate.name}</h3>
                   <span className="truncate type-meta text-oxford/70">{domain || 'Website not verified'}</span>
                   {isBestIdentityMatch(candidate, index) ? (
-                    <span className="type-label-section text-oxford/60">Best match</span>
+                    <span className="type-label-section text-oxford/65">Best match</span>
                   ) : null}
                 </div>
                 {candidate.description ? (
-                  <p className="mt-phi-1 type-meta text-oxford/60 line-clamp-2">{candidate.description}</p>
+                  <p className="mt-phi-1 type-meta text-oxford/65 line-clamp-2">{candidate.description}</p>
                 ) : null}
-                <p className="mt-phi-1 type-meta text-oxford/50">{evidenceLine(candidate, domain)}</p>
+                <p className="mt-phi-1 type-meta text-oxford/65">{evidenceLine(candidate, domain)}</p>
               </div>
               <button
                 type="button"
@@ -92,7 +92,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
 
       {refineOpen ? (
         <div className="grid gap-phi-2 pt-phi-1">
-          <label htmlFor="candidate-website" className="type-label-section text-oxford/60">Company website</label>
+          <label htmlFor="candidate-website" className="type-label-section text-oxford/65">Company website</label>
           <div className="flex items-center gap-phi-2 border-b border-oxford/[0.18]">
             <input
               id="candidate-website"
@@ -104,7 +104,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
               placeholder="Company website (e.g. example.ie)"
               autoComplete="off"
               disabled={busy}
-              className="min-w-0 flex-1 bg-transparent px-0 py-phi-2 font-sans text-[13px] text-oxford placeholder:text-oxford/60 outline-none"
+              className="min-w-0 flex-1 bg-transparent px-0 py-phi-2 font-sans text-[13px] text-oxford placeholder:text-oxford/65 outline-none"
             />
             <button type="button" onClick={submitRefine} disabled={busy || !website.trim()} className={candidateAction}>
               Resolve website
@@ -116,7 +116,7 @@ export default function CandidatePicker({ candidates, onPick, onRefine, busy, he
           type="button"
           onClick={() => setRefineOpen(true)}
           disabled={busy}
-          className="justify-self-start type-meta cursor-pointer border-0 bg-transparent p-0 text-oxford/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 [@media(hover:hover)_and_(pointer:fine)]:hover:text-oxford disabled:opacity-60"
+          className="justify-self-start type-meta cursor-pointer border-0 bg-transparent p-0 text-oxford/65 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 [@media(hover:hover)_and_(pointer:fine)]:hover:text-oxford disabled:opacity-60"
         >
           {candidates.length ? 'None of these — add a website' : 'Add a website'}
         </button>

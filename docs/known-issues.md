@@ -268,31 +268,20 @@ surviving the loop.
 
 ---
 
-### Fresh schemas are missing portfolio tables and can fall back to shared local files
+### `portfolio_startups` is preserved historical Supabase data, not a runtime table
 
-**Status:** resolved · **Priority:** P1 · **Surface:** production data integrity ·
-**Verified in:** `backend/portfolio/store.py`, `backend/utils/feed_fetcher.py`,
-`backend/portfolio/rejection.py`, `supabase/migrations/` · **Fixed by:**
-`supabase/migrations/20260804000003_portfolio_startups_feed_cache_rejection_patterns.sql`,
-`backend/portfolio/rejection.py`, `backend/utils/feed_fetcher.py`,
-`backend/tests/test_production_fallbacks.py`
+**Status:** retired as a runtime dependency · **Priority:** P1 · **Surface:**
+startup authority and portability · **Verified in:** `backend/portfolio/store.py`,
+`backend/pipeline_runner.py`, `backend/startup_repository.py`,
+`backend/startup_id_alias_repository.py`, and the PostgreSQL contract tests.
 
-### Root cause
+`public.startups` is the sole canonical startup authority. Approved
+`startup_id_aliases` rows resolve the 133 historical legacy identifiers without
+reading the legacy table. The live Supabase `portfolio_startups` rows remain
+untouched and are not part of `db/migrations/`.
 
-Code required `portfolio_startups`, `portfolio_feed_cache`, and
-`portfolio_rejection_patterns`, but no migration created them. On Supabase errors,
-feed and rejection paths fell back to local files even in production (unlike
-`portfolio/store.py`, which already failed closed correctly); the rejection-pattern
-file was not tenant-namespaced.
-
-### Fix
-
-A new migration creates all three tables with service-role-only RLS.
-`RejectionAnalyzer`'s local-file fallback path is now per-tenant
-(`rejection_patterns_{user_id}.json`, was a single shared file), and both
-`RejectionAnalyzer` and `FeedFetcher` raise instead of silently falling back to a
-local file when `env_config.local_fallback_allowed()` is false (production).
-Regression tests cover both fail-closed paths and the per-tenant filename scoping.
+Live-table deletion or archival is an operational decision outside this
+migration and is intentionally not performed here.
 
 ---
 

@@ -7,7 +7,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-import env_config
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -23,12 +22,8 @@ from pipeline_execution import (
     PipelineExecutionResult,
     PipelineExecutionState,
 )
-from supabase_doc_store import list_get_all_strict, list_upsert
 from tenant_context import require_user_id
 from utils.timeutil import utcnow
-
-
-_OUTCOME_TABLE = "lookup_job_outcomes"
 
 
 class LookupOutcomeStoreUnavailable(RuntimeError):
@@ -327,70 +322,3 @@ class LookupAttemptOutcome(BaseModel):
                 else "The durable worker will retry this lookup attempt."
             ),
         )
-
-
-def _require_store() -> None:
-    if not env_config.use_supabase_storage():
-        raise LookupOutcomeStoreUnavailable(
-            "Durable lookup outcome store is unavailable because Supabase storage is disabled"
-        )
-
-
-def record_lookup_attempt(outcome: LookupAttemptOutcome) -> LookupAttemptOutcome:
-    """Validate and upsert exactly one attempt lifecycle row."""
-    _require_store()
-    validated = LookupAttemptOutcome.model_validate(outcome)
-    try:
-        list_upsert(
-            _OUTCOME_TABLE,
-            validated.model_dump(mode="json"),
-            user_id=validated.user_id,
-        )
-    except Exception as exc:
-        raise LookupOutcomeStoreUnavailable(
-            "Durable lookup outcome write failed"
-        ) from exc
-    return validated
-
-
-def latest_lookup_attempt(
-    user_id: str, lookup_id: str
-) -> Optional[LookupAttemptOutcome]:
-    """Return the newest valid attempt, never an older terminal attempt."""
-    _require_store()
-    uid = require_user_id(user_id, context="latest_lookup_attempt")
-    lid = str(lookup_id or "").strip()
-    if not lid:
-        raise ValueError("lookup_id is required")
-    try:
-        records = list_get_all_strict(_OUTCOME_TABLE, user_id=uid)
-    except Exception as exc:
-        raise LookupOutcomeStoreUnavailable(
-            "Durable lookup outcome read failed"
-        ) from exc
-    matching = []
-    for record in records:
-        if str(record.get("lookup_id") or "").strip() != lid:
-            continue
-        try:
-            outcome = LookupAttemptOutcome.model_validate(record)
-        except Exception as exc:
-            raise LookupOutcomeCorrupt(
-                "Durable lookup outcome failed contract validation"
-            ) from exc
-        if outcome.user_id != uid:
-            raise LookupOutcomeCorrupt(
-                "Durable lookup outcome tenant does not match storage scope"
-            )
-        matching.append(outcome)
-    if not matching:
-        return None
-    return max(
-        matching,
-        key=lambda item: (
-            item.attempt,
-            item.recorded_at,
-            item.job_id,
-            item.pipeline_run_id,
-        ),
-    )

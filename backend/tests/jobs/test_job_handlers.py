@@ -110,6 +110,7 @@ async def test_cycle_handler_passes_job_tenant_and_stable_pipeline_run(monkeypat
     assert calls[0][1]["manual_one_shot"] is True
     assert calls[0][1]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][1]["identity_repository"].pool is repository.pool
+    assert calls[0][1]["fund_intelligence_repository"].pool is repository.pool
     assert calls[0][1]["evaluation_prerequisites"] == _prerequisites()
     assert callable(calls[0][1]["ownership_check"])
     assert [item["stage"] for item in repository.checkpoints] == [
@@ -191,6 +192,7 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert calls[0][2]["pipeline_run_id"] == job.pipeline_run_id
     assert calls[0][2]["resolution"].canonical_name == "Acme"
     assert calls[0][2]["evaluation_prerequisites"] == _prerequisites()
+    assert calls[0][2]["fund_intelligence_repository"].pool is repository.pool
     assert callable(calls[0][2]["ownership_check"])
     assert calls[0][2]["institutional_context"] == {
         "observation_id": "observation-1",

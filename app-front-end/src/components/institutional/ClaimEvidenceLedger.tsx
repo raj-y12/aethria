@@ -56,7 +56,7 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
       <section aria-label="Supporting claims">
         <p className="type-label-section">Supporting claims</p>
         {currentClaims.length === 0 ? (
-          <p className="type-body mt-phi-3 text-oxford/55">No supporting claim has been recorded yet.</p>
+          <p className="type-body mt-phi-3 text-oxford/65">No supporting claim has been recorded yet.</p>
         ) : (
           <div className="mt-phi-3 divide-y divide-oxford/10 border-y border-oxford/10">
             {currentClaims.map((claim) => {
@@ -77,7 +77,7 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
                       <div key={link.link_id} className="border-l border-oxford/15 pl-phi-3">
                         <div>
                           <p className="type-body text-oxford/65">{item?.display_excerpt || link.rationale}</p>
-                          <p className="type-meta mt-1 text-oxford/45">
+                          <p className="type-meta mt-1 text-oxford/65">
                             {artifact?.title || artifact?.artifact_type?.replace(/_/g, ' ') || 'Source unavailable'}
                           </p>
                         </div>
@@ -96,7 +96,7 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
             <p className="type-label-section">What is still missing</p>
             <ul className="mt-phi-2 space-y-phi-2">
               {ledger.plans.map((plan) => (
-                <li key={plan.evidence_plan_id} className="type-body text-oxford/60">
+                <li key={plan.evidence_plan_id} className="type-body text-oxford/65">
                   {plan.missing_evidence.join(', ') || 'No specific evidence gap was named.'}
                 </li>
               ))}

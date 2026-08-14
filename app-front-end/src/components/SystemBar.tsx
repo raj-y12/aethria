@@ -74,13 +74,13 @@ export function SpineNavButton({
   // active state needs !important to hold full white. On paper the inverse
   // class must be omitted entirely or it paints cream text on cream.
   const textActive = onPaper ? 'text-oxford' : '!text-white';
-  const textIdle = onPaper ? 'text-oxford/60 hover:text-oxford/80' : 'text-white/60 hover:text-white/[0.88]';
+  const textIdle = onPaper ? 'text-oxford/65 hover:text-oxford/80' : 'text-white/60 hover:text-white/[0.88]';
   const ring = onPaper ? 'focus-visible:ring-oxford/35' : 'focus-visible:ring-white/35';
   const bgActive = onPaper ? 'bg-surface-selected' : 'bg-white/[0.08]';
   const bgHover = onPaper ? 'hover:bg-oxford/[0.04]' : 'hover:bg-white/[0.05]';
   const shortcutActive = onPaper ? 'text-oxford' : 'text-white';
   const shortcutIdle = onPaper
-    ? 'text-oxford/60 group-hover:text-oxford'
+    ? 'text-oxford/65 group-hover:text-oxford'
     : 'text-white/60 group-hover:text-white';
 
   return (

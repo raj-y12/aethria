@@ -8,7 +8,7 @@ import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
 import type { ActivitySummary } from '../api/activity';
 import { useCountUp, usePrefersReducedMotion } from '../hooks';
 import type { SpinePipelineState } from '../components/AppSpine';
-import { useFundReadiness } from '../hooks/useFundReadiness';
+import { deriveMandatePrompt, useFundReadiness } from '../hooks/useFundReadiness';
 import { transitionOrReduced } from '../design-system/motion';
 import { tokens } from '../design-system/tokens';
 import { getDealAttentionReason, getDeskAttention, isDealUnresolved } from '../lib/dealState';
@@ -80,7 +80,7 @@ function HomeDoor({
         className={`type-meta relative z-10 text-center leading-snug tabular-nums transition-colors duration-300 ${EASE} ${
           tone === 'escalation'
             ? 'text-escalation/90 group-hover:text-escalation-bright'
-            : 'text-oxford/60 group-hover:text-oxford/70'
+            : 'text-oxford/65 group-hover:text-oxford/70'
         }`}
       >
         {detail}
@@ -95,10 +95,10 @@ function HomeDoor({
  * actually running — it has to stay honest, especially about 'Issue'.
  */
 const PIPELINE_PAPER_TONE: Record<SpinePipelineState, { dot: string; text: string }> = {
-  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/60' },
-  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/45' },
-  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/45' },
-  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/45' },
+  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/65' },
+  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/65' },
+  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/65' },
+  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/65' },
   Issue: { dot: 'bg-escalation escalation-dot-active', text: 'text-escalation' },
 };
 
@@ -142,7 +142,7 @@ function HomeRail({ side, text }: { side: 'left' | 'right'; text: string }) {
   return (
     <span
       aria-hidden
-      className={`pointer-events-none absolute top-1/2 z-10 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-oxford/40 [text-orientation:mixed] [writing-mode:vertical-rl] min-[900px]:block ${
+      className={`pointer-events-none absolute top-1/2 z-10 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-oxford/65 [text-orientation:mixed] [writing-mode:vertical-rl] min-[900px]:block ${
         side === 'left' ? 'left-phi-5' : 'right-phi-5'
       }`}
     >
@@ -248,8 +248,17 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
   // We wait until the readiness check resolves (loading=false) to avoid a
   // flash for returning users. An unreadable readiness check is not treated
   // as a missing mandate or a published mandate.
-  const showFirstRun = !fundReadinessLoading && !fundReadinessUnknown && !mandatePublished;
-  const showFundReadinessUnavailable = !fundReadinessLoading && fundReadinessUnknown;
+  const mandatePrompt = deriveMandatePrompt({
+    hasActiveThesis: Boolean(data.fundThesisRuntime?.active_version_id),
+    mandatePublished,
+    unknown: fundReadinessLoading
+      || fundReadinessUnknown
+      || data.fundThesisRuntimeLoading
+      || Boolean(data.fundThesisRuntimeError),
+  });
+  const showFirstRun = mandatePrompt === 'missing';
+  const showPublishPrompt = mandatePrompt === 'publish';
+  const showFundReadinessUnavailable = mandatePrompt === 'unavailable';
 
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
@@ -294,7 +303,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
               </h1>
             </Reveal>
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-note text-center text-oxford/60">
+              <p className="type-note text-center text-oxford/65">
                 Aethria could not verify fund readiness. Retry when the control plane is available.
               </p>
             </Reveal>
@@ -308,7 +317,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-note text-center text-oxford/60">
+              <p className="type-note text-center text-oxford/65">
                 Aethria won't scout or evaluate until a fund mandate is published.
               </p>
             </Reveal>
@@ -319,6 +328,29 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                 className="type-action border-b border-oxford/30 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction"
               >
                 Set mandate →
+              </Link>
+            </Reveal>
+          </>
+        ) : showPublishPrompt ? (
+          <>
+            <Reveal delay={0.16} y={10} className="mt-phi-6">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+                Publish your mandate.
+              </h1>
+            </Reveal>
+
+            <Reveal delay={0.24} className="mt-phi-5">
+              <p className="type-note text-center text-oxford/65">
+                Aethria has a saved thesis, but it is not published as the live mandate yet.
+              </p>
+            </Reveal>
+
+            <Reveal delay={0.32} className="mt-phi-7">
+              <Link
+                to="/v1/settings"
+                className="type-action border-b border-oxford/30 px-1 pb-0.5 transition-colors hover:text-oxford btn-interaction"
+              >
+                Review and publish →
               </Link>
             </Reveal>
           </>
@@ -387,7 +419,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                           </span>
                           <span
                             className={`type-meta tabular-nums sm:shrink-0 ${
-                              urgent ? 'text-escalation/90' : 'text-oxford/60'
+                              urgent ? 'text-escalation/90' : 'text-oxford/65'
                             }`}
                           >
                             {reason}

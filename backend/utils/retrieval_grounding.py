@@ -15,12 +15,22 @@ from typing import Any, Dict, List, Set
 
 import certifi
 
+import metrics
 from utils.reference_verify import extract_http_urls, normalize_url_for_match
 from utils.search_providers import normalize_category, provider_name, provider_search
 from utils.search_results import ProviderSearchResults
+from utils.retrieval_cache import RetrievalCache, build_retrieval_identity, freshness_ttl_seconds, key_lock
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
+
+_RETRIEVAL_CACHE: RetrievalCache | None = None
+
+
+def configure_retrieval_cache(repository: Any | None) -> None:
+    """Configure the process-wide repository; tenant identity remains per call."""
+    global _RETRIEVAL_CACHE
+    _RETRIEVAL_CACHE = RetrievalCache(repository) if repository is not None else None
 
 
 def _fallback_search(query: str, max_results: int) -> List[Dict[str, str]]:
@@ -255,6 +265,8 @@ def retrieve_source_pack(
     topic: str | None = None,
     days: int | None = None,
     category: str | None = None,
+    target_company_id: str | None = None,
+    target_person_id: str | None = None,
 ) -> Dict[str, Any]:
     """
     Build retrieval source pack with provider metadata and URL allowlist.
@@ -271,15 +283,72 @@ def retrieve_source_pack(
     effective_category = normalize_category(
         category or ("news" if str(topic or "").strip().lower() == "news" else None)
     )
+    identity = build_retrieval_identity(
+        query=query, category=effective_category, time_range=time_range, days=days,
+        target_company_id=target_company_id, target_person_id=target_person_id,
+    )
+    cache = _RETRIEVAL_CACHE
+    cache_lock = key_lock(identity)
+    with cache_lock:
+        if cache is not None and freshness_ttl_seconds(effective_category) > 0:
+            cached = cache.get_fresh(
+                user_id=user_id, query=query, category=effective_category,
+                time_range=time_range, days=days, max_results=max_results,
+                target_company_id=target_company_id, target_person_id=target_person_id,
+            )
+            if cached is not None:
+                metrics.observe_retrieval_cache("hit")
+                metrics.observe_retrieval_cache("provider_call_avoided")
+                sources = _normalize_sources(cached.get("sources") or [])
+                allowlist = {s["url"] for s in sources if s.get("url")}
+                return {
+                    "provider": cached.get("provider") or "cache",
+                    "category": effective_category,
+                    "retrieval_outcome": "sources_found" if sources else "no_results",
+                    "provider_diagnostics": cached.get("provider_diagnostics") or [],
+                    "query": query,
+                    "sources": sources,
+                    "url_allowlist": allowlist,
+                    "cache": "hit",
+                }
+            metrics.observe_retrieval_cache("miss")
+        elif cache is not None:
+            metrics.observe_retrieval_cache("miss")
     primary_provider = provider_name(effective_category)
     used_provider = "none"
-    raw: List[Dict[str, str]] = provider_search(
-        query,
-        max_results=max_results,
-        category=effective_category,
-        time_range=time_range,
-        days=days,
-    )
+    # Re-check while holding the per-identity lock immediately before the
+    # external call. This closes the concurrent duplicate window between the
+    # first cache check and provider invocation.
+    if cache is not None:
+        with cache_lock:
+            cached = cache.get_fresh(
+                user_id=user_id, query=query, category=effective_category,
+                time_range=time_range, days=days, max_results=max_results,
+                target_company_id=target_company_id, target_person_id=target_person_id,
+            )
+            if cached is not None:
+                metrics.observe_retrieval_cache("hit")
+                metrics.observe_retrieval_cache("provider_call_avoided")
+                sources = _normalize_sources(cached.get("sources") or [])
+                return {
+                    "provider": cached.get("provider") or "cache",
+                    "category": effective_category,
+                    "retrieval_outcome": "sources_found" if sources else "no_results",
+                    "provider_diagnostics": cached.get("provider_diagnostics") or [],
+                    "query": query,
+                    "sources": sources,
+                    "url_allowlist": {s["url"] for s in sources if s.get("url")},
+                    "cache": "hit",
+                }
+            raw: List[Dict[str, str]] = provider_search(
+                query, max_results=max_results, category=effective_category,
+                time_range=time_range, days=days,
+            )
+    else:
+        raw = provider_search(
+            query, max_results=max_results, category=effective_category,
+            time_range=time_range, days=days,
+        )
     provider_diagnostics = [
         _diagnostic_for_rows(raw, provider=primary_provider, query=query)
     ]
@@ -302,6 +371,28 @@ def retrieve_source_pack(
         used_provider = str(provider_diagnostics[0].get("provider") or primary_provider)
 
     sources = _normalize_sources(raw)
+    if cache is not None:
+        try:
+            if sources:
+                persisted = cache.persist_success(
+                    user_id=user_id, query=query, category=effective_category,
+                    time_range=time_range, days=days, provider=used_provider,
+                    diagnostics=provider_diagnostics[-1] if provider_diagnostics else {},
+                    sources=sources, max_results=max_results,
+                    target_company_id=target_company_id, target_person_id=target_person_id,
+                )
+                if persisted.get("duplicate_content_suppressed", 0):
+                    metrics.observe_retrieval_cache("duplicate_suppressed")
+            else:
+                cache.persist_failure(
+                    user_id=user_id, query=query, category=effective_category,
+                    time_range=time_range, days=days, provider=used_provider,
+                    diagnostics=provider_diagnostics[-1] if provider_diagnostics else {},
+                    target_company_id=target_company_id, target_person_id=target_person_id,
+                )
+                metrics.observe_retrieval_cache("failure")
+        except Exception as exc:
+            logger.warning("retrieval cache persistence failed: %s", exc)
     allowlist: Set[str] = {s["url"] for s in sources if s.get("url")}
     normalized_allowlist = sorted(
         {

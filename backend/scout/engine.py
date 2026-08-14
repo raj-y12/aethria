@@ -29,7 +29,7 @@ from utils.founder_enrichment import (
 )
 from utils.storage import Storage
 from tenant_context import require_user_id
-from utils.settings_loader import get_runtime_limits, is_scouts_enabled
+from utils.settings_loader import DEFAULT_SETTINGS, runtime_limits_from_settings
 from utils.prompt_version import hash_prompt
 from pipeline_execution import ScoutCycleResult, StageExecutionResult
 
@@ -58,6 +58,8 @@ class ScoutEngine:
         deal_memory=None,
         tenant_user_id: str = "",
         active_thesis: Optional[Dict[str, Any]] = None,
+        settings: Optional[Dict[str, Any]] = None,
+        startup_repository: Any = None,
     ):
         """
         Initialize the Scout engine.
@@ -76,13 +78,15 @@ class ScoutEngine:
         self.cost_controller = cost_controller
         self.deal_memory = deal_memory
         self.active_thesis: Optional[Dict[str, Any]] = active_thesis
+        self.settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
+        self.startup_repository = startup_repository
 
         uid = self.tenant_user_id
         self.scouts: List[Scout] = [
-            MarketDrivenScout(api_key, model=model, tenant_user_id=uid),
-            BuilderTechnicalScout(api_key, model=model, tenant_user_id=uid),
-            PainPointScout(api_key, model=model, tenant_user_id=uid),
-            ContrarianScout(api_key, model=model, tenant_user_id=uid),
+            MarketDrivenScout(api_key, model=model, tenant_user_id=uid, settings=self.settings),
+            BuilderTechnicalScout(api_key, model=model, tenant_user_id=uid, settings=self.settings),
+            PainPointScout(api_key, model=model, tenant_user_id=uid, settings=self.settings),
+            ContrarianScout(api_key, model=model, tenant_user_id=uid, settings=self.settings),
         ]
         
         self.backpressure_threshold = int(
@@ -100,6 +104,20 @@ class ScoutEngine:
         # debug detail. Lets pipeline_runner surface a transparent failure message
         # (what was searched, what was missing) instead of a generic error.
         self.last_lookup_outcome: Optional[Dict[str, Any]] = None
+
+    async def _persist_discovery(self, payload: Dict[str, Any], *, pipeline_run_id: Optional[str] = None) -> str:
+        if self.startup_repository is not None:
+            from utils.adapters import financials_from_scout_output, scout_output_to_scout_info
+
+            return await self.startup_repository.create_startup(
+                self.tenant_user_id,
+                scout_output_to_scout_info(payload),
+                financials=financials_from_scout_output(payload),
+                pipeline_run_id=pipeline_run_id,
+            )
+        return await asyncio.to_thread(
+            self.storage.add_discovery, payload, pipeline_run_id=pipeline_run_id
+        )
 
     def set_active_thesis(self, thesis: Optional[Dict[str, Any]]) -> None:
         self.active_thesis = thesis
@@ -170,7 +188,7 @@ class ScoutEngine:
         lossless terminal account of every selected Scout persona.
         """
         self.logger.info(f"Starting discovery cycle at {utcnow().isoformat()}")
-        if not is_scouts_enabled(self.tenant_user_id):
+        if not (self.settings.get("agent_config") or {}).get("scouts_enabled", False):
             self.logger.info("Discovery cycle skipped (scouts disabled in settings)")
             return ScoutCycleResult(
                 outcome=StageExecutionResult.skipped_result(
@@ -180,7 +198,7 @@ class ScoutEngine:
                 )
             )
         try:
-            max_discoveries = int(get_runtime_limits(self.tenant_user_id).get("max_agents_per_run", 10))
+            max_discoveries = int(runtime_limits_from_settings(self.settings).get("max_agents_per_run", 10))
         except Exception:
             max_discoveries = 10
         max_discoveries = max(1, max_discoveries)
@@ -254,7 +272,7 @@ class ScoutEngine:
             attempted_count += len(selected_scouts)
 
             if self.deal_memory:
-                memory_context = self.deal_memory.get_memory_context_for_scout()
+                memory_context = await self.deal_memory.get_memory_context_for_scout()
                 for scout in self.scouts:
                     scout.set_dynamic_context(memory_context)
 
@@ -291,7 +309,7 @@ class ScoutEngine:
                 else:
                     if self.deal_memory:
                         thesis = result.get("primary_thesis", "")
-                        if self.deal_memory.is_duplicate_thesis(thesis):
+                        if await self.deal_memory.is_duplicate_thesis(thesis):
                             self.logger.info(
                                 f"[{scout.scout_type}] Skipping duplicate thesis: "
                                 f"{result['name']}"
@@ -321,8 +339,8 @@ class ScoutEngine:
 
                     if self.storage and persist_discoveries:
                         try:
-                            persisted_id = await asyncio.to_thread(
-                                self.storage.add_discovery, result, pipeline_run_id=pipeline_run_id
+                            persisted_id = await self._persist_discovery(
+                                result, pipeline_run_id=pipeline_run_id
                             )
                             if not str(persisted_id or "").strip():
                                 raise RuntimeError(
@@ -343,7 +361,7 @@ class ScoutEngine:
 
                     if self.deal_memory:
                         try:
-                            self.deal_memory.record_scout_discovery(
+                            await self.deal_memory.record_scout_discovery(
                                 result.get("sector", ""),
                                 result.get("primary_thesis", ""),
                             )
@@ -642,11 +660,7 @@ class ScoutEngine:
             pr = (pipeline_run_id or "").strip() or None
             persisted_id = str(payload.get("id") or "")
             if self.storage:
-                persisted_id = await asyncio.to_thread(
-                    self.storage.add_discovery,
-                    payload,
-                    pipeline_run_id=pr,
-                )
+                persisted_id = await self._persist_discovery(payload, pipeline_run_id=pr)
             already_exists = bool(persisted_id and persisted_id != str(payload.get("id") or ""))
             if not already_exists and persisted_id:
                 handoff_startup.startup_id = persisted_id

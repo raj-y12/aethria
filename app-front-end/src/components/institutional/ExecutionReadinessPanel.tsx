@@ -51,7 +51,7 @@ export default function ExecutionReadinessPanel({
   const deadLetter = countStatus(counts, 'dead_letter');
   const outbox = Number(counts['outbox:pending'] ?? 0);
   const label = readiness.replace(/^./, (character) => character.toUpperCase());
-  const stateTone = readiness === 'blocked' || readiness === 'degraded' ? 'text-escalation' : readiness === 'healthy' || readiness === 'active' || readiness === 'historical' ? 'text-oxford' : 'text-oxford/55';
+  const stateTone = readiness === 'blocked' || readiness === 'degraded' ? 'text-escalation' : readiness === 'healthy' || readiness === 'active' || readiness === 'historical' ? 'text-oxford' : 'text-oxford/65';
   const latestFailureCode = recentJobs
     .filter((job) => job.job_type === 'pipeline_cycle')
     .find((job) => job.failure_code || job.block_code)?.failure_code
@@ -65,7 +65,7 @@ export default function ExecutionReadinessPanel({
         <div>
           <p className="type-label-section">Execution plane</p>
           <div className="mt-phi-2 flex items-center gap-phi-2"><span className={`h-1.5 w-1.5 rounded-none ${readiness === 'healthy' || readiness === 'active' || readiness === 'historical' ? 'bg-oxford' : readiness === 'unavailable' ? 'bg-oxford/25' : 'bg-escalation'}`} aria-hidden /><span className={`type-status ${stateTone}`}>{label}</span></div>
-          <p className="type-body mt-phi-2 max-w-2xl text-oxford/55">
+          <p className="type-body mt-phi-2 max-w-2xl text-oxford/65">
             {loading ? 'Reading durable execution readiness…'
               : readiness === 'blocked' ? 'Durable execution is required, but its worker and repository are not ready. New work must remain blocked.'
                 : readiness === 'active' ? 'The worker is healthy and retrying a job automatically while other work continues.'

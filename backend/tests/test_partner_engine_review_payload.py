@@ -41,6 +41,8 @@ PARTNER_REVIEW_PAYLOAD_KEYS = frozenset(
         "disagreement_summary",
         "aethria_view",
         "reviews",
+        "contradiction_guard",
+        "canonical_context_snapshot",
         "handoff_quality",
     }
 )
@@ -113,6 +115,26 @@ def test_build_entry_review_keys_match_partner_contract():
     entry = engine._build_entry(startup)
     assert entry is not None
     assert frozenset(entry["review"]) == PARTNER_REVIEW_PAYLOAD_KEYS
+
+
+def test_build_entry_exposes_guarded_review_and_audit_metadata():
+    guard = {"state": "directly_contradicted", "corrections": [{"criterion": "traction"}]}
+    review_info = ReviewInfo(
+        market_score=6,
+        product_score=6,
+        technical_score=6,
+        execution_score=6,
+        overall_summary="x",
+        key_risks=["Evidence-consistent traction interpretation."],
+        verdict="MEDIUM",
+        contradiction_guard=guard,
+        canonical_context_snapshot={"contexts": {"traction": {"has_canonical_coverage": True}}},
+    )
+    startup = Startup(startup_id="s-test", scout_info=_minimal_scout(), review_info=review_info)
+    engine = PartnerEngine(storage=SimpleNamespace(_user_id="user-test"), tenant_user_id="user-test", use_llm_fallback=False)
+    entry = engine._build_entry(startup)
+    assert entry["review"]["key_risks"] == ["Evidence-consistent traction interpretation."]
+    assert entry["review"]["contradiction_guard"] == guard
 
 
 PARTNER_SCOUT_PAYLOAD_KEYS = frozenset(

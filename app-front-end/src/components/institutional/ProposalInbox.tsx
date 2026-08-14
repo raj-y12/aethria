@@ -30,16 +30,16 @@ export default function ProposalInbox({ fundConfig }: { fundConfig: Record<strin
         <div>
           <p className="type-label-section">Fund Intelligence</p>
           <h3 className="mt-phi-2 font-display text-2xl font-medium text-oxford">Policy proposal inbox</h3>
-          <p className="type-body mt-phi-2 max-w-2xl text-oxford/55">Override and outcome patterns produce attributed proposals. Analysis never changes the live policy.</p>
+          <p className="type-body mt-phi-2 max-w-2xl text-oxford/65">Override and outcome patterns produce attributed proposals. Analysis never changes the live policy.</p>
         </div>
         <button type="button" onClick={() => derive.mutate()} disabled={derive.isPending} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Derive override patterns</button>
       </header>
-      {proposals.isLoading ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/55">Loading proposals…</p>
+      {proposals.isLoading ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/65">Loading proposals…</p>
         : proposals.isError ? <p role="alert" className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-signal">Fund Intelligence is unavailable. No production policy was changed.</p>
-          : (proposals.data?.length ?? 0) === 0 ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/55">No policy proposals. More attributed human rulings and outcomes may be required.</p>
+          : (proposals.data?.length ?? 0) === 0 ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/65">No policy proposals. More attributed human rulings and outcomes may be required.</p>
             : <div className="divide-y divide-oxford/10 border-t border-oxford/10">{proposals.data!.map((proposal) => (
               <article key={proposal.policy_proposal_id} className="grid gap-phi-4 px-phi-5 py-phi-4 lg:grid-cols-[1fr_auto] lg:items-center">
-                <div><div className="flex flex-wrap items-center gap-phi-2"><span className="type-status">{statusLabel(proposal.status)}</span><span className="type-meta text-oxford/45">{proposal.sample_size} signals · {Math.round(proposal.confidence * 100)}%</span></div><p className="type-body mt-phi-2 font-medium text-oxford/75">{proposal.pattern_summary}</p><p className="type-meta mt-phi-2 text-oxford/45">Attribution: {proposal.attribution.replace(/_/g, ' ')}</p></div>
+                <div><div className="flex flex-wrap items-center gap-phi-2"><span className="type-status">{statusLabel(proposal.status)}</span><span className="type-meta text-oxford/65">{proposal.sample_size} signals · {Math.round(proposal.confidence * 100)}%</span></div><p className="type-body mt-phi-2 font-medium text-oxford/75">{proposal.pattern_summary}</p><p className="type-meta mt-phi-2 text-oxford/65">Attribution: {proposal.attribution.replace(/_/g, ' ')}</p></div>
                 <button type="button" onClick={() => setSelected(proposal)} className="type-action border border-oxford/15 px-3 py-2 text-oxford">Review proposal</button>
               </article>
             ))}</div>}

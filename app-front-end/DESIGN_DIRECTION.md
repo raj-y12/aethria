@@ -93,24 +93,28 @@ addresses it.
 
 ## Flow
 
-**Queue | active decision.** The queue (34%) is compressed utility — small type, dense
-rows, selection read through weight and full ink, never size. The right column (66%) is
-the **Decision Stage**: the active company owns the canvas with the one act the product
-exists for — make a judgment — given real gravity:
+**Docket | memo on selection.** The docket is compressed utility — small type, dense
+rows, selection read through weight, face, and vertical room, never through colour or a
+chevron. A selected row rises from 16px sans to Playfair at display scale; the docket
+animates to 38.2% and the memo takes the remaining 61.8%.
 
-- a huge conviction numeral (counts up on arrival) over a tiny `/100 conviction` scale
-- the state of the call in bold mono — `NEEDS YOUR RULING` in escalation ink is the
-  product's moment of tension
-- the company name at display scale, one standfirst line
-- the instruments: thesis-fit track, the reviewer **agreement map** (each reviewer's
-  mean as a tick on the 0–10 axis; split reads in escalation ink), partner confidence
-- "What decides it" — the focal question — then the full memo flowing beneath
+The docket has a resting state: it opens with no subject, and a row becomes the subject
+only on a deliberate click (which is also what marks it seen). Search is retrieval, not
+refinement — a query looks across the whole docket regardless of the active view.
 
-The stage always has a subject: the top of the current queue view takes the canvas
-automatically (without being acknowledged — only a deliberate click marks a row seen).
-There is no empty resting state and no Close: a different row replaces the subject.
-This is the layout's compression/release rhythm: dense list → silence → huge score →
-small metadata.
+Inside the memo, the ruling is the close: seven numbered sections, the appendix, then
+the decision surface. Because that is a long way down, a sticky bar keeps `Make your
+ruling` reachable from anywhere in the document, and committing a ruling passes through
+a full-plate confirmation that restates the call against Aethria's lean before it is
+written. That confirmation is the product's moment of tension and its release; the
+spine's `Need ruling` count is what builds it.
+
+> **Not built.** An earlier direction specified a *Decision Stage* — an auto-subject
+> canvas with a counting conviction numeral, `NEEDS YOUR RULING` in escalation ink, and
+> a reviewer agreement map, with no empty resting state. The docket shipped instead.
+> The numeral survives on Home (`ActivityStatsRow`); the agreement map and the
+> auto-subject do not exist. Treat the Stage as an unbuilt idea, not as current
+> behaviour.
 
 Deep links: `/v1/flow?open=<id>` opens a memo (used by Today, Dispatch results,
 Portfolio, and Fund); `/v1/flow?queue=escalated|new` focuses a queue view (used by the

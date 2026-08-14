@@ -159,7 +159,7 @@ def backplane_enabled() -> bool:
 
 
 def _database_url() -> str:
-    return (os.getenv("DATABASE_URL", "") or os.getenv("SUPABASE_DB_URL", "") or "").strip()
+    return os.getenv("DATABASE_URL", "").strip()
 
 
 def _on_notification(_conn: Any, _pid: int, _channel: str, payload: str) -> None:
@@ -233,7 +233,7 @@ async def start_backplane(
     if connect is None and not resolved_dsn:
         message = (
             "event_bus_backplane_unavailable; EVENT_BUS_BACKPLANE=postgres requires "
-            "DATABASE_URL or SUPABASE_DB_URL"
+            "DATABASE_URL"
         )
         if env_config.is_production_env() and not env_config.allow_process_local_state():
             raise RuntimeError(message)

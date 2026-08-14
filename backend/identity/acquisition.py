@@ -94,20 +94,38 @@ def observation_from_scout_discovery(
         "evidence_sources": evidence_sources,
         "source": "validated_scout_payload",
     }
+    is_named_lookup = (
+        str(discovery.get("origin_type") or "").strip() == "on_demand_lookup"
+    )
+    channel = (
+        SourceChannel.MANUAL_LOOKUP
+        if is_named_lookup
+        else SourceChannel.AUTONOMOUS_DISCOVERY
+    )
+    lookup_id = str(discovery.get("lookup_id") or "").strip() or None
+    external_key = (
+        f"lookup:{lookup_id or startup_id}"
+        if is_named_lookup
+        else f"discovery:{startup_id}:{scout_type}"
+    )
     return SourceObservationInput(
         user_id=user_id,
-        channel=SourceChannel.AUTONOMOUS_DISCOVERY,
+        channel=channel,
         observed_name=name,
         observed_domain=observed_domain,
         provider_identifiers=provider_identifiers,
-        external_event_key=f"discovery:{startup_id}:{scout_type}",
+        external_event_key=external_key,
+        lookup_id=lookup_id,
         legacy_startup_id=(startup_id or None) if include_legacy_projection else None,
         source_metadata={
-            "source": "scout_engine",
+            "source": "scout_engine" if not is_named_lookup else "named_lookup",
             "scout_type": scout_type,
             "prompt_version": str(discovery.get("prompt_version") or "").strip() or None,
             "pipeline_run_id": str(discovery.get("pipeline_run_id") or "").strip() or None,
             "reference_count": len(references),
+            "operator_confirmed_identity": bool(
+                is_named_lookup and str(discovery.get("lookup_website") or "").strip()
+            ),
         },
         resolution_payload=resolution_payload,
     )

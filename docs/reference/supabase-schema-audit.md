@@ -14,7 +14,7 @@ Evidence basis: live `pg_class`/`pg_stat` sizing + per-table code-reference scan
 |---|---|---|---|
 | **startups** | 166 / 4.7 MB | **REDESIGN** | 29 KB/row; `review_info` = 20 KB/row = 64% of table. Split (below). |
 | startup_pipeline_state | 174 | KEEP | Clean typed state machine; different write cadence than startups. |
-| portfolio_startups | 133 | KEEP (reconcile later) | Properly normalized, but duplicates startup fields. Long-term: derive from slim `startups` where decision=YES. |
+| portfolio_startups | 133 | HISTORICAL ONLY | Live rows are preserved for provenance and reconciliation. Runtime reads and writes use `startups`; the table is intentionally absent from the provider-neutral schema. Live deletion/archive is a separate operational decision. |
 | fund_thesis | 7 | KEEP | Well-modeled, FK to active version. |
 | fund_thesis_versions | 43 | KEEP | Versioned thesis; fine. |
 | fund_thesis_embeddings | 43 / 592 KB | **REDESIGN** | Vectors stored as **jsonb arrays**. Move to `pgvector vector(1536)`: ~half the bytes + real ANN index. |
@@ -204,4 +204,3 @@ The expand/contract DDL is inert until these land. Scope = move `review_info`/`a
 7. Keep the existing missing-column fallback pattern (`_is_missing_*_error`) for a smooth rollout.
 **Verify** against `backend/tests/` (esp. `test_egress_optimizations.py`, `test_memory_safety.py`)
 before applying contract.
-

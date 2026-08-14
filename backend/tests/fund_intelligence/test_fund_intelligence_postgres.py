@@ -97,3 +97,127 @@ async def test_repository_preview_review_and_publication_are_hash_bound():
                 "delete from public.policy_proposals where user_id=$1", user_id
             )
         await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_settings_policy_publication_is_idempotent_and_preserves_unrelated_settings():
+    import asyncpg
+    from fund_intelligence.repository import FundIntelligenceRepository
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=4)
+    repository = FundIntelligenceRepository(pool)
+    user_id = f"policy-settings-{uuid4()}"
+    try:
+        async with pool.acquire() as connection:
+            await connection.execute(
+                "insert into public.settings (user_id,key,data) values ($1,$1,$2::jsonb)",
+                user_id,
+                '{"agent_config":{"reviewers_enabled":true},"fund_config":{"draftOnly":true}}',
+            )
+        first = await repository.publish_settings_policy(
+            user_id=user_id,
+            actor_id=user_id,
+            fund_config={"scoringWeights": [{"key": "market", "weight": 40}]},
+            policy_hash="hash-settings-1",
+            expected_policy_id="",
+            expected_policy_hash="",
+        )
+        retry = await repository.publish_settings_policy(
+            user_id=user_id,
+            actor_id=user_id,
+            fund_config={"scoringWeights": [{"key": "market", "weight": 40}]},
+            policy_hash="hash-settings-1",
+        )
+        assert retry["governed_policy_version_id"] == first["governed_policy_version_id"]
+        with pytest.raises(RuntimeError, match="stale"):
+            await repository.publish_settings_policy(
+                user_id=user_id,
+                actor_id=user_id,
+                fund_config={"scoringWeights": [{"key": "market", "weight": 50}]},
+                policy_hash="hash-settings-2",
+                expected_policy_id="old-policy",
+                expected_policy_hash="old-hash",
+            )
+        async with pool.acquire() as connection:
+            settings = await connection.fetchval(
+                "select data from public.settings where user_id=$1 and key=$1", user_id
+            )
+            settings = settings if isinstance(settings, dict) else __import__("json").loads(settings)
+            assert settings["agent_config"] == {"reviewers_enabled": True}
+            assert settings["fund_config"]["draftOnly"] is True
+            assert settings["fund_config"]["activePolicyVersionId"] == first["governed_policy_version_id"]
+            assert await connection.fetchval(
+                "select count(*) from public.governed_policy_versions where user_id=$1 and status='published'",
+                user_id,
+            ) == 1
+    finally:
+        async with pool.acquire() as connection:
+            await connection.execute("delete from public.domain_outbox where user_id=$1", user_id)
+            await connection.execute("delete from public.settings where user_id=$1", user_id)
+            await connection.execute("delete from public.governed_policy_versions where user_id=$1", user_id)
+        await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_concurrent_settings_policy_publications_allow_one_stale_writer_only():
+    import asyncio
+    import asyncpg
+    from fund_intelligence.repository import FundIntelligenceRepository
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=6)
+    repository = FundIntelligenceRepository(pool)
+    user_id = f"policy-concurrent-{uuid4()}"
+    try:
+        async def publish(index):
+            return await repository.publish_settings_policy(
+                user_id=user_id,
+                actor_id=f"actor-{index}",
+                fund_config={"scoringWeights": [{"key": "market", "weight": 30 + index}]},
+                policy_hash=f"hash-concurrent-{index}",
+                expected_policy_id="",
+                expected_policy_hash="",
+            )
+
+        results = await asyncio.gather(publish(1), publish(2), return_exceptions=True)
+        assert sum(not isinstance(result, Exception) for result in results) == 1
+        async with pool.acquire() as connection:
+            assert await connection.fetchval(
+                "select count(*) from public.governed_policy_versions where user_id=$1 and status='published'",
+                user_id,
+            ) == 1
+    finally:
+        async with pool.acquire() as connection:
+            await connection.execute("delete from public.domain_outbox where user_id=$1", user_id)
+            await connection.execute("delete from public.settings where user_id=$1", user_id)
+            await connection.execute("delete from public.governed_policy_versions where user_id=$1", user_id)
+        await pool.close()
+
+
+@pytest.mark.asyncio
+async def test_canonical_policy_upgrade_uses_governed_repository_and_is_retry_safe():
+    import asyncpg
+    from fund_intelligence.repository import FundIntelligenceRepository
+    from services.scoring.policy_upgrade import upgrade_published_policy_with_repository
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=4)
+    repository = FundIntelligenceRepository(pool)
+    user_id = f"policy-upgrade-{uuid4()}"
+    config = {"scoringWeights": [{"key": "market", "weight": 40}]}
+    try:
+        first = await upgrade_published_policy_with_repository(
+            repository, user_id, fund_config=config, apply=True
+        )
+        retry = await upgrade_published_policy_with_repository(
+            repository, user_id, fund_config=config, apply=True
+        )
+        assert first.status.value == "applied"
+        assert retry.status.value == "already_current"
+        active = await repository.get_active_published_policy(user_id=user_id)
+        assert active["governed_policy_version_id"] == first.new_policy_id
+        assert active["publication_source"] == "settings"
+    finally:
+        async with pool.acquire() as connection:
+            await connection.execute("delete from public.domain_outbox where user_id=$1", user_id)
+            await connection.execute("delete from public.settings where user_id=$1", user_id)
+            await connection.execute("delete from public.governed_policy_versions where user_id=$1", user_id)
+        await pool.close()

@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: aethria_test
+      POSTGRES_USER: aethria
+      POSTGRES_PASSWORD: local-test-password
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aethria -d aethria_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    volumes:
+      - aethria-postgres-test-data:/var/lib/postgresql/data
+
   backend:
     build:
       context: .
@@ -9,6 +25,13 @@ services:
       - .env
     environment:
       PORT: "8000"
+      DATABASE_URL: postgresql://aethria:local-test-password@postgres:5432/aethria_test
+      USE_SUPABASE_STORAGE: "0"
+      ENVIRONMENT: development
+      EVENT_BUS_BACKPLANE: postgres
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -21,3 +44,27 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://aethria:local-test-password@postgres:5432/aethria_test
+      USE_SUPABASE_STORAGE: "0"
+      ENVIRONMENT: development
+    command:
+      [
+        "python",
+        "scripts/migrate_postgres.py",
+        "--database-url",
+        "postgresql://aethria:local-test-password@postgres:5432/aethria_test",
+      ]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  aethria-postgres-test-data:

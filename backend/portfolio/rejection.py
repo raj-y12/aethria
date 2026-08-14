@@ -1,7 +1,7 @@
 """
 Rejection pattern analyzer. Learns from passed deals.
-Persists to Supabase (`portfolio_rejection_patterns`) when configured with tenant context;
-falls back to local JSON file otherwise.
+Uses the provider-neutral Batch 2 snapshot in the async pipeline; falls back
+to local JSON only in explicitly local/dev mode.
 """
 import json
 import logging
@@ -9,9 +9,8 @@ import os
 import fcntl
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from uuid import uuid4
-
-from supabase_client import get_service_client
+from batch2.repository import Batch2State
+from batch2.store import rejection_patterns_get, rejection_patterns_set
 import env_config
 
 logger = logging.getLogger(__name__)
@@ -30,23 +29,18 @@ def _empty_patterns() -> Dict[str, Any]:
 class RejectionAnalyzer:
     """Analyzes rejection patterns and writes tenant-scoped storage."""
 
-    def __init__(self, data_dir: str = "data/portfolio", user_id: Optional[str] = None):
+    def __init__(self, data_dir: str = "data/portfolio", user_id: Optional[str] = None, batch2_state: Optional[Batch2State] = None):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.user_id = (user_id or "").strip() or None
+        self.batch2_state = batch2_state
         # ponytail: filename-safe tenant scoping — the fallback file must never
         # be shared across tenants (it was previously one unscoped file).
         file_suffix = f"_{self.user_id}" if self.user_id else ""
         self.patterns_file = self.data_dir / f"rejection_patterns{file_suffix}.json"
-        if env_config.use_supabase_storage() and not self.user_id:
-            raise RuntimeError("RejectionAnalyzer requires explicit user_id when Supabase storage is enabled")
+        if env_config.is_production_env() and not self.user_id:
+            raise RuntimeError("RejectionAnalyzer requires explicit user_id in production")
         self.logger = logging.getLogger("rejection.analyzer")
-
-    def _using_supabase(self) -> bool:
-        return bool(self.user_id and os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
-
-    def _supabase_client(self):
-        return get_service_client()
 
     def analyze_rejection(
         self,
@@ -105,27 +99,11 @@ class RejectionAnalyzer:
         return self._read_patterns()
 
     def _read_patterns(self) -> Dict[str, Any]:
-        if self._using_supabase():
-            try:
-                r = (
-                    self._supabase_client()
-                    .table("portfolio_rejection_patterns")
-                    .select("stats,created_at")
-                    .eq("user_id", self.user_id)
-                    .order("created_at", desc=True)
-                    .limit(1)
-                    .execute()
-                )
-                rows = (r.data or []) if hasattr(r, "data") else []
-                if rows and isinstance(rows[0].get("stats"), dict):
-                    return rows[0]["stats"]
-                return _empty_patterns()
-            except Exception as e:
-                if not env_config.local_fallback_allowed():
-                    raise RuntimeError(
-                        "RejectionAnalyzer: supabase_read_failed_no_local_fallback_in_production"
-                    ) from e
-                self.logger.warning("Supabase rejection patterns read failed; using file fallback: %s", e)
+        if self.user_id and self.batch2_state is None and not env_config.local_fallback_allowed():
+            raise RuntimeError("RejectionAnalyzer: batch2_asyncpg_snapshot_required")
+        if self.user_id and self.batch2_state is not None:
+            data = rejection_patterns_get(user_id=self.user_id, state=self.batch2_state)
+            return data if isinstance(data, dict) else _empty_patterns()
         if not self.patterns_file.exists():
             return _empty_patterns()
         try:
@@ -139,34 +117,11 @@ class RejectionAnalyzer:
             return _empty_patterns()
 
     def _write_patterns(self, data: Dict[str, Any]) -> None:
-        if self._using_supabase():
-            try:
-                # Keep exactly one current row per user via update-or-insert.
-                q = (
-                    self._supabase_client()
-                    .table("portfolio_rejection_patterns")
-                    .select("id")
-                    .eq("user_id", self.user_id)
-                    .limit(1)
-                    .execute()
-                )
-                rows = (q.data or []) if hasattr(q, "data") else []
-                if rows:
-                    row_id = rows[0].get("id")
-                    self._supabase_client().table("portfolio_rejection_patterns").update(
-                        {"stats": data}
-                    ).eq("id", row_id).eq("user_id", self.user_id).execute()
-                else:
-                    self._supabase_client().table("portfolio_rejection_patterns").insert(
-                        {"id": str(uuid4()), "user_id": self.user_id, "stats": data}
-                    ).execute()
-                return
-            except Exception as e:
-                if not env_config.local_fallback_allowed():
-                    raise RuntimeError(
-                        "RejectionAnalyzer: supabase_write_failed_no_local_fallback_in_production"
-                    ) from e
-                self.logger.warning("Supabase rejection patterns write failed; using file fallback: %s", e)
+        if self.user_id and self.batch2_state is None and not env_config.local_fallback_allowed():
+            raise RuntimeError("RejectionAnalyzer: batch2_asyncpg_snapshot_required")
+        if self.user_id and self.batch2_state is not None:
+            rejection_patterns_set(data, user_id=self.user_id, state=self.batch2_state)
+            return
         temp_path = self.patterns_file.with_suffix(".tmp")
         with open(temp_path, "w") as f:
             json.dump(data, f, indent=2)

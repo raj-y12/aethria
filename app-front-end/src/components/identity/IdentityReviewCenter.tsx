@@ -1,13 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import IdentityReviewQueue from './IdentityReviewQueue';
 import { transitionOrReduced } from '../../design-system/motion';
 import { usePrefersReducedMotion } from '../../hooks';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 export default function IdentityReviewCenter() {
   const reduceMotion = usePrefersReducedMotion();
   const [open, setOpen] = useState(false);
   const [linkedJobId, setLinkedJobId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(open, panelRef);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   useEffect(() => {
     const openReview = (event: Event) => {
@@ -38,6 +50,7 @@ export default function IdentityReviewCenter() {
             exit={{ x: 32 }}
             transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
             className="h-full w-full max-w-2xl overflow-y-auto border-l border-oxford/10 bg-paper shadow-2xl"
+            ref={panelRef}
           >
             <IdentityReviewQueue onClose={() => setOpen(false)} linkedJobId={linkedJobId} />
           </motion.div>

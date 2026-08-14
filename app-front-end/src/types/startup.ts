@@ -451,11 +451,12 @@ export interface Timestamps {
 }
 
 export type RulingDecision = 'YES' | 'NO' | 'MAYBE';
+export type DecisionHistoryDecision = RulingDecision | 'ADVANCE';
 
 export interface DecisionHistoryRecord {
   company_id: string;
-  previous_decision?: RulingDecision | null;
-  new_decision: RulingDecision;
+  previous_decision?: DecisionHistoryDecision | null;
+  new_decision: DecisionHistoryDecision;
   timestamp: string;
   rationale?: string | null;
   confidence?: number | null;

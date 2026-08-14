@@ -41,7 +41,7 @@ export default function CrmExportAction({
         type="button"
         onClick={() => prepare.mutate()}
         disabled={prepare.isPending}
-        className="type-status text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+        className="type-status text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
       >
         {prepare.isPending ? 'Preparing…' : 'Prepare CRM export'}
       </button>
@@ -67,7 +67,7 @@ export default function CrmExportAction({
               </div>
             ))}
           </dl>
-          <p className="mt-phi-2 type-meta text-oxford/55">
+          <p className="mt-phi-2 type-meta text-oxford/65">
             Prepared only — nothing has been sent to your CRM yet.
           </p>
           {approve.isSuccess ? (

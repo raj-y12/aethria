@@ -101,4 +101,14 @@ describe('canonical startup queue adapter', () => {
       .mockResolvedValueOnce(response([{ id: 'startup-1' }]));
     await expect(fetchStartups()).resolves.toEqual([{ id: 'startup-1' }]);
   });
+
+  it('falls back to the legacy queue when canonical data is empty', async () => {
+    authedFetch
+      .mockResolvedValueOnce(response({ mode: 'canonical_read', canonical_reads_allowed: true }))
+      .mockResolvedValueOnce(response({ opportunities: [] }))
+      .mockResolvedValueOnce(response([{ id: 'startup-legacy' }]));
+
+    await expect(fetchStartups()).resolves.toEqual([{ id: 'startup-legacy' }]);
+    expect(authedFetch.mock.calls[2][0]).toContain('/api/startups');
+  });
 });

@@ -1,18 +1,14 @@
-"""
-Cross-agent deal memory for institutional learning.
-Backed by Supabase memory table (explicit user_id per tenant).
-"""
+"""Cross-agent deal memory for institutional learning."""
 import logging
 import re
 from collections import Counter
 from typing import List, Dict, Any
 
 from tenant_context import require_user_id
-from supabase_doc_store import doc_get, doc_set
+from memory_repository import MemoryRepository
 
 logger = logging.getLogger(__name__)
 
-_MEMORY_TABLE = "memory"
 _DEFAULT_MEMORY = {
     "seen_sectors": {},
     "seen_theses": [],
@@ -46,7 +42,7 @@ def _word_overlap_similarity(a: str, b: str) -> float:
 
 class DealMemory:
     """
-    Cross-agent institutional memory. Backed by Supabase memory table.
+    Cross-agent institutional memory backed by direct PostgreSQL JSONB.
     """
 
     MAX_THESES = 50
@@ -54,34 +50,41 @@ class DealMemory:
     MAX_SUCCESSFUL = 50
     SIMILARITY_THRESHOLD = 0.75
 
-    def __init__(self, user_id: str):
+    def __init__(self, user_id: str, pool: Any = None):
         self.logger = logging.getLogger("deal_memory")
         self._user_id = require_user_id(user_id, context="DealMemory")
-        data = doc_get(_MEMORY_TABLE, user_id=self._user_id)
-        if not data or not isinstance(data, dict):
-            doc_set(_MEMORY_TABLE, dict(_DEFAULT_MEMORY), user_id=self._user_id)
+        self._repository = MemoryRepository(pool)
 
-    def _read(self) -> Dict[str, Any]:
-        data = doc_get(_MEMORY_TABLE, user_id=self._user_id)
+    async def initialize(self) -> None:
+        data = await self._repository.get(self._user_id)
+        if not data or not isinstance(data, dict):
+            await self._repository.upsert(self._user_id, dict(_DEFAULT_MEMORY))
+
+    async def _read(self) -> Dict[str, Any]:
+        try:
+            data = await self._repository.get(self._user_id)
+        except Exception as exc:
+            self.logger.warning("Deal memory read unavailable: %s", exc)
+            return dict(_DEFAULT_MEMORY)
         if not isinstance(data, dict):
             return dict(_DEFAULT_MEMORY)
         return data
 
-    def _write(self, data: Dict[str, Any]) -> None:
-        doc_set(_MEMORY_TABLE, data, user_id=self._user_id)
+    async def _write(self, data: Dict[str, Any]) -> None:
+        await self._repository.upsert(self._user_id, data)
 
-    def is_duplicate_thesis(self, thesis: str) -> bool:
+    async def is_duplicate_thesis(self, thesis: str) -> bool:
         if not thesis:
             return False
-        data = self._read()
+        data = await self._read()
         for existing in data.get("seen_theses", []):
             if _word_overlap_similarity(thesis, existing) > self.SIMILARITY_THRESHOLD:
                 self.logger.info("Duplicate thesis detected: '%s...'", thesis[:60])
                 return True
         return False
 
-    def record_scout_discovery(self, sector: str, primary_thesis: str) -> None:
-        data = self._read()
+    async def record_scout_discovery(self, sector: str, primary_thesis: str) -> None:
+        data = await self._read()
         sectors = data.get("seen_sectors", {})
         sectors[sector] = sectors.get(sector, 0) + 1
         data["seen_sectors"] = sectors
@@ -89,39 +92,39 @@ class DealMemory:
         if primary_thesis:
             theses.append(primary_thesis)
             data["seen_theses"] = theses[-self.MAX_THESES:]
-        self._write(data)
+        await self._write(data)
 
-    def record_failed_assumptions(self, assumptions: List[str]) -> None:
+    async def record_failed_assumptions(self, assumptions: List[str]) -> None:
         if not assumptions:
             return
-        data = self._read()
+        data = await self._read()
         failed = data.get("failed_assumptions", [])
         failed.extend(assumptions)
         data["failed_assumptions"] = failed[-self.MAX_FAILED:]
-        self._write(data)
+        await self._write(data)
 
-    def record_successful_thesis(self, thesis: str) -> None:
+    async def record_successful_thesis(self, thesis: str) -> None:
         if not thesis:
             return
-        data = self._read()
+        data = await self._read()
         successful = data.get("successful_theses", [])
         successful.append(thesis)
         data["successful_theses"] = successful[-self.MAX_SUCCESSFUL:]
-        self._write(data)
+        await self._write(data)
 
-    def get_oversaturated_sectors(self, top_n: int = 3) -> List[str]:
-        data = self._read()
+    async def get_oversaturated_sectors(self, top_n: int = 3) -> List[str]:
+        data = await self._read()
         sectors = data.get("seen_sectors", {})
         sorted_sectors = sorted(sectors.items(), key=lambda x: x[1], reverse=True)
         return [s[0] for s in sorted_sectors[:top_n]]
 
-    def get_recent_failed_assumptions(self, n: int = 5) -> List[str]:
-        data = self._read()
+    async def get_recent_failed_assumptions(self, n: int = 5) -> List[str]:
+        data = await self._read()
         return data.get("failed_assumptions", [])[-n:]
 
-    def get_memory_context_for_scout(self) -> str:
-        oversaturated = self.get_oversaturated_sectors(3)
-        failed = self.get_recent_failed_assumptions(5)
+    async def get_memory_context_for_scout(self) -> str:
+        oversaturated = await self.get_oversaturated_sectors(3)
+        failed = await self.get_recent_failed_assumptions(5)
         parts = []
         if oversaturated:
             parts.append(f"Avoid these overexplored sectors this cycle: {', '.join(oversaturated)}.")

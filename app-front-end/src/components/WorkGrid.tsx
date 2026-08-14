@@ -17,6 +17,7 @@ import DecisionQueueHeader, {
 } from './queue/DecisionQueueHeader';
 import DocketCaseRow from './queue/DocketCaseRow';
 import type { DocketRowModel } from './queue/queueRowShared';
+import { normalizeQuery, startupMatchesQuery } from '../lib/queueSearch';
 import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
 import { queueAttentionRank } from '../lib/dealState';
 import {
@@ -186,6 +187,7 @@ const WorkGrid = ({
   const [reviewFilters, setReviewFilters] = useState<Set<ReviewFilter>>(() => new Set());
   const [sortFilter, setSortFilter] = useState<SortFilter>('QUEUE_PRIORITY');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [query, setQuery] = useState('');
   // In the NEW view, a clicked row is acknowledged and would normally drop out
   // immediately (is_new_to_user flips false). Pin it so it stays visible until
   // the analyst clicks off it (closes the memo or selects another row).
@@ -293,10 +295,18 @@ const WorkGrid = ({
   }, [viewCounts, onViewCounts]);
 
   const orderedModels = useMemo(() => {
+    // A search is a retrieval, not a refinement: it looks across the whole
+    // docket, because the operator recalling a name does not also recall which
+    // view it is sitting in.
+    const normalizedQuery = normalizeQuery(query);
     const filtered = allModels.filter((row) => {
-      const pinnedInNew =
-        queueView === 'NEW' && pinnedNewId != null && row.startup.id === pinnedNewId;
-      if (!pinnedInNew && !rowMatchesQueueView(row, queueView)) return false;
+      if (normalizedQuery) {
+        if (!startupMatchesQuery(row.startup, normalizedQuery)) return false;
+      } else {
+        const pinnedInNew =
+          queueView === 'NEW' && pinnedNewId != null && row.startup.id === pinnedNewId;
+        if (!pinnedInNew && !rowMatchesQueueView(row, queueView)) return false;
+      }
       if (sourceFilters.size > 0 && !sourceFilters.has(row.sourceBadge)) return false;
       if (!rowMatchesOutcomeFilters(row, outcomeFilters)) return false;
       if (!rowMatchesFlagFilters(row, flagFilters)) return false;
@@ -334,7 +344,7 @@ const WorkGrid = ({
       }
     }
     return sorted;
-  }, [allModels, queueView, sourceFilters, outcomeFilters, flagFilters, reviewFilters, sortFilter, pinnedNewId]);
+  }, [allModels, queueView, query, sourceFilters, outcomeFilters, flagFilters, reviewFilters, sortFilter, pinnedNewId]);
 
   // Drop the pin once the selection moves off the pinned row (memo closed or
   // a different row selected), letting the acknowledged row leave the NEW view.
@@ -384,6 +394,8 @@ const WorkGrid = ({
         config={config}
         sortFilter={sortFilter}
         onSortFilterChange={setSortFilter}
+        query={query}
+        onQueryChange={setQuery}
         sourceFilters={sourceFilters}
         onToggleSource={toggleSource}
         outcomeFilters={outcomeFilters}
@@ -414,18 +426,21 @@ const WorkGrid = ({
                 animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
                 variants={emptyStateContainerVariants}
               >
-                <motion.p className="type-label-tab text-oxford/60" variants={emptyStateItemVariants}>
-                  Queue view
+                <motion.p className="type-label-tab text-oxford/65" variants={emptyStateItemVariants}>
+                  {query.trim() ? 'Search' : 'Queue view'}
                 </motion.p>
                 <motion.p
                   className="mt-phi-3 type-body-emphasis text-oxford"
                   variants={emptyStateItemVariants}
                 >
-                  No deals match this view.
+                  {query.trim()
+                    ? `Nothing on the docket matches “${query.trim()}”.`
+                    : 'No deals match this view.'}
                 </motion.p>
-                <motion.p className="mt-phi-2 type-body text-oxford/60" variants={emptyStateItemVariants}>
-                  Clear filters or switch to a broader queue view. Stale work is classified after{' '}
-                  {config.thresholds.staleAfterHours} hours.
+                <motion.p className="mt-phi-2 type-body text-oxford/65" variants={emptyStateItemVariants}>
+                  {query.trim()
+                    ? 'This searches every company already on the docket. To bring in one Aethria has not seen, dispatch a lookup.'
+                    : `Clear filters or switch to a broader queue view. Stale work is classified after ${config.thresholds.staleAfterHours} hours.`}
                 </motion.p>
                 {(hasActiveFilters || (queueView !== 'PRIORITY' && queueView !== 'ALL')) && (
                   <motion.div

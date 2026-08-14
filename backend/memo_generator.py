@@ -368,6 +368,27 @@ class MemoGenerator:
             if not key_risks:
                 lines.append("- Not provided")
             lines.append("")
+            contradiction_guards = [
+                getattr(ri, "contradiction_guard", None),
+                getattr(startup.partner_info, "contradiction_guard", None) if startup.partner_info else None,
+            ]
+            corrections = [
+                correction
+                for guard in contradiction_guards
+                if isinstance(guard, dict)
+                for correction in (guard.get("corrections", []) or [])
+            ]
+            if corrections:
+                lines.append("### Evidence Guard")
+                lines.append("")
+                lines.append("Material Reviewer judgments were checked against canonical decision-time evidence:")
+                for correction in corrections:
+                    state = str(correction.get("state") or "uncertain").replace("_", " ")
+                    criterion = str(correction.get("criterion") or "unknown")
+                    sources = sorted({str(item.get("source_locator")) for item in correction.get("evidence", []) if item.get("source_locator")})
+                    source_text = f" Sources: {', '.join(sources)}." if sources else ""
+                    lines.append(f"- **{criterion} — {state}.** {correction.get('guarded') or 'Reassess against the evidence.'}{source_text}")
+                lines.append("")
             if not for_display:
                 diligence_red_flags = getattr(ri, "diligence_red_flags", None) or []
                 lines.append("### **Diligence Red Flags**")

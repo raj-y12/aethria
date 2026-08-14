@@ -60,6 +60,8 @@ async def test_status_uses_exact_published_policy_prerequisite_contract(monkeypa
 
     governed_repository = object()
     monkeypatch.setattr("api._durable_job_repository", DurableRepository())
+    monkeypatch.setattr("api.load_settings", lambda user_id: {"agent_config": {}})
+    monkeypatch.setattr("api.load_settings", lambda user_id: {"agent_config": {}})
     monkeypatch.setattr(
         "api._agents_status_reads_sync",
         lambda *_args: (True, True, "thesis-live", None, True),
@@ -118,6 +120,7 @@ async def test_status_advertises_execution_only_after_exact_prerequisites_load(
         policy=SimpleNamespace(policy_version_id="policy-live"),
     )
     monkeypatch.setattr("api._durable_job_repository", DurableRepository())
+    monkeypatch.setattr("api.load_settings", lambda user_id: {"agent_config": {}})
     monkeypatch.setattr(
         "api._agents_status_reads_sync",
         lambda *_args: (True, True, "thesis-live", None, True),
@@ -139,5 +142,44 @@ async def test_status_advertises_execution_only_after_exact_prerequisites_load(
     assert result["execution_prerequisites_ready"] is True
     assert result["published_policy_ready"] is True
     assert result["active_policy_version_id"] == "policy-live"
+    assert result["agents_will_run"] is True
+    assert result["lookup_will_run"] is True
+
+
+@pytest.mark.asyncio
+async def test_status_accepts_provider_neutral_postgres_without_supabase(
+    monkeypatch,
+):
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://example/aethria")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    class DurableRepository:
+        async def tenant_queue_depths(self, *, user_id):
+            return {}
+
+    prerequisites = SimpleNamespace(
+        thesis_version_id="thesis-live",
+        policy=SimpleNamespace(policy_version_id="policy-live"),
+    )
+    monkeypatch.setattr("api._durable_job_repository", DurableRepository())
+    monkeypatch.setattr("api.load_settings", lambda user_id: {"agent_config": {}})
+    monkeypatch.setattr(
+        "api._agents_status_reads_sync",
+        lambda *_args: (True, True, "thesis-live", None, True),
+    )
+
+    async def ready(**_kwargs):
+        return prerequisites
+
+    monkeypatch.setattr("api.load_evaluation_prerequisites", ready, raising=False)
+
+    result = await agents_status(
+        SimpleNamespace(state=SimpleNamespace(user_id="user_123"))
+    )
+
+    assert result["agents_infrastructure_ready"] is True
+    assert result["lookup_infrastructure_ready"] is True
+    assert result["execution_prerequisites_ready"] is True
     assert result["agents_will_run"] is True
     assert result["lookup_will_run"] is True

@@ -28,8 +28,8 @@ export default function SignalEventRow({
   className = '',
 }: SignalEventRowProps) {
   const borderCls = showDivider ? 'border-b border-hairline' : '';
-  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/60';
-  const bodyCls = 'type-body-sm text-oxford/60 leading-phi';
+  const tsCls = 'shrink-0 tabular-nums type-meta text-oxford/65';
+  const bodyCls = 'type-body-sm text-oxford/65 leading-phi';
 
   if (layout === 'compact') {
     return (
@@ -46,13 +46,13 @@ export default function SignalEventRow({
       <div className="flex items-baseline gap-phi-2 flex-wrap">
         <span className={tsCls}>{timestamp}</span>
         {label != null && label !== '' && (
-          <span className="type-label-section text-oxford/60">{label}</span>
+          <span className="type-label-section text-oxford/65">{label}</span>
         )}
         {trailing != null && <span className="ml-auto shrink-0">{trailing}</span>}
       </div>
       <div className={bodyCls}>{body}</div>
       {meta != null && meta !== '' && (
-        <p className="type-meta text-oxford/60 mt-phi-1">{meta}</p>
+        <p className="type-meta text-oxford/65 mt-phi-1">{meta}</p>
       )}
     </div>
   );

@@ -39,9 +39,13 @@ export default function ActivityStatsRow({
       {stats.map((stat, i) => (
         <motion.div
           key={stat.label}
-          initial={{ opacity: 0, y: 10 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: EASE, delay: baseDelay + i * 0.07 }}
+          transition={
+            reduceMotion
+              ? { duration: 0 }
+              : { duration: 0.45, ease: EASE, delay: baseDelay + i * 0.07 }
+          }
           style={{ textAlign: 'center' }}
         >
           <div

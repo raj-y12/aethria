@@ -312,6 +312,7 @@ class FounderEvidence(BaseModel):
     snippet: str = ""
     source_type: FounderSourceType = "other"
     supports: str = ""
+    access_class: Literal["public", "tenant_confidential", "restricted"] = "public"
 
 
 class FounderFieldConflict(BaseModel):

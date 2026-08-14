@@ -1,3 +1,5 @@
+import pytest
+
 from utils.settings_loader import (
     dimension_weights_from_fund_config,
     fund_config_content_changed,
@@ -5,9 +7,8 @@ from utils.settings_loader import (
     fund_config_matches_thesis_payload,
     fund_config_raw_text,
     fund_config_to_thesis_parsed_json,
-    load_settings,
+    reconcile_fund_config_with_thesis,
     recommendation_for_score_from_fund_config,
-    save_settings,
     thesis_payload_fingerprint,
 )
 
@@ -70,6 +71,49 @@ def test_fund_config_maps_to_active_thesis_shape():
     assert parsed["source"] == "settings.fund_config"
 
 
+def test_reconcile_fund_config_uses_active_thesis_as_canonical_content():
+    stored = _fund_config()
+    stored["version"] = 34
+    stored["mandate"]["preferredSectors"] = ["Old sector"]
+    stored["mandate"]["thesisText"] = ""
+    active = {
+        "sectors": ["AI", "Infrastructure"],
+        "stage_focus": ["Seed", "Series A"],
+        "geography": ["Europe", "US"],
+        "exclusions": ["Crypto"],
+        "risk_profile": "balanced",
+        "check_size_min": 100000,
+        "check_size_max": 2000000,
+        "ownership_target": 10,
+        "score_bands": [{"min": 75, "max": 100, "label": "Invest"}],
+        "scoring_weights": [{"key": "market", "weight": 30}],
+        "rubric": [{"key": "market", "label": "Market"}],
+        "thresholds": {"partnerReview": 61},
+    }
+
+    reconciled = reconcile_fund_config_with_thesis(
+        stored,
+        raw_text="canonical thesis",
+        parsed_json=active,
+        version_number=37,
+        version_id="version-37",
+    )
+
+    assert reconciled["version"] == 37
+    assert reconciled["versionLabel"] == "Fund Thesis v37"
+    assert reconciled["activePolicyVersionId"] == "version-37"
+    assert reconciled["mandate"]["preferredSectors"] == ["AI", "Infrastructure"]
+    assert reconciled["mandate"]["excludedSectorList"] == ["Crypto"]
+    assert reconciled["mandate"]["excludedSectors"] == ["Crypto"]
+    assert reconciled["mandate"]["checkSizeMin"] == 100000
+    assert reconciled["mandate"]["checkSizeMax"] == 2000000
+    assert reconciled["risk"]["sensitivity"] == "balanced"
+    assert reconciled["scoreBands"] == active["score_bands"]
+    assert reconciled["scoringWeights"] == active["scoring_weights"]
+    assert reconciled["rubric"] == active["rubric"]
+    assert reconciled["thresholds"] == active["thresholds"]
+
+
 def test_published_mandate_signal_distinguishes_user_config_from_default():
     """The onboarding gate keys off parsed_json.is_default: the bootstrap default
     carries it, a user-published fund_config must not."""
@@ -99,37 +143,40 @@ def test_score_bands_drive_recommendation_mapping():
     assert recommendation_for_score_from_fund_config(8.0, fc) == "INVEST"
 
 
-def test_settings_save_and_reload_preserves_fund_config(monkeypatch):
+@pytest.mark.asyncio
+async def test_settings_save_and_reload_preserves_fund_config():
     import utils.settings_loader as settings_mod
 
-    store = {}
+    class Repository:
+        def __init__(self):
+            self.store = {}
 
-    def fake_doc_set(table, data, key, user_id):
-        store[(table, key, user_id)] = data
+        async def get(self, user_id, *, key=None):
+            return self.store.get((user_id, key))
 
-    def fake_doc_get(table, key, user_id):
-        return store.get((table, key, user_id))
+        async def upsert(self, user_id, data, *, key=None):
+            self.store[(user_id, key)] = data
 
-    monkeypatch.setattr(settings_mod, "doc_set", fake_doc_set)
-    monkeypatch.setattr(settings_mod, "doc_get", fake_doc_get)
+    repository = Repository()
     settings_mod._SETTINGS_CACHE.clear()
 
     saved = {"fund_config": _fund_config()}
-    save_settings(saved, "user_settings")
-    reloaded = load_settings("user_settings", use_cache=False)
+    await settings_mod.save_settings(saved, "user_settings", repository=repository)
+    reloaded = await settings_mod.load_settings(
+        "user_settings", repository=repository, use_cache=False
+    )
 
     assert reloaded["fund_config"]["mandate"]["preferredSectors"] == ["AI Infrastructure"]
     assert reloaded["fund_config"]["scoreBands"][2]["label"] == "Strong Proceed"
     assert reloaded["fund_config"]["scoringWeights"][0]["key"] == "market"
 
 
-def test_runtime_limits_load_from_saved_settings(monkeypatch):
+@pytest.mark.asyncio
+async def test_runtime_limits_load_from_saved_settings(monkeypatch):
     import utils.settings_loader as settings_mod
 
-    monkeypatch.setattr(
-        settings_mod,
-        "load_settings",
-        lambda user_id=None, use_cache=True: {
+    async def load_settings(*_args, **_kwargs):
+        return {
             "agent_config": {"max_agents_per_run": 2},
             "cost_budget": {
                 "enabled": True,
@@ -137,10 +184,10 @@ def test_runtime_limits_load_from_saved_settings(monkeypatch):
                 "cooldown_seconds": 7,
                 "daily_cost_ceiling": 0.25,
             },
-        },
-    )
+        }
 
-    limits = settings_mod.get_runtime_limits("user_settings")
+    monkeypatch.setattr(settings_mod, "load_settings", load_settings)
+    limits = await settings_mod.get_runtime_limits("user_settings")
 
     assert limits["max_agents_per_run"] == 2
     assert limits["max_tokens_per_run"] == 321

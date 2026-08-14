@@ -1,5 +1,5 @@
 """
-Deterministic pipeline state for startup memo readiness (Supabase only).
+Deterministic pipeline state for startup memo readiness.
 Explicit user_id on every call; pipeline_run_id for cross-service tracing.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal, Optional
 
 from tenant_context import require_user_id
+from batch4a.context import get_state as get_batch4a_state
 
 logger = logging.getLogger("pipeline_state")
 
@@ -102,10 +103,11 @@ def upsert_pipeline_state(
         "updated_at": now,
         "error": err,
     }
-    try:
-        client.table(_TABLE).upsert(row, on_conflict="user_id,startup_id").execute()
-    except Exception as e:
-        logger.warning("upsert_pipeline_state failed startup_id=%s: %s", sid, e)
+    state = get_batch4a_state()
+    if state is not None:
+        state.upsert_pipeline_state(row)
+        return
+    logger.warning("upsert_pipeline_state: Batch4A state unavailable, skipping startup_id=%s", sid)
 
 
 def get_pipeline_state_row(
@@ -118,22 +120,11 @@ def get_pipeline_state_row(
     sid = (startup_id or "").strip()
     if not sid:
         return None
-    try:
-        r = (
-            client.table(_TABLE)
-            .select("pipeline_run_id,status,updated_at,error")
-            .eq("user_id", uid)
-            .eq("startup_id", sid)
-            .limit(1)
-            .execute()
-        )
-    except Exception as e:
-        logger.warning("get_pipeline_state_row failed: %s", e)
-        return None
-    rows = (r.data or []) if hasattr(r, "data") else []
-    if not rows:
-        return None
-    return rows[0]
+    state = get_batch4a_state()
+    if state is not None:
+        return state.get_pipeline_state(sid)
+    logger.warning("get_pipeline_state_row: Batch4A state unavailable, returning no state for startup_id=%s", sid)
+    return None
 
 
 def api_memo_status_label(db_status: Optional[str]) -> str:

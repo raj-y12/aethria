@@ -81,17 +81,16 @@ async def test_startups_endpoint_uses_bounded_projection(monkeypatch):
 
     captured = {}
 
-    class FakeStorage(SupabaseStartupsStorage):
-        def __init__(self):
-            pass
-
-        def get_list_projection_rows(self, *, limit=None, offset=0):
+    class FakeRepository:
+        async def list_projection(self, user_id, *, limit=100, offset=0):
             captured["limit"] = limit
             captured["offset"] = offset
             return []
 
-    monkeypatch.setattr(api, "_get_storage", lambda request: FakeStorage())
-    monkeypatch.setattr(api, "_get_user_last_seen_at", lambda user_id: None)
+    monkeypatch.setattr(api, "_get_startup_repository", lambda request: FakeRepository())
+    async def no_last_seen(user_id):
+        return None
+    monkeypatch.setattr(api, "_get_user_last_seen_at", no_last_seen)
 
     result = await api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
 
@@ -106,26 +105,19 @@ async def test_startups_endpoint_does_not_full_row_fallback_on_projection_failur
     import api
     from fastapi import HTTPException
 
-    class FakeStorage(SupabaseStartupsStorage):
-        def __init__(self):
-            self.paginated_called = False
+    class FakeRepository:
+        async def list_projection(self, user_id, *, limit=100, offset=0):
+            raise HTTPException(status_code=503, detail="projection unavailable")
 
-        def get_list_projection_rows(self, *, limit=None, offset=0):
-            return None  # query failed
-
-        def get_startups_paginated(self, limit=50, offset=0):
-            self.paginated_called = True
-            return [], -1
-
-    storage = FakeStorage()
-    monkeypatch.setattr(api, "_get_storage", lambda request: storage)
-    monkeypatch.setattr(api, "_get_user_last_seen_at", lambda user_id: None)
+    monkeypatch.setattr(api, "_get_startup_repository", lambda request: FakeRepository())
+    async def no_last_seen(user_id):
+        return None
+    monkeypatch.setattr(api, "_get_user_last_seen_at", no_last_seen)
 
     with pytest.raises(HTTPException) as exc:
         await api.get_startups(SimpleNamespace(state=SimpleNamespace(user_id="user-1")))
 
     assert exc.value.status_code == 503
-    assert storage.paginated_called is False
 
 
 def test_malloc_tuning_helpers_are_defensive():

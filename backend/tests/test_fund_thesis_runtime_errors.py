@@ -30,7 +30,8 @@ class _FailingClient:
         return _FailingQuery()
 
 
-def test_fund_thesis_runtime_transient_transport_error_returns_503(monkeypatch):
+@pytest.mark.asyncio
+async def test_fund_thesis_runtime_transient_transport_error_returns_503(monkeypatch):
     monkeypatch.setattr(_ftr, "_require_supabase_for_thesis", lambda: None)
     monkeypatch.setattr(_ftr, "get_service_client", lambda: _FailingClient())
     monkeypatch.setattr(_ftr, "compute_thesis_alignment_stats", lambda *args, **kwargs: {})
@@ -52,7 +53,7 @@ def test_fund_thesis_runtime_transient_transport_error_returns_503(monkeypatch):
     request = SimpleNamespace(state=SimpleNamespace(user_id="user_123"))
 
     with pytest.raises(HTTPException) as exc:
-        _ftr.get_fund_thesis_runtime(request)
+        await _ftr.get_fund_thesis_runtime(request)
 
     assert exc.value.status_code == 503
     assert exc.value.detail == "Thesis query failed; please retry"

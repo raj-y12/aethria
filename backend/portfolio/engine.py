@@ -8,10 +8,11 @@ Runs:
 - Health Monitor (system checks)
 """
 import asyncio
+import inspect
 import logging
 import os
 import env_config
-from typing import Optional
+from typing import Any, Dict, Optional
 from datetime import datetime, timedelta
 from utils.timeutil import utcnow, ensure_aware
 
@@ -51,6 +52,8 @@ class PortfolioEngine:
         signal_interval: int = 3600,  # Check watchlist every hour
         feedback_interval: int = 86400,  # Calculate metrics daily
         health_interval: int = 3600,  # Health check every hour
+        settings: Optional[Dict[str, Any]] = None,
+        startup_repository: Any = None,
     ):
         """
         Initialize Portfolio Engine.
@@ -64,6 +67,8 @@ class PortfolioEngine:
             health_interval: Seconds between health checks
         """
         self.discovery_storage = discovery_storage
+        self.startup_repository = startup_repository
+        self._watchlist_escalation_ids: list[str] = []
         
         if portfolio_store is None:
             portfolio_store = PortfolioStore()
@@ -72,11 +77,10 @@ class PortfolioEngine:
         tenant_uid = getattr(self.portfolio_store, "_tenant_user_id", None)
         if not tenant_uid:
             tenant_uid = os.getenv("AETHRIA_AGENT_USER_ID", "").strip() or None
-        use_sb = env_config.use_supabase_storage()
-        if use_sb and not tenant_uid:
+        if env_config.is_production_env() and not tenant_uid:
             raise RuntimeError(
                 "PortfolioEngine requires explicit tenant: set PortfolioStore(..., user_id=...) "
-                "or AETHRIA_AGENT_USER_ID when USE_SUPABASE_STORAGE is enabled"
+                "or AETHRIA_AGENT_USER_ID in production"
             )
         offline = (tenant_uid or "offline_analytics").strip()
         self.tenant_user_id = tenant_uid
@@ -85,6 +89,7 @@ class PortfolioEngine:
         self.rejection_analyzer = RejectionAnalyzer(
             data_dir=str(self.portfolio_store.data_dir),
             user_id=tenant_uid,
+            batch2_state=getattr(self.portfolio_store, "batch2_state", None),
         )
         self.execution_agent = ExecutionAgent(
             self.portfolio_store, rejection_analyzer=self.rejection_analyzer,
@@ -93,7 +98,7 @@ class PortfolioEngine:
         self.feedback_loop = FeedbackLoop(
             self.portfolio_store, discovery_storage=discovery_storage,
         )
-        self.cost_controller = CostController(user_id=tenant_uid)
+        self.cost_controller = CostController(user_id=tenant_uid, settings=settings)
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
         self.cluster_analyzer = ClusterAnalyzer(user_id=offline)
         self.execution_scan_limit = max(
@@ -125,8 +130,7 @@ class PortfolioEngine:
         now = utcnow()
         if self.tenant_user_id:
             try:
-                due = await asyncio.to_thread(
-                    claim_due_jobs,
+                claimed = claim_due_jobs(
                     self.tenant_user_id,
                     {
                         "execution": self.execution_interval,
@@ -135,6 +139,7 @@ class PortfolioEngine:
                         "health": self.health_interval,
                     },
                 )
+                due = await claimed if inspect.isawaitable(claimed) else claimed
             except Exception as exc:
                 self.logger.error("Portfolio schedule claim failed: %s", exc, exc_info=True)
                 return StageExecutionResult.failed_result(
@@ -305,6 +310,8 @@ class PortfolioEngine:
                     
                     # Execute decision (canonical YES/NO/MAYBE; default to NO for safety)
                     decision = partner_data.get("decision", "NO")
+                    if str(decision).strip().upper() in {"INVEST", "PASS", "MONITOR"}:
+                        decision = legacy_from_recommendation(str(decision))
                     rationale = partner_data.get("rationale", "")
                     key_risks = review_data.get("key_risks", []) if review_data else []
                     scout_type = startup_data.get("scout_type", "") if startup_data else ""
@@ -356,7 +363,13 @@ class PortfolioEngine:
     async def _run_watchlist_review(self):
         """Review watchlist entries for staleness and decay."""
         # Stage body is blocking store I/O; one hop off the event loop.
+        self._watchlist_escalation_ids = []
         await asyncio.to_thread(self._run_watchlist_review_sync)
+        if self.startup_repository is not None:
+            for startup_id in self._watchlist_escalation_ids:
+                await self.startup_repository.mark_partner_human_review(
+                    self.tenant_user_id, startup_id
+                )
 
     def _run_watchlist_review_sync(self):
         try:
@@ -392,14 +405,17 @@ class PortfolioEngine:
                 elif days > 60 and not has_signals:
                     self.logger.warning(f"Watchlist decay: {startup_id} ({days} days, no signals) - escalating")
 
-                    st = self.discovery_storage.get_startup(startup_id)
-                    pi = (
-                        dict(st.partner_info.model_dump(mode="json"))
-                        if st and st.partner_info
-                        else {}
-                    )
-                    pi["human_review_required"] = True
-                    self.discovery_storage.update_startup_partial(startup_id, {"partner_info": pi})
+                    if self.startup_repository is not None:
+                        self._watchlist_escalation_ids.append(str(startup_id))
+                    else:
+                        st = self.discovery_storage.get_startup(startup_id)
+                        pi = (
+                            dict(st.partner_info.model_dump(mode="json"))
+                            if st and st.partner_info
+                            else {}
+                        )
+                        pi["human_review_required"] = True
+                        self.discovery_storage.update_startup_partial(startup_id, {"partner_info": pi})
                     self.portfolio_store.add_signal(
                         startup_id=startup_id,
                         signal_type="negative",

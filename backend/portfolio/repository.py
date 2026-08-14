@@ -68,3 +68,84 @@ class PortfolioRepository:
                 """, uid, max(1, min(int(limit), 200)),
             )
         return [dict(row) for row in rows]
+
+    async def list_decision_history(
+        self, *, user_id: str, limit: int = 100
+    ) -> list[Dict[str, Any]]:
+        """Return canonical rulings alongside tenant-scoped legacy decisions."""
+        uid = require_user_id(user_id, context="PortfolioRepository.list_decision_history")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                """
+                with canonical_history as (
+                    select
+                      'canonical:' || hr.ruling_id::text as history_id,
+                      o.legacy_startup_id::text as startup_id,
+                      o.opportunity_id::text as opportunity_id,
+                      c.canonical_name,
+                      hr.decision,
+                      hr.rationale,
+                      hr.created_at as decided_at,
+                      hr.decision as recommended_state,
+                      'canonical'::text as source,
+                      null::text as decision_kind
+                    from public.human_rulings hr
+                    join public.opportunities o
+                      on o.user_id=hr.user_id and o.opportunity_id=hr.opportunity_id
+                    join public.companies c
+                      on c.user_id=o.user_id and c.company_id=o.company_id
+                    where hr.user_id=$1
+                ), legacy_history as (
+                    select
+                      'legacy:' || s.startup_id as history_id,
+                      s.startup_id,
+                      null::text as opportunity_id,
+                      coalesce(s.scout_info->>'name', s.startup_id) as canonical_name,
+                      lower(coalesce(
+                        s.partner_info->>'recommendation',
+                        s.partner_info->>'decision',
+                        s.partner_decision
+                      )) as decision,
+                      coalesce(
+                        s.partner_info->>'rationale',
+                        s.partner_info->>'reason',
+                        ''
+                      ) as rationale,
+                      s.updated_at as decided_at,
+                      null::text as recommended_state,
+                      'legacy'::text as source,
+                      null::text as decision_kind
+                    from public.startups s
+                    where s.user_id=$1 and s.partner_info is not null
+                ), partner_history as (
+                    select
+                      'partner:' || pd.id as history_id,
+                      pd.data->>'startup_id' as startup_id,
+                      null::text as opportunity_id,
+                      coalesce(
+                        pd.data->>'startup_name',
+                        pd.data->'scout_info'->>'name',
+                        pd.id
+                      ) as canonical_name,
+                      lower(coalesce(pd.data->>'decision', pd.data->>'recommendation')) as decision,
+                      coalesce(pd.data->>'rationale', pd.data->>'reason', '') as rationale,
+                      coalesce((pd.data->>'decided_at')::timestamptz, pd.created_at) as decided_at,
+                      pd.data->>'recommended_state' as recommended_state,
+                      'partner'::text as source,
+                      'partner'::text as decision_kind
+                    from public.portfolio_decisions pd
+                    where pd.user_id=$1
+                )
+                select * from (
+                    select * from canonical_history
+                    union all select * from legacy_history
+                    union all select * from partner_history
+                ) history
+                where decision is not null
+                order by decided_at desc nulls last, history_id
+                limit $2
+                """,
+                uid,
+                max(1, min(int(limit), 200)),
+            )
+        return [dict(row) for row in rows]

@@ -1312,8 +1312,44 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             </div>
 
             {/* The human decision surface is the final action after the memo and its appendix. */}
-            <OpportunityIntelligence startupId={displayStartup.id} readOnly={readOnly} />
+            <OpportunityIntelligence
+              startupId={displayStartup.id}
+              companyName={displayStartup.scout.name}
+              onRulingRecorded={onClose}
+              readOnly={readOnly}
+            />
 
+            {/*
+              The ruling sits below a seven-part appendix, so it needs to stay reachable
+              from anywhere in the document. Sticky-as-last-child pins the bar to the
+              viewport bottom while the memo scrolls, then settles under the composer at
+              the end — no observer, no duplicated ruling state.
+            */}
+            {!readOnly && (
+              <div className="sticky bottom-0 z-20 -mx-3 mt-phi-5 border-t border-oxford/15 bg-paper/95 px-3 py-phi-3 backdrop-blur-[2px] sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
+                <div className="flex flex-wrap items-center justify-between gap-phi-3">
+                  <p className="type-label-section text-oxford/65">
+                    The ruling is yours to make
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = document.getElementById('memo-ruling');
+                      target?.scrollIntoView({
+                        behavior: reduceMotion ? 'auto' : 'smooth',
+                        block: 'center',
+                      });
+                      target?.querySelector<HTMLElement>('button, textarea')?.focus();
+                    }}
+                    className="type-action min-h-[44px] px-phi-2 text-oxford transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  >
+                    <span className="border-b border-oxford/30 pb-0.5">
+                      Make your ruling <span aria-hidden>↓</span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
 
           </motion.div>
         </div>

@@ -3,7 +3,11 @@ from types import SimpleNamespace
 import pytest
 
 from api import _backend_to_frontend, acknowledge_startup
-from routers.analytics import _aggregate_activity_totals, mark_activity_seen
+from routers.analytics import (
+    _aggregate_activity_totals,
+    get_activity_summary,
+    mark_activity_seen,
+)
 
 
 def test_activity_totals_split_agent_and_human_decisions():
@@ -87,16 +91,20 @@ async def test_acknowledge_startup_sets_seen_fields(monkeypatch):
         "last_seen_by_user_at": "2026-05-13T10:00:00+00:00",
     }
 
-    class FakeStorage:
-        def get_by_id(self, startup_id):
-            return updated if startup_id == "s1" else None
-
-        def update_startup_partial(self, startup_id, patch):
+    class FakeRepository:
+        async def acknowledge_startup(self, user_id, startup_id, seen_at):
+            patch = {
+                "acknowledged_at": seen_at.isoformat(),
+                "last_seen_by_user_at": seen_at.isoformat(),
+            }
             captured_patch.update(patch)
             updated.update(patch)
             return startup_id == "s1"
 
-    monkeypatch.setattr("api._get_storage", lambda request: FakeStorage())
+        async def get_startup(self, user_id, startup_id):
+            return updated if startup_id == "s1" else None
+
+    monkeypatch.setattr("api._get_startup_repository", lambda request: FakeRepository())
 
     result = await acknowledge_startup(SimpleNamespace(state=SimpleNamespace(user_id="user_123")), "s1")
 
@@ -106,23 +114,50 @@ async def test_acknowledge_startup_sets_seen_fields(monkeypatch):
     assert result["is_new_to_user"] is False
 
 
-def test_mark_activity_seen_reports_persistence_failure(monkeypatch):
-    class BrokenQuery:
-        def upsert(self, *args, **kwargs):
+@pytest.mark.asyncio
+async def test_mark_activity_seen_reports_persistence_failure(monkeypatch):
+    class BrokenConnection:
+        def __init__(self):
+            self.pool = self
+
+        def acquire(self):
             return self
 
-        def execute(self):
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_exc):
+            return False
+
+        async def execute(self, *_args):
             raise RuntimeError("database unavailable")
 
-    class BrokenService:
-        def table(self, name):
-            assert name == "user_state"
-            return BrokenQuery()
-
     monkeypatch.setattr("routers.analytics.require_authenticated_user", lambda request: "user_123")
-    monkeypatch.setattr("routers.analytics._enforce_rate_limits", lambda *args, **kwargs: None)
-    monkeypatch.setattr("routers.analytics.get_service_client", lambda: BrokenService())
+    def no_rate_limit(*_args, **_kwargs):
+        return None
 
-    response = mark_activity_seen(SimpleNamespace(state=SimpleNamespace(user_id="user_123")))
+    monkeypatch.setattr("routers.analytics._enforce_rate_limits", no_rate_limit)
+    pool = BrokenConnection()
+
+    request = SimpleNamespace(
+        state=SimpleNamespace(user_id="user_123"),
+        app=SimpleNamespace(state=SimpleNamespace(durable_job_pool=pool)),
+    )
+    response = await mark_activity_seen(request)
 
     assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_activity_summary_fails_closed_without_postgres_pool():
+    request = SimpleNamespace(
+        state=SimpleNamespace(user_id="user_123"),
+        app=SimpleNamespace(state=SimpleNamespace(durable_job_pool=None)),
+    )
+
+    response = await get_activity_summary(request)
+
+    assert response.status_code == 503
+    assert response.body == (
+        b'{"status":"unavailable","reason":"durable_job_store_unavailable"}'
+    )

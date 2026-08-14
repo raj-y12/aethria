@@ -92,6 +92,18 @@ export function useAppFrame(): AppFrameContextValue {
   return ctx;
 }
 
+export function resolveMandateVersion(
+  summary: { active_version_id?: string | null; active_version_number?: number | null } | null,
+  status: { active_thesis_version_id?: string | null } | null,
+  settingsVersion?: number | null,
+): { id: string | null; number: number | null } {
+  const id = summary?.active_version_id ?? status?.active_thesis_version_id ?? null;
+  return {
+    id,
+    number: summary?.active_version_number ?? (id ? settingsVersion ?? null : null),
+  };
+}
+
 interface AppFrameProps {
   data: SystemData;
   startupsError?: string | null;
@@ -235,6 +247,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     queryKey: ['agents-status'],
     queryFn: () => fetchAgentsStatus().catch(() => null),
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate }),
+    refetchOnMount: 'always',
   });
   const agentsStatus = agentsStatusQuery.data;
   const { data: loopStatus } = useQuery({
@@ -246,6 +259,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     queryKey: ['fund-thesis', 'summary'],
     queryFn: () => fetchFundThesisSummary().catch(() => null),
     ...getQueryConfig('SEMI_DYNAMIC', { liveGate, pollIntervalMs: 30_000 }),
+    // A warm-started thesis must not override the current tenant's live
+    // mandate after a restart or database switch.
+    refetchOnMount: 'always',
     placeholderData: (prev) => prev ?? null,
   });
   const fundThesisSummary = fundThesisQuery.data ?? null;
@@ -295,9 +311,30 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   };
 
   // ── Mandate (spine block) ─────────────────────────────────────────────────
-  const hasThesis = !!fundThesisSummary?.active_version_id;
+  // The agents-status response reads the same canonical thesis but arrives on
+  // a separate request. Use it as a short-lived fallback so a transient summary
+  // request failure cannot tell an already-configured fund to define its thesis.
+  const activeThesisVersion = resolveMandateVersion(
+    fundThesisSummary,
+    agentsStatus ?? null,
+    data.settings?.fund_config?.version,
+  );
+  const activeThesisVersionId = activeThesisVersion.id;
+  const activeThesisVersionNumber = activeThesisVersion.number;
+  const settingsFundConfig = data.settings?.fund_config;
+  const fallbackThesisParsed = settingsFundConfig?.mandate
+    ? {
+        sectors: settingsFundConfig.mandate.preferredSectors,
+        stage_focus: settingsFundConfig.mandate.preferredStages,
+        geography: settingsFundConfig.mandate.geographyPreferences,
+        exclusions:
+          settingsFundConfig.mandate.excludedSectorList ?? settingsFundConfig.mandate.excludedSectors,
+      }
+    : undefined;
+  const thesisParsedJson = fundThesisSummary?.parsed_json ?? fallbackThesisParsed;
+  const hasThesis = !!activeThesisVersionId;
   const fundName = useMemo(() => {
-    const pj = fundThesisSummary?.parsed_json;
+    const pj = thesisParsedJson;
     if (pj && typeof pj === 'object') {
       for (const key of ['fund_name', 'name', 'title', 'fund', 'fund_title']) {
         const val = (pj as Record<string, unknown>)[key];
@@ -306,14 +343,14 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
     }
     const settingsName = data.settings?.fund_identity?.fund_name?.trim();
     if (settingsName) return settingsName;
-    if (fundThesisSummary?.active_version_number != null) {
-      return `Fund Thesis v${fundThesisSummary.active_version_number}`;
+    if (activeThesisVersionNumber != null) {
+      return `Fund Thesis v${activeThesisVersionNumber}`;
     }
     return '';
-  }, [fundThesisSummary, data.settings?.fund_identity?.fund_name]);
+  }, [activeThesisVersionNumber, data.settings?.fund_identity?.fund_name, thesisParsedJson]);
 
   const mandateSummaryLine = useMemo(() => {
-    const pj = fundThesisSummary?.parsed_json as Record<string, unknown> | undefined;
+    const pj = thesisParsedJson as Record<string, unknown> | undefined;
     const toStrings = (v: unknown): string[] => {
       if (Array.isArray(v)) return v.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim());
       if (typeof v === 'string' && v.trim()) return [v.trim()];
@@ -329,11 +366,11 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
       geos: geos.length ? geos : fundGeo ? [fundGeo] : [],
       sectors,
     });
-  }, [fundThesisSummary, data.settings?.fund_identity]);
+  }, [data.settings?.fund_identity, thesisParsedJson]);
 
   const mandateAmendedAt = useMemo(() => {
     const activeVersion = fundThesisSummary?.versions?.find(
-      (version) => version.id === fundThesisSummary.active_version_id,
+      (version) => version.id === activeThesisVersionId,
     );
     if (!activeVersion?.created_at) return null;
     return new Intl.DateTimeFormat('en-GB', {
@@ -341,13 +378,13 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
       month: 'short',
       timeZone: 'UTC',
     }).format(new Date(activeVersion.created_at));
-  }, [fundThesisSummary]);
+  }, [activeThesisVersionId, fundThesisSummary]);
 
   const mandate: SpineMandate = {
     hasThesis,
     fundName,
     summaryLine: mandateSummaryLine,
-    versionNumber: fundThesisSummary?.active_version_number ?? null,
+    versionNumber: activeThesisVersionNumber,
     amendedAt: mandateAmendedAt,
   };
 
@@ -402,7 +439,15 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               onAnimationComplete={completeWorkspaceChromeEntrance}
               className="flex-none"
             >
-              <MobileHeader isOpen={mobileMenuOpen} onMenuToggle={() => setMobileMenuOpen((open) => !open)} />
+              <MobileHeader
+                isOpen={mobileMenuOpen}
+                onMenuToggle={() => setMobileMenuOpen((open) => !open)}
+                pendingEscalations={telemetry.pendingEscalations}
+                onEscalationsClick={() => {
+                  setMobileMenuOpen(false);
+                  navigate('/v1/flow?queue=escalated');
+                }}
+              />
               <AnimatePresence>
                 {mobileMenuOpen && (
                   <motion.nav
@@ -418,6 +463,18 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                     aria-label="Workspaces"
                   >
                     <div className="flex flex-col items-stretch gap-phi-1">
+                      {/* Dispatch is the product's primary verb; on desktop it is ⌘K,
+                          and the phone has no keyboard to press it with. */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          dispatch.openCommandBar();
+                        }}
+                        className="type-label-tab flex min-h-[44px] items-center border-b border-white/[0.07] px-1 text-white hover:text-white btn-interaction"
+                      >
+                        Dispatch a lookup
+                      </button>
                       {SPINE_WORKSPACES.map((item) => (
                         <button
                           key={item.href}

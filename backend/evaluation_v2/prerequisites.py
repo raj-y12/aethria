@@ -10,6 +10,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict
 
+import env_config
+
 from core.policy_resolver import get_partner_rules
 from evaluation_v2.models import EvaluationPolicy
 from evaluation_v2.partner_rules import PartnerRules, parse_partner_rules
@@ -20,6 +22,7 @@ from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
     get_active_thesis,
+    get_active_thesis_from_repository,
 )
 from services.scoring.policy_compiler import (
     PolicyValidationError,
@@ -27,12 +30,19 @@ from services.scoring.policy_compiler import (
     validate_compiled_policy_bundle,
 )
 from services.scoring.policy_store import PolicyNotPublishedError, load_published_policy
-from supabase_client import get_service_client
 from tenant_context import require_user_id
+from settings_repository import SettingsRepository
 from utils.settings_loader import load_settings
 
 
 _GOVERNED_POLICY_NOT_FOUND = object()
+
+
+def get_service_client():
+    """Legacy dev/test seam; production thesis resolution uses PostgreSQL."""
+    from supabase_client import get_service_client as _get_service_client
+
+    return _get_service_client()
 
 
 @dataclass(frozen=True)
@@ -158,6 +168,7 @@ async def load_evaluation_prerequisites(
     load_policy: Callable[[str], Dict[str, Any]] | None = None,
     load_partner_rules: Callable[[], Dict[str, Any]] | None = None,
     load_fund_config: Callable[[str], Dict[str, Any]] | None = None,
+    settings_repository: SettingsRepository | None = None,
 ) -> EvaluationPrerequisites:
     """Resolve one tenant's exact thesis, published policy, and Partner rules."""
     uid = require_user_id(user_id, context="load_evaluation_prerequisites")
@@ -167,18 +178,84 @@ async def load_evaluation_prerequisites(
         if load_thesis is not None:
             value = load_thesis(uid)
             return await value if inspect.isawaitable(value) else value
-        return await asyncio.to_thread(
-            lambda: get_active_thesis(get_service_client(), uid)
-        )
+        pool = getattr(fund_intelligence_repository, "pool", None)
+        if pool is not None:
+            return await get_active_thesis_from_repository(
+                fund_intelligence_repository.thesis_repository,
+                uid,
+            )
+        if env_config.is_production_env():
+            raise EvaluationPrerequisiteError(
+                code="institutional_thesis_repository_required",
+                detail="Production evaluation requires the shared PostgreSQL thesis repository.",
+                recovery_action="Configure the durable PostgreSQL pool and retry.",
+            )
+        from fund_thesis import get_active_thesis
+        return await asyncio.to_thread(lambda: get_active_thesis(get_service_client(), uid))
 
     async def resolve_policy() -> Dict[str, Any]:
         nonlocal resolved_legacy_settings
         if load_policy is not None:
             value = load_policy(uid)
             return await value if inspect.isawaitable(value) else value
-        resolved_legacy_settings = await asyncio.to_thread(
-            load_settings, uid, use_cache=False
-        )
+        repository_pool = getattr(fund_intelligence_repository, "pool", None)
+        if repository_pool is None and env_config.is_production_env():
+            raise EvaluationPrerequisiteError(
+                code="governed_policy_repository_required",
+                detail="Production evaluation requires the canonical governed policy repository.",
+                recovery_action="Configure the shared PostgreSQL pool and retry.",
+            )
+        if repository_pool is not None:
+            try:
+                governed = await fund_intelligence_repository.get_active_published_policy(
+                    user_id=uid
+                )
+            except LookupError as exc:
+                raise EvaluationPrerequisiteError(
+                    code="published_policy_required",
+                    detail="No active governed policy is published for this tenant.",
+                    recovery_action="Publish a governed policy before evaluation.",
+                ) from exc
+            except Exception as exc:
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The governed policy could not be loaded.",
+                    recovery_action="Retry after the policy store is available.",
+                ) from exc
+            if not isinstance(governed, dict):
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The governed policy store returned an invalid response.",
+                    recovery_action="Retry after the policy store is available.",
+                )
+            patch = governed.get("policy_patch")
+            if not isinstance(patch, dict):
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The governed policy payload is invalid.",
+                    recovery_action="Republish the governed policy before retrying.",
+                )
+            compiled = await asyncio.to_thread(
+                compile_policy_from_fund_config,
+                patch,
+                require_publish_ready=True,
+            )
+            if compiled.get("policy_hash") != governed.get("policy_hash"):
+                raise EvaluationPrerequisiteError(
+                    code="prerequisite_unavailable",
+                    detail="The governed policy hash is inconsistent.",
+                    recovery_action="Republish the governed policy before retrying.",
+                )
+            compiled["policy_version_id"] = governed.get("governed_policy_version_id")
+            return compiled
+        try:
+            resolved_legacy_settings = await load_settings(
+                uid, repository=settings_repository, use_cache=False
+            )
+        except TypeError:
+            resolved_legacy_settings = load_settings(uid, use_cache=False)
+            if inspect.isawaitable(resolved_legacy_settings):
+                resolved_legacy_settings = await resolved_legacy_settings
         return await asyncio.to_thread(
             lambda: load_published_policy(uid, settings=resolved_legacy_settings)
         )

@@ -4,6 +4,7 @@ Burst-reduction follow-up (see memory/project_render_oom_diagnosis.md):
 - get_active_thesis_metadata never pulls the embedding_vector (model column only).
 - compute_thesis_alignment_stats projects 3 JSON sub-fields instead of full review_info blobs.
 """
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import pytest
@@ -187,15 +188,12 @@ def test_alignment_stats_uses_projected_query():
         {"v": "vA", "s": None, "s2": "0.7", "m": None},  # high score, no explicit match
         {"v": "vOld", "s": "0.9", "s2": None, "m": "true"},  # previous version
     ]
-    c = _client(startups=startups)
+    c = _client(startups=[])
     stats = compute_thesis_alignment_stats(
-        c, "u1", active_version_id="vA", previous_version_id="vOld", row_limit=500
+        c, "u1", active_version_id="vA", previous_version_id="vOld", row_limit=500,
+        startup_rows=startups,
     )
-    # The startups query must project sub-fields, not the whole review_info blob.
-    startup_selects = [cols for (tbl, cols) in c.calls if tbl == "startups"]
-    assert startup_selects, "no startups query issued"
-    assert "review_info->>fund_thesis_version_id" in startup_selects[0]
-    assert startup_selects[0] != "review_info"
+    assert not [cols for (tbl, cols) in c.calls if tbl == "startups"]
 
     assert stats["reviewed_with_thesis_count"] == 3  # three vA rows
     # matches: row1 true, row2 false, row3 (None + score 0.7>=0.6) -> 2 of 3
@@ -245,8 +243,8 @@ class _RuntimeQuery:
                 }])
             # timeline (desc); includes the predecessor v1
             return _FakeResp([
-                {"id": "v2", "version_number": 2, "is_active": True, "created_at": "c2"},
-                {"id": "v1", "version_number": 1, "is_active": False, "created_at": "c1"},
+                {"id": "v2", "version_number": 2, "is_active": True, "created_at": datetime(2026, 6, 14, tzinfo=timezone.utc)},
+                {"id": "v1", "version_number": 1, "is_active": False, "created_at": datetime(2026, 6, 13, tzinfo=timezone.utc)},
             ])
         if self._table == "fund_thesis_embeddings":
             return _FakeResp([{"model": "none"}])
@@ -263,7 +261,8 @@ class _RuntimeClient:
         return _RuntimeQuery(self, name)
 
 
-def test_runtime_endpoint_folds_queries(monkeypatch):
+@pytest.mark.asyncio
+async def test_runtime_endpoint_folds_queries(monkeypatch):
     from routers import fund_thesis as _ftr
 
     monkeypatch.setenv("FUND_THESIS_CACHE_TTL_SECONDS", "30")
@@ -271,15 +270,23 @@ def test_runtime_endpoint_folds_queries(monkeypatch):
     client = _RuntimeClient()
     monkeypatch.setattr(_ftr, "_require_supabase_for_thesis", lambda: None)
     monkeypatch.setattr(_ftr, "get_service_client", lambda: client)
+    class _StartupRepository:
+        async def list_thesis_alignment(self, user_id, *, limit):
+            return []
+    monkeypatch.setattr(_ftr, "StartupRepository", lambda pool: _StartupRepository())
 
     from types import SimpleNamespace
-    request = SimpleNamespace(state=SimpleNamespace(user_id="u1"))
-    resp = _ftr.get_fund_thesis_runtime(request)
+    request = SimpleNamespace(
+        state=SimpleNamespace(user_id="u1"),
+        app=SimpleNamespace(state=SimpleNamespace(durable_job_pool=None)),
+    )
+    resp = await _ftr.get_fund_thesis_runtime(request)
 
     import json
     body = json.loads(resp.body)
     assert body["mode"] == "rule_based"
     assert body["fund_thesis_updated_at"] == "2026-06-14T00:00:00Z"
+    assert body["version_timeline"][0]["created_at"] == "2026-06-14T00:00:00+00:00"
 
     fund_thesis_calls = [c for c in client.calls if c[0] == "fund_thesis"]
     version_selects = [sel for (tbl, sel) in client.calls if tbl == "fund_thesis_versions"]

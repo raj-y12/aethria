@@ -37,5 +37,10 @@ _PROVIDER_KEYS = ("EXA_API_KEY", "FIRECRAWL_API_KEY", "OPENAI_API_KEY")
 def _no_live_provider_calls(monkeypatch):
     for name in _PROVIDER_KEYS:
         monkeypatch.delenv(name, raising=False)
+    # Keep the developer's local DSN from silently turning compatibility tests
+    # into durable-worker integration tests. Tests that exercise PostgreSQL set
+    # DATABASE_URL or TEST_DATABASE_URL explicitly.
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("SUPABASE_DB_URL", raising=False)
     monkeypatch.setenv("RETRIEVAL_FALLBACK_ENABLED", "0")
     yield

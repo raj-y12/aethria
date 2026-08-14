@@ -11,11 +11,11 @@ change works.
 |---|---|---|
 | Python | 3.12 | CI pins 3.12; `backend/requirements.lock` is resolved against it |
 | Node.js | 22 | CI pins 22; both frontends use npm with committed lockfiles |
-| PostgreSQL | 16 | Only for running the PostgreSQL contract tests locally |
+| PostgreSQL | 16 | Local runtime database and PostgreSQL contract tests |
 | Docker | any recent | Optional — containerised backend |
 
-Accounts/keys you will need for the full product: **OpenAI**, **Supabase**,
-**Clerk**, and at least one retrieval provider. The chain is
+Accounts/keys you will need for the full product: **OpenAI**, **Clerk**, and at
+least one retrieval provider. Supabase is not required for local runtime. The chain is
 `Exa → Firecrawl`, with DuckDuckGo as a keyless last resort: **Exa** finds
 candidate companies semantically, **Firecrawl** reads their pages. Set both
 `EXA_API_KEY` and `FIRECRAWL_API_KEY`.
@@ -44,9 +44,7 @@ the codebase is registered there and that `.env.example` is in sync, so:
 
 ```bash
 OPENAI_API_KEY=sk-...
-USE_SUPABASE_STORAGE=1
-SUPABASE_URL=https://<project>.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=...
+DATABASE_URL=postgresql://aethria:local-test-password@127.0.0.1:15432/aethria_test
 CLERK_JWKS_URL=https://<app>.clerk.accounts.dev/.well-known/jwks.json
 EXA_API_KEY=...
 FIRECRAWL_API_KEY=...
@@ -57,7 +55,7 @@ Behaviour when these are missing is deliberate and explicit, never silent:
 | Missing | Effect |
 |---|---|
 | `OPENAI_API_KEY` | Pipeline is skipped immediately with a logged reason |
-| `USE_SUPABASE_STORAGE=1` | Falls back to local JSON under `backend/data/` — **dev only**; the production pipeline path and durable job store are unavailable |
+| `DATABASE_URL` (or `SUPABASE_DB_URL`) | Durable jobs and canonical repositories are unavailable; accepted-work endpoints fail closed |
 | `CLERK_JWKS_URL` | All authenticated routes reject with 401 |
 | Active fund thesis | Periodic cycles skip with a warning; on-demand lookup still runs |
 
@@ -82,6 +80,8 @@ The root `.gitignore` keeps `.env` and `.env.*` untracked while allowing every
 
 ```bash
 pip install -r backend/requirements.lock          # pinned; use this
+# Optional only for isolated legacy Supabase compatibility tests/tools:
+pip install -r backend/requirements-legacy.txt
 (cd app-front-end && npm ci)
 (cd web-front-end && npm ci)
 ```
@@ -89,14 +89,37 @@ pip install -r backend/requirements.lock          # pinned; use this
 `backend/requirements.txt` holds the loose top-level dependency declarations;
 `backend/requirements.lock` is what CI, Docker, and production install. Change
 `requirements.txt`, then regenerate the lock.
+The optional `backend/requirements-legacy.txt` is not installed into the
+production image; it exists only for compatibility tests and historical tools.
 
 ### Database schema
 
-Apply `supabase/migrations/*.sql` in timestamp order to your Supabase project
-(Supabase CLI, the SQL editor, or `psql`). The backend detects unapplied
-migrations at startup and logs a `SCHEMA DRIFT` warning naming the missing
-columns — the write path tolerates them by dropping fields, so that warning is
-the signal that something needs applying.
+Historical `supabase/migrations/*.sql` files are retained for reconciliation
+and live-database history. They are not the runtime migration ledger.
+
+The post-Supabase schema is being migrated to ordinary PostgreSQL. The
+application-owned runner is `backend/db/migration_runner.py`; it applies
+timestamped files from `db/migrations/` and records them in
+`app_migrations.schema_migrations`. `db/baseline/` is reserved for the
+reviewed provider-neutral schema snapshot. Do not edit historical files under
+`supabase/migrations/` or use them as the future migration ledger.
+
+Startup persistence uses `public.startups` as its sole canonical runtime
+authority. `startup_id_aliases` resolves approved legacy identifiers from the
+historical reconciliation. The live Supabase `portfolio_startups` table is
+preserved historical data only, is not created by provider-neutral migrations,
+and is not read or written by normal runtime code. Live deletion or archival is
+an operational decision outside this migration.
+
+Fund-thesis reads used by periodic evaluation are verified against the
+provider-neutral PostgreSQL contract in `db/migrations/`, through the shared
+asyncpg pool and `backend/fund_thesis_repository.py`. The repository reads the
+active version, version history, embeddings, missing-embedding worklist, and
+pipeline links with explicit tenant predicates. Thesis creation, activation,
+and embedding backfill use the bounded canonical repository paths. Policy
+publication uses `FundIntelligenceRepository` and the
+`governed_policy_versions` table; historical policy compatibility remains
+separately scoped for the 5D cleanup.
 
 `supabase/clear_all_tables.sql` resets a **local/dev** database. It is
 destructive and is not wired into any automated path.
@@ -113,9 +136,13 @@ python3 run.py
 
 Starts the backend on `:8000`, the operator app on `:3000`, the marketing site on
 `:3001`, and — when a tenant is resolvable — the standalone agent process. With
-`USE_SUPABASE_STORAGE=1` and no `AETHRIA_AGENT_USER_ID`, `run.py` deliberately
-skips the agent subprocess; the API resumes per-user agent loops after login
-instead. Logs stream with `[Backend]` / `[App]` / `[Web]` / `[Agents]` prefixes.
+no `AETHRIA_AGENT_USER_ID`, `run.py` deliberately skips the agent subprocess;
+the API resumes per-user agent loops after login instead. Logs stream with
+`[Backend]` / `[App]` / `[Web]` / `[Agents]` prefixes. When `DATABASE_URL`
+targets `127.0.0.1:15432`, it also starts the local PostgreSQL Compose service,
+waits for it, and applies the provider-neutral migrations before starting the
+backend. It stops that database container on exit only when it started it;
+already-running database containers are left running.
 
 ### Individually
 
@@ -162,16 +189,41 @@ python3 -m pytest backend/tests/evaluation_v2 -v -o asyncio_mode=auto
 ~190 test modules covering the pipeline contract, scoring engine, partner rules,
 identity, jobs, evidence, evaluation, monitoring, security, and API surface.
 
-**PostgreSQL contract tests** need a real database and are skipped without one:
+**PostgreSQL contract tests** use ordinary PostgreSQL 16 and the portable
+migrations under `db/migrations/`; they do not use Supabase migrations or
+compatibility roles:
 
 ```bash
-docker run --rm -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=aethria -p 5432:5432 postgres:16
-export TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/aethria
-psql "$TEST_DATABASE_URL" -c "create role anon; create role authenticated; create role service_role;"
-# apply the institutional migrations listed in .github/workflows/ci.yml, then:
-cd backend && python3 -m pytest tests/jobs/test_job_repository_postgres.py \
-  tests/identity/test_identity_repository_postgres.py -v -o asyncio_mode=auto
+docker-compose up -d postgres
+until docker-compose exec -T postgres pg_isready -U aethria -d aethria_test; do sleep 1; done
+export TEST_DATABASE_URL=postgresql://aethria:local-test-password@127.0.0.1:15432/aethria_test
+cd backend && python3 scripts/migrate_postgres.py
+cd ..
+python3 -m pytest -o asyncio_mode=auto -q \
+  backend/tests/memory/test_repository_postgres.py \
+  backend/tests/settings/test_settings_repository_postgres.py \
+  backend/tests/user_state/test_repository_postgres.py
 ```
+
+The jobs, identity, authority, fund-intelligence, security, and legacy-table
+contract tests run against the provider-neutral schema. Do not apply historical
+`supabase/migrations/` files to this contract database as a workaround.
+
+Inspect the application migration ledger with:
+
+```bash
+docker-compose exec -T postgres psql -U aethria -d aethria_test -c \
+  "select version, name from app_migrations.schema_migrations order by version"
+```
+
+Reset the local test database with:
+
+```bash
+docker-compose down -v
+```
+
+The password above is local-only test data and must never be reused for
+production configuration.
 
 ### Frontends
 
@@ -239,12 +291,18 @@ extend `backend/tests/evaluation_v2/test_partner_rules_contract.py`. The
 governed path (`/api/settings/policy/preview` → `/publish`) is the runtime
 equivalent for per-fund configuration.
 
+Rate limits, short-lived locks, and Meta/Portfolio schedule claims use
+application-owned asyncpg repositories over the shared PostgreSQL pool. Do not
+add Supabase RPCs or synchronous database calls to these paths. Lock release
+requires the opaque owner token returned by acquisition; schedule claiming is
+separate from durable `agent_jobs` leasing.
+
 ### Change the schema
 
-New file in `supabase/migrations/` with a timestamp prefix. Never edit an applied
-migration. If the new table or column is exercised by repository code, extend the
-PostgreSQL contract tests and add the migration to the CI list in
-`.github/workflows/ci.yml`.
+For provider-neutral direct PostgreSQL work,
+add a new timestamped file in `db/migrations/` and extend the PostgreSQL
+contract tests. Never edit an applied migration. Historical Supabase migrations
+remain immutable source material.
 
 ### Add an environment variable
 

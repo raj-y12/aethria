@@ -935,7 +935,9 @@ class IdentityRepository:
                 """
                 select o.*, c.canonical_name, c.canonical_domain,
                        r.recommended_state, r.confidence as recommendation_confidence,
-                       hr.decision as current_ruling_decision
+                       hr.decision as current_ruling_decision,
+                       hr.rationale as current_ruling_rationale,
+                       hr.created_at as current_ruling_created_at
                 from public.opportunities o
                 join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
                 left join public.recommendations r
@@ -960,7 +962,25 @@ class IdentityRepository:
                        r.principal_risks, r.missing_information, r.change_conditions,
                        e.evaluation_id, e.evidence_snapshot_hash, e.policy_version_id,
                        e.thesis_version_id,
-                       hr.decision as current_ruling_decision
+                       hr.decision as current_ruling_decision,
+                       hr.rationale as current_ruling_rationale,
+                       hr.created_at as current_ruling_created_at,
+                       (
+                         select coalesce(json_agg(json_build_object(
+                           'ruling_id', hri.ruling_id::text,
+                           'recommendation_id', hri.recommendation_id::text,
+                           'decision', hri.decision,
+                           'rationale', hri.rationale,
+                           'risk_acknowledgement', hri.risk_acknowledgement,
+                           'mandate_exception', hri.mandate_exception,
+                           'investor_confidence', hri.investor_confidence,
+                           'actor_id', hri.actor_id,
+                           'prior_ruling_id', hri.prior_ruling_id::text,
+                           'created_at', hri.created_at
+                         ) order by hri.created_at, hri.ruling_id), '[]'::json)
+                         from public.human_rulings hri
+                         where hri.user_id=o.user_id and hri.opportunity_id=o.opportunity_id
+                       ) as ruling_history
                 from public.opportunities o
                 join public.companies c on c.user_id=o.user_id and c.company_id=o.company_id
                 left join public.recommendations r
@@ -977,6 +997,7 @@ class IdentityRepository:
         payload = dict(row)
         for key in ("decision_drivers", "principal_risks", "missing_information", "change_conditions"):
             payload[key] = _json_value(payload.get(key), [])
+        payload["ruling_history"] = _json_value(payload.get("ruling_history"), [])
         return payload
 
     async def get_decision_cases(

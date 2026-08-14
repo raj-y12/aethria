@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jobs.models import (
@@ -11,6 +12,48 @@ from jobs.models import (
 )
 from jobs.lookup_outcomes import LookupAttemptOutcome, LookupOutcomeStoreUnavailable
 from security.rate_limiter import InMemorySecurityStore
+
+
+def test_direct_postgres_runtime_requires_durable_services(monkeypatch):
+    import api
+
+    monkeypatch.delenv("USE_SUPABASE_STORAGE", raising=False)
+    monkeypatch.setattr(api, "database_dsn", lambda: "postgresql://local/aethria")
+    monkeypatch.setattr(api.env_config, "use_supabase_storage", lambda: False)
+
+    assert api._durable_jobs_required() is True
+
+
+def test_explicit_local_compatibility_switch_does_not_disable_configured_postgres(
+    monkeypatch,
+):
+    import api
+
+    monkeypatch.setenv("USE_SUPABASE_STORAGE", "0")
+    monkeypatch.setattr(api, "database_dsn", lambda: "postgresql://local/aethria")
+    monkeypatch.setattr(api.env_config, "use_supabase_storage", lambda: False)
+
+    assert api._durable_jobs_required() is True
+
+
+@pytest.mark.asyncio
+async def test_durable_startup_fails_closed_when_pool_creation_fails(monkeypatch):
+    import api
+
+    async def fail_pool_creation():
+        raise ConnectionRefusedError("local database is unavailable")
+
+    async def no_op_cleanup(_app):
+        return None
+
+    monkeypatch.setattr(api, "create_durable_job_pool", fail_pool_creation)
+    monkeypatch.setattr(api, "_stop_durable_job_services", no_op_cleanup)
+    monkeypatch.setattr(api, "_durable_jobs_required", lambda: True)
+
+    with pytest.raises(RuntimeError, match="durable_job_store_unavailable:ConnectionRefusedError"):
+        await api._start_durable_job_services(
+            SimpleNamespace(state=SimpleNamespace())
+        )
 
 
 class _Repository:

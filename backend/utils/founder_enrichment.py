@@ -191,6 +191,12 @@ def founder_resolution_from_gap_pack(
                 title=str(s.get("title") or "").strip(),
                 snippet=str(s.get("snippet") or "").strip()[:12000],
                 supports="Founder or team evidence",
+                access_class=(
+                    str(s.get("access_class") or "public")
+                    if str(s.get("access_class") or "public")
+                    in {"public", "tenant_confidential", "restricted"}
+                    else "restricted"
+                ),
             )
             for s in sources
             if str(s.get("url") or "").strip()

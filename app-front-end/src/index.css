@@ -38,15 +38,15 @@
   /* Semantic text hierarchy — aligned with web-front-end */
   --text-primary:            rgba(var(--color-oxford-rgb), 0.90);
   --text-secondary:          rgba(var(--color-oxford-rgb), 0.74);
-  --text-tertiary:           rgba(var(--color-oxford-rgb), 0.62);
-  --text-muted:              rgba(var(--color-oxford-rgb), 0.50);
-  --text-subtle:             rgba(var(--color-oxford-rgb), 0.38);
+  --text-tertiary:           rgba(var(--color-oxford-rgb), 0.65);
+  --text-muted:              rgba(var(--color-oxford-rgb), 0.65);
+  --text-subtle:             rgba(var(--color-oxford-rgb), 0.65);
   --text-ghost:              rgba(var(--color-oxford-rgb), 0.22);
   --text-inverse:            rgba(217, 215, 212, 0.94);
   --text-inverse-secondary:  rgba(217, 215, 212, 0.78);
   --text-inverse-muted:      rgba(217, 215, 212, 0.56);
   --label-strong:            rgba(var(--color-oxford-rgb), 0.74);
-  --label-muted:             rgba(var(--color-oxford-rgb), 0.42);
+  --label-muted:             rgba(var(--color-oxford-rgb), 0.65);
   /* Body / long-form prose on paper, deliberately blue-tinted rather than black. */
   --color-charcoal:          #1c2836;
   /* Clerk — match app palette and typography */
@@ -446,7 +446,7 @@
   .type-body {
     font-family: var(--font-sans);
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.618; /* φ — matches DESIGN_SYSTEM.md */
   }
   .type-body-sm {
     font-family: var(--font-sans);
@@ -515,10 +515,10 @@
     letter-spacing: 0.075em;
     text-transform: uppercase;
   }
-  :where(.type-label-section, .type-label-tab) { color: rgba(var(--color-oxford-rgb), 0.42); }
-  :where(.type-meta) { color: rgba(var(--color-oxford-rgb), 0.52); }
+  :where(.type-label-section, .type-label-tab) { color: rgba(var(--color-oxford-rgb), 0.65); }
+  :where(.type-meta) { color: rgba(var(--color-oxford-rgb), 0.65); }
   :where(.type-data) { color: rgba(var(--color-oxford-rgb), 0.82); }
-  :where(.type-status) { color: rgba(var(--color-oxford-rgb), 0.62); }
+  :where(.type-status) { color: rgba(var(--color-oxford-rgb), 0.65); }
   :where(.type-action) { color: rgba(var(--color-oxford-rgb), 0.72); }
   .type-label-inverse { color: rgba(var(--color-paper-rgb), 0.56); }
   .type-meta-inverse { color: rgba(var(--color-paper-rgb), 0.64); }
@@ -1099,5 +1099,20 @@
   .dot-grid-pulse {
     opacity: 0.08;
     transform: none;
+  }
+}
+
+/**
+ * Touch targets. The docket's density is deliberate on a mouse — 32–36px rows of
+ * chips are how the queue stays scannable — but a finger needs 44px (WCAG 2.5.5,
+ * Apple HIG). Lift only on coarse pointers, and only the sites that declare a
+ * sub-44 height, so desktop density is untouched and no layout guesses are made.
+ * Outside @layer so it wins over the Tailwind utility it overrides.
+ */
+@media (pointer: coarse) {
+  .min-h-\[32px\],
+  .min-h-\[36px\],
+  .min-h-\[40px\] {
+    min-height: 44px;
   }
 }

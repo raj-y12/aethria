@@ -1,8 +1,9 @@
 """
 MetaAgent — the main orchestrator for self-optimisation cycles.
-Backed by Supabase meta_cycle_counters and meta_reports (explicit user_id per tenant).
+Backed by provider-neutral meta_cycle_counters and meta_reports.
 """
 import asyncio
+import inspect
 import logging
 import os
 from pathlib import Path
@@ -16,7 +17,8 @@ from meta.mutator import PromptMutator, _append_to_json_list
 from meta.schema import PromptMutationTargetOutcome, PromptMutationTargetState
 from meta.reweighter import ScoutReweighter
 from meta.calibrator import ThresholdCalibrator
-from supabase_doc_store import doc_get_int, doc_set_int
+from batch1.store import doc_get_int, doc_set_int
+from batch1.repository import Batch1Repository
 from utils.job_schedule import claim_due_jobs
 from pipeline_execution import MetaCycleResult, StageExecutionResult
 
@@ -30,12 +32,16 @@ _CYCLE_COUNTER_TABLE = "meta_cycle_counters"
 class MetaAgent:
     """Orchestrates the full Meta-Agent optimisation cycle."""
 
-    def __init__(self, scout_engine=None, reviewer_engine=None, user_id: str = ""):
+    def __init__(self, scout_engine=None, reviewer_engine=None, user_id: str = "", settings: Optional[Dict[str, Any]] = None, batch1_repository: Optional[Batch1Repository] = None, memory_snapshot: Optional[Dict[str, Any]] = None):
         uid = require_user_id(user_id, context="MetaAgent")
         self.user_id = uid
         self.tenant = TenantContext(user_id=uid)
         self.scout_engine = scout_engine
         self.reviewer_engine = reviewer_engine
+        self.settings = settings if isinstance(settings, dict) else {}
+        self.batch1_repository = batch1_repository
+        self.memory_snapshot = memory_snapshot if isinstance(memory_snapshot, dict) else {}
+        self._async_cycle_number: Optional[int] = None
         self.logger = logging.getLogger("meta.agent")
         self.min_reviews = int(os.getenv("META_AGENT_MIN_REVIEWS", "20"))
         self.min_decisions = int(os.getenv("META_AGENT_MIN_DECISIONS", "10"))
@@ -44,6 +50,10 @@ class MetaAgent:
         self._no_action_reasons: List[str] = []
 
     def _increment_cycle(self) -> int:
+        if self._async_cycle_number is not None:
+            cycle = self._async_cycle_number
+            self._async_cycle_number = None
+            return cycle
         cycle = doc_get_int(_CYCLE_COUNTER_TABLE, user_id=self.user_id) + 1
         doc_set_int(_CYCLE_COUNTER_TABLE, cycle, user_id=self.user_id)
         return cycle
@@ -59,11 +69,11 @@ class MetaAgent:
                 )
             )
         try:
-            due = await asyncio.to_thread(
-                claim_due_jobs,
+            claimed = claim_due_jobs(
                 self.user_id,
                 {"meta": 0 if force else self.interval},
             )
+            due = await claimed if inspect.isawaitable(claimed) else claimed
         except Exception as exc:
             self.logger.error("[MetaAgent] Schedule claim failed: %s", exc, exc_info=True)
             return MetaCycleResult(
@@ -87,8 +97,10 @@ class MetaAgent:
                     detail="The Meta analysis interval has not elapsed.",
                 )
             )
-        # The whole cycle is blocking doc-store/analysis I/O — one hop off the
-        # serving event loop rather than dozens of per-call thread hops.
+        if self.batch1_repository is not None:
+            self._async_cycle_number = await self.batch1_repository.increment_cycle_counter(self.user_id)
+        # Analysis and LLM work are synchronous by design; Batch 1 persistence
+        # is a preloaded snapshot and is flushed by the owning pipeline.
         try:
             report = await asyncio.to_thread(self._run_cycle_sync)
             if not isinstance(report, dict):
@@ -162,7 +174,7 @@ class MetaAgent:
         self._no_action_reasons = []
         self.logger.info("[MetaAgent] Starting cycle %s", cycle_number)
 
-        analyser = MetaAnalyser(self.user_id)
+        analyser = MetaAnalyser(self.user_id, memory_snapshot=self.memory_snapshot)
         signal = analyser.analyse()
 
         sufficiency = signal.get("data_sufficiency", {})
@@ -195,7 +207,7 @@ class MetaAgent:
                 reweighter = ScoutReweighter(signal, cycle_number, self.user_id)
                 weight_updates = reweighter.decide()
 
-                calibrator = ThresholdCalibrator(signal, cycle_number, self.user_id)
+                calibrator = ThresholdCalibrator(signal, cycle_number, self.user_id, settings=self.settings)
                 calibrations = calibrator.decide()
 
                 if mutation_targets:

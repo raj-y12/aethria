@@ -1,73 +1,75 @@
 import asyncio
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from meta.agent import MetaAgent
 from pipeline_execution import MetaCycleResult, StageExecutionState
 from portfolio.engine import PortfolioEngine
-from utils import job_schedule
 
 
-def test_claim_due_jobs_persists_intervals_and_isolates_tenants(monkeypatch):
-    calls = []
+@pytest.mark.asyncio
+async def test_claim_due_jobs_persists_intervals_and_isolates_tenants():
+    import asyncpg
 
-    class Request:
-        def __init__(self, rows):
-            self.rows = rows
+    from schedule_repository import ScheduleRepository
 
-        def execute(self):
-            return SimpleNamespace(data=self.rows)
-
-    class Client:
-        def rpc(self, name, params):
-            calls.append((name, params))
-            return Request([{"job_name": "signals"}])
-
-    monkeypatch.setattr(job_schedule, "get_service_client", Client)
     now = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
     intervals = {"meta": 86400, "signals": 3600}
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=2)
+    repository = ScheduleRepository(pool)
+    user_a = f"schedule-{uuid4()}"
+    user_b = f"schedule-{uuid4()}"
+    try:
+        assert await repository.claim_due_jobs(user_a, intervals, now=now) == {"meta", "signals"}
+        assert await repository.claim_due_jobs(user_a, intervals, now=now) == set()
+        assert await repository.claim_due_jobs(user_b, {"signals": 3600}, now=now) == {"signals"}
+    finally:
+        await pool.execute("delete from public.agent_job_schedules where user_id = any($1::text[])", [user_a, user_b])
+        await pool.close()
 
-    assert job_schedule.claim_due_jobs("user-a", intervals, now=now) == {"signals"}
-    assert calls == [
-        (
-            "claim_due_agent_jobs",
-            {
-                "p_user_id": "user-a",
-                "p_intervals": {"meta": 86400, "signals": 3600},
-                "p_now": "2026-07-14T12:00:00Z",
-            },
+
+@pytest.mark.asyncio
+async def test_concurrent_schedule_claim_has_one_winner():
+    import asyncpg
+
+    from schedule_repository import ScheduleRepository
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=4)
+    repository = ScheduleRepository(pool)
+    user_id = f"schedule-race-{uuid4()}"
+    now = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+    try:
+        await repository.claim_due_jobs(user_id, {"meta": 0}, now=now)
+        await pool.execute(
+            "update public.agent_job_schedules set last_claimed_at=$2 where user_id=$1",
+            user_id,
+            datetime(2026, 7, 14, 10, 59, tzinfo=timezone.utc),
         )
-    ]
+        results = await asyncio.gather(
+            repository.claim_due_jobs(user_id, {"meta": 3600}, now=now),
+            repository.claim_due_jobs(user_id, {"meta": 3600}, now=now),
+        )
+        assert sorted(results, key=lambda value: len(value)) == [set(), {"meta"}]
+    finally:
+        await pool.execute("delete from public.agent_job_schedules where user_id=$1", user_id)
+        await pool.close()
 
 
-def test_claim_due_jobs_fails_closed_on_rpc_error(monkeypatch):
-    class Client:
-        def rpc(self, name, params):
-            raise RuntimeError("schedule store unavailable")
-
-    monkeypatch.setattr(job_schedule, "get_service_client", Client)
-
-    with pytest.raises(RuntimeError, match="schedule store unavailable"):
-        job_schedule.claim_due_jobs("user-a", {"meta": 86400})
-
-
-def test_schedule_migration_claim_is_transactional_and_service_role_only():
+def test_portable_schedule_migration_has_no_supabase_security_dependencies():
     sql = (
         Path(__file__).parents[2]
-        / "supabase/migrations/20260714192632_agent_job_schedules.sql"
+        / "db/migrations/20260811000021_security_and_schedules.sql"
     ).read_text().lower()
 
-    assert "create or replace function public.claim_due_agent_jobs" in sql
-    assert "on conflict on constraint agent_job_schedules_pkey do update" in sql
-    assert "on conflict (user_id, job_name)" not in sql
-    assert "where agent_job_schedules.last_claimed_at" in sql
-    assert "returning agent_job_schedules.job_name" in sql
-    assert "(select auth.jwt()) ->> 'sub' = user_id" in sql
-    assert "revoke all on function public.claim_due_agent_jobs" in sql
-    assert "grant execute on function public.claim_due_agent_jobs" in sql
+    assert "create table if not exists public.agent_job_schedules" in sql
+    assert "primary key (user_id, job_name)" in sql
+    assert "auth." not in sql
+    assert "service_role" not in sql
+    assert "security definer" not in sql
 
 
 def test_meta_agent_skips_automatic_cycle_until_due(monkeypatch):

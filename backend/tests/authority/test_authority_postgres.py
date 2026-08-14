@@ -25,12 +25,11 @@ async def test_target_postgres_rollout_and_workflow_transactions_are_tenant_safe
     observation_id = uuid4()
     try:
         async with pool.acquire() as connection:
+            # Tenant isolation is an application-owned repository contract;
+            # Supabase RLS/service-role semantics are not portable requirements.
             assert await connection.fetchval(
-                """
-                select relrowsecurity
-                from pg_class where oid='public.tenant_authority_rollouts'::regclass
-                """
-            ) is True
+                "select 1 from information_schema.columns where table_schema='public' and table_name='tenant_authority_rollouts' and column_name='user_id'"
+            ) == 1
             await connection.execute(
                 """
                 insert into public.companies (

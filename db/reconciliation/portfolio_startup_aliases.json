@@ -1,0 +1,1870 @@
+{
+  "source": "portfolio_startups",
+  "verification_classification": "approved_reconciliation_set",
+  "approved_batch": "4B.5C",
+  "mapping_count": 133,
+  "mappings": [
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "01b1600a-99e7-4554-a38e-9a6cdde92f67",
+      "canonical_startup_id": "c9f67e8e-885c-4fc1-aaba-3fb328734475",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "01c5f17b-ff75-42e5-b239-699a72d64629",
+      "canonical_startup_id": "a4b2c3d4-e5f6-7a89-b0c1-d2e3f4567890",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "01f308d6-b150-4440-a4d6-0ba3d64b280e",
+      "canonical_startup_id": "a1b2c3d4-e5f6-4711-9a0b-1234567890ab",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "0341497a-dcd0-42ab-a9fe-12f3b14249bd",
+      "canonical_startup_id": "5c8c832b-2a78-4241-86b1-1729185d6666",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "045403cb-62f1-480e-a5b9-361eddfd5239",
+      "canonical_startup_id": "a1b2c3d4-e5f6-7890-abcd-ef0123456789",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "05ff7ea6-2ad5-45e6-b40e-cf435fb5ce9c",
+      "canonical_startup_id": "e0d8b2e3-9f7a-4b6a-9876-1234567890ab",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "07a9348d-3a48-4df0-9b43-ee5d75259cdf",
+      "canonical_startup_id": "90f62f50-d5f7-44de-8ba4-3c061e080ff2",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "08ba43d7-b8b3-4c48-865a-64b15cf5489f",
+      "canonical_startup_id": "2f9b6f3c-9a3d-4a6e-88e3-123456789abc",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "08d21c2c-71ed-4dce-af1a-5c9e96a43a0a",
+      "canonical_startup_id": "2f6d8e9b-3b5a-4a7b-9c1e-1d2a8a7d1e9f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "0d59374c-6298-4409-be8e-51436deaabce",
+      "canonical_startup_id": "a0bf05c1-0610-47c0-9d84-37c6b539cc1f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "1044bc67-4e9a-482a-807e-614e8925b42e",
+      "canonical_startup_id": "f4a2e6d8-9b3a-4f2d-8f9c-1e2f3a4b5c6d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "1049bf15-078f-4d2c-90d1-c40d0f38027a",
+      "canonical_startup_id": "eeaec18e-496e-44f3-b088-d1e4586f528f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "120767d3-18bf-49dd-814c-4410c7ca751a",
+      "canonical_startup_id": "c94c1b4c-7eb3-4a47-9f60-e3812a2337b7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "143600de-7fd8-4d23-be34-da7c52f8e281",
+      "canonical_startup_id": "280b1659-09bc-4b43-b5a4-b9d6e7c734f2",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "14a23c55-1212-474e-8a04-b3a96eb0383c",
+      "canonical_startup_id": "af07b650-37de-4181-9dae-3f74096443a0",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "1615f664-50a7-45c7-bc03-91d7c0cb8b7d",
+      "canonical_startup_id": "dc140476-4dc7-4d91-a5c9-cef1a26d9ef9",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "16ca5239-be6a-414e-a72b-274506f0bcc7",
+      "canonical_startup_id": "739e6ea0-0063-4f03-a889-6fceeab29d3b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "17bf740d-afaa-4802-a95f-1852ee1e5678",
+      "canonical_startup_id": "c770a16f-1760-4ab6-919d-de30da5540c8",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "18b9ccb4-6a9b-49e5-9b2d-874429224483",
+      "canonical_startup_id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "2285d1bd-08cb-4023-8168-4b0229d58904",
+      "canonical_startup_id": "8f2b5a9e-3c7a-4e11-9b2d-6d5e8a1f3a2b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "22a42117-e83e-48ec-93b0-308ad07d81a9",
+      "canonical_startup_id": "7f8b2d4e-3a9f-4e2a-b1d7-0a2f9d3c4e6f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "247f488b-c8a5-4e84-9e97-2dd79317b746",
+      "canonical_startup_id": "2e5a6f1b-4c9d-4f6b-8d3a-1f8b6a6e9e68",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "26e72577-1af4-4f6d-8604-bb5a72fc76bc",
+      "canonical_startup_id": "f46a1e2d-3b7f-4e8a-9b3f-1234567890ab",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "27e01257-7444-4258-819b-376729aa94aa",
+      "canonical_startup_id": "207ecb92-c437-4788-9e72-f0688bbd604e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "2e0aa8c4-398a-470b-8ed2-c05c11633321",
+      "canonical_startup_id": "af8ee638-0869-4c81-a286-272d4cb9b27a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "2e7c8ced-4617-4a06-b86c-539046cd78c1",
+      "canonical_startup_id": "2f0d3b4e-9c1a-4b2a-8d9f-9e1f3a4b5c6d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "30e90d17-2152-4c17-ae15-c8f2e47d3f0a",
+      "canonical_startup_id": "e4c0672e-88e7-41db-8878-083300039d30",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "32a20e0c-8aa6-4e80-83f1-e0f6dddc391d",
+      "canonical_startup_id": "3bfa8c98-505d-4a46-bc3d-3f5658f9e4f3",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "3399bc0e-9ec2-4b8a-9021-13babd4d91cc",
+      "canonical_startup_id": "uuid",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "34a99fcb-e4a5-45a3-b012-016927e3ada2",
+      "canonical_startup_id": "c14165cb-134b-46c7-83e9-e1df557f3330",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "355caf95-dd41-4c28-951b-ca7a7b316694",
+      "canonical_startup_id": "8f3a9b5e-4d1a-4f2b-9c6e-7a2d9d6b8a1e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "37478b4a-adcf-4ed9-a095-4e9989a5a418",
+      "canonical_startup_id": "79116b98-f2d7-474c-9864-9f9be24415bf",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "3b74adf0-1a4f-46ee-a63a-e67a55948951",
+      "canonical_startup_id": "ce90deb3-d2e9-49c8-b73f-fd64c4bf973c",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "3f3bd4a8-fa72-4ad9-acab-87ea23c0e7ab",
+      "canonical_startup_id": "c42d805d-1c4b-47f4-992c-b4a2aa93903d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "40e54f65-69be-4649-8e8f-113bc5b0f3a0",
+      "canonical_startup_id": "3f7b8a10-2a4b-4f8a-9d9b-3d7f3a5b2d9f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "4283c3b8-6d2e-4df7-8791-556b6c14caa1",
+      "canonical_startup_id": "69bda351-72a8-487c-9d4f-471488f7b577",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "46621ef4-98d7-46e9-b37d-ce778a04b055",
+      "canonical_startup_id": "5c82dfad-55b1-49d5-ac12-7cb39ab5f5d7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "472b008c-734d-49fd-b555-1c70ab9ae414",
+      "canonical_startup_id": "bf5fc65b-0de9-4c6a-bc67-346902ae4ca7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "478a208c-bac0-4c41-8b86-8664b119ddd3",
+      "canonical_startup_id": "e3a1f2d4-9b8c-4f2d-9a1b-2c3d4e5f6a7b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "55239c93-9bbb-4b7b-a330-5afdfdeeaf25",
+      "canonical_startup_id": "ed6b555b-507c-425d-a4dc-f7889842eef1",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "56f21699-b3b2-4cda-9ca5-db36d29f7af6",
+      "canonical_startup_id": "a2f3b9e1-7c4d-4f3a-9a5b-8e8e9f0b1d2a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "57226e1c-13a9-4f51-b0de-ffd4434211dd",
+      "canonical_startup_id": "c3f9a3b4-7d2a-4f8b-9f9a-5f183c2e8a9b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "5740496f-7312-40de-9ac7-dd0a07704901",
+      "canonical_startup_id": "3c4f2526-a68d-4aef-af97-0d5b54225490",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "57fed8fc-7c1e-422f-ba0f-ea4c622563a8",
+      "canonical_startup_id": "e5a3c9c2-3b7d-4f2b-9f5c-1f2a3b4c5d6e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "59867988-6cf4-444d-8290-b4b619c761e5",
+      "canonical_startup_id": "14d8c7c1-0c6f-4b76-b05c-7e115f674af5",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "5ace3185-0e1a-4ba6-af0d-1da92c33b323",
+      "canonical_startup_id": "646cbca0-9af4-4ec6-aecd-137c7d063c9b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "5d7f0353-c3b2-4856-90da-7b7c1f7b7584",
+      "canonical_startup_id": "c3b2f11a-1a2b-4bd3-8b2a-9a4d3f9a1b6d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "5f112903-6eed-4f31-8fec-19137c3c8769",
+      "canonical_startup_id": "e1a3c6f2-9b9b-4a6e-9c2b-3f2d1a7b8c9d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "62d44d3d-b533-4837-aad5-c7a291a34f38",
+      "canonical_startup_id": "f3a9b1d9-7f9a-4c2b-8d8a-3b2a1d0d4c6e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "63be2b24-c481-4274-81df-983d3eb8ec64",
+      "canonical_startup_id": "14e2fc74-1d0d-4cca-985b-8a7024da742d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "64c1a95f-2495-46b6-bfe2-482ea587985c",
+      "canonical_startup_id": "e1c582e3-55fc-4bc0-b7a1-1b6181c29f15",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "67a6441a-a3cb-4086-83dd-ed825eadece0",
+      "canonical_startup_id": "3f6a9b2d-8c1e-4a2b-9f1d-8d9a8f7e6b2c",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "683a8468-1d48-4d1f-bcb1-8dac3351b625",
+      "canonical_startup_id": "036718c8-3c78-44fd-ba10-2378e4b3b8c4",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "6948e7d9-f730-43c5-aa2f-191b954b4880",
+      "canonical_startup_id": "e7f3c1a2-8b4d-4f6a-9c7a-2c5a7f0d1f8a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "697843aa-6f66-4084-950b-d21fbafbcfb7",
+      "canonical_startup_id": "32800262-0c22-4f5a-b6ae-16dbcfee4a86",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "6a05ed01-c9de-4bb3-9828-f7efc24fe4e6",
+      "canonical_startup_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "6b4d74c3-9272-4dff-b2d6-ec2a3827b869",
+      "canonical_startup_id": "e7cda5fe-102d-4aff-9fd7-f69ac70e4a00",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "6c0c9ec6-3c06-41fd-a0fd-7f1aaf54833f",
+      "canonical_startup_id": "6f9a8a3b-4d6c-47a2-9aa7-4a1b2c3d4e5f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "6c0df106-fedc-4bc6-bde1-3d57e7359779",
+      "canonical_startup_id": "7f123cfc-969f-4a67-8fe9-6d30f482e75f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "729095ad-42e6-4d00-8e18-21161e27d76c",
+      "canonical_startup_id": "d1709a43-fb58-4650-b94c-bdc8d67e4134",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "74c832ae-2358-47da-8bbc-7cf87134cc5c",
+      "canonical_startup_id": "d3f9a8b2-7a1f-4c2d-9b5e-2c1a9f5e3b7a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "7504f37e-5c1f-4c3f-9959-c3226903deb7",
+      "canonical_startup_id": "b9f1d2a3-4e5f-6a7b-8c9d-0e1f22334455",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "755b5fd6-ac51-4039-b77c-3515841c6177",
+      "canonical_startup_id": "b63111e1-26c7-4f4b-bdad-e5f7e5c6c3c7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "77be7290-7b6b-449a-985a-d822977b6e35",
+      "canonical_startup_id": "e2a3f2b3-9a6a-4f0b-8e3f-3a2b5c0f9d7a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "79b659a5-d459-442c-bc50-1f3a9aeeb903",
+      "canonical_startup_id": "d2f9b9f0-6b1c-4a3b-8f3f-2e8b9f1c4a7a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "7c405118-615a-4da0-b4e9-cd0afb1cc7be",
+      "canonical_startup_id": "78d0878d-37c2-413d-a798-24d74ae795d0",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "7eaa141e-5d06-4d58-aea8-96a88be4acb1",
+      "canonical_startup_id": "f1a8e801-54db-44e1-9f23-2b6e9cf67ee5",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "88cfa9bd-eeaa-489a-8568-aac01f062e9d",
+      "canonical_startup_id": "d8338d93-e15d-4d0d-9b3b-eb511c1b2290",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "89e4703c-944a-4e36-86e5-092fbfd5652b",
+      "canonical_startup_id": "7f9b1c6e-3d2b-4f9a-9f5a-3a1c2d5b0a9e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8a768f94-2ec4-4502-908e-94fa71dbb38d",
+      "canonical_startup_id": "2b1f4f0e-8a3e-4a9b-9e1b-2e1a5db7f7a1",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8b4ccaec-4b52-42a2-b020-4841103eabec",
+      "canonical_startup_id": "657f44ee-b4de-4f36-9b04-f88b7b391b65",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8cdc8c63-ec1c-4269-a3c7-f896708d75a8",
+      "canonical_startup_id": "86e1943b-24ae-4f3d-9349-d4fae34cf3ca",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8d538b68-2674-4553-9c92-e5efc0f7eff9",
+      "canonical_startup_id": "9a1b2c3d-4e5f-6071-809a-bcde12345678",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8d8c44e8-e203-4d63-94a8-c70b590eb79a",
+      "canonical_startup_id": "f3e48808-e837-4b36-b64f-62ec3fdbdcc3",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "8de206cc-6849-47f7-bd9b-84ea24f32a47",
+      "canonical_startup_id": "c7a6b02f-81db-4c7e-b1ab-302678b5bc79",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "927270be-c77b-4d3c-95ce-3c4caec7b9ba",
+      "canonical_startup_id": "9b40485b-6703-4aa4-9e38-26c4475da162",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "96b1987a-318f-46b4-a1eb-6e43eb25b94a",
+      "canonical_startup_id": "00000001-0000-0000-0000-000000000001",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "9dfcecad-af07-48a8-af59-75f2799b07b6",
+      "canonical_startup_id": "2130d62a-468d-4b52-bda1-65d3fe6da22e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "9e304f9a-b080-445f-a0f3-05fb69508d58",
+      "canonical_startup_id": "2f8c9a6b-1d4a-4f9b-8c2d-4f6a2a1b9e7c",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "a048eb42-56d0-46b3-9051-3d0804872db7",
+      "canonical_startup_id": "a1b2c3d4-e5f6-47a0-9b1c-d2e3f4a5b6c7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "a4259f0b-d89e-490c-9428-3e1e36497a27",
+      "canonical_startup_id": "f65c0c4b-b09b-4b06-9a71-130408522748",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "a4f32df9-d0b0-455e-8fa3-0dae818bfa7b",
+      "canonical_startup_id": "d12f1c8b-9d3a-4f4a-8a4e-3e58f9a1b8d9",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "ab317312-df73-480e-92da-3c9a34103e61",
+      "canonical_startup_id": "f4b3e8d4-629c-4e03-9a97-14820cc62f67",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "abd2376e-5b9e-4ce3-a88e-4d17dcc0df89",
+      "canonical_startup_id": "83bd4f13-4013-444f-99bd-6cf73c6aaead",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "ac0ca7c2-54b3-4cf1-997d-4ad4a6c7846e",
+      "canonical_startup_id": "d670b53e-1f6f-4b18-9d2b-d8a7b8c8a107",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "afec0d7f-d408-4831-a342-f3108939a126",
+      "canonical_startup_id": "daa1ef84-a786-4c3f-9b05-0aaf5a42cbd6",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b2ade913-e187-406b-802c-2599f9cc8a2d",
+      "canonical_startup_id": "b7e01c72-c3b9-4f09-b343-04de43316599",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b40e5075-72d9-45c0-80ba-0cafe77a15a2",
+      "canonical_startup_id": "19b1a515-cc72-4bd4-95bd-45727273ad78",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b53098f5-6acf-42ae-8a9e-a7b4a9c474f3",
+      "canonical_startup_id": "e3b9c1f4-2e0d-44e4-9e27-85e3f8e0e6ba",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b555b1c7-b824-4e89-af39-c18117faee5f",
+      "canonical_startup_id": "e3f0b644-86ce-41c7-a4ba-659ac82b3f04",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b6ec1322-5f50-4bc9-8e55-35e20855f445",
+      "canonical_startup_id": "3b6d9f8a-9e2b-4f4a-8e8b-9d8c9b2a7f9e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "b75ea0bc-e657-4de6-ba1f-102962bdfe46",
+      "canonical_startup_id": "3f5c2d2f-8e1b-4c1a-95f5-8a0d8a9e4c3f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "bab9f9b1-1dde-428e-acdb-55bcca10026a",
+      "canonical_startup_id": "4b1a2f7a-9b3c-4d9a-8f2e-1a2c3b4d5e6f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "baddcc50-cb24-4886-9e1e-d66bc33972f7",
+      "canonical_startup_id": "a5b8b4e8-54a5-4a38-8ec8-4d4c6fb6326d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "bb6418cf-c969-4aff-a8ed-7065e0c6c4dd",
+      "canonical_startup_id": "c88a7678-4ea2-4d3e-b1e4-19e7a4f38848",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "bc7b4b8b-ff1e-4ad2-a9d7-bda6c399ec7e",
+      "canonical_startup_id": "b2c67c95-69a0-4632-9c5d-f0b99f1e6fd0",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "bd8556f1-af08-47c3-af0f-29e5066ac88e",
+      "canonical_startup_id": "a1b2c3d4-5e6f-7a8b-9c0d-e1f2a3b4c5d6",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "c7135bd3-6586-4eeb-9aef-aeb72320ce0b",
+      "canonical_startup_id": "d33a243c-dae1-4662-b00f-15fab03179e1",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "c7981bc0-f529-4c8f-8ec7-c94856dc8243",
+      "canonical_startup_id": "d2c3b4a5-6e7f-8a9b-0c1d-2e3f4a5b6c7d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "c7f3879f-5d33-4f7f-9bc7-a2669e0295e5",
+      "canonical_startup_id": "c9a1e9b2-3842-4fbd-9f4a-3e8a071b9c3f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cab4602e-39d1-4f7f-8877-255cd9da1fd7",
+      "canonical_startup_id": "a1b2c3d4-e5f6-47a9-9a4b-2c3d4e5f6a7b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cbaf57ee-58d0-4165-aaa9-9e5126ad9095",
+      "canonical_startup_id": "24a8c8b4-0e4c-4674-8b89-cdacf9802a97",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cd5550ee-5288-4327-b8c3-c6b4c98a8462",
+      "canonical_startup_id": "abae5a4b-8265-4a5e-a51c-937b0de67ccc",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cd75634d-a2e1-432c-898d-9b41576f5ecc",
+      "canonical_startup_id": "7f9f3a4b-2d6a-4e3f-b9a6-0e1a2d3f4c5b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "ceae01ad-075d-4161-afbb-c523c8f898c3",
+      "canonical_startup_id": "878cd7b4-071c-4c93-b2a4-d7ef7f230710",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cec852b8-21ea-43dc-9559-3d1281320886",
+      "canonical_startup_id": "a1f0e9b2-7d3c-4b9a-8f3e-7a2b8f9c6d11",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "cf4589e7-63d2-4fe0-b02e-a29168ace1ce",
+      "canonical_startup_id": "6f5b2c4a-7a9e-4d2e-8b8a-9d8a3b2f0a7b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "d1063c37-061f-40a0-a4f8-e5f879cde7d5",
+      "canonical_startup_id": "3f1a9c7e-9c1a-4b2a-8f7e-1afd12345678",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "d2f75c67-c840-4ecc-839f-6a6d80117b9a",
+      "canonical_startup_id": "c6b7c11e-9edf-4d8b-9a5a-9f4cedd2c0a2",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "d9126349-1357-4f82-8f56-a4221be05ee3",
+      "canonical_startup_id": "d2e0d8a6-5c12-41c1-bb73-38b6754f3883",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "d9e5ef05-8740-4e75-8b57-a2c81796bbb8",
+      "canonical_startup_id": "1c90ad0e-c512-43a2-ac24-10898da45928",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "dadb0008-a1e2-43e2-b865-eb8951dfc7b2",
+      "canonical_startup_id": "d2e7f9a4-8b5a-4e8d-9f1a-3e7b9c2a87a9",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "daf3b84a-2d0f-42ee-ba55-c3538a37afae",
+      "canonical_startup_id": "fc377e27-6039-46dd-b8d8-196ec93ae6e5",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "db348842-1eaf-47f6-b06a-c3efca8d15d0",
+      "canonical_startup_id": "d3f8b2c0-1a4e-4b8e-9f2c-3a9f4b7d2c1a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "dea8a158-2bc6-4e7a-81c3-e27ba2e31c14",
+      "canonical_startup_id": "a573cc57-3127-4e18-8d8a-dc49e3eee7c3",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "df1b7602-8079-42b8-89c3-8c889865549c",
+      "canonical_startup_id": "b1a2c3d4-e5f6-4789-9abc-1234567890ab",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "e8d5267c-df55-4547-b1e5-d2711506b595",
+      "canonical_startup_id": "8b2f9a1e-4d3b-4f2a-9c7e-2f3a1b4c5d6e",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "ed940d62-9ffb-4210-bc3f-5495f1d0dfb8",
+      "canonical_startup_id": "5e4eabea-0c36-44a0-883e-bd77ada3b7b2",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "f4095321-2057-4832-91a0-e7cb2e00d11d",
+      "canonical_startup_id": "b8f5b4a0-eeef-48fb-9d98-4114dc2a2469",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "f737fb17-1746-461c-91cf-4a2a32b12c5a",
+      "canonical_startup_id": "fae9d674-b7e7-4d96-bdd6-3368f6e23e0a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "f8595f9e-c480-4555-ac1e-33df2a482b37",
+      "canonical_startup_id": "7d9a6f8e-4c2b-4f3a-9a2f-1a2d9b9b9b9b",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "f8b57815-d450-4408-8a3c-e17ecb82e311",
+      "canonical_startup_id": "f72f2be3-457f-4d0d-af0b-8605eb22ac3f",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": false,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "fa3f2aae-74e1-41f1-95fb-cdfb288703c6",
+      "canonical_startup_id": "99f68f8b-f86b-4eb1-bb89-47c4b65b8d82",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "fabd187a-5b3d-4e70-8998-974537291203",
+      "canonical_startup_id": "5476d617-4202-4708-820a-4dbca4425cd9",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3AuLWhP64IrRCIZiOL4VtjIpO2J",
+      "legacy_startup_id": "fdbe3c0c-71ff-41d3-a4a9-0dfb8c513f5f",
+      "canonical_startup_id": "2b1f9e60-9c2a-4f5d-a5e3-1d2f9a6e7b8c",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3B4yIXhqczWSNZ2vYxkyocPPZgf",
+      "legacy_startup_id": "4a5abf41-ef9f-493f-9cfe-d0ceaa0a97a5",
+      "canonical_startup_id": "a9f4c6d2-83b1-4e0b-9a8f-2c3f5b6d7e8a",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3B4yIXhqczWSNZ2vYxkyocPPZgf",
+      "legacy_startup_id": "67cf12f2-b275-4ae4-bd0f-4f1db2e155ba",
+      "canonical_startup_id": "e5c3a2b9-8f62-4a2b-9b7f-2359a3f4b7a1",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3B4yIXhqczWSNZ2vYxkyocPPZgf",
+      "legacy_startup_id": "a7b2f74f-d2d6-4cff-a3cc-4d50bdc6c263",
+      "canonical_startup_id": "75097992-b799-44d0-b56b-f238d43121b7",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": false
+      }
+    },
+    {
+      "user_id": "user_3Ed1uyz0OzE8SPhQ0IOwAavibcb",
+      "legacy_startup_id": "42ee43b1-cc9d-4680-92fa-ffecb6721e8a",
+      "canonical_startup_id": "e61bd7d5-6224-44c2-ab34-d9c5b1b7f3c2",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3Ed1uyz0OzE8SPhQ0IOwAavibcb",
+      "legacy_startup_id": "72130be0-4f99-4930-8498-5c65a3ba832e",
+      "canonical_startup_id": "a9c1e5f7-bcca-4c8e-8776-23213ef8b9dc",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3Ed1uyz0OzE8SPhQ0IOwAavibcb",
+      "legacy_startup_id": "a38996e9-c03f-47d7-82c7-c8c4bc82a331",
+      "canonical_startup_id": "9a02b8c8-e5d9-4750-9d74-0a8b303b2143",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3Ed1uyz0OzE8SPhQ0IOwAavibcb",
+      "legacy_startup_id": "abe982cf-881c-4359-b90e-fb0f1e5d49cb",
+      "canonical_startup_id": "8f8f7a72-3b6f-4ac5-bb9c-4a6b4d65be65",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    },
+    {
+      "user_id": "user_3Ed1uyz0OzE8SPhQ0IOwAavibcb",
+      "legacy_startup_id": "fa4bbeb9-dd20-45ab-ab54-49ddc02f7196",
+      "canonical_startup_id": "6e5eb5f0-76c1-4479-9ea5-97b770ba4f9d",
+      "evidence": {
+        "normalized_name_agreement": true,
+        "one_line_agreement": true,
+        "sector_agreement": true,
+        "scout_type_agreement": true,
+        "metadata_source_agreement": true,
+        "created_within_24h": true,
+        "discovered_within_24h_of_first_seen": true
+      }
+    }
+  ]
+}

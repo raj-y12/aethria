@@ -35,268 +35,119 @@ async def test_target_postgres_supports_transactional_skip_locked_contract():
 
 
 @pytest.mark.asyncio
-async def test_target_postgres_lookup_outcomes_is_service_role_only():
+async def test_target_postgres_lookup_outcomes_is_tenant_scoped():
     import asyncpg
 
     connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
     try:
-        rls_enabled = await connection.fetchval(
+        columns = await connection.fetch(
             """
-            select c.relrowsecurity
-            from pg_class c
-            join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relname = 'lookup_job_outcomes'
-            """
-        )
-        policies = await connection.fetch(
-            """
-            select policyname, roles, cmd, qual, with_check
-            from pg_policies
-            where schemaname = 'public' and tablename = 'lookup_job_outcomes'
+            select column_name
+            from information_schema.columns
+            where table_schema='public' and table_name='lookup_job_outcomes'
             """
         )
-        grants = await connection.fetch(
+        keys = await connection.fetch(
             """
-            select grantee, privilege_type
-            from information_schema.table_privileges
-            where table_schema = 'public'
-              and table_name = 'lookup_job_outcomes'
-              and grantee in ('anon', 'authenticated', 'service_role')
+            select a.attname
+            from pg_index i
+            join pg_attribute a on a.attrelid=i.indrelid and a.attnum=any(i.indkey)
+            where i.indrelid='public.lookup_job_outcomes'::regclass and i.indisunique
             """
         )
     finally:
         await connection.close()
 
-    check = __import__(
-        "scripts.check_phase8_readiness", fromlist=["check"]
-    )._lookup_outcomes_security_check(
-        table_rows=[
-            {
-                "table_name": "lookup_job_outcomes",
-                "relrowsecurity": bool(rls_enabled),
-            }
-        ],
-        policy_rows=[dict(row) for row in policies],
-        grant_rows=[dict(row) for row in grants],
-    )
-    assert check["status"] == "passed", check
+    assert {row["column_name"] for row in columns} >= {"user_id", "id", "data"}
+    assert {row["attname"] for row in keys} >= {"user_id", "id"}
 
 
 @pytest.mark.asyncio
-async def test_target_postgres_security_limits_is_rls_protected_and_rpc_service_role_only():
+async def test_target_postgres_security_limits_uses_provider_neutral_repository():
     import asyncpg
 
-    function_names = [
-        "security_check_rate_limit",
-        "security_acquire_lock",
-        "security_release_lock",
-    ]
-    connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
+    from security.repository import SecurityRepository
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=2)
+    repository = SecurityRepository(pool)
+    key = f"contract-security-{uuid4()}"
     try:
-        rls_enabled = await connection.fetchval(
-            """
-            select c.relrowsecurity
-            from pg_class c
-            join pg_namespace n on n.oid = c.relnamespace
-            where n.nspname = 'public' and c.relname = 'security_limits'
-            """
-        )
-        policies = await connection.fetch(
-            """
-            select policyname, roles, cmd, qual, with_check
-            from pg_policies
-            where schemaname = 'public' and tablename = 'security_limits'
-            order by policyname
-            """
-        )
-        table_grants = await connection.fetch(
-            """
-            select grantee, privilege_type
-            from information_schema.table_privileges
-            where table_schema = 'public'
-              and table_name = 'security_limits'
-              and grantee in ('PUBLIC', 'anon', 'authenticated', 'service_role')
-            order by grantee, privilege_type
-            """
-        )
-        functions = await connection.fetch(
-            """
-            select
-                p.proname,
-                p.prosecdef,
-                coalesce(p.proconfig, array[]::text[]) as proconfig,
-                has_function_privilege('anon', p.oid, 'execute') as anon_execute,
-                has_function_privilege(
-                    'authenticated', p.oid, 'execute'
-                ) as authenticated_execute,
-                has_function_privilege(
-                    'service_role', p.oid, 'execute'
-                ) as service_role_execute
-            from pg_proc p
-            join pg_namespace n on n.oid = p.pronamespace
-            where n.nspname = 'public' and p.proname = any($1::text[])
-            order by p.proname
-            """,
-            function_names,
-        )
-        function_acl = await connection.fetch(
-            """
-            select
-                p.proname,
-                coalesce(r.rolname, 'PUBLIC') as grantee,
-                a.privilege_type
-            from pg_proc p
-            join pg_namespace n on n.oid = p.pronamespace
-            cross join lateral pg_catalog.aclexplode(
-                coalesce(p.proacl, pg_catalog.acldefault('f', p.proowner))
-            ) as a
-            left join pg_roles r on r.oid = a.grantee
-            where n.nspname = 'public'
-              and p.proname = any($1::text[])
-              and a.privilege_type = 'EXECUTE'
-              and a.grantee <> p.proowner
-            order by p.proname, grantee
-            """,
-            function_names,
-        )
+        count, _expires_at = await repository.check_rate_limit(key, window_seconds=60)
+        assert count == 1
     finally:
-        await connection.close()
-
-    assert rls_enabled is True
-    assert [dict(row) for row in policies] == [
-        {
-            "policyname": "security_limits_service_role_all",
-            "roles": ["service_role"],
-            "cmd": "ALL",
-            "qual": "true",
-            "with_check": "true",
-        }
-    ]
-    assert {
-        (row["grantee"], row["privilege_type"])
-        for row in table_grants
-    } == {
-        ("service_role", privilege)
-        for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
-    }
-    assert [row["proname"] for row in functions] == sorted(function_names)
-    assert all(row["prosecdef"] for row in functions)
-    assert all(
-        any(
-            setting.partition("=")[0] == "search_path"
-            and setting.partition("=")[2].strip().strip("'\"") == ""
-            for setting in row["proconfig"]
-        )
-        for row in functions
-    )
-    assert all(
-        not row["anon_execute"]
-        and not row["authenticated_execute"]
-        and row["service_role_execute"]
-        for row in functions
-    )
-    assert {
-        (row["proname"], row["grantee"], row["privilege_type"])
-        for row in function_acl
-    } == {
-        (function_name, "service_role", "EXECUTE")
-        for function_name in function_names
-    }
+        await pool.execute("delete from public.security_limits where key=$1", key)
+        await pool.close()
 
 
-LEGACY_TENANT_TABLES = [
-    "portfolio_budgets", "memory", "settings", "serp_usage",
+CANONICAL_TENANT_TABLES = [
+    "portfolio_budgets", "memory", "settings",
     "analytics_sector_concentration", "meta_prompt_library", "meta_scout_weights",
     "meta_calibration_state", "meta_cycle_counters",
     "portfolio_decisions", "portfolio_positions", "portfolio_rejections",
-    "portfolio_watchlist", "portfolio_signals", "portfolio_agent_metrics",
+    "portfolio_watchlist", "portfolio_signals",
     "meta_mutation_log", "meta_reports",
-    "meta_churn_signals", "pipeline_activity", "user_state",
+    "meta_churn_signals", "user_state",
 ]
 
-PORTFOLIO_TABLES_PREVIOUSLY_MISSING = [
-    "portfolio_startups", "portfolio_feed_cache", "portfolio_rejection_patterns",
-]
-
-
-async def _assert_tables_are_rls_protected_service_role_only(connection, tables):
+async def _assert_tables_are_tenant_scoped(connection, tables):
     rows = await connection.fetch(
         """
-        select c.relname as table_name, c.relrowsecurity
-        from pg_class c
-        join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public' and c.relname = any($1::text[])
+        select table_name
+        from information_schema.tables
+        where table_schema='public' and table_name = any($1::text[])
         """,
         tables,
     )
-    policies = await connection.fetch(
+    columns = await connection.fetch(
         """
-        select tablename, policyname, roles, cmd, qual, with_check
-        from pg_policies
-        where schemaname = 'public' and tablename = any($1::text[])
-        order by tablename
-        """,
-        tables,
-    )
-    grants = await connection.fetch(
-        """
-        select table_name, grantee, privilege_type
-        from information_schema.table_privileges
-        where table_schema = 'public'
+        select table_name
+        from information_schema.columns
+        where table_schema='public'
           and table_name = any($1::text[])
-          and grantee in ('anon', 'authenticated', 'service_role')
+          and column_name='user_id'
         """,
         tables,
     )
 
-    rls_by_table = {row["table_name"]: row["relrowsecurity"] for row in rows}
-    assert set(rls_by_table) == set(tables), set(tables) - set(rls_by_table)
-    assert all(rls_by_table.values()), rls_by_table
-
-    policy_by_table = {row["tablename"]: dict(row) for row in policies}
-    assert set(policy_by_table) == set(tables)
-    for table, policy in policy_by_table.items():
-        assert policy["roles"] == ["service_role"], (table, policy)
-        assert policy["cmd"] == "ALL"
-        assert policy["qual"] == "true"
-        assert policy["with_check"] == "true"
-
-    grants_by_table = {}
-    for row in grants:
-        grants_by_table.setdefault(row["table_name"], set()).add(
-            (row["grantee"], row["privilege_type"])
-        )
-    for table in tables:
-        assert grants_by_table.get(table) == {
-            ("service_role", privilege)
-            for privilege in ("SELECT", "INSERT", "UPDATE", "DELETE")
-        }, (table, grants_by_table.get(table))
+    assert {row["table_name"] for row in rows} == set(tables)
+    assert {row["table_name"] for row in columns} == set(tables)
 
 
 @pytest.mark.asyncio
-async def test_target_postgres_legacy_tenant_tables_are_rls_protected_service_role_only():
+async def test_target_postgres_canonical_tenant_tables_are_provider_neutral():
     import asyncpg
 
     connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
     try:
-        await _assert_tables_are_rls_protected_service_role_only(
-            connection, LEGACY_TENANT_TABLES
+        await _assert_tables_are_tenant_scoped(
+            connection, CANONICAL_TENANT_TABLES
         )
     finally:
         await connection.close()
 
 
 @pytest.mark.asyncio
-async def test_target_postgres_previously_missing_portfolio_tables_exist_and_are_rls_protected():
+async def test_target_postgres_uses_canonical_startup_authority_and_alias_bridge():
     import asyncpg
 
     connection = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
     try:
-        await _assert_tables_are_rls_protected_service_role_only(
-            connection, PORTFOLIO_TABLES_PREVIOUSLY_MISSING
+        rows = await connection.fetch(
+            """
+            select table_name
+            from information_schema.tables
+            where table_schema = 'public'
+              and table_name = any($1::text[])
+            """,
+            ["startups", "startup_id_aliases", "portfolio_startups"],
         )
     finally:
         await connection.close()
+
+    assert {row["table_name"] for row in rows} == {
+        "startups",
+        "startup_id_aliases",
+    }
 
 
 @pytest.mark.asyncio

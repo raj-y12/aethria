@@ -121,7 +121,7 @@ def _wire_common_engines(monkeypatch):
     monkeypatch.setattr("pipeline_runner.get_service_client", lambda: SimpleNamespace())
     monkeypatch.setattr(
         "pipeline_runner.SupabaseStartupsStorage",
-        lambda client, user_id: SimpleNamespace(_client=client, _user_id=user_id),
+        lambda client, user_id, settings=None: SimpleNamespace(_client=client, _user_id=user_id),
     )
     monkeypatch.setattr("pipeline_runner.load_settings", lambda user_id: {"cost_budget": {"enabled": False}})
     monkeypatch.setattr("pipeline_runner.DealMemory", lambda user_id: SimpleNamespace())
@@ -382,7 +382,7 @@ async def test_periodic_consumes_certified_thesis_without_reloading_active_thesi
         },
     )
     storage = SimpleNamespace(remove_startups_without_references=lambda: 0)
-    monkeypatch.setattr("pipeline_runner._build_storage_sync", lambda user_id: storage)
+    monkeypatch.setattr("pipeline_runner._build_storage_sync", lambda user_id, settings=None: storage)
     monkeypatch.setattr(
         "pipeline_runner._load_active_thesis_sync",
         lambda _user_id: pytest.fail("certified thesis must not be reloaded"),
@@ -571,7 +571,7 @@ async def test_on_demand_lookup_returns_terminal_failure_when_partner_exhausts_r
         get_startup=lambda startup_id: startup,
         update_startup_partial=lambda startup_id, patch: patches.append((startup_id, patch)) or True,
     )
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
 
     class _MemoGenerator:
         def generate_memo(self, current, **kwargs):
@@ -601,6 +601,28 @@ async def test_on_demand_lookup_returns_terminal_failure_when_partner_exhausts_r
 
 
 @pytest.mark.asyncio
+async def test_partner_failure_does_not_reference_unavailable_review_memo(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+    _FakePartnerEngine.result = False
+    states = []
+    startup = SimpleNamespace(startup_id="startup-1")
+    storage = SimpleNamespace(
+        _client=SimpleNamespace(),
+        _user_id="user_123",
+        get_startup=lambda startup_id: None,
+    )
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
+    monkeypatch.setattr("pipeline_runner.upsert_pipeline_state", lambda *a, **k: states.append(k))
+
+    result = await run_on_demand_lookup("user_123", "Perplexity AI", lookup_id="lookup-partner-memo-missing")
+
+    assert result.state is PipelineExecutionState.FAILED_STAGE
+    assert result.failed_stage == "partner"
+    assert states[-1]["status"] == "failed"
+
+
+@pytest.mark.asyncio
 async def test_retry_reuses_current_review_and_resumes_at_partner(monkeypatch):
     _wire_common_engines(monkeypatch)
     prerequisites = _prerequisites()
@@ -619,7 +641,7 @@ async def test_retry_reuses_current_review_and_resumes_at_partner(monkeypatch):
         _user_id="user_123",
         get_startup=lambda startup_id: startup,
     )
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
 
     result = await run_on_demand_lookup(
         "user_123",
@@ -652,7 +674,7 @@ async def test_retry_reruns_stale_review_before_partner(monkeypatch):
         _user_id="user_123",
         get_startup=lambda startup_id: startup,
     )
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
 
     result = await run_on_demand_lookup(
         "user_123",
@@ -694,7 +716,7 @@ async def test_partner_receives_reloaded_startup_after_reviewer_persists(monkeyp
         _user_id="user_123",
         get_startup=get_startup,
     )
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
 
     result = await run_on_demand_lookup(
         "user_123",
@@ -723,7 +745,7 @@ async def test_add_context_rerun_regenerates_and_persists_memo(monkeypatch):
         get_startup=lambda startup_id: startup,
         update_startup_partial=lambda startup_id, patch: patches.append((startup_id, patch)) or True,
     )
-    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id: storage)
+    monkeypatch.setattr("pipeline_runner.SupabaseStartupsStorage", lambda client, user_id, settings=None: storage)
 
     class _MemoGenerator:
         def generate_memo(self, current, **kwargs):

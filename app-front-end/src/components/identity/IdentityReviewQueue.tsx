@@ -74,7 +74,7 @@ export default function IdentityReviewQueue({
       <header className="flex items-start justify-between gap-phi-4 px-phi-5 py-phi-4">
         <div>
           <p className="type-label-section">Identity review</p>
-          <p className="type-body mt-1 text-oxford/60">
+          <p className="type-body mt-1 text-oxford/65">
             {groups.isLoading
               ? 'Loading unresolved observations…'
               : `${rows.length} identit${rows.length === 1 ? 'y' : 'ies'} to review (${totalObservations} observation${totalObservations === 1 ? '' : 's'})`}
@@ -88,7 +88,7 @@ export default function IdentityReviewQueue({
           Identity review is unavailable. No case state was changed.
         </p>
       ) : rows.length === 0 && !groups.isLoading ? (
-        <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/55">No open identity cases.</p>
+        <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/65">No open identity cases.</p>
       ) : (
         <div className="divide-y divide-oxford/10 border-t border-oxford/10">
           {rows.map((group) => {
@@ -101,7 +101,7 @@ export default function IdentityReviewQueue({
                   <h3 className="truncate font-sans text-sm font-semibold text-oxford">
                     {group.observed_names[0] || observation?.observed_name || 'Observed company'}
                   </h3>
-                  <p className="type-meta mt-1 truncate text-oxford/55">
+                  <p className="type-meta mt-1 truncate text-oxford/65">
                     {group.canonical_domain || observation?.observed_domain || 'Domain unconfirmed'} · {candidateCount} candidate{candidateCount === 1 ? '' : 's'}
                     {group.observation_count > 1 ? ` · ${group.observation_count} observations` : ''}
                   </p>

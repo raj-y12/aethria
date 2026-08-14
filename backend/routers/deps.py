@@ -20,23 +20,23 @@ import os
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+from uuid import uuid4
 
 from fastapi import HTTPException, Request
 
 import env_config
 from security.rate_limiter import (
     FixedWindowRateLimiter,
+    InMemorySecurityStore,
     RateLimitPolicy,
-    build_security_store,
     rate_limit_exceeded,
 )
-from supabase_client import get_service_client
-from supabase_storage import SupabaseStartupsStorage
+from security.repository import SecurityRepository
 from portfolio.store import PortfolioStore
 from portfolio.cost_control import CostController
 from utils.storage import Storage
-from utils.settings_loader import is_cost_budget_enabled
 from utils.timeutil import utcnow, ensure_aware
+from startup_repository import StartupRepository
 
 logger = logging.getLogger("api.deps")
 
@@ -52,35 +52,95 @@ SETTINGS_MUTATION_POLICY = RateLimitPolicy("settings_mutation_minute", limit=30,
 ADMIN_LOGIN_POLICY = RateLimitPolicy("admin_login_minute", limit=10, window_seconds=60)
 ADMIN_OVERVIEW_POLICY = RateLimitPolicy("admin_overview_minute", limit=30, window_seconds=60)
 
-# --- Security store + rate limiting -----------------------------------------
-_security_store = None
+# --- Provider-neutral security repository + rate limiting -------------------
+_security_repository: Optional[SecurityRepository] = None
+_security_compat_store = InMemorySecurityStore()
+_security_store = _security_compat_store  # compatibility seam for isolated tests
+_security_lock_tokens: Dict[str, str] = {}
+
+
+def configure_security_repository(pool: Any | None) -> None:
+    """Bind API security checks to the shared provider-neutral PostgreSQL pool."""
+    global _security_repository
+    _security_repository = SecurityRepository(pool) if pool is not None else None
+    _security_lock_tokens.clear()
 
 
 def get_security_store():
-    global _security_store
-    if _security_store is None:
-        _security_store = build_security_store()
+    """Return the process-local compatibility store for isolated non-production tests."""
     return _security_store
 
 
-def enforce_rate_limits(key: str, policies: List[RateLimitPolicy]):
-    limiter = FixedWindowRateLimiter(store=get_security_store())
+def _configured_security_repository(pool: Any | None = None) -> Optional[SecurityRepository]:
+    if pool is not None:
+        return SecurityRepository(pool)
+    return _security_repository
+
+
+async def enforce_rate_limits(
+    key: str,
+    policies: List[RateLimitPolicy],
+    *,
+    pool: Any | None = None,
+):
+    repository = _configured_security_repository(pool)
+    if repository is None:
+        if env_config.is_production_env():
+            raise RuntimeError("security_repository_unavailable")
+        limiter = FixedWindowRateLimiter(store=get_security_store())
+        for policy in policies:
+            decision = limiter.check(key, policy)
+            if not decision.allowed:
+                return rate_limit_exceeded(retry_after_seconds=decision.retry_after_seconds)
+        return None
+
+    now = datetime.now(timezone.utc)
     for policy in policies:
-        decision = limiter.check(key, policy)
-        if not decision.allowed:
-            return rate_limit_exceeded(retry_after_seconds=decision.retry_after_seconds)
+        count, expires_at = await repository.check_rate_limit(
+            f"rate:{policy.name}:{key}", window_seconds=policy.window_seconds
+        )
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if count > policy.limit:
+            retry_after = max(1, int((expires_at - now).total_seconds()))
+            return rate_limit_exceeded(retry_after_seconds=retry_after)
     return None
 
 
-def acquire_security_lock(key: str, *, ttl_seconds: int) -> bool:
-    return bool(get_security_store().acquire_lock(f"lock:{key}", ttl_seconds=ttl_seconds))
+async def acquire_security_lock(
+    key: str,
+    *,
+    ttl_seconds: int,
+    pool: Any | None = None,
+) -> bool:
+    repository = _configured_security_repository(pool)
+    storage_key = f"lock:{key}"
+    if repository is None:
+        if env_config.is_production_env():
+            raise RuntimeError("security_repository_unavailable")
+        return bool(get_security_store().acquire_lock(storage_key, ttl_seconds=ttl_seconds))
+    owner_token = str(uuid4())
+    acquired = await repository.acquire_lock(
+        storage_key, ttl_seconds=ttl_seconds, owner_token=owner_token
+    )
+    if acquired:
+        _security_lock_tokens[key] = owner_token
+    return bool(acquired)
 
 
-def release_security_lock(key: Optional[str]) -> None:
+async def release_security_lock(key: Optional[str], *, pool: Any | None = None) -> None:
     if not key:
         return
+    repository = _configured_security_repository(pool)
     try:
-        get_security_store().release_lock(f"lock:{key}")
+        if repository is None:
+            if env_config.is_production_env():
+                raise RuntimeError("security_repository_unavailable")
+            get_security_store().release_lock(f"lock:{key}")
+            return
+        owner_token = _security_lock_tokens.pop(key, None)
+        if owner_token:
+            await repository.release_lock(f"lock:{key}", owner_token=owner_token)
     except Exception as exc:
         logger.debug("security lock release failed key=%s error=%s", key, exc)
 
@@ -107,9 +167,41 @@ def get_root() -> Path:
 
 
 # --- Storage helpers --------------------------------------------------------
-def get_storage(request: Request) -> SupabaseStartupsStorage:
+def get_service_client():
+    """Load the legacy Supabase client only for compatibility routes."""
+    from supabase_client import get_service_client as _get_service_client
+
+    return _get_service_client()
+
+
+def _supabase_storage_type():
+    from supabase_storage import SupabaseStartupsStorage
+
+    return SupabaseStartupsStorage
+
+
+def _is_supabase_storage(value: Any) -> bool:
+    return isinstance(value, _supabase_storage_type())
+
+
+def get_storage(request: Request) -> Any:
     """Supabase startups storage for the authenticated user (service-role client)."""
-    return SupabaseStartupsStorage(get_service_client(), request.state.user_id)
+    return _supabase_storage_type()(get_service_client(), request.state.user_id)
+
+
+def get_startup_repository(request: Request) -> StartupRepository:
+    """Required PostgreSQL authority for normal startup runtime operations."""
+    app_state = getattr(getattr(request, "app", None), "state", None)
+    pool = getattr(app_state, "durable_job_pool", None)
+    if pool is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "STARTUP_REPOSITORY_UNAVAILABLE",
+                "message": "Startup PostgreSQL repository is unavailable.",
+            },
+        )
+    return StartupRepository(pool)
 
 
 def get_portfolio_store(user_id: str) -> PortfolioStore:
@@ -154,7 +246,7 @@ def read_json_list(path: Path) -> List[Dict[str, Any]]:
 def read_json_dict_file(path: Path, user_id: Optional[str] = None) -> Dict[str, Any]:
     """Best-effort reader from Supabase or file. Returns {} on missing/invalid."""
     if path and "sector_concentration" in str(path):
-        from supabase_doc_store import doc_get
+        from batch1.store import doc_get
         data = doc_get("analytics_sector_concentration", user_id=user_id)
         return data if isinstance(data, dict) else {}
     if not path.exists():
@@ -168,13 +260,13 @@ def read_json_dict_file(path: Path, user_id: Optional[str] = None) -> Dict[str, 
 
 
 def get_pending_escalations(
-    storage: Union[Storage, SupabaseStartupsStorage],
+    storage: Union[Storage, Any],
 ) -> List[Dict[str, Any]]:
     """
     Return raw startup dicts where partner_info.human_review_required is True
     and no human_resolution has been recorded.
     """
-    if isinstance(storage, SupabaseStartupsStorage):
+    if _is_supabase_storage(storage):
         return storage.query_pending_escalations_raw()
     raw = storage.get_all()
     pending: List[Dict[str, Any]] = []
@@ -191,9 +283,9 @@ def get_pending_escalations(
     return pending
 
 
-def startup_name_index(storage: Union[Storage, SupabaseStartupsStorage]) -> Dict[str, str]:
+def startup_name_index(storage: Union[Storage, Any]) -> Dict[str, str]:
     """startup_id -> display name without loading full startup JSON when on Supabase."""
-    if isinstance(storage, SupabaseStartupsStorage):
+    if _is_supabase_storage(storage):
         return storage.get_startup_id_name_map()
     out: Dict[str, str] = {}
     for s in storage.get_all():
@@ -206,8 +298,12 @@ def startup_name_index(storage: Union[Storage, SupabaseStartupsStorage]) -> Dict
 
 
 def get_system_health(
-    storage: Union[Storage, SupabaseStartupsStorage],
+    storage: Union[Storage, Any, None],
     user_id: Optional[str] = None,
+    settings: Optional[Dict[str, Any]] = None,
+    pending_escalations: Optional[int] = None,
+    unreviewed: Optional[int] = None,
+    undecided: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Assemble system health object from multiple backend sources.
@@ -227,19 +323,22 @@ def get_system_health(
                 break
 
     # Pending escalations based on startups requiring human review
-    pending_escalations = len(get_pending_escalations(storage))
+    if pending_escalations is None:
+        pending_escalations = len(get_pending_escalations(storage)) if storage is not None else 0
 
     # Queue depths
-    try:
-        unreviewed = storage.count_unreviewed()
-    except Exception:
-        unreviewed = 0
-        health_errors.append("unreviewed_count_unavailable")
-    try:
-        undecided = storage.count_undecided()
-    except Exception:
-        undecided = 0
-        health_errors.append("undecided_count_unavailable")
+    if unreviewed is None:
+        try:
+            unreviewed = storage.count_unreviewed() if storage is not None else 0
+        except Exception:
+            unreviewed = 0
+            health_errors.append("unreviewed_count_unavailable")
+    if undecided is None:
+        try:
+            undecided = storage.count_undecided() if storage is not None else 0
+        except Exception:
+            undecided = 0
+            health_errors.append("undecided_count_unavailable")
     try:
         watchlist = len(portfolio_store.get_all_watchlist()) if portfolio_store else 0
     except Exception:
@@ -248,8 +347,8 @@ def get_system_health(
 
     # Budget status only when cost budget enforcement is enabled for this user
     budget_status: List[Dict[str, Any]] = []
-    if is_cost_budget_enabled(user_id):
-        cost_controller = CostController(user_id=user_id)
+    if bool((settings or {}).get("cost_budget", {}).get("enabled", False)):
+        cost_controller = CostController(user_id=user_id, settings=settings)
         all_budgets: Dict[str, Any] = getattr(cost_controller, "budgets", {}) or {}
         for agent_type, defaults in cost_controller.default_budgets.items():
             agent_budget = all_budgets.get(agent_type, {})

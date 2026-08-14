@@ -1,4 +1,9 @@
-"""Tenant-aware fixed-window rate limits and short-lived queue locks."""
+"""Pure rate-limit models and local compatibility stores.
+
+Production runtime uses :mod:`security.repository` through the shared asyncpg
+pool. The Supabase-backed store below is retained only for historical tests
+and local compatibility; it is not constructed by API runtime paths.
+"""
 
 from __future__ import annotations
 
@@ -56,7 +61,7 @@ class InMemorySecurityStore:
     def __init__(self, *, now: Optional[Callable[[], datetime]] = None) -> None:
         self._now = now or _utcnow
         self._counters: Dict[Tuple[str, int], Tuple[int, datetime]] = {}
-        self._locks: Dict[str, datetime] = {}
+        self._locks: Dict[str, Tuple[datetime, str]] = {}
         self._lock = Lock()
 
     def increment_fixed_window(self, key: str, *, window_seconds: int) -> Tuple[int, datetime]:
@@ -73,23 +78,31 @@ class InMemorySecurityStore:
             self._counters[store_key] = (current, current_expires)
             return current, current_expires
 
-    def acquire_lock(self, key: str, *, ttl_seconds: int) -> bool:
+    def acquire_lock(
+        self, key: str, *, ttl_seconds: int, owner_token: str = ""
+    ) -> bool:
         now = self._now()
         expires_at = now + timedelta(seconds=ttl_seconds)
         with self._lock:
             existing = self._locks.get(key)
-            if existing and existing > now:
+            if existing and existing[0] > now:
                 return False
-            self._locks[key] = expires_at
+            self._locks[key] = (expires_at, owner_token)
             return True
 
-    def release_lock(self, key: str) -> None:
+    def release_lock(self, key: str, *, owner_token: str = "") -> bool:
         with self._lock:
+            existing = self._locks.get(key)
+            if existing is None:
+                return True
+            if existing[1] and existing[1] != owner_token:
+                return False
             self._locks.pop(key, None)
+            return True
 
 
 class SupabaseSecurityStore:
-    """Supabase-backed store. Uses RPCs from the security_limits migration."""
+    """Historical Supabase RPC adapter; not a production runtime path."""
 
     def __init__(self, client: Any) -> None:
         self._client = client
@@ -184,7 +197,7 @@ _WARNED_MEMORY_FALLBACK = False
 
 
 def build_security_store() -> InMemorySecurityStore | SupabaseSecurityStore:
-    """Build the configured security store without remote-to-memory fallback."""
+    """Build the historical compatibility store for isolated tests only."""
     global _WARNED_MEMORY_FALLBACK
     use_supabase = env_config.use_supabase_storage()
     if use_supabase and env_config.supabase_configured():

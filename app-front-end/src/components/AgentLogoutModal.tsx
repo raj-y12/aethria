@@ -126,7 +126,7 @@ export default function AgentLogoutModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.18 }}
-            className="type-body text-center text-oxford/60 mt-phi-3 mb-phi-8 max-w-[34ch]"
+            className="type-body text-center text-oxford/65 mt-phi-3 mb-phi-8 max-w-[34ch]"
           >
             {agentsEnabled
               ? 'The pipeline can keep reviewing deals after you log out. Leave it running, or pause it first.'

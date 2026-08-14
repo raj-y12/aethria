@@ -35,6 +35,7 @@ export interface AgentsStatus {
   durable_job_counts?: Record<string, number>;
   supabase_configured: boolean;
   openai_configured: boolean;
+  user_agents_enabled?: boolean;
   agents_will_run: boolean;
   lookup_will_run: boolean;
   execution_prerequisites_ready: boolean;

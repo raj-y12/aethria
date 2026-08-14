@@ -3,29 +3,35 @@
 from __future__ import annotations
 
 import logging
+import json
 from typing import Any, Dict
-
-from supabase_client import get_service_client
 
 logger = logging.getLogger(__name__)
 
 
-def record_admin_audit_event(
+async def record_admin_audit_event(
     *,
+    pool: Any,
     event: str,
     success: bool,
     client_host: str | None = None,
     detail: Dict[str, Any] | None = None,
 ) -> None:
+    """Best-effort admin audit insert through the application's asyncpg pool."""
     try:
-        get_service_client().table("admin_audit_log").insert(
-            {
-                "event": event,
-                "success": success,
-                "client_host": client_host,
-                "detail": detail or {},
-            }
-        ).execute()
+        if pool is None:
+            raise RuntimeError("database pool unavailable")
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """
+                insert into public.admin_audit_log
+                    (event, success, client_host, detail)
+                values ($1, $2, $3, $4::jsonb)
+                """,
+                event,
+                success,
+                client_host,
+                json.dumps(detail or {}),
+            )
     except Exception as exc:
         logger.warning("Unable to write admin audit event %s: %s", event, exc)
-

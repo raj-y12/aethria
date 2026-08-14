@@ -31,6 +31,7 @@ import OperationsStrip from './OperationsStrip';
 import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
 import { MetaCommandTab } from '../components/system/internals';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
+import { derivePipelineAvailability } from '../lib/pipelineReadiness';
 import {
   getDeploymentConfirmation,
   getPendingChanges,
@@ -74,7 +75,7 @@ const stageOptions = ['Pre-seed', 'Seed', 'Series A', 'Series B+'];
 const geographyOptions = ['US', 'Europe', 'UK/Ireland', 'Global'];
 const sectorOptions = ['B2B SaaS', 'AI', 'Infrastructure', 'Fintech', 'Healthcare', 'Devtools', 'Climate'];
 const inputCls =
-  'w-full rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm text-oxford outline-none transition-colors placeholder:text-oxford/45 focus:border-oxford/45';
+  'w-full rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 type-body-sm text-oxford outline-none transition-colors placeholder:text-oxford/65 focus:border-oxford/45';
 const selectCls =
   `${inputCls} cursor-pointer appearance-none bg-no-repeat bg-[length:10px] bg-[center_right_2px] pr-7`;
 const labelCls = 'type-label-section text-xs text-oxford/70';
@@ -119,7 +120,7 @@ function TextField({
         value={value}
         disabled={disabled}
         onChange={(event) => onChange(type === 'number' ? Number(event.target.value) || 0 : event.target.value)}
-        className={`${inputCls} disabled:cursor-not-allowed disabled:text-oxford/60 disabled:opacity-60`}
+        className={`${inputCls} disabled:cursor-not-allowed disabled:text-oxford/65 disabled:opacity-60`}
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
@@ -149,7 +150,7 @@ function TextAreaField({
         rows={rows}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/45 focus:border-oxford/[0.28]"
+        className="w-full resize-y rounded-none border border-oxford/[0.08] bg-oxford/[0.025] px-phi-3 py-phi-3 type-body-sm leading-relaxed text-oxford outline-none transition-colors placeholder:text-oxford/65 focus:border-oxford/[0.28]"
       />
       {hint && <p className={metaCls}>{hint}</p>}
     </div>
@@ -291,7 +292,7 @@ function StepButton({
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="type-data flex h-6 w-6 items-center justify-center leading-none text-oxford/35 transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 disabled:pointer-events-none disabled:text-oxford/15"
+      className="type-data flex h-6 w-6 items-center justify-center leading-none text-oxford/65 transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 disabled:pointer-events-none disabled:text-oxford/15"
     >
       {children}
     </button>
@@ -520,6 +521,7 @@ export default function SettingsPage() {
   }, [settingsQuery.data]);
 
   const loading = settings == null && settingsQuery.isPending;
+  const pipelineAvailability = derivePipelineAvailability(agentsStatus);
 
   useEffect(() => {
     let cancelled = false;
@@ -1031,7 +1033,7 @@ export default function SettingsPage() {
                     <SpecRow label="Live thesis">
                       <p className="type-body-sm text-oxford">
                         {thesisSummary?.active_version_number != null
-                          ? `Fund Thesis v${thesisSummary.active_version_number}`
+                          ? `Fund Thesis v${thesisSummary.active_version_number}${agentsStatus?.mandate_published === false ? ' · awaiting publication' : ''}`
                           : 'Not published'}
                       </p>
                     </SpecRow>
@@ -1090,7 +1092,7 @@ export default function SettingsPage() {
                     <div className="grid grid-cols-2 gap-phi-3 py-phi-3 sm:grid-cols-5">
                     {draft.scoringWeights.map((item) => (
                       <div key={item.key} className="group flex min-w-0 flex-col items-center gap-phi-3 px-phi-2 text-center">
-                        <p className="type-label-section text-[10px] leading-tight text-oxford/60">{item.label}</p>
+                        <p className="type-label-section text-[10px] leading-tight text-oxford/65">{item.label}</p>
                         <WeightInput
                           label={item.label}
                           value={item.weight}
@@ -1212,7 +1214,7 @@ export default function SettingsPage() {
                         fundConfiguration={draft}
                       />
                     ) : (
-                      <p className="type-note py-phi-4 text-oxford/60">
+                      <p className="type-note py-phi-4 text-oxford/65">
                         Select Agent governance in the Settings rail to load advanced controls.
                       </p>
                     )}
@@ -1226,9 +1228,9 @@ export default function SettingsPage() {
                     {agentsStatus ? (
                       <div className="border-t border-oxford/[0.06]">
                         <EditorialStatus
-                          label="Storage access"
+                          label="PostgreSQL access"
                           value={agentsStatus.supabase_configured ? 'Ready' : 'Unavailable'}
-                          detail={agentsStatus.supabase_configured ? undefined : 'Supabase required to run the pipeline.'}
+                          detail={agentsStatus.supabase_configured ? undefined : 'The shared PostgreSQL repository is required to run the pipeline.'}
                           tone={agentsStatus.supabase_configured ? 'ready' : 'warning'}
                         />
                         <EditorialStatus
@@ -1250,9 +1252,15 @@ export default function SettingsPage() {
                         />
                         <EditorialStatus
                           label="Pipeline availability"
-                          value={agentsStatus.agents_will_run ? 'Able to run' : 'Blocked'}
-                          detail={agentsStatus.agents_will_run ? undefined : (agentsStatus.execution_prerequisite_detail ?? agentsStatus.thesis_error ?? (agentsStatus.durable_job_error ? 'The durable job store is unreachable.' : null) ?? 'A required gate is not ready.')}
-                          tone={agentsStatus.agents_will_run ? 'ready' : 'warning'}
+                          value={pipelineAvailability.state === 'ready' ? 'Able to run' : pipelineAvailability.state === 'off' ? 'Off' : 'Blocked'}
+                          detail={pipelineAvailability.state === 'ready' || pipelineAvailability.state === 'unavailable'
+                            ? undefined
+                            : pipelineAvailability.detail
+                              ?? agentsStatus.execution_prerequisite_detail
+                              ?? agentsStatus.thesis_error
+                              ?? (agentsStatus.durable_job_error ? 'The durable job store is unreachable.' : null)
+                              ?? 'A required gate is not ready.'}
+                          tone={pipelineAvailability.state === 'ready' || pipelineAvailability.state === 'off' ? 'ready' : 'warning'}
                         />
                       </div>
                     ) : (
