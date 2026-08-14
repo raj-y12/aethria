@@ -57,7 +57,7 @@ export default function HomePage() {
           onDone={() => setShowLoader(false)}
         />
       )}
-      <GalleryFrame active="home" enter={entered} />
+      <GalleryFrame active="home" enter={entered} quiet />
       <HeroPlate enter={entered} />
 
       <div className="gallery home-gallery">
