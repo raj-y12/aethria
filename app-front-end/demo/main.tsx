@@ -136,7 +136,7 @@ function Demo() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/v1/flow']}>
+      <MemoryRouter initialEntries={['/v1']}>
         <Routes>
           <Route path="*" element={<Demo />} />
         </Routes>

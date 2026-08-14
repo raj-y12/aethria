@@ -32,7 +32,9 @@ export default function HeroPlate({ enter = true }: { enter?: boolean }) {
             <a href="#access" className="cta-primary" onClick={(e) => scrollToAnchor(e, '#access')}>
               Request access
             </a>
-            <a href="#market" className="cta-secondary" onClick={(e) => scrollToAnchor(e, '#market')}>
+            {/* Points at the live console, not an anchor on this page — the label
+                is only honest if it actually shows the system. */}
+            <a href="/demo" className="cta-secondary">
               View the system
             </a>
           </div>

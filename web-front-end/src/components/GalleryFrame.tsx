@@ -65,6 +65,9 @@ export default function GalleryFrame({
         <a href="#market" onClick={(e) => goToPlate(e, '#market')} aria-current={active === 'home' ? 'page' : undefined}>
           Product
         </a>
+        {/* Plain anchor, not Link: /demo is a rewrite to the app deployment, so it
+            must leave the router rather than be caught as an unknown route. */}
+        <a href="/demo">Demo</a>
         <Link to="/team" aria-current={active === 'team' ? 'page' : undefined}>
           Team
         </Link>
