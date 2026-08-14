@@ -261,14 +261,17 @@
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--accent);
   border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--stock);
   padding: 0 2.5rem;
   text-decoration: none;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-.cta-primary:hover {
-  background: var(--accent);
+.cta-primary:hover,
+.cta-primary:focus-visible {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
   color: var(--stock);
 }
 .cta-secondary {
