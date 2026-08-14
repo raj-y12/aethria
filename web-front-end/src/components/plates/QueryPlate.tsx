@@ -5,8 +5,8 @@ import Plate from '../Plate';
 
 const CHAR_MIN_MS = 60;
 const CHAR_MAX_MS = 90;
-const STAGE_DELAY_MS = 820;
-const MEMO_DELAY_MS = 520;
+const STAGE_DELAY_MS = 680;
+const MEMO_DELAY_MS = 420;
 const STEPS = ['Identify', 'Discover', 'Review', 'Decide'] as const;
 type QueryStep = (typeof STEPS)[number];
 type QueryStatus = QueryStep | 'pending';
