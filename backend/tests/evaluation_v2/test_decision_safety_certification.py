@@ -40,10 +40,40 @@ CASES = [
         expected_state="insufficient_evidence",
     ),
     SafetyCase(
+        "required_dimension_missing_with_grounded_critical_risk",
+        "evaluation",
+        expected_state="insufficient_evidence",
+        expected_human_review=True,
+    ),
+    SafetyCase(
+        "contradicted_scored_criterion",
+        "evaluation",
+        expected_state="insufficient_evidence",
+        expected_human_review=True,
+    ),
+    SafetyCase(
         "grounded_critical_risk_with_high_scores", "evaluation", expected_state="pass"
     ),
     SafetyCase(
+        "contradicted_grounded_critical_risk",
+        "evaluation",
+        expected_state="insufficient_evidence",
+        expected_human_review=True,
+    ),
+    SafetyCase(
+        "status_only_contradicted_grounded_critical_risk",
+        "evaluation",
+        expected_state="insufficient_evidence",
+        expected_human_review=True,
+    ),
+    SafetyCase(
         "grounded_hard_exclusion_with_high_scores", "evaluation", expected_state="pass"
+    ),
+    SafetyCase(
+        "contradicted_grounded_hard_exclusion",
+        "evaluation",
+        expected_state="insufficient_evidence",
+        expected_human_review=True,
     ),
     SafetyCase(
         "grounded_complete_high_scores", "evaluation", expected_state="advance"
@@ -61,7 +91,7 @@ CASES = [
     SafetyCase(
         "malformed_critical_risk",
         "evaluation",
-        expected_state="advance",
+        expected_state="insufficient_evidence",
         expected_human_review=True,
         expected_missing_information="critical risk",
     ),
@@ -156,14 +186,42 @@ def _snapshot_for(name: str) -> list[dict[str, object]]:
         ]
     if name == "required_dimension_missing":
         return [market]
+    if name == "required_dimension_missing_with_grounded_critical_risk":
+        return [market, _claim("risk", "critical_risk", value=True)]
+    if name == "contradicted_scored_criterion":
+        market["contradicting_evidence_ids"] = ["evidence-market-contradiction"]
+        market["evidence_relationships"].append(
+            _support("evidence-market-contradiction", relationship="contradicts")
+        )
+        return [market, execution]
     if name == "grounded_critical_risk_with_high_scores":
         return [market, execution, _claim("risk", "critical_risk", value=True)]
+    if name == "contradicted_grounded_critical_risk":
+        risk = _claim("risk", "critical_risk", value=True)
+        risk["contradicting_evidence_ids"] = ["evidence-risk-contradiction"]
+        risk["evidence_relationships"].append(
+            _support("evidence-risk-contradiction", relationship="contradicts")
+        )
+        return [market, execution, risk]
+    if name == "status_only_contradicted_grounded_critical_risk":
+        risk = _claim("risk", "critical_risk", value=True)
+        risk["status_at_snapshot"] = "contradicted"
+        return [market, execution, risk]
     if name == "grounded_hard_exclusion_with_high_scores":
         return [
             market,
             execution,
             _claim("exclusion", "mandate_exclusion", value=True),
         ]
+    if name == "contradicted_grounded_hard_exclusion":
+        exclusion = _claim("exclusion", "mandate_exclusion", value=True)
+        exclusion["contradicting_evidence_ids"] = [
+            "evidence-exclusion-contradiction"
+        ]
+        exclusion["evidence_relationships"].append(
+            _support("evidence-exclusion-contradiction", relationship="contradicts")
+        )
+        return [market, execution, exclusion]
     if name == "grounded_complete_high_scores":
         return [market, execution]
     if name in {

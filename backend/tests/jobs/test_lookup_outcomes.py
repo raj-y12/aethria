@@ -202,3 +202,67 @@ async def test_durable_lookup_read_rejects_cross_tenant_data():
         await DurableJobRepository(Pool()).latest_lookup_attempt(
             user_id="user-a", lookup_id="lookup-acme-1"
         )
+
+
+@pytest.mark.asyncio
+async def test_pre_contract_rows_are_skipped_not_treated_as_corruption():
+    """An old-shape row is legacy, not corrupt.
+
+    Conflating the two made GET /api/startups/lookup-status a permanent 500 for
+    every lookup that had a pre-contract row, which the dispatch UI then showed
+    as a failed lookup while the pipeline kept running.
+    """
+    from jobs.lookup_outcomes import LookupAttemptOutcome
+    from jobs.repository import DurableJobRepository
+
+    current = LookupAttemptOutcome.accepted_for_job(_job())
+    legacy = {
+        "id": "old-1",
+        "lookup_id": current.lookup_id,
+        "status": "failed",
+        "message": "legacy failure record",
+        "failed_at": "2026-06-01T00:00:00+00:00",
+    }
+
+    class Connection:
+        async def fetch(self, *_args):
+            return [{"data": legacy}, {"data": current.model_dump(mode="json")}]
+
+    class Acquire:
+        async def __aenter__(self):
+            return Connection()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class Pool:
+        def acquire(self):
+            return Acquire()
+
+    repo = DurableJobRepository(Pool())
+    outcome = await repo.latest_lookup_attempt(user_id=current.user_id, lookup_id=current.lookup_id)
+
+    assert outcome is not None
+    assert outcome.job_id == current.job_id
+
+
+@pytest.mark.asyncio
+async def test_only_a_pre_contract_row_reads_as_no_attempt_yet():
+    from jobs.repository import DurableJobRepository
+
+    class Connection:
+        async def fetch(self, *_args):
+            return [{"data": {"id": "old-1", "lookup_id": "lk-1", "status": "failed"}}]
+
+    class Acquire:
+        async def __aenter__(self):
+            return Connection()
+
+        async def __aexit__(self, *_args):
+            return None
+
+    class Pool:
+        def acquire(self):
+            return Acquire()
+
+    assert await DurableJobRepository(Pool()).latest_lookup_attempt(user_id="user-a", lookup_id="lk-1") is None

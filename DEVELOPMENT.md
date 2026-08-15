@@ -135,14 +135,20 @@ python3 run.py
 ```
 
 Starts the backend on `:8000`, the operator app on `:3000`, the marketing site on
-`:3001`, and — when a tenant is resolvable — the standalone agent process. With
+`:3001` with Uvicorn auto-reload enabled, and — when a tenant is resolvable — the standalone agent process. With
 no `AETHRIA_AGENT_USER_ID`, `run.py` deliberately skips the agent subprocess;
 the API resumes per-user agent loops after login instead. Logs stream with
 `[Backend]` / `[App]` / `[Web]` / `[Agents]` prefixes. When `DATABASE_URL`
 targets `127.0.0.1:15432`, it also starts the local PostgreSQL Compose service,
-waits for it, and applies the provider-neutral migrations before starting the
-backend. It stops that database container on exit only when it started it;
-already-running database containers are left running.
+waits for it, and applies the provider-neutral migrations to the local database
+before starting the backend. When the database is `aethria_prod_snapshot`, this
+is the mutable working copy; reset it from the immutable golden backup with
+`python3 run.py --reset-local-snapshot`. On macOS, when the active Docker
+context is `colima`, it starts Colima automatically if the Docker daemon is
+unavailable. It stops that database container on exit only when it started it;
+already-running database containers are left running. The launcher prints a
+static header with the ports and current snapshot, followed by normal terminal
+logs.
 
 ### Individually
 

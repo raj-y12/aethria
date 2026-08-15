@@ -216,6 +216,18 @@ def build_founder_context(
     )
 
 
+def resolved_founder_names(context: Dict[str, Any]) -> List[str]:
+    """Founders the identity layer actually resolved — the only people a read may name."""
+    if not isinstance(context, dict):
+        return []
+    names: List[str] = []
+    for claim in context.get("claims") or []:
+        name = str((claim or {}).get("founder_name") or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def apply_founder_grounding_guard(value: Any, context: Dict[str, Any]) -> Any:
     """Prevent unsupported founder-strength language from becoming a judgment."""
     if isinstance(value, dict):

@@ -50,3 +50,21 @@ describe('resolveLookupFailure', () => {
     },
   );
 });
+
+describe('an unreachable status endpoint is not a failed lookup', () => {
+  it('keeps the dispatch alive when the status check itself could not complete', () => {
+    // A 500 on /lookup-status used to be mapped to failed+terminal, so the
+    // analyst saw "dispatch failed" and then the finished memo appeared.
+    expect(
+      resolveLookupFailure({
+        hasMatchedStartup: true,
+        memoStatus: { status: 'generating' },
+        jobStatus: {
+          failed: false,
+          status: 'pending',
+          detail: 'Could not verify lookup status; still checking.',
+        },
+      }),
+    ).toBeUndefined();
+  });
+});

@@ -1,10 +1,10 @@
-name: aethria-snapshot
+name: aethria-snapshot-working
 
 services:
   postgres:
     image: postgres:16
     environment:
-      POSTGRES_DB: aethria_test
+      POSTGRES_DB: aethria_prod_snapshot
       POSTGRES_USER: aethria
       POSTGRES_PASSWORD: local-test-password
     ports:
@@ -15,8 +15,8 @@ services:
       timeout: 5s
       retries: 12
     volumes:
-      - aethria-prod-snapshot-data:/var/lib/postgresql/data
+      - aethria-prod-working-data:/var/lib/postgresql/data
 
 volumes:
-  aethria-prod-snapshot-data:
+  aethria-prod-working-data:
     external: true

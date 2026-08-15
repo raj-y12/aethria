@@ -1,14 +1,10 @@
-import { useCallback, forwardRef, useEffect, useImperativeHandle, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
 import type { ScoringDimensionKey, SignalItem, Startup } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
-import {
-  buildMemoPDF,
-  icPackSafeBaseName,
-  getPipelineReplaySteps,
-} from '../lib/memoIcPack';
+import { getPipelineReplaySteps } from '../lib/memoIcPack';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
@@ -17,17 +13,11 @@ import MemoMasthead from './memo/MemoMasthead';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import MemoSectionTitle from './memo/MemoSectionTitle';
-import MemoDossierOpening from './memo/MemoDossierOpening';
-import { DECISION_BADGE_LABEL } from './DecisionBadge';
-import { getDecisionBadgeVariant } from '../lib/decisionBadgeVariant';
-import { isDealDecided } from '../lib/dealState';
-import { extractAdverseRegister, type AdverseRegisterItem } from '../lib/adverseRegister';
 import {
   createDefaultFundConfiguration,
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
-import { getNextStepText, parseNextStepItems } from '../lib/memoText';
 import {
   buildFounderSectionModel,
   formatFounderBackground,
@@ -50,21 +40,15 @@ const SCORING_DIMENSIONS: Array<{ key: ScoringDimensionKey; label: string; id: s
 import {
   mergeMemoPartial,
   analystContextSections,
-  memoGeneratingDetailForVariant,
   memoSourceRows,
   reviewHasThesisAlignment,
   normalizeListItemText,
-  normalizeMemoKey,
   renderWithMonoNumbers,
-  partnerDecisionHeadline,
   toJudgmentReasoning,
   firstNonEmpty,
-  getPartnerEconomicBadgeVariant,
   memoHeaderThesisLine,
   pipelineReplayOneLiner,
   decisionLabel,
-  uniqueRiskItems,
-  missingDataItems,
   sourceSupportLine,
   collapseWhitespace,
   clipText,
@@ -73,7 +57,6 @@ import {
   buildInvestmentCase,
   cleanFactValue,
   buildSnapshotRows,
-  buildKillers,
 } from './memo/memoContentHelpers';
 
 const RESOLUTION_SECTION_LABELS: Record<string, string> = {
@@ -107,16 +90,6 @@ export interface InvestmentMemoContentProps {
   peerStartups?: Startup[];
   portfolioSignals?: SignalItem[];
 }
-
-export interface InvestmentMemoContentHandle {
-  downloadPDF: () => void;
-}
-
-const SEVERITY_LABEL: Record<AdverseRegisterItem['severity'], string> = {
-  high: 'High',
-  medium: 'Medium',
-  low: 'Low',
-};
 
 const REVIEWER_LABELS: Record<string, string> = {
   DefaultReviewer: 'Default',
@@ -198,6 +171,7 @@ function MemoDisclosureSection({
         id={`${id}-body`}
         className={`memoDisclosureReveal${open ? ' memoDisclosureReveal--open' : ''}`}
         aria-hidden={!open}
+        inert={!open}
       >
         <div className="memoDisclosureBody">{children}</div>
       </div>
@@ -205,7 +179,7 @@ function MemoDisclosureSection({
   );
 }
 
-const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, InvestmentMemoContentProps>(function InvestmentMemoContent(
+function InvestmentMemoContent(
   {
     startup,
     onClose,
@@ -216,8 +190,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     fundConfiguration,
     peerStartups = [],
     portfolioSignals = [],
-  },
-  ref
+  }: InvestmentMemoContentProps
 ) {
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
@@ -229,30 +202,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const displayStartup = useMemo(
     () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
     [startup, memoPartial]
-  );
-
-  const pipelineBadgeVariant = useMemo(
-    () => (displayStartup ? getDecisionBadgeVariant(displayStartup) : null),
-    [displayStartup]
-  );
-  const pipelineStatusDetail = useMemo(
-    () =>
-      pipelineBadgeVariant
-        ? memoGeneratingDetailForVariant(pipelineBadgeVariant)
-        : '',
-    [pipelineBadgeVariant]
-  );
-
-  const handleDownloadPDF = useCallback(async () => {
-    if (!displayStartup) return;
-    const doc = await buildMemoPDF(displayStartup);
-    doc.save(`${icPackSafeBaseName(displayStartup)}-ic-pack.pdf`);
-  }, [displayStartup]);
-
-  useImperativeHandle(
-    ref,
-    () => ({ downloadPDF: handleDownloadPDF }),
-    [handleDownloadPDF]
   );
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
@@ -326,24 +275,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   }, [startup?.id, startup?.partner?.recommendation, onMemoPipelineReady]);
 
   const showJudgment = !!displayStartup?.partner?.recommendation;
-  const decisionHeadline = displayStartup && showJudgment ? partnerDecisionHeadline(displayStartup) : '';
-  const decisionBadgeVariant = useMemo(
-    () => (displayStartup && showJudgment ? getPartnerEconomicBadgeVariant(displayStartup) : null),
-    [displayStartup, showJudgment]
-  );
-  const showEscalationBadge = !!(displayStartup?.partner?.human_review_required && decisionBadgeVariant);
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
     [displayStartup, showJudgment]
-  );
-  const adverseRegister = useMemo(
-    () => extractAdverseRegister(displayStartup),
-    [displayStartup]
-  );
-  const missingEvidenceItems = useMemo(
-    () => missingDataItems(displayStartup, adverseRegister),
-    [adverseRegister, displayStartup]
   );
   const memoSources = useMemo(
     () => (displayStartup ? memoSourceRows(displayStartup) : []),
@@ -371,6 +306,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   const founderTeamItems = (displayStartup?.review?.team_analysis ?? []).filter(
     (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
   );
+  // Investment read (reviewer_rules v2+). Narrative only; the backend has
+  // already dropped anything that failed the evidence bar, so anything present
+  // here is renderable as-is.
+  const founderFluency = displayStartup?.review?.founder_fluency ?? [];
   const founderSignal = (displayStartup?.scout.founder_signal ?? '').trim();
   const founderQuote = (displayStartup?.scout.founder_quote ?? '').trim();
   const resolutionStatus = (
@@ -380,31 +319,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   )
     .toString()
     .toUpperCase();
-  const highAdverseCount = adverseRegister.filter((item) => item.severity === 'high').length;
-  const riskFactors = useMemo(
-    () => uniqueRiskItems(displayStartup),
-    [displayStartup]
-  );
-  const isAlreadyDecided = displayStartup ? isDealDecided(displayStartup) : false;
-  const coverRulingHeadline = showJudgment
-    ? decisionHeadline
-    : pipelineBadgeVariant
-      ? DECISION_BADGE_LABEL[pipelineBadgeVariant]
-      : 'Pending';
-  const coverRulingVariantClass = (
-    (showJudgment ? decisionBadgeVariant : pipelineBadgeVariant) ?? 'pending'
-  )
-    .toString()
-    .toLowerCase();
-  const coverStatusText = isAlreadyDecided && displayStartup?.human_resolution?.resolved_at
-    ? `Recorded ruling — ${decisionLabel(displayStartup.human_resolution.decision)}`
-    : showEscalationBadge && !isAlreadyDecided
-      ? 'Human ruling required'
-      : memoPipeline === 'generating' && !showJudgment
-        ? pipelineStatusDetail
-        : !showJudgment
-          ? 'Pipeline assembling recommendation'
-          : null;
   const convictionHistory = displayStartup?.conviction_state?.decision_history ?? [];
   const precedentCandidates = useMemo(
     () => (displayStartup ? findPrecedentCandidates(displayStartup, peerStartups) : []),
@@ -420,19 +334,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     () => displayStartup?.review?.scoring_presentation ?? null,
     [displayStartup?.review]
   );
-  const nextStepText = displayStartup ? getNextStepText(displayStartup) : '';
-  const nextStepItems = useMemo(() => parseNextStepItems(nextStepText), [nextStepText]);
-  const thesisAlignmentBrief = useMemo(() => {
-    const review = displayStartup?.review;
-    if (!review) return '';
-    const score = review.thesis_alignment_score;
-    if (score != null) {
-      const ten = score <= 1 ? score * 10 : score;
-      return `${ten.toFixed(0)}/10 thesis alignment`;
-    }
-    if (review.thesis_matches_fund != null) return review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate conflict';
-    return firstNonEmpty(review.aethria_view?.thesis_fit_line, review.thesis_fit_points?.[0], review.thesis_deviation_points?.[0]);
-  }, [displayStartup?.review]);
   const thesisSection = useMemo(() => {
     const review = displayStartup?.review;
     if (!review) {
@@ -440,13 +341,9 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     }
     const rawScore = review.thesis_alignment_score;
     const score = rawScore != null ? (rawScore <= 1 ? rawScore * 10 : rawScore) : null;
-    const confidence = review.thesis_alignment_confidence;
-    const headlineTag = [
-      review.thesis_matches_fund != null
-        ? (review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate misaligned')
-        : null,
-      confidence != null ? `${(confidence * 100).toFixed(0)}% confidence` : null,
-    ].filter(Boolean).join('  ·  ');
+    const headlineTag = review.thesis_matches_fund != null
+      ? (review.thesis_matches_fund ? 'Mandate aligned' : 'Mandate misaligned')
+      : '';
     const fitPoints = (review.thesis_fit_points ?? []).filter((item) => String(item ?? '').trim());
     const gapPoints = (review.thesis_deviation_points ?? []).filter((item) => String(item ?? '').trim());
     const visible = reviewHasThesisAlignment(review) && (
@@ -454,20 +351,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     );
     return { visible, score, headlineTag, fitPoints, gapPoints };
   }, [displayStartup?.review]);
-  const openingRiskItems = useMemo(() => {
-    const items = [
-      ...adverseRegister.map((item) => item.whyItMatters || item.title),
-      ...missingEvidenceItems,
-      ...riskFactors.risks,
-    ].map((item) => normalizeListItemText(item)).filter(Boolean);
-    const seen = new Set<string>();
-    return items.filter((item) => {
-      const key = normalizeMemoKey(item);
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 2);
-  }, [adverseRegister, missingEvidenceItems, riskFactors.risks]);
   const pipelineReplaySteps = useMemo(
     () => (displayStartup ? getPipelineReplaySteps(displayStartup) : []),
     [displayStartup]
@@ -477,9 +360,17 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     [pipelineReplaySteps]
   );
   // ── Editorial derivations ──
+  // On a decided deal the standfirst sits directly under the recommendation, so
+  // it must be the REASON. Leading with partner.thesis put the bull case under
+  // a PASS ("startups are underserved by traditional insurers" beneath a Pass on
+  // an insurtech), which reads as self-contradiction; the actual rationale was
+  // buried in the appendix.
   const coverStandfirst = displayStartup
     ? leadSentences(
         firstNonEmpty(
+          ...(displayStartup.partner?.recommendation
+            ? [displayStartup.partner?.decision_rationale]
+            : []),
           displayStartup.partner?.thesis,
           displayStartup.review?.aethria_view?.headline,
           displayStartup.partner?.why_this_matters,
@@ -489,38 +380,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         260,
       )
     : '';
-  const coverBlocker = displayStartup
-    ? (openingRiskItems[0] ?? collapseWhitespace(displayStartup.scout.biggest_unknown))
-    : '';
-  const coverAction = displayStartup ? (nextStepItems[0] ?? collapseWhitespace(nextStepText)) : '';
   const investmentCasePoints = useMemo(
     () => (displayStartup ? buildInvestmentCase(displayStartup, coverStandfirst) : []),
     [displayStartup, coverStandfirst]
   );
   const snapshotRows = useMemo(
-    () => (displayStartup ? buildSnapshotRows(displayStartup, coverBlocker, false) : []),
-    [displayStartup, coverBlocker]
+    () => (displayStartup ? buildSnapshotRows(displayStartup, '', false) : []),
+    [displayStartup]
   );
-  // Decision confidence — surfaced on the verdict so the recommendation is honest
-  // about how sure it is, not just what it concludes.
-  const partnerConfidencePct =
-    typeof displayStartup?.partner?.confidence === 'number'
-      ? Math.round(Math.max(0, Math.min(1, displayStartup.partner.confidence)) * 100)
-      : null;
-  const convictionLine = useMemo(() => {
-    const parts: string[] = [];
-    if (displayStartup?.review?.overall_score != null) {
-      const sc = Number(displayStartup.review.overall_score);
-      const scText = Number.isFinite(sc) ? sc.toFixed(1) : String(displayStartup.review.overall_score);
-      parts.push(`${scText}/10 conviction`);
-    } else if (thesisAlignmentBrief) {
-      parts.push(thesisAlignmentBrief);
-    }
-    if (partnerConfidencePct != null) parts.push(`${partnerConfidencePct}% partner confidence`);
-    return parts.length ? parts.join('   ·   ') : 'Conviction forming';
-  }, [displayStartup?.review?.overall_score, thesisAlignmentBrief, partnerConfidencePct]);
-  // The single question the deal hinges on (AethriaView synthesis) — previously unused.
-  const focalQuestion = cleanFactValue(displayStartup?.review?.aethria_view?.focal_question);
   // Vitals: the quantitative facts. Stage/TAM come from the scout; funding, valuation,
   // traction, and IP come from the backend Financials grounding gate — every value there
   // is verified against a cited source, so anything present is safe to show verbatim.
@@ -549,10 +416,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
   }, [displayStartup?.review?.business_model_analysis]);
   const hasVitals =
     vitalsStrip.length > 0 || !!fundingLine || !!tractionLine || !!ipLine || !!modelLine;
-  const memoKillers = useMemo(
-    () => buildKillers(adverseRegister, riskFactors.risks),
-    [adverseRegister, riskFactors.risks]
-  );
   const reviewerConsensusRows = useMemo(() => {
     const reviews = displayStartup?.review?.reviews ?? [];
     return reviews
@@ -564,6 +427,10 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
         // Lead sentence only — the reviewer's full read lives in Reviewer detail. Keeps the
         // consensus panel compact instead of stacking a full paragraph per reviewer.
         take: leadSentences(rv.overall_summary, 140),
+        // A low score on thin evidence is a measurement, not a verdict. Without
+        // this the panel showed a bare "2.0" beside an upbeat sentence and the
+        // two read as a contradiction.
+        coverage: typeof rv.evidence_coverage === 'number' ? rv.evidence_coverage : null,
       }))
       .filter((row) => row.score != null || row.take);
   }, [displayStartup?.review?.reviews]);
@@ -585,14 +452,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
     displayStartup?.review?.consensus_verdict,
     displayStartup?.review?.derived_verdict,
   ]);
-  const reviewerState = reviewerConsensusRows.length > 0
-    ? `${reviewerConsensusRows.length} · ${reviewerConsensus.split ? 'Split' : 'Aligned'}`
-    : 'Pending';
-  const mandateFit = displayStartup?.review?.thesis_matches_fund == null
-    ? thesisAlignmentBrief || undefined
-    : displayStartup.review.thesis_matches_fund
-      ? 'Strong mandate fit'
-      : 'Outside mandate';
   // The house upward reveal (see Reveal.tsx), fired as each document section scrolls
   // into view. Shared by every numbered section so the motion stays uniform.
   const sectionReveal = {
@@ -621,7 +480,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
           <MemoMasthead
             startup={displayStartup}
             onAddContext={onAddContext}
-            onDownloadPDF={handleDownloadPDF}
             onClose={onClose}
             readOnly={readOnly}
           />
@@ -663,19 +521,16 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </p>
             ) : null}
 
-            <MemoDossierOpening
-              recommendation={coverRulingHeadline}
-              recommendationTone={coverRulingVariantClass}
-              standfirst={coverStandfirst}
-              conviction={convictionLine}
-              reviewerState={reviewerState}
-              mandateFit={mandateFit}
-              status={coverStatusText}
-              focalQuestion={focalQuestion}
-              blocker={coverBlocker}
-              nextMove={coverAction}
+            <OpportunityIntelligence
+              startupId={displayStartup.id}
+              companyName={displayStartup.scout.name}
+              onRulingRecorded={onClose}
+              readOnly={readOnly}
             />
 
+            <details className="memoSupportingAnalysis">
+              <summary>Supporting analysis</summary>
+              <div className="memoSupportingAnalysisBody">
             {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
               <div className="memoDossierContext">
                 {showJudgment && precedentCandidates.length > 0 ? (
@@ -751,12 +606,18 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     ))}
                   </ul>
                 ) : founderNames.length > 0 ? (
-                  <p className="memoDocSubhead">{founderNames.join(', ')}</p>
+                  // Names with no resolved candidate used to render as a mono
+                  // caption, so the founders read as a field label rather than
+                  // as people. They are the section's subject; set them as such.
+                  <p className="memoFounderBareNames">{founderNames.join(', ')}</p>
                 ) : (
                   <p className="memoDocProse memoFounderEmpty">{founderEmptyMessage}</p>
                 )}
                 {founderNames.length > 0 && founderMissing.length > 0 ? (
                   <p className="memoDocProse memoFounderEmpty">
+                    {founderMissing.includes('previous_employment')
+                      ? 'No founder history was retrieved. Team execution is therefore unevidenced rather than judged weak, and no founder read could be produced. '
+                      : ''}
                     Not confirmed: {formatMissingFounderFields(founderMissing)}.
                   </p>
                 ) : null}
@@ -770,6 +631,22 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   <div className="memoDocSubsection">
                     <p className="memoDocSubhead">In their words</p>
                     <p className="memoDocProse">{'“'}{founderQuote}{'”'}</p>
+                  </div>
+                ) : null}
+                {founderFluency.length > 0 ? (
+                  <div className="memoDocSubsection memoFluency">
+                    <p className="memoDocSubhead">Fluency</p>
+                    {founderFluency.map((f, i) => (
+                      <div key={`${f.founder}-${i}`} className="memoFluencyEntry">
+                        <p className="memoDocProse">
+                          <span className="memoFluencyName">{f.founder}</span>
+                          {' — '}{renderWithMonoNumbers(f.prior_domain)}
+                          {f.fluent_in?.length ? ` Fluent in ${f.fluent_in.join('; ')}.` : ''}
+                          {f.unlocks?.length ? ` Unlocks ${f.unlocks.join('; ')}.` : ''}
+                        </p>
+                        <p className="memoFluencyEvidence">{f.evidence}</p>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
                 {founderTeamItems.length > 0 ? (
@@ -803,21 +680,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </motion.section>
             )}
 
-            {/* ── Investment killers ── */}
-            {memoKillers.length > 0 && (
-              <motion.section {...sectionReveal} className="memoDocSection memoKillerSection" aria-labelledby="memo-killers">
-                <MemoSectionTitle number="04" id="memo-killers">What Limits Conviction</MemoSectionTitle>
-                <ol className="memoKillerList">
-                  {memoKillers.map((killer, i) => (
-                    <li key={i} className={`memoKiller memoKiller--${killer.severity}`}>
-                      <span className="memoKillerRank" aria-hidden>{String(i + 1).padStart(2, '0')}</span>
-                      <p className="memoKillerStatement">{renderWithMonoNumbers(killer.statement)}</p>
-                    </li>
-                  ))}
-                </ol>
-              </motion.section>
-            )}
-
             {/* ── Assessment ── */}
             {(() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
@@ -825,20 +687,19 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const hasScores = !!structuredScoring;
               const showScores = config.memo.includeScoreReasoning && hasScores;
-              const improvements = (displayStartup.review?.improvement_to_9 ?? []).filter((s) => String(s ?? '').trim());
               const assessmentReadouts = [
                 { label: 'Competitive Landscape', items: compItems },
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
-              const hasDeepDive = improvements.length > 0 || assessmentReadouts.length > 0;
+              const hasDeepDive = assessmentReadouts.length > 0;
               if (!hasScorecard && !hasPanel && !hasDeepDive) {
                 return null;
               }
               return (
                 <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <MemoSectionTitle number="05" id="memo-scoring">Assessment</MemoSectionTitle>
+                  <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
                       <AssessmentScorecard
@@ -865,6 +726,11 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                             <span className="memoConsensusName">{row.name}</span>
                             <span className="memoConsensusScore">
                               {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
+                              {row.coverage != null ? (
+                                <span className="memoConsensusCoverage">
+                                  {`${Math.round(row.coverage * 100)}% evidenced`}
+                                </span>
+                              ) : null}
                             </span>
                             <span className="memoConsensusTake">
                               {renderWithMonoNumbers(row.take || row.verdict || '—')}
@@ -876,21 +742,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                   ) : null}
                   {hasDeepDive && (
                     <div className="memoScoringMore">
-                        {improvements.length > 0 && (
-                          <div className="memoDocSubsection">
-                            <p className="memoDocSubhead">Path to a 9</p>
-                            <ExpandableList
-                              items={improvements}
-                              cap={4}
-                              renderItem={(item, i) => (
-                                <li key={i} className="memoListItem">
-                                  <span className="memoBullet" aria-hidden>·</span>
-                                  <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                                </li>
-                              )}
-                            />
-                          </div>
-                        )}
                         {assessmentReadouts.map((section) => (
                           <div key={section.label} className="memoDocSubsection">
                             <p className="memoDocSubhead">{section.label}</p>
@@ -915,7 +766,7 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
             {/* ── Fund thesis alignment ── */}
             {thesisSection.visible && (
               <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
-                <MemoSectionTitle number="06" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
+                <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
                   {(thesisSection.score != null || thesisSection.headlineTag) && (
                     <p className="memoScoreHeadline">
@@ -955,84 +806,6 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
                     </ul>
                   )}
                 </div>
-              </motion.section>
-            )}
-
-            {/* ── Risk register ── */}
-            {(adverseRegister.length > 0 || riskFactors.risks.length > 0 || riskFactors.mitigation.length > 0 || missingEvidenceItems.length > 0) && (
-              <motion.section {...sectionReveal} className="memoDocSection memoRiskRegisterSection" aria-labelledby="memo-risk-register">
-                <MemoSectionTitle number="07" id="memo-risk-register">Risks</MemoSectionTitle>
-                {adverseRegister.length > 0 && (
-                  <p className="memoEvStatLine">
-                    {renderWithMonoNumbers(`${highAdverseCount} high · ${adverseRegister.length} material`)}
-                  </p>
-                )}
-                {adverseRegister.length > 0 && (
-                  <ExpandableList
-                    items={adverseRegister}
-                    cap={4}
-                    as="div"
-                    className="memoEvRiskList"
-                    renderItem={(item) => {
-                      // The engine often sets whyItMatters == title; don't print the same line twice.
-                      const why = collapseWhitespace(item.whyItMatters);
-                      const showWhy = !!why && why.toLowerCase() !== collapseWhitespace(item.title).toLowerCase();
-                      return (
-                        <article key={item.id} className={`memoEvRisk memoEvRisk--${item.severity}`}>
-                          <span className="memoEvRiskSeverity">{SEVERITY_LABEL[item.severity]}</span>
-                          <div className="memoEvRiskBody">
-                            <p className="memoEvRiskTitle">{renderWithMonoNumbers(item.title)}</p>
-                            {showWhy && <p className="memoEvRiskWhy">{renderWithMonoNumbers(item.whyItMatters)}</p>}
-                            {(item.basis || item.missingData || item.source) && (
-                              <p className="memoEvRiskMeta">
-                                {[item.basis, item.missingData ? 'Missing data' : null, item.source].filter(Boolean).join('  ·  ')}
-                              </p>
-                            )}
-                          </div>
-                        </article>
-                      );
-                    }}
-                  />
-                )}
-                {config.memo.includeMissingData && missingEvidenceItems.length > 0 && (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Missing evidence</p>
-                    <ul className="memoList">
-                      {missingEvidenceItems.map((item, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet">·</span>
-                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {adverseRegister.length === 0 && riskFactors.risks.length > 0 && (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Other risks</p>
-                    <ul className="memoList">
-                      {riskFactors.risks.map((r, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet">·</span>
-                          <span>{renderWithMonoNumbers(normalizeListItemText(r))}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {riskFactors.mitigation.length > 0 && (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Mitigation</p>
-                    <ul className="memoList">
-                      {riskFactors.mitigation.map((item, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet">·</span>
-                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </motion.section>
             )}
 
@@ -1310,52 +1083,14 @@ const InvestmentMemoContent = forwardRef<InvestmentMemoContentHandle, Investment
               </MemoDisclosureSection>
             )}
             </div>
-
-            {/* The human decision surface is the final action after the memo and its appendix. */}
-            <OpportunityIntelligence
-              startupId={displayStartup.id}
-              companyName={displayStartup.scout.name}
-              onRulingRecorded={onClose}
-              readOnly={readOnly}
-            />
-
-            {/*
-              The ruling sits below a seven-part appendix, so it needs to stay reachable
-              from anywhere in the document. Sticky-as-last-child pins the bar to the
-              viewport bottom while the memo scrolls, then settles under the composer at
-              the end — no observer, no duplicated ruling state.
-            */}
-            {!readOnly && (
-              <div className="sticky bottom-0 z-20 -mx-3 mt-phi-5 border-t border-oxford/15 bg-paper/95 px-3 py-phi-3 backdrop-blur-[2px] sm:-mx-8 sm:px-8 lg:-mx-12 lg:px-12">
-                <div className="flex flex-wrap items-center justify-between gap-phi-3">
-                  <p className="type-label-section text-oxford/65">
-                    The ruling is yours to make
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const target = document.getElementById('memo-ruling');
-                      target?.scrollIntoView({
-                        behavior: reduceMotion ? 'auto' : 'smooth',
-                        block: 'center',
-                      });
-                      target?.querySelector<HTMLElement>('button, textarea')?.focus();
-                    }}
-                    className="type-action min-h-[44px] px-phi-2 text-oxford transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                  >
-                    <span className="border-b border-oxford/30 pb-0.5">
-                      Make your ruling <span aria-hidden>↓</span>
-                    </span>
-                  </button>
-                </div>
               </div>
-            )}
+            </details>
 
           </motion.div>
         </div>
       )}
     </article>
   );
-});
+}
 
 export default InvestmentMemoContent;

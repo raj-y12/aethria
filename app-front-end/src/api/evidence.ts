@@ -1,5 +1,14 @@
 import { apiRequest, encodedId } from './client';
 
+export type EvidenceVerificationState = 'unverified' | 'verified' | 'disputed' | 'revoked';
+export type ClaimAssertionClass =
+  | 'externally_verified'
+  | 'founder_asserted'
+  | 'operator_asserted'
+  | 'model_inferred'
+  | 'conflicted'
+  | 'unverified';
+
 export interface EvidenceArtifact {
   artifact_id: string;
   opportunity_id?: string | null;
@@ -23,7 +32,7 @@ export interface EvidenceItem {
   source_locator?: string | null;
   effective_at?: string | null;
   expires_at?: string | null;
-  verification_state: string;
+  verification_state: EvidenceVerificationState;
   source_quality: number;
   extraction_confidence: number;
 }
@@ -34,7 +43,7 @@ export interface Claim {
   opportunity_id?: string | null;
   claim_type: string;
   display_text: string;
-  assertion_class: string;
+  assertion_class: ClaimAssertionClass;
   confidence: number;
   material: boolean;
   status: string;

@@ -484,6 +484,10 @@ class SingleReview(BaseModel):
     defensibility_confidence: Optional[Literal["low", "medium", "high"]] = None
     # Optional hash of the prompt used by this reviewer instance.
     prompt_version: Optional[str] = None
+    # Fraction of rubric criteria that carried complete evidence (0.0-1.0).
+    # Travels with every persona so a low score is readable as thin evidence
+    # rather than as a judgement. None = unknown, which is not the same as 0.
+    evidence_coverage: Optional[float] = Field(default=None, ge=0, le=1)
     structured_scoring: Optional[Dict[str, Any]] = None
     # Normalized extraction payload (auditable input to deterministic scoring).
     structured_signals: Optional[Dict[str, Any]] = None
@@ -517,6 +521,12 @@ class ReviewInfo(BaseModel):
     business_model_analysis: Optional[List[str]] = None  # Monetization, pricing, unit economics
     investment_thesis: Optional[List[str]] = None  # Bullet points why to invest + core assumptions
     risk_mitigation: Optional[List[str]] = None  # Actionable strategies per diligence_red_flags
+    # Investment read (reviewer_rules v2+). Narrative only — never an input to
+    # scores or verdict. Empty when the policy evidence bar is not met.
+    founder_fluency: Optional[List[Dict[str, Any]]] = None  # Per founder: prior domain -> fluency -> unlocks
+    capability_slope: Optional[Dict[str, Any]] = None  # Hardest demonstrated instance + what is downhill
+    reframe: Optional[Dict[str, str]] = None  # Obvious question, why it misleads, the real question
+    evidence_coverage: Optional[float] = Field(default=None, ge=0, le=1)  # 0-1 rubric coverage
     score_reasoning: Optional[Dict[str, str]] = None  # Per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
     score_source: Optional[str] = None
     improvement_to_9: Optional[List[str]] = None

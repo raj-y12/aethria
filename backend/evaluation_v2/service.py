@@ -294,12 +294,19 @@ def decisive_policy_outcome(
     policy: EvaluationPolicy,
     *,
     evaluation_at: datetime,
-) -> tuple[RecommendationState | None, list[str], list[str], list[str]]:
+) -> tuple[
+    RecommendationState | None,
+    list[str],
+    list[str],
+    list[str],
+    list[str],
+]:
     risks: list[str] = []
     conflicts: list[str] = []
     uncertainties: list[str] = []
+    contradictions: list[str] = []
     for claim in snapshot:
-        if claim.get("status_at_snapshot") != "current":
+        if claim.get("status_at_snapshot") not in {"current", "contradicted"}:
             continue
         eligibility = evaluate_claim_score_eligibility(
             claim, policy=policy, evaluation_at=evaluation_at
@@ -310,6 +317,12 @@ def decisive_policy_outcome(
             set(policy.decision_safety.hard_exclusion_claim_types)
             | set(policy.decision_safety.critical_risk_claim_types)
         ):
+            continue
+        if (
+            claim.get("status_at_snapshot") == "contradicted"
+            or claim.get("contradicting_evidence_ids")
+        ):
+            contradictions.append(str(claim.get("display_text") or claim_type))
             continue
         if type(raw_value) is not bool:
             uncertainties.append(str(claim.get("display_text") or claim_type))
@@ -324,8 +337,8 @@ def decisive_policy_outcome(
         if claim_type in policy.decision_safety.critical_risk_claim_types:
             risks.append(str(claim.get("display_text") or claim_type))
     if conflicts or risks:
-        return RecommendationState.PASS, risks, conflicts, uncertainties
-    return None, risks, conflicts, uncertainties
+        return RecommendationState.PASS, risks, conflicts, uncertainties, contradictions
+    return None, risks, conflicts, uncertainties, contradictions
 
 
 def evaluate_snapshot(
@@ -434,16 +447,26 @@ def evaluate_snapshot(
             )
         )
 
-    decisive_state, decisive_risks, mandate_conflicts, decisive_uncertainties = decisive_policy_outcome(
-        snapshot, policy, evaluation_at=evaluation_clock
-    )
+    (
+        decisive_state,
+        decisive_risks,
+        mandate_conflicts,
+        decisive_uncertainties,
+        decisive_contradictions,
+    ) = decisive_policy_outcome(snapshot, policy, evaluation_at=evaluation_clock)
     missing = list(dict.fromkeys(missing + decisive_uncertainties))
     coverage = scored_weight / total_weight if total_weight else 0
     average = weighted_total / scored_weight if scored_weight else 0
-    if decisive_state is not None:
-        state = decisive_state
-    elif required_missing or coverage < policy.minimum_scored_weight:
+    if (
+        required_missing
+        or conflicts
+        or decisive_uncertainties
+        or decisive_contradictions
+        or coverage < policy.minimum_scored_weight
+    ):
         state = RecommendationState.INSUFFICIENT_EVIDENCE
+    elif decisive_state is not None:
+        state = decisive_state
     elif average >= policy.advance_threshold:
         state = RecommendationState.ADVANCE
     elif average < policy.pass_threshold:
@@ -467,7 +490,13 @@ def evaluate_snapshot(
         principal_risks=list(dict.fromkeys(conflicts + decisive_risks)),
         mandate_conflicts=sorted(set(mandate_conflicts)),
         missing_information=missing,
-        change_conditions=[f"Resolve missing evidence: {name}" for name in missing],
+        change_conditions=(
+            [f"Resolve missing evidence: {name}" for name in missing]
+            + [
+                f"Resolve contradictory evidence: {name}"
+                for name in dict.fromkeys(conflicts + decisive_contradictions)
+            ]
+        ),
         human_review_required=bool(
             decisive_state
             or conflicts

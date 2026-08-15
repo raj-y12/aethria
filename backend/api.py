@@ -1936,6 +1936,10 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "business_model_analysis": review_enriched.get("business_model_analysis") or None,
             "investment_thesis": review_enriched.get("investment_thesis") or None,
             "risk_mitigation": review_enriched.get("risk_mitigation") or None,
+            "founder_fluency": review_enriched.get("founder_fluency") or None,
+            "capability_slope": review_enriched.get("capability_slope") or None,
+            "reframe": review_enriched.get("reframe") or None,
+            "evidence_coverage": review_enriched.get("evidence_coverage"),
             "consensus_verdict": review_enriched.get("consensus_verdict"),
             "reviewer_disagreement": review_enriched.get("reviewer_disagreement"),
             "score_variance": review_enriched.get("score_variance"),
@@ -2385,67 +2389,42 @@ async def get_startup_memo(request: Request, startup_id: str):
 
     validate_route_id(startup_id, field_name="startup_id")
     await _reject_uncertified_canonical_legacy_read(request)
-    storage = _get_storage(request)
     uid = request.state.user_id
-    if _is_supabase_storage(storage):
-        startup = storage.get_startup_for_memo(startup_id)
-    else:
-        startup = storage.get_startup(startup_id)
-    if not startup:
+    # Reads the provider-neutral PostgreSQL authority, not the legacy Supabase
+    # compatibility client. _get_storage() constructs that client unconditionally,
+    # so on a PostgreSQL-only deployment (no SUPABASE_URL) this endpoint raised
+    # ValueError before doing any work — every memo request was a 500.
+    startup_repository = _get_startup_repository(request)
+    raw = await startup_repository.get_startup(uid, startup_id)
+    if not raw:
         raise HTTPException(status_code=404, detail="Startup not found")
+    startup = Startup.model_validate(raw)
 
-    if _is_supabase_storage(storage):
-        row = get_pipeline_state_row(storage._client, user_id=uid, startup_id=startup_id)
-        state_status = row.get("status") if row else None
-        pr_from_row = row.get("pipeline_run_id") if row else None
-        err_from_row = row.get("error") if row else None
+    # get_pipeline_state_row ignores its client argument entirely (it reads the
+    # Batch4A state), so progressive-memo status works without Supabase. The old
+    # non-Supabase tail below this block always returned status=ready and is gone:
+    # it could not observe pipeline state, so it reported a still-running lookup
+    # as finished.
+    row = get_pipeline_state_row(None, user_id=uid, startup_id=startup_id)
+    state_status = row.get("status") if row else None
+    pr_from_row = row.get("pipeline_run_id") if row else None
+    err_from_row = row.get("error") if row else None
 
-        md = (startup.investment_memo_markdown or "").strip()
-        pr_str = str(pr_from_row) if pr_from_row else None
+    md = (startup.investment_memo_markdown or "").strip()
+    pr_str = str(pr_from_row) if pr_from_row else None
 
-        if state_status == "failed":
-            partial = _memo_partial_payload(startup)
-            return {
-                "status": "failed",
-                "memo": None,
-                "partial": partial,
-                "pipeline_run_id": pr_str,
-                "pipeline_status": state_status,
-                "error": err_from_row,
-            }
+    if state_status == "failed":
+        partial = _memo_partial_payload(startup)
+        return {
+            "status": "failed",
+            "memo": None,
+            "partial": partial,
+            "pipeline_run_id": pr_str,
+            "pipeline_status": state_status,
+            "error": err_from_row,
+        }
 
-        if state_status and state_status != "ready":
-            return {
-                "status": "generating",
-                "memo": None,
-                "partial": _memo_partial_payload(startup) if startup.scout_info else None,
-                "pipeline_run_id": pr_str,
-                "pipeline_status": state_status,
-                "error": None,
-            }
-
-        if md:
-            return {
-                "status": "ready",
-                "memo": md,
-                "partial": None,
-                "pipeline_run_id": pr_str,
-                "pipeline_status": state_status,
-                "error": None,
-            }
-
-        # Partner decision exists or pipeline explicitly marked ready → no markdown needed
-        if state_status == "ready" or startup.partner_info is not None:
-            partial = _memo_partial_payload(startup)
-            return {
-                "status": "ready",
-                "memo": None,
-                "partial": partial,
-                "pipeline_run_id": pr_str,
-                "pipeline_status": state_status,
-                "error": None,
-            }
-
+    if state_status and state_status != "ready":
         return {
             "status": "generating",
             "memo": None,
@@ -2455,17 +2434,34 @@ async def get_startup_memo(request: Request, startup_id: str):
             "error": None,
         }
 
-    memo = MemoGenerator().generate_memo(
-        startup,
-        for_display=True,
-        tenant_user_id=uid,
-    )
+    if md:
+        return {
+            "status": "ready",
+            "memo": md,
+            "partial": None,
+            "pipeline_run_id": pr_str,
+            "pipeline_status": state_status,
+            "error": None,
+        }
+
+    # Partner decision exists or pipeline explicitly marked ready → no markdown needed
+    if state_status == "ready" or startup.partner_info is not None:
+        partial = _memo_partial_payload(startup)
+        return {
+            "status": "ready",
+            "memo": None,
+            "partial": partial,
+            "pipeline_run_id": pr_str,
+            "pipeline_status": state_status,
+            "error": None,
+        }
+
     return {
-        "status": "ready",
-        "memo": memo,
-        "partial": None,
-        "pipeline_run_id": None,
-        "pipeline_status": None,
+        "status": "generating",
+        "memo": None,
+        "partial": _memo_partial_payload(startup) if startup.scout_info else None,
+        "pipeline_run_id": pr_str,
+        "pipeline_status": state_status,
         "error": None,
     }
 

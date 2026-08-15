@@ -2,7 +2,7 @@
 Strict output schema for Reviewer.
 All Reviewers must emit JSON matching this structure exactly.
 """
-from typing import TypedDict, Literal, Dict
+from typing import Any, TypedDict, Literal, Dict, List
 
 
 class ReviewerOutput(TypedDict, total=False):
@@ -50,6 +50,92 @@ class ReviewerOutput(TypedDict, total=False):
     fund_thesis_alignment_score: float  # optional at runtime; validated when present
     structured_signals: Dict[str, dict]
     structured_scoring: Dict[str, dict]
+    # Investment read (reviewer_rules v2+). Narrative only: never an input to scores
+    # or verdict. Each is omitted (empty) when the evidence bar is not met.
+    founder_fluency: List[Dict[str, Any]]  # [{founder, prior_domain, fluent_in[], unlocks[], evidence}]
+    capability_slope: Dict[str, Any]  # {hardest_instance, downhill[], blocked_by[], evidence}
+    reframe: Dict[str, str]  # {obvious_question, why_it_misleads, real_question}
+
+
+_READ_MAX_BULLETS = 4
+_READ_MAX_FOUNDERS = 4
+
+
+def _read_str(value: Any) -> str:
+    return str(value).strip() if isinstance(value, str) else ""
+
+
+def _read_list(value: Any, cap: int = _READ_MAX_BULLETS) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    cleaned = [_read_str(item) for item in value]
+    return [item for item in cleaned if item][:cap]
+
+
+def normalize_investment_read(data: dict, allowed_founders: Any = None) -> dict:
+    """Normalize the reviewer_rules v2 investment-read fields, failing closed.
+
+    An entry missing the evidence it is required to carry is dropped, never
+    completed by inference (ADR-0010). `allowed_founders` — when a non-empty
+    collection of resolved founder names is supplied — restricts founder_fluency
+    to founders the identity layer actually resolved, so the read cannot invent
+    a person.
+    """
+    allowed = {name.strip().lower() for name in (allowed_founders or []) if _read_str(name)}
+
+    fluency: List[Dict[str, Any]] = []
+    for raw in (data.get("founder_fluency") or []) if isinstance(data.get("founder_fluency"), list) else []:
+        if not isinstance(raw, dict):
+            continue
+        founder = _read_str(raw.get("founder"))
+        prior_domain = _read_str(raw.get("prior_domain"))
+        evidence = _read_str(raw.get("evidence"))
+        fluent_in = _read_list(raw.get("fluent_in"))
+        unlocks = _read_list(raw.get("unlocks"))
+        if not (founder and prior_domain and evidence and (fluent_in or unlocks)):
+            continue
+        if allowed and founder.lower() not in allowed:
+            continue
+        fluency.append({
+            "founder": founder,
+            "prior_domain": prior_domain,
+            "fluent_in": fluent_in,
+            "unlocks": unlocks,
+            "evidence": evidence,
+        })
+    data["founder_fluency"] = fluency[:_READ_MAX_FOUNDERS]
+
+    slope_raw = data.get("capability_slope")
+    slope: Dict[str, Any] = {}
+    if isinstance(slope_raw, dict):
+        hardest = _read_str(slope_raw.get("hardest_instance"))
+        downhill = _read_list(slope_raw.get("downhill"))
+        # A slope needs a demonstrated hardest instance AND something downhill of
+        # it; a roadmap with neither is an ambition, not a slope.
+        if hardest and downhill:
+            slope = {
+                "hardest_instance": hardest,
+                "downhill": downhill,
+                "blocked_by": _read_list(slope_raw.get("blocked_by")),
+                "evidence": _read_str(slope_raw.get("evidence")),
+            }
+    data["capability_slope"] = slope
+
+    reframe_raw = data.get("reframe")
+    reframe: Dict[str, str] = {}
+    if isinstance(reframe_raw, dict):
+        obvious = _read_str(reframe_raw.get("obvious_question"))
+        misleads = _read_str(reframe_raw.get("why_it_misleads"))
+        real = _read_str(reframe_raw.get("real_question"))
+        # All three or nothing — a reframe missing its counter-question is a jab.
+        if obvious and misleads and real:
+            reframe = {
+                "obvious_question": obvious,
+                "why_it_misleads": misleads,
+                "real_question": real,
+            }
+    data["reframe"] = reframe
+    return data
 
 
 def validate_reviewer_output(data: dict) -> ReviewerOutput:
@@ -233,5 +319,7 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
         if not 0.0 <= fs <= 1.0:
             raise ValueError("fund_thesis_alignment_score must be between 0 and 1")
         data["fund_thesis_alignment_score"] = fs
+
+    normalize_investment_read(data)
 
     return ReviewerOutput(**data)

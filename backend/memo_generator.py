@@ -69,6 +69,87 @@ def _criterion_reasoning_for_dimension(structured_scoring: Dict[str, Any], dimen
     return " ".join(parts) or None
 
 
+def _append_investment_read_section(lines: list, startup: Startup, for_display: bool) -> None:
+    """Render the investment read (reviewer_rules v2+) as the memo's lead.
+
+    Narrative only — nothing here feeds a score. In display mode the section is
+    omitted when nothing met the evidence bar; the full memo prints the named
+    absence instead, so a reader can tell "no read" from "read not attempted".
+    """
+    def _sentence(text: str) -> str:
+        text = str(text or "").strip()
+        return text if not text or text[-1] in ".!?" else text + "."
+
+    ri = startup.review_info
+    reframe = (ri and getattr(ri, "reframe", None)) or {}
+    slope = (ri and getattr(ri, "capability_slope", None)) or {}
+    fluency = (ri and getattr(ri, "founder_fluency", None)) or []
+    if not (reframe or slope or fluency):
+        if for_display:
+            return
+        lines.append("## The Read")
+        lines.append("")
+        lines.append(
+            "No read recorded. The evidence does not establish a demonstrated capability, "
+            "a resolved founder history, or a question the obvious framing gets wrong. "
+            "This is a named absence, not an omission."
+        )
+        lines.append("")
+        return
+
+    lines.append("## The Read")
+    lines.append("")
+    if reframe:
+        lines.append(f"**The obvious question.** {reframe.get('obvious_question', '')}")
+        lines.append("")
+        lines.append(f"**Why it misleads.** {reframe.get('why_it_misleads', '')}")
+        lines.append("")
+        lines.append(f"**The question that decides it.** {reframe.get('real_question', '')}")
+        lines.append("")
+    if slope:
+        lines.append(
+            "**Capability slope.** Hardest instance handled today: "
+            + _sentence(slope.get("hardest_instance", ""))
+        )
+        lines.append("")
+        # Grouped under one lead-in each; repeating the label per bullet reads as
+        # a stutter once there is more than one adjacency.
+        for label, key in (("Downhill from there", "downhill"), ("Still blocked by", "blocked_by")):
+            items = slope.get(key) or []
+            if not items:
+                continue
+            lines.append(f"*{label}*")
+            lines.append("")
+            for item in items:
+                lines.append(f"- {_sentence(item)}")
+            lines.append("")
+        evidence = str(slope.get("evidence") or "").strip()
+        if evidence:
+            lines.append(f"*Evidence: {evidence}*")
+            lines.append("")
+    if fluency:
+        lines.append("**Founder fluency**")
+        lines.append("")
+        for entry in fluency:
+            if not isinstance(entry, dict):
+                continue
+            head = f"- **{entry.get('founder', '')}** — {_sentence(entry.get('prior_domain', ''))}"
+            fluent_in = "; ".join(entry.get("fluent_in") or [])
+            unlocks = "; ".join(entry.get("unlocks") or [])
+            if fluent_in:
+                head += f" Fluent in {_sentence(fluent_in)}"
+            if unlocks:
+                # "without retraining" is the definition of the field, not a
+                # per-founder qualifier; restating it strands the phrase after a
+                # semicolon-separated list.
+                head += f" Unlocks {_sentence(unlocks)}"
+            lines.append(head)
+            evidence = str(entry.get("evidence") or "").strip()
+            if evidence:
+                lines.append(f"  - *Evidence: {evidence}*")
+        lines.append("")
+
+
 def _append_thesis_alignment_section(
     lines: list,
     startup: Startup,
@@ -215,6 +296,9 @@ class MemoGenerator:
             lines.append(f"**Scout Type:** {startup.scout_info.scout_type}")
             lines.append(f"**Confidence Score:** {startup.scout_info.confidence_score:.2f}")
             lines.append("")
+
+        # The read leads: what the scores cannot say, before the facts they rank.
+        _append_investment_read_section(lines, startup, for_display)
 
         # Problem & Opportunity (Overview in old design) — separate paragraphs so heading is above text
         lines.append("## Overview")

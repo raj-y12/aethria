@@ -340,6 +340,11 @@ def filter_references_by_url_probe(
     return output
 
 
+# Cap on references carried into the memo. Rank-ordered, so the cut falls on the
+# lowest-ranked citations — but it is logged, never silent.
+_MAX_REFERENCES = 8
+
+
 def _company_tokens(company_name: Optional[str]) -> List[str]:
     text = re.sub(r"[^a-z0-9 ]+", " ", (company_name or "").lower())
     stop = {"ai", "inc", "ltd", "llc", "the", "and", "company", "technologies", "technology", "labs"}
@@ -379,6 +384,15 @@ def _reference_company_match(ref: str, *, company_name: Optional[str], host: str
     if len(tokens) == 1:
         token = tokens[0]
         return token in ref_tokens or token in host_tokens
+    # NOTE: requiring EVERY token costs real coverage when the second token is a
+    # generic industry word the press omits — "Corgi Insurance" keeps
+    # /insurance-startup-corgi-hits-1-3b-valuation/ but drops
+    # /corgi-raises-106m-series-b1/. Relaxing this to a lead-token match on
+    # trusted trade sources was tried and reverted: it admits "Acme Foods" for
+    # "Acme Robotics" and a competitor's funding article for "Manna Air
+    # Delivery" (see test_company_relevance_rejects_similar_name_collision and
+    # test_path_only_single_token_coincidence_is_rejected). Recall here needs
+    # page content or a resolved alias set, not looser string matching.
     return False
 
 
@@ -572,14 +586,19 @@ def filter_references_by_company_relevance(
             continue
         kept.append(ref)
     kept.sort(key=lambda r: _rank_reference(r, company_name, anchor_hostname))
-    if dropped:
+    truncated = max(0, len(kept) - _MAX_REFERENCES)
+    if dropped or truncated:
+        # Truncation was silent, so a memo citing [S9] could list four sources
+        # and look like the rest never existed. Rank-ordered truncation is fine;
+        # unrecorded truncation is not.
         logger.info(
-            "reference_verify: source_filter company=%s kept=%d dropped=%d",
+            "reference_verify: source_filter company=%s kept=%d dropped=%d truncated=%d",
             (company_name or "")[:80],
-            len(kept),
+            min(len(kept), _MAX_REFERENCES),
             dropped,
+            truncated,
         )
-    return kept[:8]
+    return kept[:_MAX_REFERENCES]
 
 
 def build_source_evidence(refs: List[str], *, company_name: Optional[str]) -> List[Dict[str, str]]:
