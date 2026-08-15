@@ -23,6 +23,7 @@ vi.mock('../../../api/decisions', async (original) => ({ ...(await original<type
 }));
 
 import OpportunityIntelligence from '../OpportunityIntelligence';
+import type { MemoDecisionBriefStatus } from '../../../lib/memoDecisionBrief';
 
 function seedApi() {
   api.fetchOpportunityByLegacyStartup.mockResolvedValue({
@@ -65,11 +66,11 @@ function seedApi() {
   api.createHumanRuling.mockResolvedValue({ ruling_id: 'ruling-1', decision: 'monitor' });
 }
 
-function renderWorkspace() {
+function renderWorkspace(props: { onDecisionStatusChange?: (status: MemoDecisionBriefStatus) => void } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <OpportunityIntelligence startupId="startup-1" />
+      <OpportunityIntelligence startupId="startup-1" {...props} />
     </QueryClientProvider>,
   );
 }
@@ -152,12 +153,15 @@ describe('OpportunityIntelligence', () => {
 
   it('treats a ruling-history error as unavailable decision data and hides the composer', async () => {
     api.listHumanRulings.mockRejectedValue(new Error('ruling store unavailable'));
+    const onDecisionStatusChange = vi.fn();
 
-    renderWorkspace();
+    renderWorkspace({ onDecisionStatusChange });
 
     expect(await screen.findByText('Decision data unavailable')).toBeInTheDocument();
     expect(screen.getByText('The ruling history could not be loaded.')).toBeInTheDocument();
     expect(screen.queryByLabelText('Make your ruling')).not.toBeInTheDocument();
+    expect(screen.queryByText('Review supporting evidence')).not.toBeInTheDocument();
+    await waitFor(() => expect(onDecisionStatusChange).toHaveBeenLastCalledWith('unavailable'));
   });
 
   it('requires a rationale before recording a human ruling', async () => {

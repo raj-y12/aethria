@@ -24,9 +24,9 @@ function relativeLuminance([red, green, blue]: [number, number, number]): number
 }
 
 describe('Investment memo section order', () => {
-  it('keeps the remaining analysis under one native supporting disclosure', () => {
-    expect(memoSource.match(/<details className="memoSupportingAnalysis"/g)).toHaveLength(1);
-    expect(memoSource).toContain('<summary>Supporting analysis</summary>');
+  it('keeps the editorial memo in the primary reading flow', () => {
+    expect(memoSource).not.toContain('<details className="memoSupportingAnalysis"');
+    expect(memoSource).not.toContain('<summary>Supporting analysis</summary>');
     expect(memoSource).toMatch(
       /<MemoSectionTitle number="02" id="memo-founder">Founder<\/MemoSectionTitle>/,
     );
@@ -43,9 +43,9 @@ describe('Investment memo section order', () => {
     expect(memoSource).not.toContain('resolveEscalation');
     expect(memoSource).not.toContain('<MemoRulingSection');
     const ruling = memoSource.indexOf('<OpportunityIntelligence');
-    const supporting = memoSource.indexOf('<details className="memoSupportingAnalysis"');
+    const snapshot = memoSource.indexOf('id="memo-snapshot"');
     expect(ruling).toBeGreaterThan(-1);
-    expect(ruling).toBeLessThan(supporting);
+    expect(snapshot).toBeGreaterThan(ruling);
     expect(memoSource).not.toContain('<MemoDossierOpening');
     expect(memoSource).not.toContain('id="memo-read"');
     expect(memoSource).not.toContain('id="memo-killers"');
