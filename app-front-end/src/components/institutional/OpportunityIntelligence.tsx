@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOpportunityByLegacyStartup } from '../../api/identity';
 import { fetchEvidenceLedger } from '../../api/evidence';
@@ -7,7 +8,10 @@ import {
   type HumanRuling,
   type HumanRulingRecordDecision,
 } from '../../api/decisions';
-import { buildMemoDecisionBrief } from '../../lib/memoDecisionBrief';
+import {
+  buildMemoDecisionBrief,
+  type MemoDecisionBriefStatus,
+} from '../../lib/memoDecisionBrief';
 import MemoDecisionBrief from '../memo/MemoDecisionBrief';
 import ClaimEvidenceLedger from './ClaimEvidenceLedger';
 import HumanRulingComposer from './HumanRulingComposer';
@@ -75,11 +79,13 @@ export default function OpportunityIntelligence({
   startupId,
   companyName = null,
   onRulingRecorded,
+  onDecisionStatusChange,
   readOnly = false,
 }: {
   startupId: string;
   companyName?: string | null;
   onRulingRecorded?: () => void;
+  onDecisionStatusChange?: (status: MemoDecisionBriefStatus) => void;
   readOnly?: boolean;
 }) {
   const opportunity = useQuery({
@@ -147,9 +153,13 @@ export default function OpportunityIntelligence({
                 : undefined;
   const canCompose = Boolean(opportunity.data) && !decisionLoading && !decisionUnavailable;
 
+  useEffect(() => {
+    onDecisionStatusChange?.(brief.status);
+  }, [brief.status, onDecisionStatusChange]);
+
   return (
     <MemoDecisionBrief brief={brief} stateMessage={stateMessage}>
-      {hasClaims ? (
+      {hasClaims && !decisionLoading && !decisionUnavailable ? (
         <details className="memoDecisionDisclosure">
           <summary>Review supporting evidence</summary>
           <div className="memoDecisionDisclosureBody">

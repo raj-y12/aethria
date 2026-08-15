@@ -112,10 +112,12 @@ describe('MemoDecisionBrief', () => {
       />,
     );
 
-    const region = screen.getByRole('region', { name: 'Decision brief' });
-    expect(within(region).getByText('Decision data unavailable')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Decision status' });
+    expect(within(region).getByRole('status')).toHaveTextContent('Decision data unavailable');
     expect(within(region).getByText('The canonical evaluation could not be loaded.')).toBeInTheDocument();
-    expect(within(region).getByText('No system lean')).toBeInTheDocument();
+    expect(within(region).queryByRole('heading', { name: 'Decision brief' })).not.toBeInTheDocument();
+    expect(within(region).queryByText('System lean')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Unknown')).not.toBeInTheDocument();
     expect(region).not.toHaveTextContent(/invest|pass|monitor/i);
   });
 

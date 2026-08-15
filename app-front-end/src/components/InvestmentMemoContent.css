@@ -770,6 +770,17 @@
   hyphens: none;
 }
 
+.memoDecisionNotice {
+  margin-top: clamp(28px, 4cqi, 46px);
+  padding: 14px 0;
+  border-top: 1px solid var(--memo-rule);
+  border-bottom: 1px solid var(--memo-rule);
+}
+
+.memoDecisionNotice .memoDecisionStateMessage {
+  margin-top: 6px;
+}
+
 .memoDecisionBrief button,
 .memoDecisionBrief select,
 .memoDecisionBrief summary {
@@ -2005,26 +2016,6 @@
 
 /* Appendix and disclosures */
 
-.memoSupportingAnalysis {
-  margin-top: clamp(34px, 6cqi, 62px);
-  border-top: 1px solid var(--memo-rule-strong);
-}
-
-.memoSupportingAnalysis > summary {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  color: var(--memo-ink);
-  font-family: var(--memo-font-mono);
-  font-size: 0.75rem;
-  line-height: 1.45;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
 .memoDecisionEyebrow,
 .memoDecisionMeta,
 .memoDecisionStatus,
@@ -2046,10 +2037,6 @@
 .memoDecisionActionHead span,
 .memoRulingSubmit:disabled {
   color: var(--memo-decision-meta);
-}
-
-.memoSupportingAnalysisBody {
-  padding-bottom: 24px;
 }
 
 .memoDiscGroup {
@@ -2287,14 +2274,6 @@
   .memoMasthead {
     width: 100%;
     padding-inline: 0;
-  }
-
-  .memoSupportingAnalysis > summary {
-    display: none;
-  }
-
-  .memoSupportingAnalysis > .memoSupportingAnalysisBody {
-    display: block !important;
   }
 
   /* Justified setting belongs to the printed broadsheet only — on screen

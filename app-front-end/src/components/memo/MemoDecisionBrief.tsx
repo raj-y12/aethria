@@ -77,6 +77,18 @@ export default function MemoDecisionBrief({
   children?: ReactNode;
 }) {
   const pending = brief.status === 'loading' || brief.status === 'unavailable';
+  if (pending) {
+    return (
+      <section
+        className={`memoDecisionNotice memoDecisionNotice--${brief.status}`}
+        aria-label="Decision status"
+      >
+        <p className="memoDecisionStatus" role="status">{STATUS_LABELS[brief.status]}</p>
+        {stateMessage ? <p className="memoDecisionStateMessage">{stateMessage}</p> : null}
+      </section>
+    );
+  }
+
   return (
     <section
       className={`memoDocSection memoRulingControls memoDecisionWorkspace memoDecisionBrief memoDecisionBrief--${brief.status}`}
@@ -105,68 +117,64 @@ export default function MemoDecisionBrief({
         </dl>
       </div>
 
-      {!pending ? (
-        <>
-          <div className="memoDecisionBriefGrid">
-            <section className="memoDecisionDrivers" aria-labelledby="memo-decision-drivers">
-              <h3 id="memo-decision-drivers">Decision drivers</h3>
-              {brief.drivers.length > 0 ? (
-                <ol>{brief.drivers.map((driver) => (
-                  <li key={driver}>
-                    <span className="memoDecisionDriverText">{driver}</span>
-                    <span className="memoDecisionMaterialProvenance">Rule-derived</span>
-                  </li>
-                ))}</ol>
-              ) : <p className="memoDecisionMuted">No decision drivers were recorded.</p>}
-            </section>
+      <div className="memoDecisionBriefGrid">
+        <section className="memoDecisionDrivers" aria-labelledby="memo-decision-drivers">
+          <h3 id="memo-decision-drivers">Decision drivers</h3>
+          {brief.drivers.length > 0 ? (
+            <ol>{brief.drivers.map((driver) => (
+              <li key={driver}>
+                <span className="memoDecisionDriverText">{driver}</span>
+                <span className="memoDecisionMaterialProvenance">Rule-derived</span>
+              </li>
+            ))}</ol>
+          ) : <p className="memoDecisionMuted">No decision drivers were recorded.</p>}
+        </section>
 
-            <section className="memoDecisionRiskSurface" aria-labelledby="memo-decision-risks">
-              <h3 id="memo-decision-risks">Risks and evidence gaps</h3>
-              {brief.risks.length > 0 ? (
-                <ul>
-                  {brief.risks.map((risk) => (
-                    <li key={risk.key}>
-                      <div className="memoDecisionRiskMeta">
-                        <span>{risk.kind === 'risk' ? 'Risk' : 'Gap'}</span>
-                        <span>{risk.severity}</span>
-                        <span>Rule-derived</span>
-                      </div>
-                      <p>{risk.text}</p>
-                      <span className="memoDecisionSourceMissing">Source missing</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="memoDecisionMuted">No material company risk or evidence gap was recorded.</p>}
-            </section>
-          </div>
+        <section className="memoDecisionRiskSurface" aria-labelledby="memo-decision-risks">
+          <h3 id="memo-decision-risks">Risks and evidence gaps</h3>
+          {brief.risks.length > 0 ? (
+            <ul>
+              {brief.risks.map((risk) => (
+                <li key={risk.key}>
+                  <div className="memoDecisionRiskMeta">
+                    <span>{risk.kind === 'risk' ? 'Risk' : 'Gap'}</span>
+                    <span>{risk.severity}</span>
+                    <span>Rule-derived</span>
+                  </div>
+                  <p>{risk.text}</p>
+                  <span className="memoDecisionSourceMissing">Source missing</span>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="memoDecisionMuted">No material company risk or evidence gap was recorded.</p>}
+        </section>
+      </div>
 
-          {(brief.claims.length > 0 || brief.derivations.length > 0) ? (
-            <section className="memoDecisionProvenance" aria-labelledby="memo-decision-provenance">
-              <h3 id="memo-decision-provenance">Claim provenance</h3>
-              <ul>
-                {brief.claims.map((claim) => (
-                  <li key={`${claim.claimId}-${claim.relationship}`}>
-                    <p>{claim.claim}</p>
-                    <span className="memoDecisionProvenanceMeta">
-                      <span>{claim.criterion.replace(/_/g, ' ')}</span>
-                      <span>{claim.relationship === 'supports' ? 'Supports' : 'Contradicts'}</span>
-                      {claim.provenance !== 'missing' ? (
-                        <span>{PROVENANCE_LABELS[claim.provenance]}</span>
-                      ) : null}
-                    </span>
-                    <SourceLinks sources={claim.sources} />
-                  </li>
-                ))}
-                {brief.derivations.map((derivation) => (
-                  <li key={derivation.criterion}>
-                    <p>{derivation.criterion.replace(/_/g, ' ')}</p>
-                    <span className="memoDecisionProvenanceMeta">Rule-derived</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </>
+      {(brief.claims.length > 0 || brief.derivations.length > 0) ? (
+        <section className="memoDecisionProvenance" aria-labelledby="memo-decision-provenance">
+          <h3 id="memo-decision-provenance">Claim provenance</h3>
+          <ul>
+            {brief.claims.map((claim) => (
+              <li key={`${claim.claimId}-${claim.relationship}`}>
+                <p>{claim.claim}</p>
+                <span className="memoDecisionProvenanceMeta">
+                  <span>{claim.criterion.replace(/_/g, ' ')}</span>
+                  <span>{claim.relationship === 'supports' ? 'Supports' : 'Contradicts'}</span>
+                  {claim.provenance !== 'missing' ? (
+                    <span>{PROVENANCE_LABELS[claim.provenance]}</span>
+                  ) : null}
+                </span>
+                <SourceLinks sources={claim.sources} />
+              </li>
+            ))}
+            {brief.derivations.map((derivation) => (
+              <li key={derivation.criterion}>
+                <p>{derivation.criterion.replace(/_/g, ' ')}</p>
+                <span className="memoDecisionProvenanceMeta">Rule-derived</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : null}
 
       {children}
