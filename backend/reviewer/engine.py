@@ -47,6 +47,30 @@ def load_active_policy(*args, **kwargs):
     return _load_active_policy(*args, **kwargs)
 
 
+def _evidence_coverage_from_trace(trace: Dict[str, Any]) -> Optional[float]:
+    """Fraction of rubric criteria that carried complete evidence, 0.0-1.0.
+
+    None when the trace exposes no criteria at all — an unknown coverage must not
+    render as 0% coverage.
+    """
+    evidenced = 0
+    total = 0
+    for dim in ("market", "product", "technical", "execution", "defensibility"):
+        details = trace.get(dim) if isinstance(trace.get(dim), dict) else {}
+        criteria = details.get("criteria")
+        if not isinstance(criteria, dict):
+            continue
+        for criterion in criteria.values():
+            if not isinstance(criterion, dict):
+                continue
+            total += 1
+            if not criterion.get("missing_data_applied"):
+                evidenced += 1
+    if total == 0:
+        return None
+    return round(evidenced / total, 3)
+
+
 class ReviewerEngine:
     """
     Execution engine for the Reviewer layer.
@@ -651,6 +675,7 @@ class ReviewerEngine:
                 defensibility_weaknesses=r.get("defensibility_weaknesses") or None,
                 defensibility_confidence=r.get("defensibility_confidence"),
                 prompt_version=r.get("prompt_version"),
+                evidence_coverage=r.get("evidence_coverage"),
                 structured_scoring=r.get("structured_scoring") if keep_structured else None,
                 structured_signals=(
                     dict(r["structured_signals"])
@@ -716,6 +741,13 @@ class ReviewerEngine:
         updated["execution_score"] = _dim_score("execution")
         updated["defensibility_score"] = _dim_score("defensibility")
         updated["structured_scoring"] = trace
+        # Every persona keeps a scalar record of how much of the rubric was
+        # actually evidenced. The full trace is retained only on the primary
+        # snapshot (memory), which left the other personas publishing a bare
+        # number with its provenance discarded — a 2.0 that means "almost
+        # nothing was evidenced" is indistinguishable from a 2.0 that means
+        # "bad company" unless coverage travels with it.
+        updated["evidence_coverage"] = _evidence_coverage_from_trace(trace)
         updated["score_source"] = "Structured assessment framework"
         updated["score_reasoning"] = self._score_reasoning_from_structured_trace(trace)
         return updated

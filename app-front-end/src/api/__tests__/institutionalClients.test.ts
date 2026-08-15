@@ -123,6 +123,44 @@ describe('institutional API clients', () => {
     expect(result.recommendation?.change_conditions).toEqual(['Verify three-month retention.']);
   });
 
+  it('normalizes criterion claim and quality arrays across rollout payload shapes', async () => {
+    authedFetch.mockResolvedValueOnce(new Response(JSON.stringify({
+      evaluation: { evaluation_id: 'evaluation-1', model_manifest: {}, prompt_manifest: {} },
+      criteria: [
+        {
+          criterion: 'stringified',
+          supporting_claim_ids: '["claim-support"]',
+          contradicting_claim_ids: '["claim-contradiction"]',
+          quality_flags: '["weak_sources"]',
+        },
+        {
+          criterion: 'malformed',
+          supporting_claim_ids: '[not json', contradicting_claim_ids: '{}', quality_flags: 'not json',
+        },
+        { criterion: 'missing' },
+        {
+          criterion: 'arrays',
+          supporting_claim_ids: ['claim-a'], contradicting_claim_ids: ['claim-b'], quality_flags: ['contested_review'],
+        },
+      ],
+      recommendation: null,
+    }), { status: 200 }));
+
+    const result = await fetchCurrentEvaluation('opportunity-1');
+
+    expect(result.criteria.map((criterion) => ({
+      criterion: criterion.criterion,
+      supporting: criterion.supporting_claim_ids,
+      contradicting: criterion.contradicting_claim_ids,
+      flags: criterion.quality_flags,
+    }))).toEqual([
+      { criterion: 'stringified', supporting: ['claim-support'], contradicting: ['claim-contradiction'], flags: ['weak_sources'] },
+      { criterion: 'malformed', supporting: [], contradicting: [], flags: [] },
+      { criterion: 'missing', supporting: [], contradicting: [], flags: [] },
+      { criterion: 'arrays', supporting: ['claim-a'], contradicting: ['claim-b'], flags: ['contested_review'] },
+    ]);
+  });
+
   it('creates human rulings and reads their history', async () => {
     authedFetch
       .mockResolvedValueOnce(new Response(JSON.stringify({ ruling_id: 'ruling-1', decision: 'advance' }), { status: 200 }))

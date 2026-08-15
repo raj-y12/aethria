@@ -13,6 +13,7 @@ import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import { type PipelineReplayStep } from '../../lib/memoIcPack';
 import { type RulingDecision } from '../../lib/dealState';
 import { type AdverseRegisterItem, type AdverseSeverity } from '../../lib/adverseRegister';
+import { formatDecisionDriver, formatDecisionDrivers } from '../../lib/decisionDrivers';
 
 export function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | null): Startup {
   if (!partial) return base;
@@ -210,7 +211,8 @@ export function memoHeaderThesisLine(startup: Startup): string {
   if (scoutOneLine) return scoutOneLine;
   const candidates = [
     startup.partner?.snapshot?.key_signal,
-    startup.partner?.decision_drivers?.[0],
+    // decision_drivers are machine tags — never render one raw.
+    formatDecisionDriver(startup.partner?.decision_drivers?.[0] ?? ''),
     startup.review?.aethria_view?.thesis_fit_line,
     startup.review?.investment_thesis?.[0],
     startup.partner?.thesis,
@@ -359,7 +361,7 @@ export function buildInvestmentCase(startup: Startup, exclude: string): string[]
     startup.partner?.traction_signals,
     startup.review?.aethria_view?.thesis_fit_line,
     ...(startup.review?.investment_thesis ?? []),
-    ...(startup.partner?.decision_drivers ?? []),
+    ...formatDecisionDrivers(startup.partner?.decision_drivers),
     startup.scout.why_now,
     startup.scout.primary_thesis,
   ];
@@ -417,7 +419,7 @@ export function buildSnapshotRows(
       label: 'Why Aethria flagged it',
       text: firstNonEmpty(
         startup.partner?.snapshot?.key_signal,
-        startup.partner?.decision_drivers?.[0],
+        formatDecisionDriver(startup.partner?.decision_drivers?.[0] ?? ''),
         startup.scout.why_now,
         startup.partner?.why_this_matters,
       ),

@@ -64,6 +64,8 @@ REGISTRY: List[EnvVar] = [
     EnvVar("LOCAL_SNAPSHOT_READ_ONLY", "bool", "", "Core / storage",
            "Local imported production snapshot mode; keeps repositories readable and disables autonomous writers.",
            example="0"),
+    EnvVar("LOCAL_SNAPSHOT_GOLDEN_BACKUP_PATH", "str", "", "Core / storage",
+           "Optional path to the immutable local snapshot backup used by reset-local-snapshot."),
 
     # --- OpenAI / models -----------------------------------------------------
     EnvVar("OPENAI_API_KEY", "secret", "", "OpenAI / models",

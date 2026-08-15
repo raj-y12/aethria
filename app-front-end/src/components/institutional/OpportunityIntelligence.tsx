@@ -7,9 +7,10 @@ import {
   type HumanRuling,
   type HumanRulingRecordDecision,
 } from '../../api/decisions';
+import { buildMemoDecisionBrief } from '../../lib/memoDecisionBrief';
+import MemoDecisionBrief from '../memo/MemoDecisionBrief';
 import ClaimEvidenceLedger from './ClaimEvidenceLedger';
 import HumanRulingComposer from './HumanRulingComposer';
-import RecommendationPanel from './RecommendationPanel';
 
 function nestedString(value: unknown, key: string): string | null {
   if (!value || typeof value !== 'object') return null;
@@ -47,12 +48,7 @@ function RulingHistory({ rulings }: { rulings: HumanRuling[] }) {
         <p className="memoDecisionHistoryDecision">{decisionLabel(latest.decision)}</p>
       </div>
       <p className="memoDecisionHistoryRationale">{latest.rationale}</p>
-      <p className="memoDecisionMeta">
-        {rulingDate(latest.created_at) ?? 'Recorded'}
-        {typeof latest.investor_confidence === 'number'
-          ? ` · ${Math.round(latest.investor_confidence * 100)}% confidence`
-          : ''}
-      </p>
+      <p className="memoDecisionMeta">{rulingDate(latest.created_at) ?? 'Recorded'}</p>
       {latest.override_type ? (
         <p className="memoDecisionOverride">Why it differs <span>{plainLabel(latest.override_type)}</span></p>
       ) : null}
@@ -71,18 +67,6 @@ function RulingHistory({ rulings }: { rulings: HumanRuling[] }) {
           </ol>
         </details>
       ) : null}
-    </section>
-  );
-}
-
-function RulingState({ message, unavailable = false }: { message: string; unavailable?: boolean }) {
-  return (
-    <section
-      className="memoDocSection memoRulingControls memoDecisionWorkspace"
-      aria-label={unavailable ? 'Your ruling unavailable' : 'Your ruling'}
-    >
-      <h2 className="memoDocSectionHead">Your ruling</h2>
-      <p className="memoDecisionIntro">{message}</p>
     </section>
   );
 }
@@ -129,38 +113,42 @@ export default function OpportunityIntelligence({
   const recommendedDecision: RecommendationState | null =
     evaluation.data?.recommendation?.recommended_state ?? null;
 
-  const recommendation = evaluation.data?.recommendation;
-  const hasRecommendation = Boolean(recommendation);
-  const hasInsufficientEvidence = recommendation?.recommended_state === 'insufficient_evidence';
   const hasClaims = Boolean(evidence.data?.claims.some((claim) => claim.status === 'current'));
-
-  if (opportunity.isLoading) {
-    return <RulingState message="Preparing the recommendation and decision record…" />;
-  }
-  if (opportunity.isError || !opportunity.data) {
-    return (
-      <RulingState
-        unavailable
-        message="This memo is still being connected to its decision record. The ruling controls will appear when that link is complete."
-      />
-    );
-  }
+  const decisionLoading = opportunity.isLoading
+    || (Boolean(opportunityId) && (evaluation.isLoading || evidence.isLoading || rulings.isLoading));
+  const decisionUnavailable = opportunity.isError
+    || (!opportunity.isLoading && !opportunity.data)
+    || evaluation.isError
+    || evidence.isError
+    || rulings.isError
+    || (Boolean(opportunityId) && !evaluation.isLoading && !evaluation.data)
+    || (Boolean(opportunityId) && !evidence.isLoading && !evidence.data);
+  const brief = buildMemoDecisionBrief({
+    evaluation: evaluation.data,
+    ledger: evidence.data,
+    ruling: rulings.data?.[0],
+    loading: decisionLoading,
+    unavailable: decisionUnavailable,
+  });
+  const stateMessage = decisionLoading
+    ? 'Loading the canonical evaluation and evidence ledger.'
+    : opportunity.isError || (!opportunity.isLoading && !opportunity.data)
+      ? 'The opportunity-to-decision record link is unavailable.'
+      : evaluation.isError || !evaluation.data
+        ? 'The canonical evaluation could not be loaded.'
+        : evidence.isError || !evidence.data
+          ? 'The evidence ledger could not be loaded.'
+          : rulings.isError
+            ? 'The ruling history could not be loaded.'
+            : brief.coverage === 'missing'
+              ? 'The canonical evaluation is blocked by missing evidence.'
+              : brief.coverage === 'contradictory'
+                ? 'The canonical evaluation is blocked by contradictory evidence.'
+                : undefined;
+  const canCompose = Boolean(opportunity.data) && !decisionLoading && !decisionUnavailable;
 
   return (
-    <section className="memoDocSection memoRulingControls memoDecisionWorkspace" aria-labelledby="opportunity-final-ruling">
-      <h2 className="memoDocSectionHead" id="opportunity-final-ruling">Your ruling</h2>
-      <p className="memoDecisionIntro">
-        {hasInsufficientEvidence
-          ? 'Aethria cannot make a decisive recommendation yet. Review what is missing, then make the call for your fund.'
-          : hasRecommendation
-          ? 'See why Aethria leans this way, review the evidence that matters, then make the call for your fund.'
-          : 'The memo above is the case. Record the call for your fund.'}
-      </p>
-
-      {/* Every produced recommendation remains visible, including a non-decisive
-          insufficient-evidence state. The claim ledger still waits for real claims. */}
-      {hasRecommendation ? <RecommendationPanel evaluation={evaluation.data ?? null} /> : null}
-
+    <MemoDecisionBrief brief={brief} stateMessage={stateMessage}>
       {hasClaims ? (
         <details className="memoDecisionDisclosure">
           <summary>Review supporting evidence</summary>
@@ -170,18 +158,18 @@ export default function OpportunityIntelligence({
         </details>
       ) : null}
 
-      {rulings.isError ? (
-        <p role="alert" className="memoDecisionMuted">Earlier rulings could not be loaded.</p>
-      ) : <RulingHistory rulings={rulings.data ?? []} />}
+      {!rulings.isError ? <RulingHistory rulings={rulings.data ?? []} /> : null}
 
-      <HumanRulingComposer
-        opportunityId={opportunity.data.opportunity_id}
-        recommendationId={recommendationId}
-        recommendedDecision={recommendedDecision}
-        companyName={companyName}
-        onRecorded={onRulingRecorded}
-        readOnly={readOnly}
-      />
-    </section>
+      {canCompose ? (
+        <HumanRulingComposer
+          opportunityId={opportunity.data!.opportunity_id}
+          recommendationId={recommendationId}
+          recommendedDecision={recommendedDecision}
+          companyName={companyName}
+          onRecorded={onRulingRecorded}
+          readOnly={readOnly}
+        />
+      ) : null}
+    </MemoDecisionBrief>
   );
 }

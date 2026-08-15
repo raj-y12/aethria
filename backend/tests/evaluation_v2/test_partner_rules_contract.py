@@ -192,6 +192,18 @@ def test_prerequisites_inject_one_typed_rules_object_consumed_by_partner():
     assert engine._get_rules() is prerequisites.partner_rules
 
 
+def test_compiled_policy_marks_each_configured_dimension_required_for_evaluation():
+    policy = evaluation_policy_from_compiled(
+        _compiled_policy(), partner_rules=_rules()
+    )
+
+    assert {criterion.criterion for criterion in policy.criteria} == {
+        "market",
+        "execution",
+    }
+    assert all(criterion.required for criterion in policy.criteria)
+
+
 def test_partner_consumes_validated_rule_values_without_behavioral_defaults():
     rules = _rules()
     rules["quality_labels"]["MEDIUM"] = "Custom policy label"

@@ -22,7 +22,7 @@ export default function FounderSignalsPanel({
   const signals = claims.filter((claim) => claim.status === 'current' && isFounderSignal(claim));
 
   return (
-    <section className="border-y border-oxford/10 py-phi-4" aria-label="Evidence-backed founder signals">
+    <section className="border-y border-oxford/10 py-phi-4" aria-label="Founder evidence signals">
       <div className="flex items-baseline justify-between gap-phi-4">
         <p className="type-label-section">Founder evidence</p>
         <span className="type-meta text-oxford/65">Only claims tied to a recorded source</span>

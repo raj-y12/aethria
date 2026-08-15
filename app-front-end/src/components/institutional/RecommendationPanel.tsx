@@ -31,7 +31,6 @@ export default function RecommendationPanel({ evaluation }: { evaluation: Evalua
           <p className="memoDecisionEyebrow">Aethria recommendation</p>
           <p className="memoDecisionRecommendation">{semantics.label}</p>
         </div>
-        <p className="memoDecisionMeta">{Math.round(recommendation.confidence * 100)}% confidence</p>
       </div>
       <p className="memoDecisionExplanation">{explanation}</p>
       <div className="memoDecisionReasoningGrid">

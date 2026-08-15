@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -32,7 +32,7 @@ function seedApi() {
     created_at: '2026-07-15T12:00:00Z', updated_at: '2026-07-15T12:00:00Z',
   });
   api.fetchEvidenceLedger.mockResolvedValue({
-    artifacts: [{ artifact_id: 'artifact-1', artifact_type: 'interview_note', title: 'Founder interview', trust_class: 'founder', access_class: 'tenant_confidential' }],
+    artifacts: [{ artifact_id: 'artifact-1', artifact_type: 'interview_note', title: 'Founder interview', source_uri: 'https://example.com/founder-interview', trust_class: 'founder', access_class: 'tenant_confidential' }],
     items: [{ evidence_item_id: 'item-1', artifact_id: 'artifact-1', item_type: 'interview_quote', display_excerpt: 'Shipped the first workflow in nine days after six customer interviews.', verification_state: 'verified', source_quality: 0.8, extraction_confidence: 0.9 }],
     claims: [{ claim_id: 'claim-1', company_id: 'company-1', opportunity_id: 'opportunity-1', claim_type: 'founder_speed', display_text: 'Built and shipped the first workflow in nine days.', assertion_class: 'founder_asserted', confidence: 0.82, material: true, status: 'current' }],
     links: [{ link_id: 'link-1', claim_id: 'claim-1', evidence_item_id: 'item-1', relationship: 'supports', support_strength: 0.8, rationale: 'Direct interview evidence.' }],
@@ -44,7 +44,11 @@ function seedApi() {
       partner_rules_version: 'rules-v1', partner_rules_hash: 'rules-hash-v1',
       model_manifest: { model_id: 'gpt-5-nano' }, prompt_manifest: { prompt_version: 'prompt-a' },
     },
-    criteria: [],
+    criteria: [{
+      criterion_assessment_id: 'criterion-1', criterion: 'founder', score: 7, confidence: 0.8,
+      evidence_sufficiency: 'sufficient', reasoning: 'Direct founder evidence.',
+      supporting_claim_ids: ['claim-1'], contradicting_claim_ids: [], missing_evidence: [], quality_flags: [],
+    }],
     recommendation: {
       recommendation_id: 'recommendation-1', recommended_state: 'monitor',
       decision_drivers: ['Customer pull is promising.'], principal_risks: ['Retention evidence remains missing.'],
@@ -73,9 +77,14 @@ function renderWorkspace() {
 describe('OpportunityIntelligence', () => {
   beforeEach(() => { Object.values(api).forEach((mock) => mock.mockReset()); seedApi(); });
 
-  it('is one plain-language ruling surface without dashboard or system plumbing', async () => {
+  it('is one decision brief with status, system lean, and ruling action in the same work surface', async () => {
     renderWorkspace();
-    expect(await screen.findByRole('heading', { name: 'Your ruling' })).toBeInTheDocument();
+    const brief = await screen.findByRole('region', { name: 'Decision brief' });
+    expect(within(brief).getByRole('heading', { name: 'Decision brief' })).toBeInTheDocument();
+    expect(await within(brief).findByText('Ruling recorded')).toBeInTheDocument();
+    expect(within(brief).getByText('System lean')).toBeInTheDocument();
+    expect(within(brief).getByText('Monitor', { selector: 'strong' })).toBeInTheDocument();
+    expect(within(brief).getByLabelText('Make your ruling')).toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.queryByText(/current status/i)).not.toBeInTheDocument();
     expect(screen.queryByText('opportunity-1')).not.toBeInTheDocument();
@@ -83,16 +92,33 @@ describe('OpportunityIntelligence', () => {
     expect(screen.queryByText(/keep watching|company identity|artifact hash|storage reference/i)).not.toBeInTheDocument();
   });
 
-  it('shows the recommendation reasoning and keeps supporting evidence available on demand', async () => {
+  it('shows decision drivers and inline provenance while keeping the evidence ledger available on demand', async () => {
     renderWorkspace();
     expect(await screen.findByText('Customer pull is promising.')).toBeInTheDocument();
-    expect(within(screen.getByLabelText('Aethria reasoning')).getByText('Monitor')).toBeInTheDocument();
     expect(screen.getByText('Retention evidence remains missing.')).toBeInTheDocument();
+    expect(screen.getByText('Reported')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Founder interview' })).toHaveAttribute('href', 'https://example.com/founder-interview');
+    expect(screen.queryByText(/% confidence/i)).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Review supporting evidence'));
-    const founderSignals = await screen.findByLabelText('Evidence-backed founder signals');
+    const founderSignals = await screen.findByLabelText('Founder evidence signals');
     expect(within(founderSignals).getByText('Built and shipped the first workflow in nine days.')).toBeInTheDocument();
     expect(within(founderSignals).getByText('Shipped the first workflow in nine days after six customer interviews.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Evidence-backed founder signals')).not.toBeInTheDocument();
     expect(screen.queryByText(/magnetic founder/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the decision brief and evidence visible in read-only mode while hiding the composer', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <OpportunityIntelligence startupId="startup-1" readOnly />
+      </QueryClientProvider>,
+    );
+
+    const brief = await screen.findByRole('region', { name: 'Decision brief' });
+    expect(await within(brief).findByText('Customer pull is promising.')).toBeInTheDocument();
+    expect(within(brief).getByText('Review supporting evidence')).toBeInTheDocument();
+    expect(within(brief).queryByLabelText('Make your ruling')).not.toBeInTheDocument();
   });
 
   it('keeps the latest recorded ruling and rationale visible', async () => {
@@ -102,6 +128,36 @@ describe('OpportunityIntelligence', () => {
     expect(within(history).getByText('Monitor')).toBeInTheDocument();
     expect(within(history).getByText('Wait for three months of verified retention before advancing.')).toBeInTheDocument();
     expect(within(history).getByText('Timing')).toBeInTheDocument();
+  });
+
+  it('keeps decision data loading until authoritative ruling history resolves', async () => {
+    let resolveRulings!: (rulings: []) => void;
+    api.listHumanRulings.mockReturnValue(new Promise<[]>(resolve => { resolveRulings = resolve; }));
+
+    renderWorkspace();
+
+    await waitFor(() => {
+      expect(api.fetchCurrentEvaluation).toHaveBeenCalledOnce();
+      expect(api.fetchEvidenceLedger).toHaveBeenCalledOnce();
+      expect(api.listHumanRulings).toHaveBeenCalledOnce();
+    });
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.getByText('Decision data loading')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Make your ruling')).not.toBeInTheDocument();
+
+    await act(async () => { resolveRulings([]); });
+    expect(await screen.findByText('Ready for ruling')).toBeInTheDocument();
+    expect(screen.getByLabelText('Make your ruling')).toBeInTheDocument();
+  });
+
+  it('treats a ruling-history error as unavailable decision data and hides the composer', async () => {
+    api.listHumanRulings.mockRejectedValue(new Error('ruling store unavailable'));
+
+    renderWorkspace();
+
+    expect(await screen.findByText('Decision data unavailable')).toBeInTheDocument();
+    expect(screen.getByText('The ruling history could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Make your ruling')).not.toBeInTheDocument();
   });
 
   it('requires a rationale before recording a human ruling', async () => {
@@ -148,11 +204,11 @@ describe('OpportunityIntelligence', () => {
     api.fetchEvidenceLedger.mockResolvedValue({ artifacts: [], items: [], claims: [], links: [], plans: [] });
     renderWorkspace();
     expect(await screen.findByRole('button', { name: 'Review ruling' })).toBeInTheDocument();
-    expect(await screen.findByText('Insufficient evidence')).toBeInTheDocument();
+    expect(await screen.findByText('Blocked by evidence')).toBeInTheDocument();
+    expect(screen.getByText('No system lean')).toBeInTheDocument();
     expect(screen.getByText('Verified market demand')).toBeInTheDocument();
     expect(screen.getByText('Resolve missing evidence: market.')).toBeInTheDocument();
-    expect(screen.getByText(/does not yet have enough grounded evidence/i)).toBeInTheDocument();
     expect(screen.queryByText('Review supporting evidence')).not.toBeInTheDocument();
-    expect(screen.getByText(/review what is missing, then make the call/i)).toBeInTheDocument();
+    expect(screen.getByText(/canonical evaluation is blocked by missing evidence/i)).toBeInTheDocument();
   });
 });

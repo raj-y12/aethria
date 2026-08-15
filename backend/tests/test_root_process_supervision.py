@@ -47,6 +47,16 @@ def test_agents_start_only_with_an_explicit_tenant():
     assert root_run._should_start_agents(use_supabase=True, agent_user_id="") is False
 
 
+def test_backend_command_enables_reload_without_worker_mode():
+    root_run = _root_run_module()
+
+    command = root_run._backend_command()
+
+    assert command[:4] == [root_run.sys.executable, "-m", "uvicorn", "api:app"]
+    assert "--reload" in command
+    assert "--workers" not in command
+
+
 def test_run_pipeline_only_auto_starts_the_explicit_local_postgres_target(monkeypatch):
     root_run = _root_run_module()
 
@@ -72,17 +82,49 @@ def test_snapshot_database_selects_isolated_compose_stack():
     assert root_run._compose_file_for_database(test_dsn) == root_run.COMPOSE_FILE
 
 
-def test_run_never_applies_migrations_to_snapshot_database():
+def test_compose_command_starts_colima_when_the_active_daemon_is_unavailable(monkeypatch):
+    root_run = _root_run_module()
+    calls = []
+    docker = "/opt/homebrew/bin/docker"
+    colima = "/opt/homebrew/bin/colima"
+
+    def fake_which(command):
+        return {"docker": docker, "colima": colima}.get(command)
+
+    def fake_run(command, **kwargs):
+        calls.append(command)
+        if command == [docker, "info"]:
+            return root_run.subprocess.CompletedProcess(command, 1, stderr="daemon unavailable")
+        if command == [docker, "context", "show"]:
+            return root_run.subprocess.CompletedProcess(command, 0, stdout="colima\n")
+        if command == [colima, "start"]:
+            return root_run.subprocess.CompletedProcess(command, 0)
+        if command == [docker, "compose", "version"]:
+            return root_run.subprocess.CompletedProcess(command, 0)
+        raise AssertionError(f"unexpected command: {command}")
+
+    monkeypatch.setattr(root_run.shutil, "which", fake_which)
+    monkeypatch.setattr(root_run.subprocess, "run", fake_run)
+
+    assert root_run._compose_command() == [docker, "compose"]
+    assert calls[:3] == [
+        [docker, "info"],
+        [docker, "context", "show"],
+        [colima, "start"],
+    ]
+
+
+def test_run_applies_migrations_to_mutable_snapshot_working_copy():
     root_run = _root_run_module()
 
     snapshot_dsn = "postgresql://aethria:local-test-password@127.0.0.1:15432/aethria_prod_snapshot"
     test_dsn = "postgresql://aethria:local-test-password@127.0.0.1:15432/aethria_test"
 
-    assert root_run._should_apply_local_migrations(snapshot_dsn) is False
+    assert root_run._should_apply_local_migrations(snapshot_dsn) is True
     assert root_run._should_apply_local_migrations(test_dsn) is True
 
 
-def test_terminal_renderer_pins_banner_and_scrolls_log_region():
+def test_terminal_renderer_prints_static_banner_and_normal_logs():
     root_run = _root_run_module()
     stream = StringIO()
     renderer = root_run._TerminalRenderer(
@@ -102,45 +144,49 @@ def test_terminal_renderer_pins_banner_and_scrolls_log_region():
     assert "STATUS" in output
     assert "first log" in output
     assert "second log" in output
-    assert "\x1b[3;8r" in output
-    assert "\x1b[r" in output
+    assert output.count("BANNER") == 1
+    assert "\x1b[2J" not in output
+    assert "\x1b[?1000h" not in output
+    assert "\x1b[r" not in output
 
 
-def test_terminal_renderer_left_aligns_aethria_in_white_header():
+def test_terminal_renderer_does_not_capture_terminal_scrolling():
     root_run = _root_run_module()
-    stream = StringIO()
     renderer = root_run._TerminalRenderer(
-        "---\n       AETHRIA\n\n\n\n\n\n---\nBackend (API)",
-        stream=stream,
-        enabled=True,
-        terminal_lines=20,
-        terminal_columns=100,
-        use_color=True,
-    )
-
-    renderer.start()
-
-    output = stream.getvalue()
-    lines = output.splitlines()
-    assert lines[1].startswith("\x1b[47m")
-    assert "\x1b[47m" not in lines[8]
-    assert "\x1b[30m" not in output
-    assert "\x1b[38;2;0;33;71m" in output or "AETHRIA" in output
-    assert "AETHRIA" in lines[1]
-
-
-def test_white_logo_box_covers_ascii_art_side_padding():
-    root_run = _root_run_module()
-    banner = root_run._build_banner(False)
-    renderer = root_run._TerminalRenderer(
-        banner,
+        "BANNER\nSTATUS",
         stream=StringIO(),
         enabled=True,
-        terminal_lines=30,
-        terminal_columns=100,
-        use_color=True,
+        terminal_lines=8,
+    )
+    renderer.start()
+    renderer.emit("log line")
+
+    output = renderer._stream.getvalue()
+    assert "log line" in output
+    assert "\x1b[?1000h" not in output
+    assert "\x1b[?1006h" not in output
+
+
+def test_banner_uses_white_aethria_text_without_a_background(monkeypatch):
+    root_run = _root_run_module()
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://aethria:local-test-password@127.0.0.1:15432/aethria_prod_snapshot",
     )
 
-    raw_logo_width = max(len(line) for line in banner.splitlines()[1:7])
+    banner = root_run._build_banner(True)
 
-    assert renderer._title_box_width >= max(raw_logo_width, root_run.BANNER_WIDTH)
+    assert "\x1b[37m" in banner
+    assert "\x1b[47m" not in banner
+    assert "\x1b[38;2;0;33;71m" not in banner
+    assert "Current snapshot:   aethria_prod_snapshot (working copy)" in banner
+
+
+def test_banner_lists_all_local_ports(monkeypatch):
+    root_run = _root_run_module()
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    banner = root_run._build_banner(False)
+
+    assert "http://localhost:8000" in banner
+    assert "http://localhost:3000" in banner
+    assert "http://localhost:3001" in banner

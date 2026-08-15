@@ -1,0 +1,70 @@
+{
+  "version": "2",
+  "description": "Reviewer evaluation rules. Align with evaluation_rubric_v1.json (v1.1) for dimensions and verdict logic. v2 adds the investment_read doctrine (founder fluency, capability slope, reframe). The read is narrative only: it does not feed scores or verdict thresholds.",
+  "diligence_red_flags": [
+    {
+      "id": "missing_founding_team",
+      "label": "Missing founding team details",
+      "action": "Add to diligence_red_flags when founding team information is absent."
+    },
+    {
+      "id": "missing_revenue",
+      "label": "Missing revenue or traction data",
+      "action": "Add to diligence_red_flags when revenue/ARR/traction data is absent."
+    },
+    {
+      "id": "missing_competitors",
+      "label": "Competitive landscape unclear",
+      "action": "Add to diligence_red_flags when specific competitors are not identified."
+    },
+    {
+      "id": "missing_valuation",
+      "label": "Missing valuation data",
+      "action": "Add to diligence_red_flags when valuation information is absent."
+    },
+    {
+      "id": "critical_risk",
+      "label": "Regulatory or execution impossibility",
+      "action": "Score dimension 1-3; consider WEAK verdict."
+    },
+    {
+      "id": "contradictory_scores",
+      "label": "Gap \u22654 between highest and lowest dimension",
+      "action": "Flag for human review or LLM fallback."
+    }
+  ],
+  "verdict_thresholds": {
+    "STRONG": {
+      "min_avg": 8.0,
+      "min_any": 7,
+      "max_low": 0
+    },
+    "MEDIUM": {
+      "min_avg": 6.0,
+      "min_any": 5,
+      "max_low": 1
+    },
+    "WEAK": {
+      "min_avg": 0,
+      "min_any": 0,
+      "max_low": 999
+    }
+  },
+  "hypothesis_feedback_guidance": "Review Scout primary_thesis, key_assumptions, and biggest_unknown. In assumption_feedback: comment on which assumptions are well-supported or weak, and highlight critical unknowns that could invalidate the thesis. Use only information provided; do not hallucinate missing data.",
+  "investment_read": {
+    "purpose": "Produce the analyst read that scores cannot express: what the founder's background makes cheap, what the demonstrated capability makes reachable, and which obvious question about this company is the wrong one. Narrative only \u2014 never an input to scores or verdict.",
+    "evidence_bar": "Every claim must trace to a named prior employer, role, publication, product capability, or customer stated in the Scout memo, founder context, or supplemental snippets. A plausible inference with no named source is a fabrication. Emit nothing rather than something.",
+    "founder_fluency": {
+      "rule": "For each founder named in the resolved founder context, map the background rather than ranking it: the prior domain, the problems that domain makes them fluent in, and the markets or buyers it lets them reach without retraining.",
+      "omit_when": "No resolved founder context, or the context carries no prior role, employer, or publication. Do not infer fluency from a company description."
+    },
+    "capability_slope": {
+      "rule": "Identify the hardest instance of the problem the product demonstrably handles today. List what is strictly easier than that instance and therefore downhill from it. Name what still blocks each adjacency (regulatory, distribution, capital, unproven physics).",
+      "omit_when": "The evidence does not establish a demonstrated capability, only a stated ambition. A roadmap is not a slope."
+    },
+    "reframe": {
+      "rule": "State the question a generalist would ask about this company, why that question misreads it, and the question that actually decides the investment. The real question must be answerable with diligence, not rhetoric.",
+      "omit_when": "The obvious question is in fact the right one. Most companies are what they look like; a forced reframe is worse than none."
+    }
+  }
+}

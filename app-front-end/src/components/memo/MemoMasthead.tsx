@@ -5,9 +5,9 @@ import { renderWithMonoNumbers } from './memoContentHelpers';
 interface MemoMastheadProps {
   startup: Startup;
   onAddContext?: () => void;
-  onDownloadPDF: () => void;
+  onDownloadPDF?: () => void;
   onClose?: () => void;
-  /** Share link / co-GP view: keeps the PDF, hides Add context. */
+  /** Share link / co-GP view: hides Add context. */
   readOnly?: boolean;
 }
 
@@ -46,14 +46,16 @@ export default function MemoMasthead({
               Add context
             </button>
           ) : null}
-          <button
-            type="button"
-            className="memoAction"
-            onClick={onDownloadPDF}
-            aria-label="Download IC pack as PDF"
-          >
-            IC pack (PDF)
-          </button>
+          {onDownloadPDF ? (
+            <button
+              type="button"
+              className="memoAction"
+              onClick={onDownloadPDF}
+              aria-label="Download IC pack as PDF"
+            >
+              IC pack (PDF)
+            </button>
+          ) : null}
           {onClose ? (
             <button type="button" className="memoAction" onClick={onClose}>
               Close

@@ -116,7 +116,7 @@ own fixed-window policy (`backend/security/rate_limiter.py`).
 
 | Method | Path | Notes |
 |---|---|---|
-| `GET` | `/api/opportunities/{opportunity_id}/evaluation` | Current immutable evaluation + recommendation |
+| `GET` | `/api/opportunities/{opportunity_id}/evaluation` | Current immutable evaluation + machine recommendation; incomplete, contradictory, malformed, or ungrounded decision evidence returns the existing `insufficient_evidence` state, never an authority ruling |
 | `POST` | `/api/opportunities/{opportunity_id}/evaluate` | Explicit operator refresh; fails closed on unmet prerequisites |
 | `POST` | `/api/opportunities/{opportunity_id}/rulings` | Record the authoritative human ruling |
 | `GET` | `/api/opportunities/{opportunity_id}/rulings` | Ruling history |

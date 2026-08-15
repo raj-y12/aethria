@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
@@ -60,6 +61,23 @@ def _outbox_from_row(row: Any) -> Optional[DomainOutboxEvent]:
     payload = db_row(row)
     payload["payload"] = _json_payload(payload.get("payload"))
     return DomainOutboxEvent.model_validate(payload)
+
+
+logger = logging.getLogger(__name__)
+
+# Derived from the contract itself rather than hand-listed: `failed` and
+# `terminal` are computed properties, not stored fields, and hardcoding them
+# misclassified every valid row as legacy.
+_LOOKUP_OUTCOME_REQUIRED_KEYS = frozenset(
+    name for name, field in LookupAttemptOutcome.model_fields.items() if field.is_required()
+)
+
+
+def _is_pre_contract_outcome(data: Any) -> bool:
+    """True when a stored outcome is an old shape rather than a broken current one."""
+    if not isinstance(data, dict):
+        return False
+    return not _LOOKUP_OUTCOME_REQUIRED_KEYS.issubset(data.keys())
 
 
 class DurableJobRepository:
@@ -129,6 +147,25 @@ class DurableJobRepository:
         matching = []
         for record in records:
             data = record.get("data") if hasattr(record, "get") else record["data"]
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except ValueError:
+                    raise LookupOutcomeCorrupt(
+                        "Durable lookup outcome is not decodable JSON"
+                    )
+            if _is_pre_contract_outcome(data):
+                # A row written before the governed contract existed is old, not
+                # corrupt. Treating the two alike made every status poll for an
+                # affected lookup a permanent 500 (see migration
+                # 20260815000001_quarantine_legacy_lookup_outcomes.sql). Skip it
+                # and log; corruption of a CURRENT-shape row still fails closed.
+                logger.warning(
+                    "latest_lookup_attempt: skipping pre-contract lookup outcome "
+                    "lookup_id=%s — quarantine migration has not been applied",
+                    lid,
+                )
+                continue
             try:
                 outcome = LookupAttemptOutcome.model_validate(data)
             except Exception as exc:

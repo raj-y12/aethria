@@ -16,14 +16,14 @@ from concurrent.futures import ThreadPoolExecutor
 from openai import OpenAI
 from utils.openai_client import build_openai_client
 
-from reviewer.schema import ReviewerOutput, validate_reviewer_output
+from reviewer.schema import ReviewerOutput, normalize_investment_read, validate_reviewer_output
 from utils.prompt_version import hash_prompt
 from utils.traction_extraction import render_traction_facts
 from utils.recency import reviewer_recency_directive
 from utils.scoring import DEFAULT_SCORE_SOURCE
 from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
 from regulatory_context import apply_regulatory_grounding_guard
-from founder_context import apply_founder_grounding_guard
+from founder_context import apply_founder_grounding_guard, resolved_founder_names
 
 
 logger = logging.getLogger(__name__)
@@ -354,7 +354,42 @@ def _evidence_anchors_block() -> str:
     return "\n".join(lines) + "\n"
 
 
-def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any]) -> str:
+def _build_investment_read_block(reviewer_rules: Dict[str, Any]) -> str:
+    """Render the investment-read doctrine from versioned policy (reviewer_rules v2+).
+
+    Absent from the active policy (v1) → empty string, so the prompt is unchanged.
+    """
+    read = reviewer_rules.get("investment_read")
+    if not isinstance(read, dict) or not read:
+        return ""
+    lines = ["", "INVESTMENT READ (founder_fluency, capability_slope, reframe):"]
+    for key in ("purpose", "evidence_bar"):
+        text = str(read.get(key) or "").strip()
+        if text:
+            lines.append(f"- {text}")
+    for field in ("founder_fluency", "capability_slope", "reframe"):
+        section = read.get(field)
+        if not isinstance(section, dict):
+            continue
+        rule = str(section.get("rule") or "").strip()
+        omit = str(section.get("omit_when") or "").strip()
+        if rule:
+            lines.append(f"- {field}: {rule}")
+        if omit:
+            lines.append(f"  Omit {field} when: {omit}")
+    lines.append(
+        "- The read never changes a score, a confidence, or the verdict. Omitting it is a "
+        "correct answer and the common one; a forced read is a defect."
+    )
+    return "\n".join(lines) + "\n"
+
+
+def _build_system_prompt(
+    reviewer_rules: Dict[str, Any],
+    rubric: Dict[str, Any],
+    *,
+    include_investment_read: bool = True,
+) -> str:
     """Build system prompt from versioned reviewer rules and evaluation rubric (policy_resolver)."""
     red_flags_block = ""
     if reviewer_rules.get("diligence_red_flags"):
@@ -369,6 +404,9 @@ def _build_system_prompt(reviewer_rules: Dict[str, Any], rubric: Dict[str, Any])
             red_flags_block += f"- {label}\n"
 
     dimensions_block = _build_dimensions_block(rubric)
+    investment_read_block = (
+        _build_investment_read_block(reviewer_rules) if include_investment_read else ""
+    )
 
     return f"""You are a Reviewer for a venture capital firm.
 
@@ -401,7 +439,7 @@ HYPOTHESIS-DRIVEN EVALUATION:
 - Consume Scout hypothesis fields: primary_thesis, key_assumptions, biggest_unknown (when provided).
 - In assumption_feedback: comment on which assumptions are well-supported or weak; highlight critical unknowns that could invalidate the thesis.
 - Use only information provided or defined in resources. Do NOT hallucinate missing data.
-
+{investment_read_block}
 {red_flags_block}
 
 You do NOT:
@@ -522,7 +560,17 @@ class Reviewer(ABC):
             else None
         )
         reviewer_rules, rubric = _load_reviewer_resources()
-        self.SYSTEM_PROMPT = _build_system_prompt(reviewer_rules, rubric)
+        # Investment read is opt-in policy data (reviewer_rules v2+) and primary
+        # persona only. Skeptical and Opportunist exist to diverge on evidence,
+        # not to each write prose — sending them ~2k chars of doctrine they are
+        # then forbidden from acting on is both cost and an instruction conflict.
+        self._investment_read_enabled = (
+            bool(reviewer_rules.get("investment_read"))
+            and getattr(type(self), "REVIEWER_TYPE", "default") == "default"
+        )
+        self.SYSTEM_PROMPT = _build_system_prompt(
+            reviewer_rules, rubric, include_investment_read=self._investment_read_enabled
+        )
         self.reviewer_type = getattr(self, 'reviewer_type', 'default')
         self.agent_name = self._get_agent_name()
         self._load_prompt_from_library()
@@ -829,6 +877,18 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 '  "score_reasoning": {"market_score": "string", "product_score": "string", ...},'
                 '  // Optional: concise reasoning per dimension for memo table\n'
             )
+            investment_read_schema_block = "" if not self._investment_read_enabled else (
+                '  "founder_fluency": [{"founder": "resolved founder name", "prior_domain": "string",\n'
+                '      "fluent_in": ["problems the prior domain makes them fluent in"],\n'
+                '      "unlocks": ["markets/buyers reachable without retraining"],\n'
+                '      "evidence": "the named employer, role, or publication this rests on"}],  // [] if unevidenced\n'
+                '  "capability_slope": {"hardest_instance": "hardest problem the product demonstrably handles today",\n'
+                '      "downhill": ["what is strictly easier than that instance"],\n'
+                '      "blocked_by": ["what still gates each adjacency"],\n'
+                '      "evidence": "string"},  // {} if only ambition is evidenced\n'
+                '  "reframe": {"obvious_question": "string", "why_it_misleads": "string",\n'
+                '      "real_question": "the question diligence should actually answer"},  // {} if the obvious question is the right one\n'
+            )
             json_schema = '''{
   "structured_signals": { // required: extraction-only evidence used by deterministic scorer
     "market": {
@@ -877,7 +937,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "business_model_analysis": ["string", "..."], // Optional: monetization, pricing, growth plan, unit economics; [] if absent
   "investment_thesis": ["string", "..."],    // Optional: bullet points why to invest + core assumptions
   "risk_mitigation": ["string", "..."],     // Optional: actionable strategies for each diligence_red_flags item
-''' + score_reasoning_schema_line + '''  "market_reasoning": ["string", "..."],      // 2-4 bullets
+''' + investment_read_schema_block + score_reasoning_schema_line + '''  "market_reasoning": ["string", "..."],      // 2-4 bullets
   "market_weaknesses": ["string", "..."],     // 1-3 bullets
   "market_confidence": "low" | "medium" | "high",
   "product_reasoning": ["string", "..."],     // 2-4 bullets
@@ -1070,6 +1130,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     "execution_reasoning",
                     "execution_weaknesses",
                     "investment_thesis",
+                    "founder_fluency",
                 ):
                     if field in data:
                         data[field] = apply_founder_grounding_guard(data[field], founder_context)
@@ -1101,6 +1162,16 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 if field not in data or not isinstance(data.get(field), list):
                     data[field] = []
                 data[field] = _strip_missing_tokens_from_list(data.get(field))
+            if self._investment_read_enabled:
+                # Restrict the founder read to founders identity actually resolved,
+                # then drop any entry that fails the evidence bar (ADR-0010).
+                normalize_investment_read(
+                    data,
+                    resolved_founder_names(founder_context) if isinstance(founder_context, dict) else None,
+                )
+            else:
+                for field in ("founder_fluency", "capability_slope", "reframe"):
+                    data.pop(field, None)
             if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
                 data["score_reasoning"] = {}
             if "score_source" not in data or not isinstance(data.get("score_source"), str):

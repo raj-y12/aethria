@@ -51,6 +51,12 @@ describe('MemoMasthead', () => {
     expect(screen.getByRole('button', { name: 'Download IC pack as PDF' })).toBeInTheDocument();
   });
 
+  it('does not expose the IC pack action when no export callback is supplied', () => {
+    render(<MemoMasthead startup={startup} />);
+
+    expect(screen.queryByRole('button', { name: 'Download IC pack as PDF' })).not.toBeInTheDocument();
+  });
+
   it('renders the complete dossier identity when embedded or standalone', () => {
     const { container } = render(
       <MemoMasthead startup={startup} onAddContext={vi.fn()} onDownloadPDF={vi.fn()} />,

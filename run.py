@@ -8,9 +8,10 @@ Starts:
   - Web frontend (port 3001) — public marketing site
   - DealFlow agents (Scout, Reviewer, Partner, Portfolio)
 
-Loads .env from repo root. Banner stays at top; rolling logs stream below
+Loads .env from repo root. A static banner is followed by normal terminal logs
 with [Backend] / [App] / [Web] / [Agents] so you can see API and frontend activity.
 """
+import argparse
 import os
 import re
 import shutil
@@ -35,13 +36,16 @@ ENV_FILE = REPO_ROOT / ".env"
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 SNAPSHOT_COMPOSE_FILE = REPO_ROOT / "docker-compose.snapshot.yml"
 SNAPSHOT_DATABASE_NAME = "aethria_prod_snapshot"
-SNAPSHOT_VERIFIER = BACKEND_DIR / "scripts" / "verify_local_snapshot.py"
+RESET_SNAPSHOT_SCRIPT = BACKEND_DIR / "scripts" / "reset_local_snapshot.py"
+WORKING_SNAPSHOT_VOLUME = "aethria-prod-working-data"
+DEFAULT_GOLDEN_SNAPSHOT_BACKUP = (
+    REPO_ROOT.parent / "aethria-backups" / "aethria_prod_snapshot_20260814.dump"
+)
 
 BACKEND_PORT = 8000
 APP_FRONTEND_PORT = 3000
 WEB_FRONTEND_PORT = 3001
 
-# Keep banner at top; logs roll below
 BANNER_WIDTH = 76
 
 # ANSI colours for prefixes (only when stdout is a TTY)
@@ -60,7 +64,6 @@ TAG_DEFAULT_COLOR = "\033[95m"   # bright magenta
 METHOD_COLOR = "\033[94m"        # bright blue
 PATH_COLOR = "\033[97m"          # bright white
 IP_COLOR = "\033[90m"            # gray
-OXFORD_BLUE = "\033[38;2;0;33;71m"
 
 ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 TAG_RE = re.compile(r"\[([A-Z0-9_\- ]{2,})\]")
@@ -89,6 +92,16 @@ LEVEL_COL_WIDTH = 5
 HTTP_PATH_COL_WIDTH = 42
 
 
+def _current_snapshot_name() -> str:
+    database_url = os.getenv("DATABASE_URL", "").strip()
+    database_name = urlsplit(database_url).path.lstrip("/")
+    if not database_name:
+        return "not configured"
+    if database_name == SNAPSHOT_DATABASE_NAME:
+        return f"{database_name} (working copy)"
+    return database_name
+
+
 def _build_banner(use_color: bool) -> str:
     title = (
         "      █████╗ ███████╗████████╗██╗  ██╗██████╗ ██╗ █████╗      ",
@@ -100,7 +113,7 @@ def _build_banner(use_color: bool) -> str:
     )
     line = "=" * BANNER_WIDTH
     if use_color:
-        title_block = "\n".join(f"{OXFORD_BLUE}{row}{RESET}" for row in title)
+        title_block = "\n".join(f"{DEFAULT_TEXT_COLOR}{row}{RESET}" for row in title)
     else:
         title_block = "\n".join(title)
     return (
@@ -112,15 +125,31 @@ def _build_banner(use_color: bool) -> str:
         f"  Web frontend:       http://localhost:{WEB_FRONTEND_PORT}\n"
         f"  Agents:             Scout, Reviewer, Partner, Portfolio\n"
         f"  Mode:               local development\n"
+        f"  Current snapshot:   {_current_snapshot_name()}\n"
         f"{line}\n"
         f"  Press Ctrl+C to stop all processes.\n"
-        f"  Rolling logs below.\n"
+        f"  Logs:\n"
         f"{line}\n"
     )
 
 
+def _backend_command() -> list[str]:
+    """Build the local backend command with Uvicorn's development reloader."""
+    return [
+        sys.executable,
+        "-m",
+        "uvicorn",
+        "api:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        str(BACKEND_PORT),
+        "--reload",
+    ]
+
+
 class _TerminalRenderer:
-    """Keep the launcher banner fixed while log lines scroll below it."""
+    """Print one static launcher header, then use normal terminal output for logs."""
 
     def __init__(
         self,
@@ -134,78 +163,20 @@ class _TerminalRenderer:
     ) -> None:
         self._stream = stream or sys.stdout
         self._banner = banner.rstrip("\n")
-        self._banner_lines = self._banner.splitlines()
-        self._terminal_lines = terminal_lines or shutil.get_terminal_size(
-            fallback=(120, 24)
-        ).lines
-        self._terminal_columns = terminal_columns or shutil.get_terminal_size(
-            fallback=(120, 24)
-        ).columns
-        self._use_color = use_color
-        title_lines = self._banner_lines[1:7]
-        title_width = max(
-            (len(ANSI_RE.sub("", line)) for line in title_lines),
-            default=0,
-        )
-        self._title_box_width = min(
-            max(title_width + 4, BANNER_WIDTH),
-            self._terminal_columns,
-        )
-        interactive = self._stream.isatty() if enabled is None else enabled
-        self._fixed = bool(
-            interactive and self._terminal_lines > len(self._banner_lines) + 2
-        )
         self._lock = threading.RLock()
-
-    def _banner_line(self, index: int, line: str) -> str:
-        clean_line = ANSI_RE.sub("", line)
-        if 1 <= index <= 6:
-            # Keep the artwork at its original left-aligned banner position.
-            clean_line = clean_line.rstrip().ljust(self._title_box_width)
-            left_padding = 0
-            right_padding = self._terminal_columns - self._title_box_width
-            if not self._use_color:
-                return f"{' ' * left_padding}{clean_line}{' ' * right_padding}"
-            return (
-                f"{' ' * left_padding}\x1b[47m{OXFORD_BLUE}{clean_line}"
-                f"{RESET}{' ' * right_padding}"
-            )
-        else:
-            clean_line = clean_line.ljust(self._terminal_columns)
-        if not self._use_color:
-            return clean_line
-        return clean_line
 
     def start(self) -> None:
         with self._lock:
-            if not self._fixed:
-                self._stream.write(f"{self._banner}\n")
-                self._stream.flush()
-                return
-            self._stream.write("\x1b[2J\x1b[H")
-            for index, line in enumerate(self._banner_lines):
-                self._stream.write(f"{self._banner_line(index, line)}\x1b[K\n")
-            first_log_line = len(self._banner_lines) + 1
-            self._stream.write(
-                f"\x1b[{first_log_line};{self._terminal_lines}r"
-                f"\x1b[{first_log_line};1H"
-            )
+            self._stream.write(f"{self._banner}\n")
             self._stream.flush()
 
     def emit(self, line: str) -> None:
         with self._lock:
-            if not self._fixed:
-                self._stream.write(f"{line}\n")
-                self._stream.flush()
-                return
-            self._stream.write(f"\r{line}\x1b[K\n")
+            self._stream.write(f"{line}\n")
             self._stream.flush()
 
     def close(self) -> None:
-        if not self._fixed:
-            return
         with self._lock:
-            self._stream.write("\x1b[r\x1b[?25h")
             self._stream.flush()
 
 
@@ -337,24 +308,30 @@ def _local_postgres_dsn() -> str:
     return dsn
 
 
+def _golden_snapshot_backup_path() -> Path:
+    configured = os.getenv("LOCAL_SNAPSHOT_GOLDEN_BACKUP_PATH", "").strip()
+    return Path(configured).expanduser() if configured else DEFAULT_GOLDEN_SNAPSHOT_BACKUP
+
+
 def _is_snapshot_database(database_url: str) -> bool:
-    """Return whether a DSN targets the preserved local production snapshot."""
+    """Return whether a DSN targets the local snapshot working copy."""
     return urlsplit(database_url).path.lstrip("/") == SNAPSHOT_DATABASE_NAME
 
 
 def _compose_file_for_database(database_url: str) -> Path:
-    """Keep the preserved snapshot on a volume separate from disposable tests."""
+    """Keep the snapshot working copy on a volume separate from disposable tests."""
     return SNAPSHOT_COMPOSE_FILE if _is_snapshot_database(database_url) else COMPOSE_FILE
 
 
 def _should_apply_local_migrations(database_url: str) -> bool:
-    """Normal startup may migrate disposable test databases, never the snapshot."""
-    return not _is_snapshot_database(database_url)
+    """Local databases, including the mutable snapshot copy, may be migrated."""
+    return bool(database_url)
 
 
 def _compose_command() -> list[str]:
     docker = shutil.which("docker")
     if docker is not None:
+        _ensure_docker_daemon(docker)
         probe = subprocess.run(
             [docker, "compose", "version"],
             capture_output=True,
@@ -370,6 +347,34 @@ def _compose_command() -> list[str]:
         "Docker Compose is required to start local PostgreSQL "
         "(install the Docker Compose plugin or docker-compose)"
     )
+
+
+def _ensure_docker_daemon(docker: str) -> None:
+    """Start Colima when it is the active Docker context but is not running."""
+    daemon_probe = subprocess.run(
+        [docker, "info"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if daemon_probe.returncode == 0:
+        return
+
+    context_probe = subprocess.run(
+        [docker, "context", "show"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if context_probe.returncode != 0 or context_probe.stdout.strip() != "colima":
+        return
+
+    colima = shutil.which("colima")
+    if colima is None:
+        return
+
+    print("  [run.py] Docker daemon unavailable. Starting Colima...", flush=True)
+    subprocess.run([colima, "start"], check=True)
 
 
 def _docker_compose(
@@ -441,6 +446,12 @@ def _start_local_postgres_and_migrate(database_url: str) -> bool:
                 f"Local PostgreSQL database {database_name!r} did not become ready"
             )
 
+        if _is_snapshot_database(database_url):
+            print(
+                "  [run.py] Using the mutable local snapshot working copy; "
+                "reset with --reset-local-snapshot when needed.",
+                flush=True,
+            )
         if _should_apply_local_migrations(database_url):
             print("  [run.py] Applying local PostgreSQL migrations...", flush=True)
             subprocess.run(
@@ -451,19 +462,6 @@ def _start_local_postgres_and_migrate(database_url: str) -> bool:
                     database_url,
                 ],
                 cwd=str(BACKEND_DIR),
-                check=True,
-                env={**os.environ, "DATABASE_URL": database_url},
-            )
-        else:
-            print("  [run.py] Verifying preserved local production snapshot...", flush=True)
-            subprocess.run(
-                [
-                    sys.executable,
-                    str(SNAPSHOT_VERIFIER),
-                    "--database-url",
-                    database_url,
-                ],
-                cwd=str(REPO_ROOT),
                 check=True,
                 env={**os.environ, "DATABASE_URL": database_url},
             )
@@ -553,9 +551,51 @@ def _critical_services_running(
     )
 
 
-def main() -> int:
+def _reset_local_snapshot(database_url: str) -> int:
+    if not _is_snapshot_database(database_url):
+        print(
+            "Error: --reset-local-snapshot requires DATABASE_URL to target "
+            f"{SNAPSHOT_DATABASE_NAME!r}",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        _compose_command()
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RESET_SNAPSHOT_SCRIPT),
+                "--database-url",
+                database_url,
+                "--backup-path",
+                str(_golden_snapshot_backup_path()),
+                "--volume-name",
+                WORKING_SNAPSHOT_VOLUME,
+            ],
+            cwd=str(REPO_ROOT),
+            check=False,
+            env={**os.environ, "DATABASE_URL": database_url},
+        )
+    except Exception as exc:
+        print(f"  [run.py] Snapshot reset failed: {exc}", file=sys.stderr, flush=True)
+        return 1
+    return result.returncode
+
+
+def main(argv: list[str] | None = None) -> int:
     if load_dotenv and ENV_FILE.exists():
         load_dotenv(ENV_FILE, override=True)
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--reset-local-snapshot",
+        action="store_true",
+        help="recreate the mutable working snapshot from the golden backup and exit",
+    )
+    args = parser.parse_args(argv)
+
+    if args.reset_local_snapshot:
+        return _reset_local_snapshot(_local_postgres_dsn())
 
     if not BACKEND_DIR.is_dir():
         print(f"Error: backend directory not found: {BACKEND_DIR}", file=sys.stderr)
@@ -568,8 +608,7 @@ def main() -> int:
         return 1
 
     use_color = sys.stdout.isatty()
-    # Banner at top — stays there; logs roll below
-    print(_build_banner(use_color), flush=True)
+    banner = _build_banner(use_color)
     backend_proc = None
     app_proc = None
     web_proc = None
@@ -577,7 +616,7 @@ def main() -> int:
     started_local_postgres = False
     local_database_url = ""
     renderer = _TerminalRenderer(
-        _build_banner(use_color),
+        banner,
         stream=sys.stdout,
         enabled=sys.stdout.isatty(),
         use_color=use_color,
@@ -591,7 +630,7 @@ def main() -> int:
                 local_database_url
             )
         backend_proc = subprocess.Popen(
-            [sys.executable, "-m", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", str(BACKEND_PORT), "--workers", "1"],
+            _backend_command(),
             cwd=str(BACKEND_DIR),
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -732,6 +771,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        sys.exit(main(sys.argv[1:]))
     except KeyboardInterrupt:
         sys.exit(130)

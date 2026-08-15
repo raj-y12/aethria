@@ -141,8 +141,34 @@ export interface Scout {
   field_provenance?: Record<string, string>;
 }
 
+/** One founder's background mapped to what it makes cheap, not ranked on a ladder. */
+export interface FounderFluency {
+  founder: string;
+  prior_domain: string;
+  fluent_in?: string[];
+  unlocks?: string[];
+  evidence: string;
+}
+
+/** The hardest instance demonstrated today, and what is downhill of it. */
+export interface CapabilitySlope {
+  hardest_instance: string;
+  downhill?: string[];
+  blocked_by?: string[];
+  evidence?: string;
+}
+
+/** The obvious question, why it misreads the company, and the one that decides it. */
+export interface MemoReframe {
+  obvious_question: string;
+  why_it_misleads: string;
+  real_question: string;
+}
+
 export interface SingleReview {
   reviewer_type: 'DefaultReviewer' | 'SkepticalReviewer' | 'OpportunistReviewer';
+  /** Fraction of rubric criteria that carried complete evidence (0-1). Undefined = unknown, not zero. */
+  evidence_coverage?: number;
   market_score: number;
   product_score: number;
   technical_score: number;
@@ -332,6 +358,13 @@ export interface Review {
   diligence_red_flags?: string[];
   assumption_feedback?: string[];
   team_analysis?: string[];
+  /**
+   * Investment read (reviewer_rules v2+). Narrative only — never an input to a
+   * score or the verdict. Absent when the policy evidence bar was not met.
+   */
+  founder_fluency?: FounderFluency[];
+  capability_slope?: CapabilitySlope;
+  reframe?: MemoReframe;
   competition_analysis?: string[];
   business_model_analysis?: string[];
   investment_thesis?: string[];

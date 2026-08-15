@@ -39,18 +39,27 @@ Or use docker compose (see below).
 ### Local production snapshot protection
 
 The normal compose stack uses the disposable `aethria-postgres-test-data`
-volume. The restored production snapshot is intentionally separate and is
-started only through `docker-compose.snapshot.yml`, which uses the explicitly
-created external volume `aethria-prod-snapshot-data`.
+volume. The local production-data test setup has two layers: the immutable
+golden dump outside the repository, and the mutable working copy started by
+`docker-compose.snapshot.yml` on the external volume
+`aethria-prod-working-data`.
 
 `run.py` detects `aethria_prod_snapshot`, selects the snapshot compose stack,
-and verifies `db/snapshots/aethria_prod_snapshot_manifest.json`. It never runs
-normal migrations against that database. A manifest mismatch stops startup;
-it does not repair or overwrite the snapshot.
+applies provider-neutral migrations to the working copy, and never modifies the
+golden dump. Normal startup does not compare working-copy row counts to the
+golden manifest because local testing is expected to change the working copy.
 
-The snapshot volume is not removed by normal compose cleanup. To intentionally
-replace it, stop the services, create a new backup first, and perform the
-restore as a separate operator action. Do not add the backup dump to git.
+To discard local changes and recreate the working copy from the golden dump:
+
+```bash
+python3 run.py --reset-local-snapshot
+```
+
+The reset removes only `aethria-prod-working-data`, restores the configured
+`LOCAL_SNAPSHOT_GOLDEN_BACKUP_PATH` (or the default backup outside the repo),
+and verifies the restored copy against
+`db/snapshots/aethria_prod_snapshot_manifest.json`. It never removes or writes
+the golden backup. Do not add the backup dump to git.
 
 ### Required environment variables
 
@@ -106,12 +115,13 @@ The separate snapshot stack is selected automatically by `run.py` when the
 local `DATABASE_URL` names `aethria_prod_snapshot`. For direct inspection:
 
 ```bash
-docker volume create aethria-prod-snapshot-data
-docker compose -f docker-compose.snapshot.yml up -d postgres
+docker volume create aethria-prod-working-data
+docker-compose -f docker-compose.snapshot.yml up -d postgres
 ```
 
-Do not run `docker compose down -v` against the snapshot stack unless you have
-an external backup and explicitly intend to remove that snapshot volume.
+Do not remove `aethria-prod-working-data` unless you intend to reset it; use
+`python3 run.py --reset-local-snapshot` so the golden restore and verification
+steps are performed together.
 
 ## Health check
 

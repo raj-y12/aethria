@@ -65,7 +65,11 @@ def test_rule_based_alignment_b2b_saas_seed():
     assert out["thesis_matches_fund"] is True
     assert out["thesis_alignment_confidence"] == 0.25
     assert out["thesis_fit_points"]
-    assert out["thesis_deviation_points"]
+    # A company that matches the mandate on every axis has no deviations. The
+    # list used to be padded with "No major deviations flagged by rules" so it
+    # was never empty, which downstream consumers then rendered as an actual
+    # mandate gap. Empty is the honest answer here.
+    assert out["thesis_deviation_points"] == []
 
 
 def test_rule_based_exclusion_penalty():

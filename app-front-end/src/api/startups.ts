@@ -298,14 +298,18 @@ export async function fetchLookupJobStatus(lookupId: string): Promise<LookupJobS
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
+    // A status check that could not complete is NOT a job that failed. Reporting
+    // it as terminal killed the dispatch view while the backend pipeline kept
+    // running to completion — the analyst saw "failed" and then the finished
+    // memo. Stay non-terminal and keep polling; the worker is the only thing
+    // allowed to declare a lookup dead.
     return {
       lookup_id: id,
-      failed: true,
-      terminal: true,
-      status: 'failed',
+      failed: false,
+      terminal: false,
+      status: 'pending',
       code: 'lookup_status_unavailable',
-      detail: 'Could not verify lookup status. Check your connection and try again.',
-      message: 'Could not verify lookup status. Check your connection and try again.',
+      detail: 'Could not verify lookup status; still checking.',
     };
   }
   const data = await res.json();

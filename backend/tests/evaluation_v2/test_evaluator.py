@@ -161,6 +161,62 @@ def test_required_unscored_criterion_forces_insufficient_evidence_despite_high_a
     assert result.recommendation.human_review_required is True
 
 
+def test_missing_required_criterion_precedes_grounded_critical_risk():
+    claims = [_claims()[0]] + [
+        {
+            "claim_id": "claim-critical-risk",
+            "claim_type": "critical_risk",
+            "normalized_value": {"value": True},
+            "display_text": "Regulatory ban risk in primary market.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 1,
+        }
+    ]
+    claims[0]["normalized_value"] = {"criterion_score": 9.0}
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link("claim-critical-risk"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert "execution" in result.recommendation.missing_information
+    assert "Resolve missing evidence: execution" in result.recommendation.change_conditions
+    assert result.recommendation.human_review_required is True
+
+
+def test_contradicted_scored_criterion_forces_insufficient_evidence():
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link(
+                "claim-market",
+                evidence_item_id="evidence-market-contradiction",
+                relationship="contradicts",
+            ),
+            _verified_link("claim-execution"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert "market" in result.recommendation.principal_risks
+    assert "Resolve contradictory evidence: market" in result.recommendation.change_conditions
+    assert result.recommendation.human_review_required is True
+
+
 def test_optional_unscored_criterion_never_receives_numeric_placeholder():
     policy = _policy().model_copy(deep=True)
     policy.criteria[1].required = False
@@ -317,7 +373,7 @@ def test_untrusted_input_is_provenance_not_an_eligibility_filter():
     assert result.recommendation.state is RecommendationState.ADVANCE
 
 
-def test_hard_exclusion_is_deterministic_pass_with_driver():
+def test_complete_grounded_hard_exclusion_is_deterministic_pass_with_driver():
     claims = _claims() + [
         {
             "claim_id": "claim-exclusion",
@@ -335,7 +391,11 @@ def test_hard_exclusion_is_deterministic_pass_with_driver():
     )
     snapshot, _ = snapshot_claims(
         claims,
-        links=[_verified_link("claim-exclusion")],
+        links=[
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-exclusion"),
+        ],
         evaluation_at=EVALUATION_AT,
     )
 
@@ -381,7 +441,100 @@ def test_grounded_critical_risk_forces_pass_despite_high_supported_scores():
     assert "Regulatory ban risk in primary market." in result.recommendation.principal_risks
 
 
-def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
+@pytest.mark.parametrize(
+    ("claim_type", "display_text"),
+    [
+        ("critical_risk", "Regulatory ban risk in primary market."),
+        ("excluded_sector", "Company operates in an excluded sector."),
+    ],
+    ids=["critical-risk", "hard-exclusion"],
+)
+def test_contradicted_grounded_decisive_claim_forces_insufficient_evidence(
+    claim_type, display_text
+):
+    claims = _claims() + [
+        {
+            "claim_id": "claim-decisive",
+            "claim_type": claim_type,
+            "normalized_value": {"value": True},
+            "display_text": display_text,
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 1,
+        }
+    ]
+    for claim in claims[:2]:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-decisive"),
+            _verified_link(
+                "claim-decisive",
+                evidence_item_id="evidence-decisive-contradiction",
+                relationship="contradicts",
+            ),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert (
+        f"Resolve contradictory evidence: {display_text}"
+        in result.recommendation.change_conditions
+    )
+    assert result.recommendation.human_review_required is True
+
+
+@pytest.mark.parametrize(
+    ("claim_type", "display_text"),
+    [
+        ("critical_risk", "Regulatory ban risk in primary market."),
+        ("excluded_sector", "Company operates in an excluded sector."),
+    ],
+    ids=["critical-risk", "hard-exclusion"],
+)
+def test_status_only_contradicted_decisive_claim_forces_insufficient_evidence(
+    claim_type, display_text
+):
+    claims = _claims() + [
+        {
+            "claim_id": "claim-decisive",
+            "claim_type": claim_type,
+            "normalized_value": {"value": True},
+            "display_text": display_text,
+            "assertion_class": "externally_verified",
+            "status": "contradicted",
+            "confidence": 1,
+        }
+    ]
+    for claim in claims[:2]:
+        claim["normalized_value"] = {"criterion_score": 9.0}
+    snapshot, _ = snapshot_claims(
+        claims,
+        [
+            _verified_link("claim-market"),
+            _verified_link("claim-execution"),
+            _verified_link("claim-decisive"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
+    assert (
+        f"Resolve contradictory evidence: {display_text}"
+        in result.recommendation.change_conditions
+    )
+    assert result.recommendation.human_review_required is True
+
+
+def test_ungrounded_critical_risk_forces_insufficient_evidence():
     claims = _claims() + [
         {
             "claim_id": "claim-critical-risk",
@@ -407,7 +560,7 @@ def test_ungrounded_critical_risk_is_uncertainty_not_an_automatic_pass():
 
     result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
 
-    assert result.recommendation.state is RecommendationState.ADVANCE
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
     assert result.recommendation.human_review_required is True
     assert (
         "Unverified regulatory ban risk in primary market."
@@ -447,7 +600,7 @@ def test_claim_confidence_constrains_recommendation(claim_confidence, expected_s
     "raw_value",
     ["false", "0", "no", 0, 1, [], {}, None],
 )
-def test_malformed_decisive_boolean_is_uncertainty_not_pass(raw_value):
+def test_malformed_decisive_boolean_forces_insufficient_evidence(raw_value):
     claims = _claims()
     for claim in claims:
         claim["normalized_value"] = {"criterion_score": 9.0}
@@ -475,7 +628,7 @@ def test_malformed_decisive_boolean_is_uncertainty_not_pass(raw_value):
 
     result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
 
-    assert result.recommendation.state is RecommendationState.ADVANCE
+    assert result.recommendation.state is RecommendationState.INSUFFICIENT_EVIDENCE
     assert result.recommendation.human_review_required is True
     assert "Malformed decisive risk value." in result.recommendation.missing_information
 

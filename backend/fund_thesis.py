@@ -326,8 +326,10 @@ def rule_based_thesis_alignment(
 
     if not fit:
         fit.append("Rule-based scan: limited explicit matches in scout text")
-    if not dev:
-        dev.append("No major deviations flagged by rules")
+    # An empty deviations list IS "no deviations". Padding it with a filler
+    # sentence made every consumer treat the absence as content — the memo's
+    # focal question rendered "Mandate gap to resolve: No major deviations
+    # flagged by rules", directly under a "Mandate misaligned" banner.
 
     return {
         "thesis_alignment_score": normalized,

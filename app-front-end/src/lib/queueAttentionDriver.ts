@@ -17,6 +17,7 @@ import { normalizeConfidence } from '../components/scoring/ConfidenceIndicator';
 import { extractAdverseRegister, type AdverseRegisterItem } from './adverseRegister';
 import { getDealAgeDays, isDealDecided, type RulingDecision } from './dealState';
 import { computeConfiguredScore, isStartupStaleByConfig, type FundConfiguration } from './fundConfiguration';
+import { formatDecisionDriver } from './decisionDrivers';
 
 export type QueueAttentionDriverKey =
   | 'reviewer_split'
@@ -374,7 +375,7 @@ export function resolveQueueAttentionDriver(ctx: QueueRowContext): QueueAttentio
   if (needsRuling) {
     const detail =
       cleanQueueReason(startup.queue_reason) ||
-      startup.partner?.decision_drivers?.[0]?.trim() ||
+      formatDecisionDriver(startup.partner?.decision_drivers?.[0] ?? '') ||
       startup.partner?.snapshot?.key_signal?.trim() ||
       (recommendation ? `Partner recommends ${recommendation.toLowerCase()}.` : undefined);
     return {

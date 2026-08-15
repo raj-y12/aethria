@@ -24,7 +24,10 @@ export interface CriterionAssessment {
   confidence: number;
   evidence_sufficiency: string;
   reasoning: string;
+  supporting_claim_ids: string[];
+  contradicting_claim_ids: string[];
   missing_evidence: string[];
+  quality_flags: string[];
 }
 
 export interface RecommendationRecord {
@@ -79,7 +82,10 @@ function normalizeEvaluation(result: EvaluationRecord): EvaluationRecord {
     },
     criteria: (result.criteria ?? []).map((criterion) => ({
       ...criterion,
+      supporting_claim_ids: stringArray(criterion.supporting_claim_ids),
+      contradicting_claim_ids: stringArray(criterion.contradicting_claim_ids),
       missing_evidence: stringArray(criterion.missing_evidence),
+      quality_flags: stringArray(criterion.quality_flags),
     })),
     recommendation: recommendation ? {
       ...recommendation,
