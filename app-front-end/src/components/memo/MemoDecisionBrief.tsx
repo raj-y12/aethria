@@ -70,10 +70,12 @@ function SourceLinks({ sources }: { sources: MemoSource[] }) {
 export default function MemoDecisionBrief({
   brief,
   stateMessage,
+  priorRecommendation,
   children,
 }: {
   brief: MemoDecisionBriefModel;
   stateMessage?: string;
+  priorRecommendation?: 'INVEST' | 'PASS' | 'MONITOR' | null;
   children?: ReactNode;
 }) {
   const pending = brief.status === 'loading' || brief.status === 'unavailable';
@@ -85,6 +87,13 @@ export default function MemoDecisionBrief({
       >
         <p className="memoDecisionStatus" role="status">{STATUS_LABELS[brief.status]}</p>
         {stateMessage ? <p className="memoDecisionStateMessage">{stateMessage}</p> : null}
+        {brief.status === 'unavailable' && priorRecommendation ? (
+          <div className="memoDecisionPriorRecord" aria-label="Prior workflow recommendation">
+            <span>Prior workflow recommendation</span>
+            <strong>{priorRecommendation.charAt(0) + priorRecommendation.slice(1).toLowerCase()}</strong>
+            <em>Reference only</em>
+          </div>
+        ) : null}
       </section>
     );
   }

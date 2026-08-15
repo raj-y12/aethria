@@ -41,6 +41,28 @@ function normalizedCompanyName(value: string | null | undefined): string {
     .replace(/[^a-z0-9]+/g, '');
 }
 
+function cleanedFounderName(value: string | null | undefined): string {
+  return String(value ?? '')
+    .trim()
+    .replace(/_+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function cleanFounderNames(values: Array<string | null | undefined>): string[] {
+  const cleaned = values.map(cleanedFounderName).filter(Boolean);
+  const normalized = new Set(cleaned.map(normalizedCompanyName));
+  const seen = new Set<string>();
+  return cleaned.filter((name) => {
+    const key = normalizedCompanyName(name);
+    const navigationTarget = name.match(/^meet\s+(.+)$/i)?.[1];
+    if (navigationTarget && normalized.has(normalizedCompanyName(navigationTarget))) return false;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function completeResolverMatchesCompany(
   founderResolution: FounderResolution | null | undefined,
   companyResolution: CompanyResolution | null | undefined,
@@ -68,10 +90,18 @@ export function buildFounderSectionModel({
   companyResolution,
   scoutFounderNames,
 }: FounderSectionInput): FounderSectionModel {
-  const scoutNames = (scoutFounderNames ?? []).filter((n) => String(n ?? '').trim());
-  const resolverCandidates = (founderResolution?.founders ?? []).filter((f) =>
-    String(f?.name ?? '').trim(),
+  const scoutNames = cleanFounderNames(scoutFounderNames ?? []);
+  const resolverCandidateNames = cleanFounderNames(
+    (founderResolution?.founders ?? []).map((founder) => founder?.name),
   );
+  const resolverCandidateNameSet = new Set(resolverCandidateNames.map(normalizedCompanyName));
+  const resolverCandidates = (founderResolution?.founders ?? [])
+    .map((founder) => ({ ...founder, name: cleanedFounderName(founder?.name) }))
+    .filter((founder, index, candidates) => {
+      const key = normalizedCompanyName(founder.name);
+      if (!key || !resolverCandidateNameSet.has(key)) return false;
+      return candidates.findIndex((candidate) => normalizedCompanyName(candidate.name) === key) === index;
+    });
   const candidates = scoutNames.length > 0 && !completeResolverMatchesCompany(founderResolution, companyResolution)
     ? []
     : resolverCandidates;
@@ -81,7 +111,7 @@ export function buildFounderSectionModel({
     : scoutNames.length
       ? scoutNames
       : companyResolution?.founder_names?.length
-      ? companyResolution.founder_names
+      ? cleanFounderNames(companyResolution.founder_names)
       : [];
 
   // `founder_names` is reported as missing when nobody was found at all; the

@@ -26,6 +26,7 @@ import { isDealUnresolved } from '../lib/dealState';
 import { docketHeadline } from '../lib/docketHeadline';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
+import type { MemoDecisionBriefStatus } from '../lib/memoDecisionBrief';
 import CsvImportDrawer from '../components/institutional/CsvImportDrawer';
 
 /**
@@ -104,6 +105,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const identityReviewCount = identityCasesQuery.data?.length ?? 0;
 
   const [selectedStartup, setSelectedStartup] = useState<Startup | null>(null);
+  const [selectedDecisionStatus, setSelectedDecisionStatus] = useState<MemoDecisionBriefStatus>('loading');
   const [importOpen, setImportOpen] = useState(false);
   const restoreRef = useRef<HTMLElement | null>(null);
 
@@ -149,6 +151,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   const handleStartupClick = useCallback(
     (startup: Startup) => {
       restoreRef.current = document.activeElement as HTMLElement | null;
+      setSelectedDecisionStatus('loading');
       setSelectedStartup(startup.is_new_to_user ? acknowledge(startup) : startup);
     },
     [acknowledge],
@@ -159,6 +162,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
     if (!openId || startups.length === 0) return;
     const match = startups.find((s) => s.id === openId);
     if (match) {
+      setSelectedDecisionStatus('loading');
       setSelectedStartup(match.is_new_to_user ? acknowledge(match) : match);
     }
     const params = new URLSearchParams(searchParams);
@@ -193,7 +197,10 @@ export default function FlowPage({ data }: { data: SystemData }) {
     [queryClient],
   );
 
-  const handleCloseMemo = useCallback(() => setSelectedStartup(null), []);
+  const handleCloseMemo = useCallback(() => {
+    setSelectedStartup(null);
+    setSelectedDecisionStatus('loading');
+  }, []);
 
   useEscapeKey(handleCloseMemo, memoOpen);
   useRestoreFocus(memoOpen, restoreRef, true);
@@ -306,6 +313,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 startups={startups}
                 onStartupClick={handleStartupClick}
                 selectedId={selectedStartup?.id ?? null}
+                selectedDecisionStatus={selectedStartup ? selectedDecisionStatus : undefined}
                 watchlistIds={watchlistIds}
                 fundConfiguration={fundConfiguration}
                 queueView={queueView}
@@ -386,6 +394,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
             fundConfiguration={fundConfiguration}
             peerStartups={startups}
             portfolioSignals={signals}
+            onDecisionStatusChange={setSelectedDecisionStatus}
           />
         </motion.aside>
       ) : null}
@@ -408,6 +417,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
             fundConfiguration={fundConfiguration}
             peerStartups={startups}
             portfolioSignals={signals}
+            onDecisionStatusChange={setSelectedDecisionStatus}
           />
         )}
       </AnimatePresence>
