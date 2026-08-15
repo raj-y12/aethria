@@ -18,7 +18,6 @@ import {
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { findPrecedentCandidates } from '../lib/institutionalConviction';
-import type { MemoDecisionBriefStatus } from '../lib/memoDecisionBrief';
 import {
   buildFounderSectionModel,
   formatFounderBackground,
@@ -199,7 +198,6 @@ function InvestmentMemoContent(
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
   const [memoGateError, setMemoGateError] = useState<string | null>(null);
-  const [decisionStatus, setDecisionStatus] = useState<MemoDecisionBriefStatus>('loading');
 
   const displayStartup = useMemo(
     () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
@@ -217,7 +215,6 @@ function InvestmentMemoContent(
     }
     setMemoPartial(null);
     setMemoGateError(null);
-    setDecisionStatus('loading');
 
     if (startup.partner?.recommendation) {
       setMemoPipeline('ready');
@@ -278,7 +275,6 @@ function InvestmentMemoContent(
   }, [startup?.id, startup?.partner?.recommendation, onMemoPipelineReady]);
 
   const showJudgment = !!displayStartup?.partner?.recommendation;
-  const showDecisionAnalysis = decisionStatus === 'ready_for_ruling' || decisionStatus === 'recorded';
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
@@ -529,13 +525,15 @@ function InvestmentMemoContent(
               startupId={displayStartup.id}
               companyName={displayStartup.scout.name}
               onRulingRecorded={onClose}
-              onDecisionStatusChange={setDecisionStatus}
               readOnly={readOnly}
             />
 
-            {(showDecisionAnalysis && showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
+            <details className="memoSupportingAnalysis">
+              <summary>Supporting analysis</summary>
+              <div className="memoSupportingAnalysisBody">
+            {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
               <div className="memoDossierContext">
-                {showDecisionAnalysis && showJudgment && precedentCandidates.length > 0 ? (
+                {showJudgment && precedentCandidates.length > 0 ? (
                   <MemoPrecedentStrip
                     candidates={precedentCandidates}
                     renderWithMonoNumbers={renderWithMonoNumbers}
@@ -683,7 +681,7 @@ function InvestmentMemoContent(
             )}
 
             {/* ── Assessment ── */}
-            {showDecisionAnalysis && (() => {
+            {(() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
@@ -766,7 +764,7 @@ function InvestmentMemoContent(
             })()}
 
             {/* ── Fund thesis alignment ── */}
-            {showDecisionAnalysis && thesisSection.visible && (
+            {thesisSection.visible && (
               <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
                 <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
@@ -816,7 +814,7 @@ function InvestmentMemoContent(
             {/* Hidden via :only-child when every disclosure fails its render condition. */}
             <p className="memoAppendixLabel" aria-hidden>Appendix</p>
             {/* ── Partner rationale ── */}
-            {showDecisionAnalysis && showJudgment && reasoningParagraphs.length > 0 && (
+            {showJudgment && reasoningParagraphs.length > 0 && (
               <MemoDisclosureSection
                 id={`${contentKey}-rationale`}
                 title="Partner rationale"
@@ -829,7 +827,7 @@ function InvestmentMemoContent(
               </MemoDisclosureSection>
             )}
 
-            {showDecisionAnalysis && showJudgment && (convictionHistory.length > 0 || precedentCandidates.length > 0) && (
+            {showJudgment && (convictionHistory.length > 0 || precedentCandidates.length > 0) && (
               <MemoDisclosureSection
                 id={`${contentKey}-ledger`}
                 title="Decision ledger"
@@ -879,7 +877,7 @@ function InvestmentMemoContent(
             )}
 
             {/* ── Decision context (LLM trigger) ── */}
-            {showDecisionAnalysis && displayStartup.partner?.llm_fallback_reason && (
+            {displayStartup.partner?.llm_fallback_reason && (
               <MemoDisclosureSection
                 id={`${contentKey}-context`}
                 title="Decision context"
@@ -894,7 +892,7 @@ function InvestmentMemoContent(
                 id={`${contentKey}-analyst-context`}
                 title="Analyst context"
                 summary={`${analystContext.length} added item${analystContext.length === 1 ? '' : 's'}`}
-                initialOpen={false}
+                initialOpen
               >
                 <ol className="memoAnalystContextList">
                   {analystContext.map((section, i) => {
@@ -1038,7 +1036,7 @@ function InvestmentMemoContent(
                 id={`${contentKey}-sources`}
                 title="Sources"
                 summary={`${memoSources.length} reference${memoSources.length === 1 ? '' : 's'}`}
-                initialOpen={false}
+                initialOpen={!config.memo.deepDiveCollapsed}
               >
                 <ul className="memoList">
                   {memoSources.map((source, i) => (
@@ -1085,6 +1083,8 @@ function InvestmentMemoContent(
               </MemoDisclosureSection>
             )}
             </div>
+              </div>
+            </details>
 
           </motion.div>
         </div>
