@@ -105,23 +105,20 @@ describe('MemoDecisionBrief', () => {
   });
 
   it('names unavailable decision data instead of rendering a categorical verdict', () => {
-    const props = {
-      brief: { ...brief, status: 'unavailable', lean: 'none', leanProvenance: 'missing' },
-      stateMessage: 'The canonical evaluation could not be loaded.',
-      priorRecommendation: 'PASS',
-    };
-    render(<MemoDecisionBrief {...(props as unknown as React.ComponentProps<typeof MemoDecisionBrief>)} />);
+    render(
+      <MemoDecisionBrief
+        brief={{ ...brief, status: 'unavailable', lean: 'none', leanProvenance: 'missing' }}
+        stateMessage="The canonical evaluation could not be loaded."
+      />,
+    );
 
     const region = screen.getByRole('region', { name: 'Decision status' });
     expect(within(region).getByRole('status')).toHaveTextContent('Decision data unavailable');
     expect(within(region).getByText('The canonical evaluation could not be loaded.')).toBeInTheDocument();
-    expect(within(region).getByText('Prior workflow recommendation')).toBeInTheDocument();
-    expect(within(region).getByText('Pass')).toBeInTheDocument();
-    expect(within(region).getByText('Reference only')).toBeInTheDocument();
     expect(within(region).queryByRole('heading', { name: 'Decision brief' })).not.toBeInTheDocument();
     expect(within(region).queryByText('System lean')).not.toBeInTheDocument();
     expect(within(region).queryByText('Unknown')).not.toBeInTheDocument();
-    expect(region).not.toHaveTextContent(/system lean/i);
+    expect(region).not.toHaveTextContent(/invest|pass|monitor/i);
   });
 
   it('names an evidence block explicitly', () => {

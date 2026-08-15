@@ -31,7 +31,7 @@ describe('Investment memo section order', () => {
       /<MemoSectionTitle number="02" id="memo-founder">Founder<\/MemoSectionTitle>/,
     );
     expect(memoSource).toMatch(
-      /<MemoSectionTitle number="04" id="memo-scoring">\s*\{showPriorWorkflowAnalysis \? 'Prior workflow read' : 'Assessment'\}\s*<\/MemoSectionTitle>/,
+      /<MemoSectionTitle number="04" id="memo-scoring">Assessment<\/MemoSectionTitle>/,
     );
     expect(memoSource).toMatch(
       /<MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment<\/MemoSectionTitle>/,
@@ -77,9 +77,7 @@ describe('Investment memo section order', () => {
     expect(containerStart).toBeGreaterThan(-1);
     expect(containerRules).toMatch(/\.memoDecisionStateGrid,[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionBriefHead[\s\S]*flex-direction:\s*column/);
-    expect(containerRules.match(/\.memoConsensusRow\s*\{([^}]*)\}/)?.[1] ?? '').not.toContain(
-      'grid-template-columns',
-    );
+    expect(containerRules).toMatch(/\.memoConsensusRow[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionReasoningGrid[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionActionCreate[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionChoices[\s\S]*grid-template-columns:\s*1fr/);
@@ -95,14 +93,6 @@ describe('Investment memo section order', () => {
         new RegExp(`${selector.replace('.', '\\.')}[\\s\\S]*flex-direction:\\s*column`),
       );
     }
-  });
-
-  it('keeps reviewer comparisons horizontal until the genuinely narrow breakpoint', () => {
-    const narrowStart = memoStyles.indexOf('@container memoPanel (max-width: 520px)');
-    const narrowRules = memoStyles.slice(narrowStart);
-
-    expect(narrowStart).toBeGreaterThan(-1);
-    expect(narrowRules).toMatch(/\.memoConsensusRow[\s\S]*grid-template-columns:\s*1fr/);
   });
 
   it('gives desktop reviewer scores room for coverage and permits coverage to wrap', () => {

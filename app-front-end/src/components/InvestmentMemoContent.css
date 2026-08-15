@@ -781,35 +781,6 @@
   margin-top: 6px;
 }
 
-.memoDecisionPriorRecord {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: baseline;
-  gap: 12px;
-  margin-top: 12px;
-  padding-top: 11px;
-  border-top: 1px solid var(--memo-rule);
-  font-family: var(--memo-font-mono);
-  font-size: 0.6875rem;
-  line-height: 1.45;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-
-.memoDecisionPriorRecord span,
-.memoDecisionPriorRecord em {
-  color: var(--memo-ink-faint);
-}
-
-.memoDecisionPriorRecord strong {
-  color: var(--memo-ink);
-  font-weight: 650;
-}
-
-.memoDecisionPriorRecord em {
-  font-style: normal;
-}
-
 .memoDecisionBrief button,
 .memoDecisionBrief select,
 .memoDecisionBrief summary {
@@ -1698,47 +1669,6 @@
   margin-top: 34px;
 }
 
-.memoPriorWorkflowLead {
-  max-width: 46rem;
-  padding: 16px 0 18px;
-  border-top: 1px solid var(--memo-rule-strong);
-  border-bottom: 1px solid var(--memo-rule);
-}
-
-.memoPriorWorkflowMeta {
-  margin: 0;
-  color: var(--memo-ink-faint);
-  font-family: var(--memo-font-mono);
-  font-size: 0.6875rem;
-  line-height: 1.5;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-}
-
-.memoPriorWorkflowDecision {
-  display: grid;
-  grid-template-columns: minmax(72px, 0.2fr) minmax(0, 1fr);
-  gap: 18px;
-  margin: 12px 0 0;
-  color: var(--memo-ink-body);
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
-
-.memoPriorWorkflowDecision strong {
-  color: var(--memo-ink);
-  font-family: var(--memo-font-display);
-  font-size: 1.2rem;
-  font-weight: 500;
-  line-height: 1.35;
-}
-
-.memoPriorMandateRead {
-  margin-top: 34px;
-  padding-top: 20px;
-  border-top: 1px solid var(--memo-rule);
-}
-
 .memoScoreList--moat {
   margin-top: 12px;
 }
@@ -1762,7 +1692,10 @@
 }
 
 .memoConsensusHead {
-  display: block;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .memoConsensusSpread,
@@ -1775,7 +1708,6 @@
 }
 
 .memoConsensusList {
-  width: 100%;
   margin: 14px 0 0;
   padding: 0;
   list-style: none;
@@ -2377,6 +2309,7 @@
   .memoDecisionBriefGrid,
   .memoDecisionProvenance ul,
   .memoDecisionChecks,
+  .memoConsensusRow,
   .memoDecisionReasoningGrid,
   .memoDecisionActionCreate,
   .memoDecisionChoices {
@@ -2480,12 +2413,6 @@
   .memoConsensusRow {
     grid-template-columns: 1fr;
     gap: 6px;
-  }
-
-  .memoDecisionPriorRecord,
-  .memoPriorWorkflowDecision {
-    grid-template-columns: 1fr;
-    gap: 5px;
   }
 
   .memoPrecedentToggle,

@@ -78,14 +78,12 @@ function RulingHistory({ rulings }: { rulings: HumanRuling[] }) {
 export default function OpportunityIntelligence({
   startupId,
   companyName = null,
-  priorRecommendation = null,
   onRulingRecorded,
   onDecisionStatusChange,
   readOnly = false,
 }: {
   startupId: string;
   companyName?: string | null;
-  priorRecommendation?: 'INVEST' | 'PASS' | 'MONITOR' | null;
   onRulingRecorded?: () => void;
   onDecisionStatusChange?: (status: MemoDecisionBriefStatus) => void;
   readOnly?: boolean;
@@ -160,11 +158,7 @@ export default function OpportunityIntelligence({
   }, [brief.status, onDecisionStatusChange]);
 
   return (
-    <MemoDecisionBrief
-      brief={brief}
-      stateMessage={stateMessage}
-      priorRecommendation={priorRecommendation}
-    >
+    <MemoDecisionBrief brief={brief} stateMessage={stateMessage}>
       {hasClaims && !decisionLoading && !decisionUnavailable ? (
         <details className="memoDecisionDisclosure">
           <summary>Review supporting evidence</summary>

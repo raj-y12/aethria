@@ -15,7 +15,6 @@ import {
   type QueueAttentionDriver,
   type QueueRowContext,
 } from '../../lib/queueAttentionDriver';
-import type { MemoDecisionBriefStatus } from '../../lib/memoDecisionBrief';
 
 function queueDecisionBadgeVariant(
   decisionVariant: DecisionBadgeVariant,
@@ -58,29 +57,17 @@ export default function QueueVerdictLine({
   decisionVariant,
   prominent = false,
   attentionDriver,
-  decisionStatus,
 }: {
   ctx: QueueRowContext;
   decisionVariant: DecisionBadgeVariant;
   prominent?: boolean;
   badges?: unknown;
   attentionDriver?: QueueAttentionDriver;
-  decisionStatus?: MemoDecisionBriefStatus;
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
   const convictionPct = getQueueConvictionPct(ctx);
   const convictionLabel = convictionPct != null ? String(convictionPct) : null;
   const badgeVariant = queueDecisionBadgeVariant(decisionVariant, recommendation);
-
-  if (decisionStatus === 'loading' || decisionStatus === 'unavailable') {
-    return (
-      <div className="inline-flex items-baseline justify-end">
-        <QueueVerdictText prominent={prominent} tone={decisionStatus === 'unavailable' ? 'burgundy' : 'muted'}>
-          {decisionStatus === 'unavailable' ? 'Decision unavailable' : 'Checking decision'}
-        </QueueVerdictText>
-      </div>
-    );
-  }
 
   const convictionEl =
     convictionLabel != null ? (

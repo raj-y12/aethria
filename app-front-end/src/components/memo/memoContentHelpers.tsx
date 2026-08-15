@@ -353,7 +353,7 @@ export function reviewerMeanScore(rv: SingleReview): number | null {
  * Investment case observations — partner-voiced reasons this might matter, drawn from
  * narrative fields only (no scoring terms or system metadata). Deduped, capped at five.
  */
-export function buildInvestmentCase(startup: Startup, exclude: string | string[]): string[] {
+export function buildInvestmentCase(startup: Startup, exclude: string): string[] {
   const candidates = [
     startup.partner?.why_this_matters,
     startup.partner?.market_insight,
@@ -366,60 +366,19 @@ export function buildInvestmentCase(startup: Startup, exclude: string | string[]
     startup.scout.primary_thesis,
   ];
   const seen = new Set<string>();
-  const excluded = Array.isArray(exclude) ? exclude : [exclude];
-  const referenceTokenSets: Set<string>[] = [];
-  for (const value of excluded) {
-    const key = normalizeMemoKey(value);
-    if (key) seen.add(key);
-    const tokens = memoMeaningfulTokens(value);
-    if (tokens.size > 0) referenceTokenSets.push(tokens);
-  }
+  const excludeKey = normalizeMemoKey(exclude);
+  if (excludeKey) seen.add(excludeKey);
   const points: string[] = [];
   for (const candidate of candidates) {
     const text = collapseWhitespace(candidate);
     if (!text) continue;
-    if (/^sector overlaps (?:the )?fund thesis targets\.?$/i.test(text)) continue;
     const key = normalizeMemoKey(text);
     if (!key || seen.has(key)) continue;
-    const tokens = memoMeaningfulTokens(text);
-    if (referenceTokenSets.some((reference) => memoTokenOverlap(tokens, reference) >= 0.72)) continue;
     seen.add(key);
     points.push(clipText(text, 240));
-    referenceTokenSets.push(tokens);
-    if (points.length >= 3) break;
+    if (points.length >= 5) break;
   }
   return points;
-}
-
-const MEMO_TOKEN_STOP_WORDS = new Set([
-  'a', 'an', 'and', 'are', 'as', 'at', 'by', 'for', 'from', 'in', 'is', 'of', 'on', 'or', 'the', 'to', 'with',
-]);
-
-function memoMeaningfulTokens(value: unknown): Set<string> {
-  return new Set(
-    collapseWhitespace(value)
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .split(' ')
-      .filter((token) => token.length > 2 && !MEMO_TOKEN_STOP_WORDS.has(token)),
-  );
-}
-
-function memoTokenOverlap(left: Set<string>, right: Set<string>): number {
-  if (left.size === 0 || right.size === 0) return 0;
-  let shared = 0;
-  for (const token of left) if (right.has(token)) shared += 1;
-  return shared / Math.min(left.size, right.size);
-}
-
-function completeNarrative(...values: unknown[]): string {
-  for (const value of values) {
-    const text = collapseWhitespace(value);
-    if (!text) continue;
-    if (/\b(?:and|or|with|including|backed|by|for|to|of|the|a|an|but|while|through)$/i.test(text)) continue;
-    return text;
-  }
-  return '';
 }
 
 /** A fact is shown only when it carries real signal — empty, [MISSING], and
@@ -458,7 +417,7 @@ export function buildSnapshotRows(
     },
     {
       label: 'Why Aethria flagged it',
-      text: completeNarrative(
+      text: firstNonEmpty(
         startup.partner?.snapshot?.key_signal,
         formatDecisionDriver(startup.partner?.decision_drivers?.[0] ?? ''),
         startup.scout.why_now,

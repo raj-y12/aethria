@@ -26,7 +26,6 @@ import {
   type FundConfiguration,
 } from '../lib/fundConfiguration';
 import { productInteraction } from '../design-system/productSystem';
-import type { MemoDecisionBriefStatus } from '../lib/memoDecisionBrief';
 import {
   buildQueueRowContext,
   getVisibleRecommendation,
@@ -38,7 +37,6 @@ interface WorkGridProps {
   startups: Startup[];
   onStartupClick: (startup: Startup) => void;
   selectedId?: string | null;
-  selectedDecisionStatus?: MemoDecisionBriefStatus;
   watchlistIds?: Set<string>;
   fundConfiguration?: FundConfiguration;
   /** Controlled queue view — the room header readouts own view switching. */
@@ -155,7 +153,6 @@ const WorkGrid = ({
   startups,
   onStartupClick,
   selectedId,
-  selectedDecisionStatus,
   watchlistIds,
   fundConfiguration,
   queueView,
@@ -518,7 +515,6 @@ const WorkGrid = ({
                     }}
                     model={model}
                     isSelected={isSelected}
-                    decisionStatus={isSelected ? selectedDecisionStatus : undefined}
                     rowIndex={idx}
                     onClick={() => handleRowSelect(model.startup)}
                     onKeyDown={keyDown}

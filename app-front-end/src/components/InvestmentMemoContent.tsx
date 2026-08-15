@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
@@ -87,7 +87,6 @@ export interface InvestmentMemoContentProps {
   readOnly?: boolean;
   onMemoPipelineReady?: () => void;
   onDecisionResolved?: (startup: Startup) => void;
-  onDecisionStatusChange?: (status: MemoDecisionBriefStatus) => void;
   fundConfiguration?: FundConfiguration;
   peerStartups?: Startup[];
   portfolioSignals?: SignalItem[];
@@ -189,7 +188,6 @@ function InvestmentMemoContent(
     embedded = false,
     readOnly = false,
     onMemoPipelineReady,
-    onDecisionStatusChange,
     fundConfiguration,
     peerStartups = [],
     portfolioSignals = [],
@@ -202,10 +200,6 @@ function InvestmentMemoContent(
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
   const [memoGateError, setMemoGateError] = useState<string | null>(null);
   const [decisionStatus, setDecisionStatus] = useState<MemoDecisionBriefStatus>('loading');
-  const handleDecisionStatusChange = useCallback((status: MemoDecisionBriefStatus) => {
-    setDecisionStatus(status);
-    onDecisionStatusChange?.(status);
-  }, [onDecisionStatusChange]);
 
   const displayStartup = useMemo(
     () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
@@ -285,8 +279,6 @@ function InvestmentMemoContent(
 
   const showJudgment = !!displayStartup?.partner?.recommendation;
   const showDecisionAnalysis = decisionStatus === 'ready_for_ruling' || decisionStatus === 'recorded';
-  const showPriorWorkflowAnalysis = decisionStatus === 'unavailable' && showJudgment;
-  const showAssessmentAnalysis = showDecisionAnalysis || showPriorWorkflowAnalysis;
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
   const reasoningParagraphs = useMemo(
     () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
@@ -315,16 +307,8 @@ function InvestmentMemoContent(
       }),
     [displayStartup, companyResolution],
   );
-  const founderTeamItems = founderMissing.includes('previous_employment')
-    ? []
-    : (displayStartup?.review?.team_analysis ?? []).filter(
-        (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
-      );
-  const resolutionMissingFields = (companyResolution?.missing_fields ?? []).filter(
-    (field) => field !== 'founder_names' || founderNames.length === 0,
-  );
-  const resolutionNotes = (companyResolution?.notes ?? []).filter(
-    (note) => founderNames.length === 0 || !/founder_names/i.test(note),
+  const founderTeamItems = (displayStartup?.review?.team_analysis ?? []).filter(
+    (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
   );
   // Investment read (reviewer_rules v2+). Narrative only; the backend has
   // already dropped anything that failed the evidence bar, so anything present
@@ -401,11 +385,7 @@ function InvestmentMemoContent(
       )
     : '';
   const investmentCasePoints = useMemo(
-    () => (displayStartup ? buildInvestmentCase(displayStartup, [
-      coverStandfirst,
-      displayStartup.scout.solution ?? '',
-      displayStartup.scout.one_line ?? '',
-    ]) : []),
+    () => (displayStartup ? buildInvestmentCase(displayStartup, coverStandfirst) : []),
     [displayStartup, coverStandfirst]
   );
   const snapshotRows = useMemo(
@@ -548,9 +528,8 @@ function InvestmentMemoContent(
             <OpportunityIntelligence
               startupId={displayStartup.id}
               companyName={displayStartup.scout.name}
-              priorRecommendation={displayStartup.partner?.recommendation ?? null}
               onRulingRecorded={onClose}
-              onDecisionStatusChange={handleDecisionStatusChange}
+              onDecisionStatusChange={setDecisionStatus}
               readOnly={readOnly}
             />
 
@@ -704,7 +683,7 @@ function InvestmentMemoContent(
             )}
 
             {/* ── Assessment ── */}
-            {showAssessmentAnalysis && (() => {
+            {showDecisionAnalysis && (() => {
               const isMissing = (s: string) => /^\[MISSING/i.test(String(s ?? '').trim());
               const compItems = (displayStartup.review?.competition_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
               const bizItems = (displayStartup.review?.business_model_analysis ?? []).filter((s) => String(s ?? '').trim() && !isMissing(String(s)));
@@ -717,28 +696,12 @@ function InvestmentMemoContent(
               const hasScorecard = showScores && !!structuredScoring;
               const hasPanel = reviewerConsensusRows.length > 0;
               const hasDeepDive = assessmentReadouts.length > 0;
-              if (!hasScorecard && !hasPanel && !hasDeepDive && !showPriorWorkflowAnalysis) {
+              if (!hasScorecard && !hasPanel && !hasDeepDive) {
                 return null;
               }
               return (
                 <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <MemoSectionTitle number="04" id="memo-scoring">
-                    {showPriorWorkflowAnalysis ? 'Prior workflow read' : 'Assessment'}
-                  </MemoSectionTitle>
-                  {showPriorWorkflowAnalysis ? (
-                    <div className="memoPriorWorkflowLead">
-                      <p className="memoPriorWorkflowMeta">Legacy record · not authoritative</p>
-                      <p className="memoPriorWorkflowDecision">
-                        <strong>
-                          {(displayStartup.partner?.recommendation ?? '').charAt(0)
-                            + (displayStartup.partner?.recommendation ?? '').slice(1).toLowerCase()}
-                        </strong>
-                        {displayStartup.partner?.decision_rationale ? (
-                          <span>{renderWithMonoNumbers(displayStartup.partner.decision_rationale)}</span>
-                        ) : null}
-                      </p>
-                    </div>
-                  ) : null}
+                  <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
                       <AssessmentScorecard
@@ -798,24 +761,6 @@ function InvestmentMemoContent(
                         ))}
                     </div>
                   )}
-                  {showPriorWorkflowAnalysis && thesisSection.visible ? (
-                    <div className="memoPriorMandateRead">
-                      <p className="memoDocSubhead">Mandate read</p>
-                      {thesisSection.headlineTag ? (
-                        <p className="memoDocProse">{renderWithMonoNumbers(thesisSection.headlineTag)}</p>
-                      ) : null}
-                      {[...thesisSection.fitPoints, ...thesisSection.gapPoints].length > 0 ? (
-                        <ul className="memoList">
-                          {[...thesisSection.fitPoints, ...thesisSection.gapPoints].slice(0, 4).map((item, index) => (
-                            <li key={`${item}-${index}`} className="memoListItem">
-                              <span className="memoBullet" aria-hidden>·</span>
-                              <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </motion.section>
               );
             })()}
@@ -1035,12 +980,12 @@ function InvestmentMemoContent(
                       <span>Founders: {founderNames.join(', ')}</span>
                     </li>
                   ) : null}
-                  {resolutionMissingFields.length > 0 ? (
+                  {(companyResolution?.missing_fields?.length ?? 0) > 0 ? (
                     <li className="memoListItem">
                       <span className="memoBullet">·</span>
                       <span>
                         Missing evidence:{' '}
-                        {resolutionMissingFields
+                        {companyResolution!.missing_fields!
                           .map((f) => RESOLUTION_MISSING_FIELD_LABELS[f] ?? f)
                           .join(', ')}
                       </span>
@@ -1058,7 +1003,7 @@ function InvestmentMemoContent(
                       </span>
                     </li>
                   ) : null}
-                  {resolutionNotes.map((note, i) => (
+                  {(companyResolution?.notes ?? []).map((note, i) => (
                     <li key={`note-${i}`} className="memoListItem">
                       <span className="memoBullet">·</span>
                       <span>{note}</span>

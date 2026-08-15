@@ -50,35 +50,4 @@ describe('WorkGrid', () => {
     expect(onStartupClick).toHaveBeenCalledTimes(3);
     expect(onStartupClick).toHaveBeenLastCalledWith(startup);
   });
-
-  it('replaces a selected legacy recommendation when its canonical decision is unavailable', () => {
-    const unavailableStartup: Startup = {
-      ...startup,
-      partner: {
-        recommendation: 'PASS',
-        human_review_required: true,
-      },
-      review: { overall_score: 2.5 },
-    };
-    const props = {
-      startups: [unavailableStartup],
-      onStartupClick: vi.fn(),
-      selectedId: unavailableStartup.id,
-      selectedDecisionStatus: 'unavailable',
-      queueView: 'PRIORITY',
-      onQueueViewChange: vi.fn(),
-    };
-
-    render(
-      <MemoryRouter>
-        {/** The status prop is the behavior under test and is introduced by the fix. */}
-        <WorkGrid {...(props as unknown as React.ComponentProps<typeof WorkGrid>)} />
-      </MemoryRouter>,
-    );
-
-    const docketRow = screen.getByRole('button', { name: /Keyboard Docket Co/ });
-    expect(docketRow).toHaveTextContent('Decision unavailable');
-    expect(docketRow).not.toHaveTextContent('PASS');
-    expect(docketRow).not.toHaveTextContent('25');
-  });
 });

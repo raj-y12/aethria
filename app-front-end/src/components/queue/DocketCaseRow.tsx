@@ -13,12 +13,10 @@ import {
 } from './queueRowShared';
 import { QUEUE_ROW_SELECT_TRANSITION } from './queueRowMotion';
 import { queueRowPadding } from '../../design-system/density';
-import type { MemoDecisionBriefStatus } from '../../lib/memoDecisionBrief';
 
 interface DocketCaseRowProps {
   model: DocketRowModel;
   isSelected: boolean;
-  decisionStatus?: MemoDecisionBriefStatus;
   rowIndex?: number;
   onClick: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
@@ -32,7 +30,7 @@ interface DocketCaseRowProps {
  * tint and text share the same horizontal gutter as the system-rail buttons.
  */
 const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function DocketCaseRow(
-  { model, isSelected, decisionStatus, rowIndex = 0, onClick, onKeyDown },
+  { model, isSelected, rowIndex = 0, onClick, onKeyDown },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
@@ -70,7 +68,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
       role="button"
       tabIndex={0}
       aria-pressed={isSelected}
-      aria-label={buildRowAriaLabel(model, isSelected, decisionStatus)}
+      aria-label={buildRowAriaLabel(model, isSelected)}
       onClick={onClick}
       onKeyDown={onKeyDown}
       initial={false}
@@ -122,7 +120,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               decisionVariant={decisionVariant}
               prominent={isSelected}
               attentionDriver={attentionDriver}
-              decisionStatus={decisionStatus}
             />
           </div>
         </div>
