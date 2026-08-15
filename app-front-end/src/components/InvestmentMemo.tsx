@@ -8,6 +8,7 @@ import { chrome } from '../design-system/chrome';
 import { transitionOrReduced } from '../design-system/motion';
 import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
 import InvestmentMemoContent from './InvestmentMemoContent';
+import type { MemoDecisionBriefStatus } from '../lib/memoDecisionBrief';
 
 interface InvestmentMemoProps {
   startup: Startup | null;
@@ -18,12 +19,13 @@ interface InvestmentMemoProps {
   fundConfiguration?: FundConfiguration;
   peerStartups?: Startup[];
   portfolioSignals?: SignalItem[];
+  onDecisionStatusChange?: (status: MemoDecisionBriefStatus) => void;
 }
 
 /**
  * Full-screen modal wrapper for the investment memo. Used on small viewports.
  */
-export default function InvestmentMemo({ startup, onClose, onAddContext, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups, portfolioSignals }: InvestmentMemoProps) {
+export default function InvestmentMemo({ startup, onClose, onAddContext, onMemoPipelineReady, onDecisionResolved, fundConfiguration, peerStartups, portfolioSignals, onDecisionStatusChange }: InvestmentMemoProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const reduceMotion = usePrefersReducedMotion();
   useFocusTrap(true, containerRef);
@@ -86,6 +88,7 @@ export default function InvestmentMemo({ startup, onClose, onAddContext, onMemoP
           fundConfiguration={fundConfiguration}
           peerStartups={peerStartups}
           portfolioSignals={portfolioSignals}
+          onDecisionStatusChange={onDecisionStatusChange}
         />
       </div>
     </motion.div>

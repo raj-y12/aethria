@@ -2,6 +2,7 @@ import type { Startup } from '../../types/startup';
 import type { ReviewerQualityBand } from '../../design-system/semantics';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAttentionDriver';
+import type { MemoDecisionBriefStatus } from '../../lib/memoDecisionBrief';
 
 export interface DocketRowModel {
   startup: Startup;
@@ -43,7 +44,11 @@ export function formatUnresolvedAgeDays(value: string): string {
   return `${days}d`;
 }
 
-export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): string {
+export function buildRowAriaLabel(
+  model: DocketRowModel,
+  isSelected: boolean,
+  decisionStatus?: MemoDecisionBriefStatus,
+): string {
   const { startup, attentionDriver, queueContext } = model;
   const rec = queueContext.startup.partner?.recommendation ?? '';
   const score = queueContext.configuredScore;
@@ -51,9 +56,15 @@ export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): s
     startup.scout.name,
     startup.scout.location?.trim(),
     model.sectorStage || 'Unknown sector',
-    attentionDriver.detail ?? attentionDriver.label,
+    decisionStatus === 'unavailable'
+      ? 'Canonical decision unavailable'
+      : decisionStatus === 'loading'
+        ? 'Checking canonical decision'
+        : attentionDriver.detail ?? attentionDriver.label,
     Number.isFinite(score) && score > 0 ? `Score ${Math.round(score)}` : '',
-    rec ? `Recommendation ${rec}` : '',
+    decisionStatus !== 'unavailable' && decisionStatus !== 'loading' && rec
+      ? `Recommendation ${rec}`
+      : '',
     isSelected ? 'Selected case' : '',
     'Press Enter to open memo',
   ].filter(Boolean);

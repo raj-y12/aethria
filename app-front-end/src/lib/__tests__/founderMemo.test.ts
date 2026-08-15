@@ -145,6 +145,20 @@ describe('founder section model', () => {
     expect(model.names).toEqual([]);
     expect(model.emptyMessage).not.toBeNull();
   });
+
+  it('cleans source artifacts and removes navigation text mistaken for a founder', () => {
+    const model = buildFounderSectionModel({
+      scoutFounderNames: [
+        'Emily Yuan',
+        'Nico Laqua',
+        'Meet Nico Laqua',
+        'Mike Milotich_',
+        '  emily yuan  ',
+      ],
+    });
+
+    expect(model.names).toEqual(['Emily Yuan', 'Nico Laqua', 'Mike Milotich']);
+  });
 });
 
 describe('founder formatting', () => {
