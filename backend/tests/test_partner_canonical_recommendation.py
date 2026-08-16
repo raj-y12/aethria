@@ -88,3 +88,33 @@ def test_a_critical_risk_still_forces_pass_even_when_canonical_says_advance():
     out = engine.decide(_base_scout(), review, canonical_recommendation="advance")
 
     assert out["recommendation"] == "PASS"
+
+
+def test_canonical_override_also_reaches_the_grey_zone_llm_escalation_path():
+    """The LLM-escalation trigger sites (_decide_with_llm) build their own
+    final_recommendation from score_recommendation/branch_recommendation and
+    don't route through _emit_deterministic — they need the same override
+    applied at their own call sites (sub-project 1, Task 5)."""
+    engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
+    review = _base_review(
+        market_score=7, product_score=7, technical_score=6, execution_score=6,
+    )  # Core-dim avg = 6.5 — borderline band, triggers LLM escalation.
+
+    llm_kwargs: dict = {}
+
+    def fake_llm(*args, **kwargs):
+        llm_kwargs.update(kwargs)
+        return engine._create_decision(
+            decision="MAYBE",
+            confidence=6,
+            rationale="LLM rationale",
+            next_action="Monitor market and track progress",
+            human_review_required=True,
+            assumption_risks=[],
+        )
+
+    engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
+    out = engine.decide(_base_scout(), review, canonical_recommendation="advance")
+
+    assert llm_kwargs.get("final_recommendation") == "INVEST"
+    assert out["recommendation"] == "INVEST"

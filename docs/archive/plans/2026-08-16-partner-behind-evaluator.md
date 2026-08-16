@@ -112,12 +112,15 @@ This means Task 3 cannot actually move to canonical until Sub-project 4 (canonic
 
 ### Task 5: Read and scope the LLM-escalation path
 
-**Do not skip this by assuming the ~500 lines are all necessary.** This session characterized it by structure (prompt building, JSON-budget truncation, response parsing, rescue retry) but did not read every line.
+**DONE — read in full, and found a real gap that's now fixed rather than just scoped.**
 
-- [ ] Read `_decide_with_llm`, `_compact_llm_rescue_call`, `_align_llm_partner_payload` in full ([decision.py:1681-2210](../../../backend/partner/decision.py:1681)).
-- [ ] Check whether the JSON-budget-truncation helpers (`_json_within_budget`, `_partner_rules_json_for_prompt`) duplicate an existing shared utility elsewhere in the codebase (check `utils/` first) before assuming they're partner-specific and must be ported as-is.
-- [ ] Determine the trigger conditions precisely (grey-zone score window, contradictory-scores flag) and confirm they still make sense once Task 1 and Task 4 land — the trigger inputs may have moved.
-- [ ] Write this task's own bite-sized steps once the above is done. Likely shape: a canonical `escalate_to_llm(snapshot, policy) -> Recommendation` function, gated the same way, called only when the rule-based `evaluate_snapshot()` result is genuinely ambiguous — not a port of the class-based retry/rescue machinery verbatim.
+- [x] Read `_decide_with_llm`, `_compact_llm_rescue_call`, `_align_llm_partner_payload` in full. Key finding: **the LLM never decides the recommendation.** Its own docstring: *"Canonical recommendation is fixed by the caller; model supplies defense narrative only."* `final_recommendation` is always a caller-supplied parameter — the LLM only writes rationale/confidence text defending a recommendation the deterministic rules already picked. This means the "escalation" is materially smaller than the ~500 lines suggested: no separate decision authority to reconcile with canonical, just a narrative generator.
+- [x] Checked `_json_within_budget`/`_partner_rules_json_for_prompt` against `utils/` — no existing duplicate. Genuinely partner-specific, not bloat.
+- [x] **Found and fixed a real gap**, not just scoped one: all 3 call sites that trigger `_decide_with_llm` (low-score-near-threshold edge case, MEDIUM-verdict grey zone, MEDIUM borderline band) compute `final_recommendation` from raw `score_recommendation`/`branch_recommendation` — bypassing `_emit_deterministic()` entirely, so Task 1's canonical override never reached them. Two *other* usages of the same variables do go through `_emit_deterministic` and were already covered.
+- [x] Extracted the override into a shared `_canonical_override_or()` helper (used by `_emit_deterministic` too, replacing its inline duplicate of the same check) and applied it at all 3 LLM-trigger call sites, so a canonical recommendation now overrides the LLM path's fixed recommendation exactly like the deterministic path.
+- [x] New test: `test_canonical_override_also_reaches_the_grey_zone_llm_escalation_path` in `test_partner_canonical_recommendation.py` — stubs `_decide_with_llm` (same pattern as the existing `test_medium_6_4_borderline_routes_to_llm`), confirms the canonical value reaches the escalation call, not the raw score-ladder value.
+- [x] Full backend suite: 2192 passed, 0 regressions.
+- No canonical port of the retry/rescue machinery itself needed — it's narrative-only, so there's nothing decision-bearing left to reconcile.
 
 ---
 

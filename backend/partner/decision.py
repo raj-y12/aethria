@@ -415,6 +415,21 @@ class PartnerDecisionEngine:
         mapping = {"advance": "INVEST", "monitor": "MONITOR", "pass": "PASS"}
         return mapping.get((canonical_recommendation or "").strip().lower())
 
+    def _canonical_override_or(
+        self,
+        fallback: str,
+        *,
+        canonical_recommendation: Optional[str],
+        has_critical_risk: bool,
+    ) -> str:
+        """Shared override point for every deterministic and LLM-escalated branch:
+        canonical wins when available, never over a fail-closed critical-risk PASS."""
+        if canonical_recommendation is not None and not has_critical_risk:
+            mapped = self._recommendation_from_canonical_state(canonical_recommendation)
+            if mapped is not None:
+                return mapped
+        return fallback
+
     def _canonical_recommendation(self, avg_score: float) -> str:
         """Score-threshold fallback, used only when no canonical recommendation
         was supplied (see ``_recommendation_from_canonical_state``)."""
@@ -1144,12 +1159,11 @@ class PartnerDecisionEngine:
             # (STRONG/MEDIUM/WEAK, v3's score ladder) — but never over a critical-
             # risk PASS, which is this engine's own fail-closed gate and must not
             # be second-guessed by a less-informed canonical opinion.
-            if canonical_recommendation is not None and not has_critical_risk:
-                canonical_mapped = self._recommendation_from_canonical_state(
-                    canonical_recommendation
-                )
-                if canonical_mapped is not None:
-                    recommendation = canonical_mapped
+            recommendation = self._canonical_override_or(
+                recommendation,
+                canonical_recommendation=canonical_recommendation,
+                has_critical_risk=has_critical_risk,
+            )
             effective_human_review = bool(human_rev or has_red_flags)
             if historical_v3:
                 # Preserve v3's recommendation-derived action mapping. The one
@@ -1230,6 +1244,11 @@ class PartnerDecisionEngine:
             )
             if self.use_llm_fallback and low_score_edge_case:
                 trigger_reason = "MEDIUM verdict slightly below pass threshold"
+                llm_final_recommendation = self._canonical_override_or(
+                    score_recommendation,
+                    canonical_recommendation=canonical_recommendation,
+                    has_critical_risk=has_critical_risk,
+                )
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -1240,12 +1259,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=score_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=score_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
@@ -1326,6 +1345,11 @@ class PartnerDecisionEngine:
                 trigger_reason = "High thesis alignment with solid average — extended partner review"
             use_llm = self.use_llm_fallback and bool(trigger_reason)
             if use_llm:
+                llm_final_recommendation = self._canonical_override_or(
+                    branch_recommendation,
+                    canonical_recommendation=canonical_recommendation,
+                    has_critical_risk=has_critical_risk,
+                )
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -1336,12 +1360,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=branch_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=branch_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
@@ -1395,6 +1419,11 @@ class PartnerDecisionEngine:
                     if grey_zone_active
                     else "MEDIUM verdict with borderline average score"
                 )
+                llm_final_recommendation = self._canonical_override_or(
+                    branch_recommendation,
+                    canonical_recommendation=canonical_recommendation,
+                    has_critical_risk=has_critical_risk,
+                )
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -1405,12 +1434,12 @@ class PartnerDecisionEngine:
                     thesis_block=thesis_block,
                     avg_score=avg_score,
                     avg_dims=avg_dims,
-                    final_recommendation=branch_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     fund_thesis=fund_thesis,
                 )
                 return self._align_llm_partner_payload(
                     result,
-                    final_recommendation=branch_recommendation,
+                    final_recommendation=llm_final_recommendation,
                     assumption_risks=assumption_risks,
                     tags=tags,
                     primary=primary,
