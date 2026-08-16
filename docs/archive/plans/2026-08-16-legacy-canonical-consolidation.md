@@ -1,0 +1,135 @@
+# Legacy/Canonical Consolidation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Finish the migration approved in [docs/archive/specs/2026-07-15-evidence-decision-platform-design.md](../specs/2026-07-15-evidence-decision-platform-design.md) — collapse the two independent, disagreeing recommendation systems (legacy `partner`/`reviewer` and canonical `evaluation_v2`) into one, so the product has a single source of truth instead of two engines that can silently contradict each other.
+
+**Architecture:** Strangler migration, not a rewrite — per §21.1 of the source spec, this is a *master* plan; each sub-project below gets its own detailed task-by-task plan before implementation begins, written by whoever picks it up, after reading the actual files involved (not from this document alone). This document exists to sequence the sub-projects correctly and record why each one is scoped the way it is.
+
+**Tech Stack:** Python 3.12, FastAPI, asyncpg/PostgreSQL, Pydantic. No new dependencies.
+
+## Global Constraints
+
+- Explicit `user_id` tenancy on every storage call, constructor, and job (invariant 1).
+- Thresholds are versioned policy data in `resources/config/`, never hardcoded in Python (invariant 3). Any threshold discovered hardcoded during this work gets extracted, not just relocated to a different Python file.
+- Row-level storage; never delete-and-rewrite a tenant's rows (invariant 4).
+- Fail closed: missing thesis, ambiguous identity, thin evidence, or an unconfigured dependency produces a named block (invariant 5).
+- Migrations are append-only; never edit an applied migration (invariant 7).
+- No model call where a rule already works (invariant 8).
+- Public API shapes, SSE events, persisted rows, enum values, and policy files are contracts — additive changes only unless a sub-project explicitly says otherwise and updates API.md in the same change.
+- Never weaken or delete a test to make a change pass.
+
+---
+
+## Why this exists (context for a fresh reader)
+
+Two systems currently run for every dispatch and produce two independent recommendations from overlapping evidence:
+
+- **Legacy**: `scout/` (2,556 lines, 4 personas) researches a company and writes narrative JSON onto `startups`. `reviewer/` (3,525 lines, 3 personas) scores it via `services/scoring/*` into `structured_scoring`. `partner/decision.py` (2,210 lines, one file) applies rule-based thresholds to produce a recommendation. `portfolio/store.py` (531 lines) persists portfolio effects.
+- **Canonical**: `identity/` resolves company/opportunity identity. `evidence/` holds claims and evidence artifacts (populated today by extracting facts out of scout's narrative output, not by independent retrieval). `evaluation_v2/service.py`'s `evaluate_snapshot()` scores claims deterministically and produces its own recommendation, stored via `evaluation_v2/repository.py`. `decisions/` records the human ruling. `portfolio/repository.py` (151 lines) is the canonical portfolio store, wired but barely used.
+
+The canonical evaluator now runs for every dispatch (bridged in `backend/jobs/handlers.py::_execute_company_lookup`, 2026-08-16), but nothing reconciles its output with the legacy `partner/decision.py` recommendation or the legacy reviewer's `structured_scoring`. A reader can see "Blocked by evidence" from canonical and five confident dimension scores from legacy on the same document.
+
+Per the source spec's own Phase 4 exit criteria (never completed): *"Current PartnerEngine adapted behind RecommendationEngine"* and *"Existing startup and memo APIs served from compatibility projections."* This plan finishes that.
+
+## Sequencing
+
+Four sub-projects, in this order. Each is independently shippable and testable — do not start sub-project N+1 until N's acceptance criteria pass in CI.
+
+1. **Partner-behind-evaluator** — the recommendation itself stops disagreeing with itself. Highest leverage, does first.
+2. **Reviewer scoring collapse** — the Assessment scores stop being a second, unreconciled scoring system.
+3. **Portfolio store consolidation** — one portfolio persistence path instead of two.
+4. **Canonical evidence extraction** — only attempt once 1–3 are done; this is the one that eventually lets scout's persona pipeline shrink, and it's the riskiest because nothing else does company research today.
+
+---
+
+### Sub-project 1: Partner-behind-evaluator
+
+**Objective:** `partner/decision.py`'s recommendation stops being computed and shown independently. The canonical `evaluate_snapshot()` recommendation becomes authoritative; `partner/decision.py` either becomes a thin adapter that maps its rule outputs into canonical-shaped compatibility fields, or is retired outright if nothing still needs its bespoke output shape.
+
+**Files to read fully before writing a task-level plan** (do this first — do not plan blind):
+- `backend/partner/decision.py` (2,210 lines) — the rule engine, including the `conviction=8` hardcoded branch at the line the codex audit flagged.
+- `backend/partner/engine.py` (794 lines) — orchestration; find every caller.
+- `backend/evaluation_v2/service.py::evaluate_snapshot` — the canonical equivalent, already read in full during this session; the two need a mapping table (which legacy recommendation fields have no canonical equivalent yet, and vice versa).
+- `backend/routers/*.py` and `backend/api.py` — every endpoint currently returning `startup.partner` fields, to know what compatibility shape must be preserved (API.md contract).
+- Every test in `backend/tests/partner/` and `backend/tests/evaluation_v2/` — these define current behavior; a passing suite after this sub-project must mean "same or better," not "different."
+
+**Acceptance criteria:**
+- A dispatch produces exactly one recommendation, not two, reachable from the memo/startup APIs.
+- No API response field is renamed or removed without an API.md update in the same change (additive only, or an explicitly announced breaking change with a version note).
+- The `conviction=8` hardcoded branch and any other threshold found hardcoded in `partner/decision.py` is extracted into `resources/config/partner_rules/`, versioned, and covered by `backend/tests/evaluation_v2/test_partner_rules_contract.py`.
+- `backend/tests/evaluation_v2/test_partner_rules_contract.py` and `backend/tests/test_decision_safety_certification.py` (or their successors) pass.
+- No caller of the old `partner/decision.py` recommendation silently gets a different answer for the same evidence — a golden-set regression comparison (legacy output vs. new output, same inputs) is part of the required tests for this sub-project, not optional.
+
+**Required tests:** golden-set comparison (old vs. new recommendation for a fixed evidence snapshot, asserting equivalence or an explicitly-reviewed intentional change); contract test extension for any newly-versioned threshold; existing `test_decision_safety_certification.py` continues passing unmodified in spirit (extend, don't weaken).
+
+**Prohibited:** deleting `partner/decision.py`'s test suite instead of updating it; silently changing a recommendation threshold as a side effect of the refactor (any behavior change must be a deliberate, separately-reviewed decision, not a refactor accident).
+
+---
+
+### Sub-project 2: Reviewer scoring collapse
+
+**Objective:** `reviewer/`'s three personas stop independently producing `structured_scoring` for Assessment. Scoring authority moves entirely to `evaluate_snapshot()`. Reviewer's remaining job is exactly what ADR-0012 already scoped for it: `founder_fluency`, `capability_slope`, `reframe` — narrative only, never a score input.
+
+**Files to read fully before writing a task-level plan:**
+- `backend/reviewer/engine.py` (1,657 lines) and `backend/reviewer/base.py` (1,290 lines) — find every place `structured_scoring` is produced and every consumer of it (the frontend's `AssessmentScorecard.tsx` is the main one, confirmed this session).
+- `backend/services/scoring/*` (4,436 lines across 9 files) — determine exactly which layers (`extraction_layer`, `normalization_layer`, `consistency_layer`, `aggregation_layer`, `presentation_layer`, `scoring_engine`) are reviewer-only vs. shared with `evaluation_v2/prerequisites.py`. Only the reviewer-only layers are candidates for deletion after this sub-project; the policy-compilation layers (`policy_compiler.py`, `policy_store.py`) are shared and stay.
+- `app-front-end/src/components/scoring/AssessmentScorecard.tsx` and `app-front-end/src/lib/reviewScoring.ts` — the frontend consumer; this sub-project has a frontend half (point Assessment at canonical `criteria` scores instead of `structuredScoring`).
+- ADR-0012 (`docs/adr/0012-investment-read-is-narrative-not-score.md`) — the founder-fluency/capability-slope/reframe boundary this sub-project must respect and extend to the rest of reviewer's output.
+
+**Acceptance criteria:**
+- Assessment's dimension scores come from `evaluation.criteria` (canonical), not `structured_scoring` (legacy).
+- Reviewer's three personas (Primary/Skeptical/Opportunist) still diverge on *evidence* — contradicting claims — not on independent scores, matching ADR-0012's stated intent.
+- `services/scoring/` shrinks to only what canonical `evaluation_v2` needs; reviewer-only presentation/extraction layers are deleted, not left dormant.
+- No regression in founder-fluency/capability-slope/reframe rendering (existing tests in `backend/tests/reviewer/` covering ADR-0012 continue passing).
+
+**Required tests:** frontend component test confirming Assessment reads canonical criteria; backend test confirming reviewer no longer writes a `structured_scoring` recommendation input (only narrative fields); regression test that reviewer disagreement now surfaces as `MemoEvidenceCoverage: 'contradictory'` (already the mechanism, per this session's finding) rather than a since-removed `agreement` field.
+
+**Prohibited:** re-adding a "reviewer agreement" concept to the canonical model — this session already established it's redundant with evidence coverage.
+
+---
+
+### Sub-project 3: Portfolio store consolidation
+
+**Objective:** One portfolio persistence path (`portfolio/repository.py`, canonical, asyncpg) instead of two (`portfolio/store.py`, legacy, Supabase-client).
+
+**Files to read fully before writing a task-level plan:**
+- `backend/portfolio/store.py` (531 lines) — current call sites, confirmed this session: `pipeline_runner.py`, `api.py`, `routers/deps.py`, `routers/analytics.py`, `partner/engine.py`, `partner/decision.py`, `portfolio/signals.py`, `portfolio/feedback.py`, `portfolio/execution.py`, `portfolio/health.py`, `portfolio/engine.py` — every one of these needs to move to `repository.py` deliberately, not have `store.py` deleted out from under it.
+- `backend/portfolio/repository.py` (151 lines) — what it currently supports vs. what `store.py`'s callers need; this sub-project likely needs to *extend* `repository.py`'s surface before callers can move, not just redirect imports.
+- `backend/portfolio/canonical_projection.py` (48 lines) — may already be a partial bridge; read it before assuming one needs to be built from scratch.
+
+**Acceptance criteria:**
+- Every listed call site reads/writes through `portfolio/repository.py`.
+- `portfolio/store.py` is deleted, not left as unused dead code (AGENTS.md: clean up orphans a change creates).
+- No portfolio row is silently dropped or duplicated during the migration — this sub-project should include a one-time backfill/reconciliation check (matching the pattern used for Phase 2's identity backfill) before `store.py` is removed, not after.
+
+**Required tests:** contract test that every call site's read/write behavior is unchanged after moving to `repository.py`; a reconciliation test comparing row counts/content between the two stores before cutover.
+
+**Prohibited:** deleting `store.py` before every caller has moved and been verified — this is a common way strangler migrations quietly lose data.
+
+---
+
+### Sub-project 4: Canonical evidence extraction
+
+**Objective:** Give the canonical evidence layer its own retrieval/extraction capability (the spec's Phase 3 "evidence-planning stage" and "retrieval stage," never built) so it stops depending entirely on scout's narrative prose via the regex-based `canonical_scout_claims.py` bridge. Only once this exists does simplifying `scout/`'s four personas become possible without breaking the product's only sourcing mechanism.
+
+**Do not start this sub-project's detailed planning until 1–3 have shipped.** It's the largest, riskiest piece, and the first three sub-projects will change what "the canonical side" looks like in ways that should inform this one's design. Revisit the source spec's §9.3 (evidence-planning stage), §9.4 (retrieval stage), and §9.5 (extraction stage) when this sub-project is actually scoped.
+
+---
+
+## Verification gate (applies to every sub-project)
+
+Mirrors AGENTS.md's definition of done — run before calling any sub-project complete:
+
+```bash
+python3 -m pytest -o asyncio_mode=auto
+cd app-front-end && npm run lint && npm test && npm run build && npm run check:bundle
+```
+
+Plus, for any sub-project touching a scored recommendation: a manual review of the golden-set comparison output, since a silent recommendation change is a product-safety issue (invariant 5), not just a test failure.
+
+## Explicitly out of scope for this plan
+
+- Phases 6–8 of the source spec (attention-triggered enrichment, Fund Intelligence, channel/outcome expansion) — not started, not blocking this consolidation.
+- Any change to `meta/` — already correctly shadow-mode/proposal-only per Phase 0, not part of the duplication problem this plan addresses.
+- Rewriting `services/scoring/policy_compiler.py` or `policy_store.py` — shared, working, not implicated in the duplication.
