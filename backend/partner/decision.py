@@ -1061,13 +1061,25 @@ class PartnerDecisionEngine:
 
         startup_sector = scout_output.get("sector", "")
         startup_funding_stage = scout_output.get("funding_stage")
+        # Facts that only ever nudged conviction_adjust silently — a reader saw
+        # a number move with no visible reason. Named here and surfaced onto
+        # decision_drivers by _emit_deterministic below, instead of staying an
+        # invisible adjustment (matches the audit's fake-precision finding:
+        # a conviction delta with no attached reason is exactly that pattern).
+        silent_conviction_facts: List[str] = []
+        if has_red_flags:
+            silent_conviction_facts.append("red_flag_language_in_key_risks")
+        if has_missing_assumptions:
+            silent_conviction_facts.append("unresolved_assumption_risk")
         if portfolio_context:
             sector_counts = portfolio_context.get("sector_counts", {})
             total = portfolio_context.get("total_portfolio_size", 0)
             if sector_counts.get(startup_sector, 0) >= 3:
                 conviction_adjust -= 2
+                silent_conviction_facts.append("portfolio_sector_concentration")
             if total > 20 and startup_funding_stage == "Pre-Seed":
                 conviction_adjust -= 1
+                silent_conviction_facts.append("large_portfolio_pre_seed_caution")
 
         score_recommendation = self._canonical_recommendation(avg_score)
         if has_critical_risk:
@@ -1198,7 +1210,7 @@ class PartnerDecisionEngine:
                 traction_signals=n_traction,
                 risks=merged_risks,
             )
-            result["decision_drivers"] = drivers
+            result["decision_drivers"] = list(dict.fromkeys(drivers + silent_conviction_facts))
             result = self._apply_final_recommendation_fields(
                 result,
                 recommendation,
@@ -1286,6 +1298,7 @@ class PartnerDecisionEngine:
                     scout_output=scout_output,
                     avg_dims=avg_dims,
                     force_human_review=has_red_flags,
+                    silent_conviction_facts=silent_conviction_facts,
                 )
 
             return _emit_deterministic(
@@ -1387,6 +1400,7 @@ class PartnerDecisionEngine:
                     scout_output=scout_output,
                     avg_dims=avg_dims,
                     force_human_review=has_red_flags,
+                    silent_conviction_facts=silent_conviction_facts,
                 )
 
             return _emit_deterministic(
@@ -1461,6 +1475,7 @@ class PartnerDecisionEngine:
                     scout_output=scout_output,
                     avg_dims=avg_dims,
                     force_human_review=has_red_flags,
+                    silent_conviction_facts=silent_conviction_facts,
                 )
 
             return _emit_deterministic(
@@ -1818,6 +1833,7 @@ class PartnerDecisionEngine:
         scout_output: Dict[str, Any],
         avg_dims: int,
         force_human_review: bool = False,
+        silent_conviction_facts: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Force rationale + headline to match canonical recommendation (LLM narrative only)."""
         rationale, drivers = compose_decision_rationale(
@@ -1841,7 +1857,7 @@ class PartnerDecisionEngine:
         )
         result["decision_rationale"] = rationale
         result["rationale"] = rationale
-        result["decision_drivers"] = drivers
+        result["decision_drivers"] = list(dict.fromkeys(drivers + (silent_conviction_facts or [])))
         result = self._apply_final_recommendation_fields(
             result, final_recommendation, assumption_risks
         )
