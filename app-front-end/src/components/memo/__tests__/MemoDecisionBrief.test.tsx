@@ -35,27 +35,28 @@ const brief: MemoDecisionBriefModel = {
 };
 
 describe('MemoDecisionBrief', () => {
-  it('presents one decision region with status distinct from the subordinate system lean', () => {
+  it('presents the evidence-coverage region right before the ruling — no lean, mandate, or reviewer tiles', () => {
     render(<MemoDecisionBrief brief={brief} />);
 
-    const region = screen.getByRole('region', { name: 'Decision brief' });
-    expect(within(region).getByRole('heading', { name: 'Decision brief' })).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Evidence coverage' });
+    expect(within(region).getByRole('heading', { name: 'Evidence coverage' })).toBeInTheDocument();
     expect(within(region).getByText('Ready for ruling')).toBeInTheDocument();
-    expect(within(region).getByText('System lean')).toBeInTheDocument();
-    expect(within(region).getByText('Advance')).toBeInTheDocument();
-    expect(within(region).getByText('Mandate')).toBeInTheDocument();
-    expect(within(region).getByText('Evidence')).toBeInTheDocument();
-    expect(within(region).getByText('Reviewer state')).toBeInTheDocument();
+    // System lean, mandate, and reviewer-state now live on the masthead and Thesis alignment.
+    // The Evidence tile is gone too — it could never say anything the status line hadn't already said.
+    expect(within(region).queryByText('System lean')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Mandate')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Reviewer state')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Evidence')).not.toBeInTheDocument();
+    // Decision drivers now live under Assessment, not here.
+    expect(within(region).queryByText('Decision drivers')).not.toBeInTheDocument();
+    expect(within(region).queryByText('Customer pull is sustained.')).not.toBeInTheDocument();
     expect(region).not.toHaveTextContent(/\d+(?:\.\d+)?%|confidence/i);
   });
 
   it('keeps claim source links while rejecting source rendering on the grouped risk surface', () => {
     render(<MemoDecisionBrief brief={brief} />);
 
-    const region = screen.getByRole('region', { name: 'Decision brief' });
-    const driver = within(region).getByText('Customer pull is sustained.').closest('li');
-    expect(driver).not.toBeNull();
-    expect(within(driver!).getByText('Rule-derived')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Evidence coverage' });
     const claim = within(region).getByText('Three customers renewed after the pilot.').closest('li');
     expect(claim).not.toBeNull();
     expect(within(claim!).getByText('Supports')).toBeInTheDocument();
@@ -68,7 +69,7 @@ describe('MemoDecisionBrief', () => {
     const risk = within(region).getByText('Expansion requires regulatory approval.').closest('li');
     expect(risk).not.toBeNull();
     expect(within(risk!).getByText('Rule-derived')).toBeInTheDocument();
-    expect(within(risk!).getByText('Source missing')).toBeInTheDocument();
+    expect(within(risk!).queryByText('Source missing')).not.toBeInTheDocument();
     expect(within(region).queryByRole('link', { name: 'Regulator guidance' })).not.toBeInTheDocument();
     expect(region).not.toHaveTextContent(/reviewer score spread|gap >=/i);
   });
@@ -101,7 +102,7 @@ describe('MemoDecisionBrief', () => {
     const risk = screen.getByText('Regulatory evidence has not been sourced.').closest('li');
     expect(risk).not.toBeNull();
     expect(within(risk!).getByText('Rule-derived')).toBeInTheDocument();
-    expect(within(risk!).getByText('Source missing')).toBeInTheDocument();
+    expect(within(risk!).queryByText('Source missing')).not.toBeInTheDocument();
   });
 
   it('names unavailable decision data instead of rendering a categorical verdict', () => {
@@ -112,10 +113,9 @@ describe('MemoDecisionBrief', () => {
       />,
     );
 
-    const region = screen.getByRole('region', { name: 'Decision brief' });
+    const region = screen.getByRole('region', { name: 'Evidence coverage' });
     expect(within(region).getByText('Decision data unavailable')).toBeInTheDocument();
     expect(within(region).getByText('The canonical evaluation could not be loaded.')).toBeInTheDocument();
-    expect(within(region).getByText('No system lean')).toBeInTheDocument();
     expect(region).not.toHaveTextContent(/invest|pass|monitor/i);
   });
 

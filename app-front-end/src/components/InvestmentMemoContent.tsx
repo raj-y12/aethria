@@ -25,6 +25,7 @@ import {
 } from '../lib/founderMemo';
 import { formatDate } from '../lib/dates';
 import OpportunityIntelligence from './institutional/OpportunityIntelligence';
+import { useMemoDecisionBrief } from '../hooks/useMemoDecisionBrief';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -203,6 +204,11 @@ function InvestmentMemoContent(
     () => (startup ? mergeMemoPartial(startup, memoPartial) : null),
     [startup, memoPartial]
   );
+
+  // Shared with OpportunityIntelligence below — same React Query keys, so this
+  // is one fetch, not two, and the masthead verdict can never drift from the
+  // decision workspace's canonical state.
+  const { brief: mastheadBrief } = useMemoDecisionBrief(displayStartup?.id ?? '');
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
 
@@ -479,6 +485,7 @@ function InvestmentMemoContent(
         >
           <MemoMasthead
             startup={displayStartup}
+            brief={mastheadBrief}
             onAddContext={onAddContext}
             onClose={onClose}
             readOnly={readOnly}
@@ -521,15 +528,7 @@ function InvestmentMemoContent(
               </p>
             ) : null}
 
-            <OpportunityIntelligence
-              startupId={displayStartup.id}
-              companyName={displayStartup.scout.name}
-              onRulingRecorded={onClose}
-              readOnly={readOnly}
-            />
-
-            <details className="memoSupportingAnalysis">
-              <summary>Supporting analysis</summary>
+            <div className="memoSupportingAnalysis">
               <div className="memoSupportingAnalysisBody">
             {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
               <div className="memoDossierContext">
@@ -759,6 +758,19 @@ function InvestmentMemoContent(
                         ))}
                     </div>
                   )}
+                  {mastheadBrief.drivers.length > 0 && (
+                    <div className="memoDocSubsection memoAssessmentDrivers">
+                      <p className="memoDocSubhead">Why the system leans this way</p>
+                      <ul className="memoList">
+                        {mastheadBrief.drivers.map((driver) => (
+                          <li key={driver} className="memoListItem">
+                            <span className="memoBullet" aria-hidden>·</span>
+                            <span>{renderWithMonoNumbers(driver)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </motion.section>
               );
             })()}
@@ -768,6 +780,9 @@ function InvestmentMemoContent(
               <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
                 <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
+                  {mastheadBrief.mandate === 'conflicted' && (
+                    <p className="memoThesisMandateConflict" role="alert">Mandate conflict — this opportunity falls outside the fund's stated mandate.</p>
+                  )}
                   {(thesisSection.score != null || thesisSection.headlineTag) && (
                     <p className="memoScoreHeadline">
                       {thesisSection.score != null && (
@@ -808,6 +823,14 @@ function InvestmentMemoContent(
                 </div>
               </motion.section>
             )}
+
+            {/* ── Before you rule: evidence coverage, deduplicated risks, and the ruling itself ── */}
+            <OpportunityIntelligence
+              startupId={displayStartup.id}
+              companyName={displayStartup.scout.name}
+              onRulingRecorded={onClose}
+              readOnly={readOnly}
+            />
 
             {/* ── Appendix ── */}
             <div className="memoDiscGroup">
@@ -929,9 +952,6 @@ function InvestmentMemoContent(
                     <span className="memoBullet">·</span>
                     <span>
                       Status: {RESOLUTION_SECTION_LABELS[resolutionStatus] ?? resolutionStatus ?? 'Unknown'}
-                      {typeof companyResolution?.confidence === 'number'
-                        ? ` (${Math.round(companyResolution.confidence * 100)}% identity confidence)`
-                        : ''}
                     </span>
                   </li>
                   {companyResolution?.website ? (
@@ -1084,7 +1104,7 @@ function InvestmentMemoContent(
             )}
             </div>
               </div>
-            </details>
+            </div>
 
           </motion.div>
         </div>

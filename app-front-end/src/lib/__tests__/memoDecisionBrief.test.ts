@@ -256,6 +256,30 @@ describe('buildMemoDecisionBrief', () => {
     expect(result.derivations).toEqual([{ criterion: 'market', provenance: 'rule-derived' }]);
   });
 
+  it('does not double-report an unscored criterion as both a gap and a claim-provenance derivation', () => {
+    const result = buildMemoDecisionBrief({
+      evaluation: {
+        ...evaluation,
+        criteria: [
+          { ...evaluation.criteria[0], criterion: 'market', supporting_claim_ids: [], missing_evidence: ['market'] },
+          { ...evaluation.criteria[0], criterion: 'execution', supporting_claim_ids: [], missing_evidence: ['execution'] },
+        ],
+        recommendation: {
+          ...evaluation.recommendation!,
+          principal_risks: [],
+          change_conditions: ['Resolve missing evidence: market.', 'Resolve missing evidence: execution.'],
+        },
+      },
+      ledger,
+    });
+
+    // Both criteria are genuine gaps — that's real, distinct diligence work.
+    expect(result.risks.map(({ key }) => key).sort()).toEqual(['execution', 'market']);
+    // Neither should also show up as an empty "rule-derived" claim-provenance row —
+    // that would just restate the same gap a second time.
+    expect(result.derivations).toEqual([]);
+  });
+
   it('groups regulatory, licensing, and jurisdiction expansion paraphrases without inventing sources for free text', () => {
     const result = buildMemoDecisionBrief({
       evaluation: {

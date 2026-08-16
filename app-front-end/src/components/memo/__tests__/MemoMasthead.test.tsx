@@ -2,7 +2,25 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Startup } from '../../../types/startup';
+import type { MemoDecisionBrief } from '../../../lib/memoDecisionBrief';
 import MemoMasthead from '../MemoMasthead';
+
+function brief(overrides: Partial<MemoDecisionBrief>): MemoDecisionBrief {
+  return {
+    status: 'ready_for_ruling',
+    lean: 'none',
+    leanProvenance: 'missing',
+    mandate: 'unknown',
+    coverage: 'unknown',
+    agreement: 'unknown',
+    ruling: null,
+    drivers: [],
+    claims: [],
+    derivations: [],
+    risks: [],
+    ...overrides,
+  };
+}
 
 const startup: Startup = {
   id: 'masthead-fixture',
@@ -70,5 +88,29 @@ describe('MemoMasthead', () => {
     expect(screen.getByText('Berlin')).toBeInTheDocument();
     expect(screen.getByText('Fixture one-liner')).toBeInTheDocument();
     expect(screen.getByText('INDUSTRIAL AI')).toBeInTheDocument();
+  });
+
+  it('shows the honest blocked status, never a bare Pass, when evidence is missing', () => {
+    render(
+      <MemoMasthead
+        startup={startup}
+        brief={brief({ status: 'blocked', lean: 'pass', coverage: 'missing', drivers: ['Missing traction evidence'] })}
+      />,
+    );
+    expect(screen.getByText('Blocked by evidence')).toBeInTheDocument();
+    expect(screen.queryByText('Pass')).not.toBeInTheDocument();
+    expect(screen.getByText('Missing traction evidence')).toBeInTheDocument();
+  });
+
+  it('shows the system lean when ready for ruling, with no reason line if no driver was recorded', () => {
+    render(<MemoMasthead startup={startup} brief={brief({ status: 'ready_for_ruling', lean: 'monitor' })} />);
+    expect(screen.getByText('Monitor')).toBeInTheDocument();
+  });
+
+  it('renders nothing while decision data is loading or unavailable', () => {
+    const { rerender } = render(<MemoMasthead startup={startup} brief={brief({ status: 'loading' })} />);
+    expect(screen.queryByText('No system lean')).not.toBeInTheDocument();
+    rerender(<MemoMasthead startup={startup} brief={brief({ status: 'unavailable' })} />);
+    expect(screen.queryByText('Decision data unavailable')).not.toBeInTheDocument();
   });
 });

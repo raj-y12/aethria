@@ -1,43 +1,11 @@
 import type { ReactNode } from 'react';
 
-import type {
-  MemoDecisionBrief as MemoDecisionBriefModel,
-  MemoProvenance,
-  MemoSource,
+import {
+  MEMO_STATUS_LABELS as STATUS_LABELS,
+  type MemoDecisionBrief as MemoDecisionBriefModel,
+  type MemoProvenance,
+  type MemoSource,
 } from '../../lib/memoDecisionBrief';
-
-const STATUS_LABELS: Record<MemoDecisionBriefModel['status'], string> = {
-  loading: 'Decision data loading',
-  ready_for_ruling: 'Ready for ruling',
-  blocked: 'Blocked by evidence',
-  recorded: 'Ruling recorded',
-  unavailable: 'Decision data unavailable',
-};
-
-const LEAN_LABELS: Record<MemoDecisionBriefModel['lean'], string> = {
-  advance: 'Advance',
-  monitor: 'Monitor',
-  pass: 'Pass',
-  none: 'No system lean',
-};
-
-const MANDATE_LABELS: Record<MemoDecisionBriefModel['mandate'], string> = {
-  conflicted: 'Conflict',
-  unknown: 'Unknown',
-};
-
-const COVERAGE_LABELS: Record<MemoDecisionBriefModel['coverage'], string> = {
-  sufficient: 'Sufficient',
-  missing: 'Missing',
-  contradictory: 'Contradictory',
-  unknown: 'Unknown',
-};
-
-const AGREEMENT_LABELS: Record<MemoDecisionBriefModel['agreement'], string> = {
-  consistent: 'Consistent',
-  contested: 'Contested',
-  unknown: 'Unknown',
-};
 
 const PROVENANCE_LABELS: Record<MemoProvenance, string> = {
   verified: 'Verified',
@@ -84,42 +52,17 @@ export default function MemoDecisionBrief({
     >
       <div className="memoDecisionBriefHead">
         <div>
-          <p className="memoDecisionEyebrow">Decision workspace</p>
-          <h2 className="memoDocSectionHead" id="memo-decision-brief-title">Decision brief</h2>
+          <p className="memoDecisionEyebrow">Before you rule</p>
+          <h2 className="memoDocSectionHead" id="memo-decision-brief-title">Evidence coverage</h2>
         </div>
         <p className="memoDecisionStatus" role="status">{STATUS_LABELS[brief.status]}</p>
       </div>
 
       {stateMessage ? <p className="memoDecisionStateMessage">{stateMessage}</p> : null}
 
-      <div className="memoDecisionStateGrid">
-        <div className="memoDecisionLean">
-          <p>System lean</p>
-          <strong>{LEAN_LABELS[brief.lean]}</strong>
-          <span>{PROVENANCE_LABELS[brief.leanProvenance]}</span>
-        </div>
-        <dl className="memoDecisionChecks">
-          <div><dt>Mandate</dt><dd>{MANDATE_LABELS[brief.mandate]}</dd></div>
-          <div><dt>Evidence</dt><dd>{COVERAGE_LABELS[brief.coverage]}</dd></div>
-          <div><dt>Reviewer state</dt><dd>{AGREEMENT_LABELS[brief.agreement]}</dd></div>
-        </dl>
-      </div>
-
       {!pending ? (
         <>
           <div className="memoDecisionBriefGrid">
-            <section className="memoDecisionDrivers" aria-labelledby="memo-decision-drivers">
-              <h3 id="memo-decision-drivers">Decision drivers</h3>
-              {brief.drivers.length > 0 ? (
-                <ol>{brief.drivers.map((driver) => (
-                  <li key={driver}>
-                    <span className="memoDecisionDriverText">{driver}</span>
-                    <span className="memoDecisionMaterialProvenance">Rule-derived</span>
-                  </li>
-                ))}</ol>
-              ) : <p className="memoDecisionMuted">No decision drivers were recorded.</p>}
-            </section>
-
             <section className="memoDecisionRiskSurface" aria-labelledby="memo-decision-risks">
               <h3 id="memo-decision-risks">Risks and evidence gaps</h3>
               {brief.risks.length > 0 ? (
@@ -132,7 +75,6 @@ export default function MemoDecisionBrief({
                         <span>Rule-derived</span>
                       </div>
                       <p>{risk.text}</p>
-                      <span className="memoDecisionSourceMissing">Source missing</span>
                     </li>
                   ))}
                 </ul>

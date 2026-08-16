@@ -77,13 +77,11 @@ function renderWorkspace() {
 describe('OpportunityIntelligence', () => {
   beforeEach(() => { Object.values(api).forEach((mock) => mock.mockReset()); seedApi(); });
 
-  it('is one decision brief with status, system lean, and ruling action in the same work surface', async () => {
+  it('is one evidence-coverage brief with status and ruling action in the same work surface', async () => {
     renderWorkspace();
-    const brief = await screen.findByRole('region', { name: 'Decision brief' });
-    expect(within(brief).getByRole('heading', { name: 'Decision brief' })).toBeInTheDocument();
+    const brief = await screen.findByRole('region', { name: 'Evidence coverage' });
+    expect(within(brief).getByRole('heading', { name: 'Evidence coverage' })).toBeInTheDocument();
     expect(await within(brief).findByText('Ruling recorded')).toBeInTheDocument();
-    expect(within(brief).getByText('System lean')).toBeInTheDocument();
-    expect(within(brief).getByText('Monitor', { selector: 'strong' })).toBeInTheDocument();
     expect(within(brief).getByLabelText('Make your ruling')).toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.queryByText(/current status/i)).not.toBeInTheDocument();
@@ -92,10 +90,10 @@ describe('OpportunityIntelligence', () => {
     expect(screen.queryByText(/keep watching|company identity|artifact hash|storage reference/i)).not.toBeInTheDocument();
   });
 
-  it('shows decision drivers and inline provenance while keeping the evidence ledger available on demand', async () => {
+  it('shows risk provenance while keeping the evidence ledger available on demand', async () => {
     renderWorkspace();
-    expect(await screen.findByText('Customer pull is promising.')).toBeInTheDocument();
-    expect(screen.getByText('Retention evidence remains missing.')).toBeInTheDocument();
+    // Decision drivers moved to the memo's Assessment section — not rendered here.
+    expect(await screen.findByText('Retention evidence remains missing.')).toBeInTheDocument();
     expect(screen.getByText('Reported')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Founder interview' })).toHaveAttribute('href', 'https://example.com/founder-interview');
     expect(screen.queryByText(/% confidence/i)).not.toBeInTheDocument();
@@ -115,8 +113,8 @@ describe('OpportunityIntelligence', () => {
       </QueryClientProvider>,
     );
 
-    const brief = await screen.findByRole('region', { name: 'Decision brief' });
-    expect(await within(brief).findByText('Customer pull is promising.')).toBeInTheDocument();
+    const brief = await screen.findByRole('region', { name: 'Evidence coverage' });
+    expect(await within(brief).findByText('Retention evidence remains missing.')).toBeInTheDocument();
     expect(within(brief).getByText('Review supporting evidence')).toBeInTheDocument();
     expect(within(brief).queryByLabelText('Make your ruling')).not.toBeInTheDocument();
   });
@@ -174,7 +172,7 @@ describe('OpportunityIntelligence', () => {
 
   it('asks why only when the ruling goes against the recommendation', async () => {
     renderWorkspace();
-    await screen.findByText('Customer pull is promising.');
+    await screen.findByText('Retention evidence remains missing.');
     // Monitor matches the system lean — no override question.
     fireEvent.click(screen.getByRole('button', { name: 'Monitor' }));
     expect(screen.queryByLabelText('Override attribution')).not.toBeInTheDocument();
@@ -205,7 +203,6 @@ describe('OpportunityIntelligence', () => {
     renderWorkspace();
     expect(await screen.findByRole('button', { name: 'Review ruling' })).toBeInTheDocument();
     expect(await screen.findByText('Blocked by evidence')).toBeInTheDocument();
-    expect(screen.getByText('No system lean')).toBeInTheDocument();
     expect(screen.getByText('Verified market demand')).toBeInTheDocument();
     expect(screen.getByText('Resolve missing evidence: market.')).toBeInTheDocument();
     expect(screen.queryByText('Review supporting evidence')).not.toBeInTheDocument();

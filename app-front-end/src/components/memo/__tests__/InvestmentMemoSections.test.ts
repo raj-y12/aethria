@@ -24,9 +24,10 @@ function relativeLuminance([red, green, blue]: [number, number, number]): number
 }
 
 describe('Investment memo section order', () => {
-  it('keeps the remaining analysis under one native supporting disclosure', () => {
-    expect(memoSource.match(/<details className="memoSupportingAnalysis"/g)).toHaveLength(1);
-    expect(memoSource).toContain('<summary>Supporting analysis</summary>');
+  it('keeps the narrative sections always visible — reading, not a collapsed disclosure', () => {
+    expect(memoSource.match(/<div className="memoSupportingAnalysis">/g)).toHaveLength(1);
+    expect(memoSource).not.toContain('<details className="memoSupportingAnalysis"');
+    expect(memoSource).not.toContain('<summary>Supporting analysis</summary>');
     expect(memoSource).toMatch(
       /<MemoSectionTitle number="02" id="memo-founder">Founder<\/MemoSectionTitle>/,
     );
@@ -39,13 +40,15 @@ describe('Investment memo section order', () => {
     expect(memoSource).not.toContain('id="memo-risk-register"');
   });
 
-  it('puts the canonical decision workspace first and removes rejected primary hierarchy', () => {
+  it('reads the narrative first, then the canonical decision workspace, then the ruling — never a bare verdict up front', () => {
     expect(memoSource).not.toContain('resolveEscalation');
     expect(memoSource).not.toContain('<MemoRulingSection');
-    const ruling = memoSource.indexOf('<OpportunityIntelligence');
-    const supporting = memoSource.indexOf('<details className="memoSupportingAnalysis"');
-    expect(ruling).toBeGreaterThan(-1);
-    expect(ruling).toBeLessThan(supporting);
+    const thesisAlignment = memoSource.indexOf('id="memo-thesis-alignment"');
+    const decisionWorkspace = memoSource.indexOf('<OpportunityIntelligence');
+    const appendix = memoSource.indexOf('{/* ── Appendix ── */}');
+    expect(thesisAlignment).toBeGreaterThan(-1);
+    expect(decisionWorkspace).toBeGreaterThan(thesisAlignment);
+    expect(decisionWorkspace).toBeLessThan(appendix);
     expect(memoSource).not.toContain('<MemoDossierOpening');
     expect(memoSource).not.toContain('id="memo-read"');
     expect(memoSource).not.toContain('id="memo-killers"');
@@ -75,7 +78,7 @@ describe('Investment memo section order', () => {
     const containerRules = memoStyles.slice(containerStart, nextContainer);
 
     expect(containerStart).toBeGreaterThan(-1);
-    expect(containerRules).toMatch(/\.memoDecisionStateGrid,[\s\S]*grid-template-columns:\s*1fr/);
+    expect(containerRules).toMatch(/\.memoDecisionProvenance ul,[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionBriefHead[\s\S]*flex-direction:\s*column/);
     expect(containerRules).toMatch(/\.memoConsensusRow[\s\S]*grid-template-columns:\s*1fr/);
     expect(containerRules).toMatch(/\.memoDecisionReasoningGrid[\s\S]*grid-template-columns:\s*1fr/);
@@ -137,10 +140,6 @@ describe('Investment memo section order', () => {
       '.memoDecisionEyebrow',
       '.memoDecisionMeta',
       '.memoDecisionStatus',
-      '.memoDecisionLean > p',
-      '.memoDecisionChecks dt',
-      '.memoDecisionDrivers li::before',
-      '.memoDecisionMaterialProvenance',
       '.memoDecisionSourceMissing',
       '.memoDecisionMuted',
       '.memoDecisionRiskMeta',

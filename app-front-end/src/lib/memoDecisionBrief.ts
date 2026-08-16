@@ -8,6 +8,7 @@ import type {
   EvidenceLedger,
 } from '../api/evidence';
 import { formatDecisionDriver } from './decisionDrivers';
+import type { DecisionBadgeVariant } from './decisionBadgeVariant';
 
 export type MemoDecisionBriefStatus =
   | 'loading'
@@ -251,7 +252,12 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
       ...criterion.supporting_claim_ids.map((claimId) => ({ claimId, relationship: 'supports' as const })),
       ...criterion.contradicting_claim_ids.map((claimId) => ({ claimId, relationship: 'contradicts' as const })),
     ];
-    if (ids.length === 0) derivations.push({ criterion: criterion.criterion, provenance: 'rule-derived' });
+    // A criterion with no linked claims already surfaces as a "missing evidence"
+    // gap below — don't also report it here as an empty rule-derived provenance
+    // row. Only unclaimed criteria that aren't already a named gap belong here.
+    if (ids.length === 0 && criterion.missing_evidence.length === 0) {
+      derivations.push({ criterion: criterion.criterion, provenance: 'rule-derived' });
+    }
     for (const { claimId, relationship } of ids.sort((left, right) =>
       left.relationship.localeCompare(right.relationship) || left.claimId.localeCompare(right.claimId),
     )) {
@@ -304,4 +310,40 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
     derivations,
     risks: riskGaps(evaluation),
   };
+}
+
+export const MEMO_STATUS_LABELS: Record<MemoDecisionBriefStatus, string> = {
+  loading: 'Decision data loading',
+  ready_for_ruling: 'Ready for ruling',
+  blocked: 'Blocked by evidence',
+  recorded: 'Ruling recorded',
+  unavailable: 'Decision data unavailable',
+};
+
+export const MEMO_LEAN_LABELS: Record<MemoDecisionBriefLean, string> = {
+  advance: 'Advance',
+  monitor: 'Monitor',
+  pass: 'Pass',
+  none: 'No system lean',
+};
+
+/**
+ * The masthead's verdict badge is a first read, before the reader has seen any
+ * evidence — it must never assert more than the honest state model does.
+ * `blocked` always wins (missing/contradictory evidence pre-empts a lean, per
+ * ADR-0013); a recorded human ruling is what actually happened; otherwise the
+ * badge reflects the system's rule-derived lean, clearly not a human decision.
+ */
+export function memoVerdictVariant(brief: MemoDecisionBrief): DecisionBadgeVariant {
+  if (brief.status === 'loading' || brief.status === 'unavailable') return 'undecided';
+  if (brief.status === 'blocked') return 'escalation';
+  if (brief.status === 'recorded' && brief.ruling) {
+    if (brief.ruling.decision === 'advance' || brief.ruling.decision === 'invest') return 'INVEST';
+    if (brief.ruling.decision === 'pass') return 'PASS';
+    return 'MONITOR';
+  }
+  if (brief.lean === 'advance') return 'INVEST';
+  if (brief.lean === 'pass') return 'PASS';
+  if (brief.lean === 'monitor') return 'MONITOR';
+  return 'awaiting';
 }
