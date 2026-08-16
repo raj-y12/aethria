@@ -140,13 +140,22 @@ async def test_identity_is_admitted_before_legacy_scout_and_projection_is_linked
             projection_id="opportunity-1",
         )
 
+    class FakeEvaluationRepository:
+        def __init__(self, pool, **kwargs):
+            pass
+
+        async def evaluate(self, **kwargs):
+            order.append("canonical_evaluation")
+            return {"recommendation_id": "recommendation-1"}
+
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: identity_repository)
     monkeypatch.setattr(handlers, "IdentityService", _Service)
     monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "EvaluationRepository", FakeEvaluationRepository)
 
     await handlers.company_lookup_handler(job_repository, _job())
 
-    assert order == ["identity", "legacy"]
+    assert order == ["identity", "legacy", "canonical_evaluation"]
     observation = captured["observation"]
     assert observation.user_id == "user-a"
     assert observation.channel.value == "manual_lookup"
@@ -161,9 +170,10 @@ async def test_identity_is_admitted_before_legacy_scout_and_projection_is_linked
     }
     assert captured["lookup_kwargs"]["evaluation_prerequisites"] == _prerequisites()
     assert identity_repository.linked[0]["opportunity_id"] == "opportunity-1"
-    assert [item["stage"] for item in job_repository.checkpoints][-2:] == [
+    assert [item["stage"] for item in job_repository.checkpoints][-3:] == [
         "projection",
         "lookup_result",
+        "canonical_evaluation",
     ]
 
 

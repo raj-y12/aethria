@@ -167,10 +167,21 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
         assert kwargs["user_id"] == "user-a"
         return _prerequisites()
 
+    evaluate_calls = []
+
+    class FakeEvaluationRepository:
+        def __init__(self, pool, **kwargs):
+            pass
+
+        async def evaluate(self, **kwargs):
+            evaluate_calls.append(kwargs)
+            return {"recommendation_id": "recommendation-1"}
+
     monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
     monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
     monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
     monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    monkeypatch.setattr(handlers, "EvaluationRepository", FakeEvaluationRepository)
     job = AgentJob(
         user_id="user-a",
         job_type=JobType.COMPANY_LOOKUP,
@@ -204,10 +215,95 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     }
     assert repository.checkpoints[0]["stage"] == "identity"
     assert repository.checkpoints[1]["stage"] == "scout"
-    assert repository.checkpoints[-1]["stage"] == "lookup_result"
-    assert repository.checkpoints[-1]["output_metadata"]["state"] == "completed"
+    assert repository.checkpoints[-2]["stage"] == "lookup_result"
+    assert repository.checkpoints[-2]["output_metadata"]["state"] == "completed"
+    assert repository.checkpoints[-1]["stage"] == "canonical_evaluation"
+    assert repository.checkpoints[-1]["status"] == "succeeded"
+    assert evaluate_calls[0]["opportunity_id"] == "opportunity-1"
+    assert evaluate_calls[0]["thesis_version_id"] == "thesis-live"
     assert _capture_lookup_attempt_outcomes == []
     assert terminal_outcome.disposition.value == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_survives_canonical_evaluation_bridge_failure(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    """A canonical-evaluation bridge failure must not fail an already-completed dispatch."""
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository()
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            return None
+
+        async def link_legacy_projection(self, **kwargs):
+            return object()
+
+    class IdentityService:
+        def __init__(self, repository):
+            pass
+
+        async def admit(self, observation):
+            return type(
+                "Admission",
+                (),
+                {
+                    "observation_id": "observation-1",
+                    "status": type("Status", (), {"value": "resolved"})(),
+                    "company_id": "company-1",
+                    "opportunity_id": "opportunity-1",
+                    "identity_case_id": None,
+                    "confidence": 1.0,
+                    "blocks_evaluation": False,
+                },
+            )()
+
+    async def run(user_id, company_name, **kwargs):
+        await kwargs["checkpoint"]("scout", "succeeded", {"startup_id": "s1"})
+        return PipelineExecutionResult.completed(
+            code="lookup_completed", detail="Lookup completed.", startup_id="s1",
+            projection_id="opportunity-1",
+        )
+
+    async def load(**kwargs):
+        return _prerequisites()
+
+    class FailingEvaluationRepository:
+        def __init__(self, pool, **kwargs):
+            pass
+
+        async def evaluate(self, **kwargs):
+            raise RuntimeError("canonical write path unavailable")
+
+    monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    monkeypatch.setattr(handlers, "EvaluationRepository", FailingEvaluationRepository)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup-1",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-1",
+            resolution={"query": "Acme", "canonical_name": "Acme", "resolution_status": "FOUND"},
+        ),
+        attempts=1,
+        status="running",
+        lease_owner="worker-a",
+    )
+
+    terminal_outcome = await handlers.company_lookup_handler(repository, job)
+
+    assert terminal_outcome.disposition.value == "succeeded"
+    assert repository.checkpoints[-2]["stage"] == "lookup_result"
+    assert repository.checkpoints[-2]["status"] == "succeeded"
+    assert repository.checkpoints[-1]["stage"] == "canonical_evaluation"
+    assert repository.checkpoints[-1]["status"] == "failed"
+    assert repository.checkpoints[-1]["output_metadata"]["error"] == "RuntimeError"
 
 
 @pytest.mark.asyncio

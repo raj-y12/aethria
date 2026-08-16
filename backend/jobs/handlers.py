@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from functools import partial
 from typing import Any, Dict
 
@@ -26,6 +27,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
+from evaluation_v2.repository import EvaluationLifecycleError, EvaluationRepository
 from fund_intelligence.repository import FundIntelligenceRepository
 from monitoring.models import RefreshReason
 from monitoring.repository import MonitoringRepository
@@ -33,6 +35,8 @@ from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
 from resolver.company_resolver import CompanyResolution, resolve_company
 from authority.repository import AuthorityBlocked
+
+_logger_handlers = logging.getLogger(__name__)
 
 
 async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
@@ -288,6 +292,48 @@ async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExe
         if not startup_id:
             raise RuntimeError("Completed company lookup did not produce a startup record")
         await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
+        await _raise_if_cancelled(repository, job)
+        # Scout's canonical claims are already persisted (identity admission bridges
+        # them before Reviewer/Partner run); the legacy scout/reviewer/partner stages
+        # never call the canonical evaluator, so the decision brief has no
+        # recommendation for a fresh dispatch without this. Best-effort: a failure
+        # here must not fail the (already-successful) legacy lookup.
+        try:
+            evaluation = await EvaluationRepository(
+                repository.pool, authority_service=getattr(repository, "authority_service", None)
+            ).evaluate(
+                user_id=job.user_id,
+                opportunity_id=admission.opportunity_id,
+                actor_id=job.user_id,
+                trigger_type="dispatch",
+                policy=evaluation_prerequisites.policy,
+                thesis_version_id=evaluation_prerequisites.thesis_version_id,
+            )
+        except EvaluationLifecycleError as exc:
+            await _checkpoint(
+                repository,
+                job,
+                "canonical_evaluation",
+                "succeeded",
+                {"skipped": True, "reason": str(exc)},
+            )
+        except Exception as exc:  # noqa: BLE001 - must not fail a completed lookup
+            _logger_handlers.exception(
+                "canonical evaluation bridge failed opportunity_id=%s: %s",
+                admission.opportunity_id,
+                type(exc).__name__,
+            )
+            await _checkpoint(
+                repository, job, "canonical_evaluation", "failed", {"error": type(exc).__name__}
+            )
+        else:
+            await _checkpoint(
+                repository,
+                job,
+                "canonical_evaluation",
+                "succeeded",
+                {"recommendation_id": evaluation.get("recommendation_id")},
+            )
     else:
         await _checkpoint(repository, job, "lookup_result", "succeeded", result_metadata)
     return result
