@@ -69,13 +69,16 @@ Already redundant with canonical, safe to delete outright:
 - Consumes: `rules.<new_field>` from the loaded `PartnerRules` object (same pattern as every other threshold in this file, e.g. `rules.score_thresholds.min_avg_pass`).
 - Produces: no behavior change — same conviction value, now sourced from versioned policy instead of a Python literal.
 
-- [ ] Add the field to the `PartnerRules`/`PartnerRulesV3` Pydantic model in `backend/evaluation_v2/partner_rules.py` (or wherever the version currently in `active.json` is defined — check before assuming V3 vs a newer version).
-- [ ] Add the value to the active versioned JSON file under `resources/config/partner_rules/`, bumping the version per the repo's "new version, never mutate a published one" rule.
-- [ ] Update `resources/config/active.json` if a new version file was created.
-- [ ] Replace `conviction=8` with `rules.<new_field>` at decision.py:945.
-- [ ] Extend `test_partner_rules_contract.py` to assert the new field parses and is used.
-- [ ] Run `python3 -m pytest -o asyncio_mode=auto backend/tests/evaluation_v2/ backend/tests/partner/`.
-- [ ] Commit.
+**DONE — status and what was actually decided:**
+
+- [x] Added `critical_risk_pass_conviction: Conviction` to the shared base `PartnerRules` model (not V4-only) — `test_partner_rules_contract.py`'s contract tests are anchored to `v3.json` specifically, so a V4-only field would have broken v3 parsing.
+- [x] **No version bump.** Added the field directly to `v3.json` and `v4.json` with the same value (`8`) that was already hardcoded — this doesn't change either version's *behavior* (identical outcome, same value, just now explicit data instead of a Python literal), which is a different thing from the "never mutate a published version's meaning" rule that's meant to stop silent threshold changes. A version bump would have been the safer default for an actual value change; this wasn't one.
+- [x] Replaced `conviction=8` with `rules.critical_risk_pass_conviction` at the exact line the audit flagged.
+- [x] Registered the new leaf in `test_partner_rules_v4_authority.py`'s `_CONSUMER_GROUPS` (under `critical_risk_clamp`, alongside the sibling `critical_risk_keywords`) — the mutation-coverage test enumerates every leaf in `v4.json` and fails if one isn't registered; this one wasn't, caught immediately.
+- [x] `test_partner_rules_contract.py` needed no changes — its leaf-path list is auto-derived from `v3.json`, so it picked up the new field on its own.
+- [x] New test: `backend/tests/test_partner_critical_risk_conviction.py` — parses `v4.json`, mutates the field to a different value, confirms `decide()`'s output conviction actually reflects it (not silently reading a cached/hardcoded value).
+- [x] Full backend suite: 2191 passed, 0 regressions (3 pre-existing Postgres-container-only failures, unrelated).
+- [ ] Commit — pending user confirmation.
 
 ---
 

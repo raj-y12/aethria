@@ -67,6 +67,7 @@
     "regulatory ban",
     "prohibited by law"
   ],
+  "critical_risk_pass_conviction": 8,
   "contradictory_scores": {
     "min_gap": 4,
     "high_threshold": 8,

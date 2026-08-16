@@ -317,6 +317,7 @@ class PartnerRules(StrictRulesModel):
     mandate_fit: MandateFitRules
     quality_labels: QualityLabels
     critical_risk_keywords: tuple[NonEmptyString, ...] = Field(min_length=1)
+    critical_risk_pass_conviction: Conviction
     contradictory_scores: ContradictoryScores
     red_flag_keywords: tuple[NonEmptyString, ...] = Field(min_length=1)
     next_actions: NextActions

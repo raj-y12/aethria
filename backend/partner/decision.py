@@ -954,7 +954,7 @@ class PartnerDecisionEngine:
             if has_critical_risk:
                 result = self._create_decision(
                     recommendation="PASS",
-                    conviction=8,
+                    conviction=rules.critical_risk_pass_conviction,
                     decision_rationale=(
                         "Critical diligence risk: the identified blocker requires "
                         "a pass even though evaluation coverage is incomplete."

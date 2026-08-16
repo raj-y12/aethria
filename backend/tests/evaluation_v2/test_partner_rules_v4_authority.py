@@ -534,7 +534,7 @@ _CONSUMER_GROUPS: dict[str, set[tuple[str, ...]]] = {
         "grey_zone_max",
         "minimum_scored_weight",
     ),
-    "critical_risk_clamp": {("critical_risk_keywords",)},
+    "critical_risk_clamp": {("critical_risk_keywords",), ("critical_risk_pass_conviction",)},
     "contradiction_detection": _field_paths(
         ("contradictory_scores",),
         "min_gap",
