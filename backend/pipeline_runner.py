@@ -39,6 +39,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
+from evaluation_v2.repository import EvaluationLifecycleError, EvaluationRepository
 from evaluation.manifest import (
     build_model_identity,
     capture_evaluation_manifest_identity,
@@ -1737,6 +1738,7 @@ async def _run_on_demand_lookup_inner(
                 detail="The lookup was cancelled after Scout completed.",
                 startup_id=startup_id,
             )
+        canonical_recommendation_state: Optional[str] = None
         if postgres_pool is not None and handoff_startup is not None:
             canonical_scout_output = handoff_startup.scout_info.model_dump(mode="json")
             canonical_scout_output["id"] = startup_id
@@ -1779,6 +1781,37 @@ async def _run_on_demand_lookup_inner(
                 startup_id,
                 canonical_admission.opportunity_id,
             )
+            # Canonical claims are already persisted by admission above — evaluate
+            # now, before Reviewer/Partner run, so Partner can defer to the
+            # canonical recommendation instead of computing its own from
+            # avg_score (see docs/archive/plans/2026-08-16-partner-behind-evaluator.md).
+            # Best-effort: a failure here must not fail an otherwise-healthy lookup.
+            if evaluation_prerequisites is not None:
+                try:
+                    canonical_evaluation = await EvaluationRepository(postgres_pool).evaluate(
+                        user_id=user_id,
+                        opportunity_id=canonical_admission.opportunity_id,
+                        actor_id=user_id,
+                        trigger_type="dispatch",
+                        policy=evaluation_prerequisites.policy,
+                        thesis_version_id=evaluation_prerequisites.thesis_version_id,
+                    )
+                    canonical_recommendation_state = (
+                        canonical_evaluation.get("recommendation") or {}
+                    ).get("state")
+                except EvaluationLifecycleError as exc:
+                    logger.info(
+                        "[%s] Canonical evaluation skipped opportunity_id=%s: %s",
+                        user_id[:12],
+                        canonical_admission.opportunity_id,
+                        exc,
+                    )
+                except Exception:
+                    logger.exception(
+                        "[%s] Canonical evaluation failed opportunity_id=%s",
+                        user_id[:12],
+                        canonical_admission.opportunity_id,
+                    )
         current_stage = "reviewer"
         review_is_current = bool(
             not replace_startup_id
@@ -1860,6 +1893,7 @@ async def _run_on_demand_lookup_inner(
             force_rerun=bool(replace_startup_id),
             bypass_agent_enabled_gate=True,
             startup=handoff_startup,
+            canonical_recommendation=canonical_recommendation_state,
         )
         metrics.observe_pipeline_stage(
             time.perf_counter() - partner_stage_started,

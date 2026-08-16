@@ -45,14 +45,9 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 ### Sub-project 1: Partner-behind-evaluator
 
-**Objective:** `partner/decision.py`'s recommendation stops being computed and shown independently. The canonical `evaluate_snapshot()` recommendation becomes authoritative; `partner/decision.py` either becomes a thin adapter that maps its rule outputs into canonical-shaped compatibility fields, or is retired outright if nothing still needs its bespoke output shape.
+**Detailed task-level plan:** [2026-08-16-partner-behind-evaluator.md](2026-08-16-partner-behind-evaluator.md).
 
-**Files to read fully before writing a task-level plan** (do this first — do not plan blind):
-- `backend/partner/decision.py` (2,210 lines) — the rule engine, including the `conviction=8` hardcoded branch at the line the codex audit flagged.
-- `backend/partner/engine.py` (794 lines) — orchestration; find every caller.
-- `backend/evaluation_v2/service.py::evaluate_snapshot` — the canonical equivalent, already read in full during this session; the two need a mapping table (which legacy recommendation fields have no canonical equivalent yet, and vice versa).
-- `backend/routers/*.py` and `backend/api.py` — every endpoint currently returning `startup.partner` fields, to know what compatibility shape must be preserved (API.md contract).
-- Every test in `backend/tests/partner/` and `backend/tests/evaluation_v2/` — these define current behavior; a passing suite after this sub-project must mean "same or better," not "different."
+**Objective (corrected after a full read of `partner/decision.py` and `partner/engine.py`):** "retire outright" was wrong — `partner/decision.py` is not a redundant duplicate scorer, it holds real investment-committee policy with no canonical equivalent (mandate-fit gating with an IC-exception override, an ownership-conflict fail-closed check, a portfolio-concentration adjustment, six risk/driver predicates, and a genuine LLM-escalation exception path for ambiguous cases — plus the audited `conviction=8` hardcode). Only the threshold ladder itself (`_canonical_recommendation`) duplicates canonical and is safe to delete outright. Everything else needs porting to a canonical home as small, reused functions, not a second large engine — see the sub-plan for the ponytail-lens breakdown of what reuses existing code (`check_ownership_conflict`, `partner_rules.mandate_fit` config, canonical's own per-criterion coverage state) versus what's genuinely new.
 
 **Acceptance criteria:**
 - A dispatch produces exactly one recommendation, not two, reachable from the memo/startup APIs.

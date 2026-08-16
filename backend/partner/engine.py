@@ -312,6 +312,7 @@ class PartnerEngine:
         scout_output: dict,
         review_output: dict,
         pipeline_run_id: Optional[str],
+        canonical_recommendation: Optional[str] = None,
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
         Run partner decision, validate JSON, write to Supabase, update pipeline state.
@@ -329,6 +330,7 @@ class PartnerEngine:
             scout_output,
             review_output,
             fund_thesis=self.fund_thesis,
+            canonical_recommendation=canonical_recommendation,
         )
         from contradiction_gate import apply_contradiction_gate
         partner_guard = apply_contradiction_gate(
@@ -667,6 +669,7 @@ class PartnerEngine:
         *,
         bypass_agent_enabled_gate: bool = False,
         startup=None,
+        canonical_recommendation: Optional[str] = None,
     ) -> bool:
         """
         Make a partner decision for one specific startup id.
@@ -674,6 +677,9 @@ class PartnerEngine:
 
         bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
         (used for occasional on-demand company lookup only).
+        canonical_recommendation: the canonical evaluator's recommendation state for
+        this opportunity, when already computed (on-demand lookup only for now — the
+        periodic pipeline cycle isn't bridged to canonical evaluation yet).
         """
         if startup is None:
             startup = await asyncio.to_thread(self.storage.get_startup, startup_id)
@@ -696,6 +702,7 @@ class PartnerEngine:
                 entry["scout"],
                 entry["review"],
                 pipeline_run_id,
+                canonical_recommendation=canonical_recommendation,
             )
             if success and decision:
                 from utils.adapters import partner_output_to_partner_info

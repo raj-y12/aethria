@@ -401,7 +401,23 @@ class PartnerDecisionEngine:
                 return float(overall), len(values)
         return sum(values) / len(values), len(values)
 
+    @staticmethod
+    def _recommendation_from_canonical_state(canonical_recommendation: Optional[str]) -> Optional[str]:
+        """Map the canonical evaluator's state to this engine's legacy vocabulary.
+
+        ``insufficient_evidence`` is deliberately not mapped here — this engine's
+        own evidence-coverage branch (below) already produces MONITOR/PASS with
+        ``human_review_required`` for that case; forcing it onto the INVEST/PASS/
+        MONITOR ladder would collapse a real distinction. Falls back to score-based
+        thresholds when the canonical evaluation isn't available yet (e.g. the
+        periodic pipeline cycle, not yet bridged to canonical evaluation).
+        """
+        mapping = {"advance": "INVEST", "monitor": "MONITOR", "pass": "PASS"}
+        return mapping.get((canonical_recommendation or "").strip().lower())
+
     def _canonical_recommendation(self, avg_score: float) -> str:
+        """Score-threshold fallback, used only when no canonical recommendation
+        was supplied (see ``_recommendation_from_canonical_state``)."""
         if self.evaluation_policy is not None:
             advance_threshold = self.evaluation_policy.advance_threshold
             pass_threshold = self.evaluation_policy.pass_threshold
@@ -492,16 +508,6 @@ class PartnerDecisionEngine:
             risk_lines = [f"Missing evidence: {m}" for m in missing]
             result["risks"] = list(dict.fromkeys(risks + risk_lines))[:5]
         return result
-
-    def _enforce_canonical_recommendation(
-        self,
-        result: Dict[str, Any],
-        avg_score: float,
-        assumption_risks: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        """Backward-compatible alias: canonical recommendation from average score."""
-        forced = self._canonical_recommendation(avg_score)
-        return self._apply_final_recommendation_fields(result, forced, assumption_risks)
 
     @staticmethod
     def _optional_thesis_alignment_score(review_output: Dict[str, Any]) -> Optional[float]:
@@ -770,6 +776,7 @@ class PartnerDecisionEngine:
         review_output: Dict[str, Any],
         context_memo: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
+        canonical_recommendation: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Return output plus independently captured model-prompt evidence."""
         token = self._execution_prompt_version.set(None)
@@ -779,6 +786,7 @@ class PartnerDecisionEngine:
                 review_output,
                 context_memo=context_memo,
                 fund_thesis=fund_thesis,
+                canonical_recommendation=canonical_recommendation,
             )
             return result, self._execution_prompt_version.get()
         finally:
@@ -790,6 +798,7 @@ class PartnerDecisionEngine:
         review_output: Dict[str, Any],
         context_memo: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
+        canonical_recommendation: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Make an investment decision based on Scout and Reviewer outputs.
@@ -799,6 +808,9 @@ class PartnerDecisionEngine:
             scout_output: Valid ScoutOutput dict (may include primary_thesis, key_assumptions, biggest_unknown, sector, funding_stage)
             review_output: Valid ReviewerOutput dict (may include assumption_feedback; defaults to [])
             context_memo: Optional pre-decision memo text for LLM context
+            canonical_recommendation: The canonical evaluator's recommendation state
+                (advance/monitor/pass/insufficient_evidence), when already computed for
+                this opportunity. Takes precedence over the score-threshold ladder.
         Returns:
             Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
@@ -1128,6 +1140,16 @@ class PartnerDecisionEngine:
             *,
             next_action: Optional[str] = None,
         ) -> Dict[str, Any]:
+            # Canonical takes precedence over every deterministic verdict branch
+            # (STRONG/MEDIUM/WEAK, v3's score ladder) — but never over a critical-
+            # risk PASS, which is this engine's own fail-closed gate and must not
+            # be second-guessed by a less-informed canonical opinion.
+            if canonical_recommendation is not None and not has_critical_risk:
+                canonical_mapped = self._recommendation_from_canonical_state(
+                    canonical_recommendation
+                )
+                if canonical_mapped is not None:
+                    recommendation = canonical_mapped
             effective_human_review = bool(human_rev or has_red_flags)
             if historical_v3:
                 # Preserve v3's recommendation-derived action mapping. The one
