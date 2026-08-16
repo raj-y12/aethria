@@ -84,12 +84,16 @@ Already redundant with canonical, safe to delete outright:
 
 ### Task 3: Port mandate-fit gating and ownership-conflict as a canonical post-processing gate
 
-**Do not write this task's exact steps yet.** This is real, ~140-line policy with four tiers, an IC-exception override, and a fail-closed ownership check. Before writing bite-sized steps:
+**BLOCKED — reordered after Sub-project 4, not attempted yet.** Read `identity/ownership_gate.py::check_ownership_conflict` in full: it's a small, self-contained regex match over **narrative text** (`scout_output`/`review_output` prose — "acquired by", "now a subsidiary of", etc.), not canonical claims. Same story for `thesis_alignment_score`/`thesis_alignment_confidence`, read off `review_output` — also legacy narrative, not a canonical claim. Canonical `evaluate_snapshot()` only ever sees typed claims; it has no equivalent of "read the reviewer's narrative summary for acquisition language" and no thesis-alignment input at all today.
 
-- [ ] Re-read `_finalize_thesis_and_mandate_gate` in full (already read once this session, [decision.py:603-738](../../../backend/partner/decision.py:603)) alongside `identity/ownership_gate.py::check_ownership_conflict` (not yet read this session).
-- [ ] Determine where `thesis_alignment_score` and `thesis_alignment_confidence` come from on the canonical side — `evaluate_snapshot()` doesn't compute these today. Either canonical evaluation needs to gain a thesis-alignment criterion (fed by `fund_thesis.py`'s existing embedding/rule-based alignment, already computed elsewhere per this session's earlier investigation of `RULE_ALIGNMENT_LOW_CONFIDENCE`), or this gate runs as a separate step after `evaluate_snapshot()` using the existing thesis-alignment computation directly. Pick the smaller diff — likely the latter, since `fund_thesis.py` already computes this independently of reviewer.
-- [ ] Once the input source is settled: write `apply_mandate_gate(recommendation, thesis_alignment_score, thesis_alignment_confidence, ownership_conflict) -> GatedRecommendation` as one small pure function in `evaluation_v2/` (not a new class, not a new module hierarchy — ponytail rung 3, one function). Reuse `check_ownership_conflict` directly; do not reimplement it.
-- [ ] The four fit-tier thresholds (`strong_fit_min`, `partial_fit_min`, `weak_fit_min`, `gate_invest_below`) already live in versioned `partner_rules.mandate_fit` — reuse that config block as-is, don't create a parallel one.
+This means Task 3 cannot actually move to canonical until Sub-project 4 (canonical evidence extraction) gives canonical evaluation some way to see narrative-derived signals — the dependency runs the opposite direction from how the master plan originally sequenced it (4 was assumed to come after 1–3; it turns out 3 needs a slice of 4 first). Decided to skip to Task 5 now and revisit Task 3 once Sub-project 4 exists, rather than building a narrow one-off slice of evidence extraction just to unblock this, or leaving the logic in place and calling it done despite the task title.
+
+**When revisited:** the original plan below is still the right shape once the input problem is solved — reuse `check_ownership_conflict` as-is (it needs no changes, just a canonical caller with access to the narrative text), reuse `partner_rules.mandate_fit`'s existing thresholds, land it as one small pure function, not a new class.
+
+- [ ] Re-read `_finalize_thesis_and_mandate_gate` in full (already read once this session, [decision.py:603-738](../../../backend/partner/decision.py:603)).
+- [ ] Determine where `thesis_alignment_score` and `thesis_alignment_confidence` come from on the canonical side once Sub-project 4 exists.
+- [ ] Write `apply_mandate_gate(recommendation, thesis_alignment_score, thesis_alignment_confidence, ownership_conflict) -> GatedRecommendation` as one small pure function in `evaluation_v2/`. Reuse `check_ownership_conflict` directly; do not reimplement it.
+- [ ] The four fit-tier thresholds already live in versioned `partner_rules.mandate_fit` — reuse as-is.
 - [ ] Required test: golden-set comparison — for a fixed set of (recommendation, thesis_alignment, ownership_conflict) inputs, the new gate produces the same gate/held/override outcome as `_finalize_thesis_and_mandate_gate` did.
 
 ---
