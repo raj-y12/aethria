@@ -65,8 +65,15 @@ def _build_prompt(dimension: str, rubric_dim: dict, claim_types: list[str], evid
         "For each distinct fact the excerpts genuinely support, emit one claim. "
         "If nothing is genuinely supported, return an empty claims list — do not "
         "invent a claim to fill the dimension.\n"
+        "A reader with no access to this prompt must be able to see why the score "
+        "landed where it did within its band, not just which band — name the specific "
+        "band criteria the evidence meets, and what stronger or weaker evidence would "
+        "have moved the score up or down.\n"
         'Respond as JSON: {"claims": [{"claim_type": one of the accepted types, '
         '"criterion_score": 0-10 float scored against the bands above, '
+        '"score_band": one of "high", "mid", "low", '
+        '"score_justification": one sentence naming the specific band criteria met and '
+        "what would raise or lower the score, "
         '"confidence": 0-1 float, "display_text": short evidence-grounded sentence, '
         '"supporting_evidence_item_ids": [item_id, ...] — at least one, must be from '
         "the excerpts above}]}"
@@ -145,13 +152,22 @@ async def extract_claims_from_evidence(
             display_text = str(raw_claim.get("display_text") or "").strip()
             if not display_text:
                 continue
+            score_band = str(raw_claim.get("score_band") or "").strip().lower()
+            if score_band not in {"high", "mid", "low"}:
+                score_band = ""
+            score_justification = str(raw_claim.get("score_justification") or "").strip()
+            normalized_value: dict[str, Any] = {"criterion_score": score}
+            if score_band:
+                normalized_value["score_band"] = score_band
+            if score_justification:
+                normalized_value["score_justification"] = score_justification
             await evidence_repository.create_claim(
                 ClaimInput(
                     user_id=user_id,
                     company_id=company_id,
                     opportunity_id=opportunity_id,
                     claim_type=claim_type,
-                    normalized_value={"criterion_score": score},
+                    normalized_value=normalized_value,
                     display_text=display_text,
                     assertion_class=AssertionClass.EXTERNALLY_VERIFIED,
                     confidence=confidence,

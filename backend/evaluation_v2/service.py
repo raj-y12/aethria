@@ -289,6 +289,28 @@ def _score(claim: Dict[str, Any]) -> float | None:
         return None
 
 
+def _claim_score_note(claim: Dict[str, Any], value: float) -> str:
+    """One claim's contribution: evidence, confidence, and -- when extraction
+    supplied it -- which rubric band it met and why the score isn't higher/lower.
+
+    A claim's normalized_value carries score_band/score_justification only when
+    extracted by evidence/extraction.py's current prompt; older claims degrade to
+    the evidence text alone rather than a missing-field error.
+    """
+    text = str(claim.get("display_text") or claim.get("claim_type") or "").strip()
+    confidence = claim["confidence_at_snapshot"]
+    normalized = claim.get("normalized_value") or {}
+    justification = str(normalized.get("score_justification") or "").strip()
+    band = str(normalized.get("score_band") or "").strip()
+    note = f'"{text}" (scored {value:.1f}, {confidence:.0%} confidence'
+    if band:
+        note += f", {band} band"
+    note += ")"
+    if justification:
+        note += f" — {justification}"
+    return note
+
+
 def _criterion_reasoning(scored: list[tuple[Dict[str, Any], float, ScoreEligibility]]) -> str:
     """Deterministic, claim-specific audit trail for a criterion's score.
 
@@ -298,15 +320,9 @@ def _criterion_reasoning(scored: list[tuple[Dict[str, Any], float, ScoreEligibil
     """
     if len(scored) == 1:
         claim, value, _ = scored[0]
-        text = str(claim.get("display_text") or claim.get("claim_type") or "").strip()
-        confidence = claim["confidence_at_snapshot"]
-        return f'Scored {value:.1f}/10 from one claim ({confidence:.0%} confidence): "{text}"'
-    parts = [
-        f'"{str(claim.get("display_text") or claim.get("claim_type") or "").strip()}" '
-        f'(scored {value:.1f}, {claim["confidence_at_snapshot"]:.0%} confidence)'
-        for claim, value, _ in scored
-    ]
-    return f"Confidence-weighted average of {len(scored)} claims: " + "; ".join(parts)
+        return f"Scored from one claim: {_claim_score_note(claim, value)}"
+    notes = [_claim_score_note(claim, value) for claim, value, _ in scored]
+    return f"Confidence-weighted average of {len(scored)} claims: " + "; ".join(notes)
 
 
 def decisive_policy_outcome(

@@ -148,6 +148,24 @@ def test_scored_criterion_reasoning_cites_the_actual_claim_not_a_placeholder():
     assert market.reasoning != "Deterministic confidence-weighted claim score."
 
 
+def test_reasoning_surfaces_score_band_and_justification_when_extraction_supplied_them():
+    claims = deepcopy(_claims())
+    claims[0]["normalized_value"]["score_band"] = "high"
+    claims[0]["normalized_value"]["score_justification"] = (
+        "Meets the high-band criterion; not a 10 because growth rate is unquantified."
+    )
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
+    )
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    market = next(item for item in result.criteria if item.criterion == "market")
+    assert "high band" in market.reasoning
+    assert "not a 10 because growth rate is unquantified" in market.reasoning
+
+
 def test_multi_claim_criterion_reasoning_cites_every_contributing_claim():
     claims = _claims() + [
         {

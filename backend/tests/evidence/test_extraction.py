@@ -159,6 +159,56 @@ async def test_valid_extraction_creates_grounded_scored_claims(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_score_band_and_justification_are_captured_when_the_model_provides_them(monkeypatch):
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([
+        {"claims": [{
+            "claim_type": "tam", "criterion_score": 8.5, "confidence": 0.8,
+            "score_band": "high", "score_justification": "Meets the high-band $3B+ TAM criterion; "
+                "not a 10 because growth rate is unquantified.",
+            "display_text": "TAM is $10B, growing 20% YoY.",
+            "supporting_evidence_item_ids": ["item-1"],
+        }]},
+    ])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+
+    await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["market"], evidence_items=_items(),
+        rubric=_rubric(), policy=_policy(), evidence_repository=repo,
+        api_key="test-key", model="gpt-5-nano",
+    )
+
+    claim, _, _ = repo.claims[0]
+    assert claim.normalized_value["score_band"] == "high"
+    assert "high-band" in claim.normalized_value["score_justification"]
+
+
+@pytest.mark.asyncio
+async def test_invalid_score_band_from_the_model_is_dropped_not_stored(monkeypatch):
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([
+        {"claims": [{
+            "claim_type": "tam", "criterion_score": 8.5, "confidence": 0.8,
+            "score_band": "extremely high", "score_justification": "  ",
+            "display_text": "TAM is $10B, growing 20% YoY.",
+            "supporting_evidence_item_ids": ["item-1"],
+        }]},
+    ])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+
+    await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["market"], evidence_items=_items(),
+        rubric=_rubric(), policy=_policy(), evidence_repository=repo,
+        api_key="test-key", model="gpt-5-nano",
+    )
+
+    claim, _, _ = repo.claims[0]
+    assert claim.normalized_value == {"criterion_score": 8.5}
+
+
+@pytest.mark.asyncio
 async def test_claim_with_no_valid_supporting_evidence_is_dropped(monkeypatch):
     repo = _FakeEvidenceRepository()
     client, _ = _fake_client([
