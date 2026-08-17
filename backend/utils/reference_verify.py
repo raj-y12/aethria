@@ -666,18 +666,26 @@ def finalize_scout_references(
     Mutates output['references'].
 
     lenient=True is for user-intentional on-demand lookups: filtering still runs to
-    prefer good citations, but the company is never dropped solely because external
-    URL probes failed (e.g. retrieval provider down). If every reference would be
-    pruned, the model's original URL-bearing citations are restored as a fallback.
+    prefer good citations, and the company is never *dropped* solely because
+    external URL probes failed (e.g. retrieval provider down) -- see
+    filter_references_by_url_probe's own lenient handling, which keeps a
+    reference through a failed/inconclusive probe rather than deleting it.
+
+    What lenient does NOT do (fixed 2026-08-17, audit CRITICAL-1): restore the
+    model's raw, unfiltered citations when the anchor-conflict or
+    company-relevance filters reject every one of them. Those two filters exist
+    specifically to catch a same-named different company or a URL the model
+    cited that was retrieved but isn't actually about this company -- silently
+    reinstating exactly what they rejected reopens the identity-confusion hole
+    the founder-misattribution fixes closed elsewhere in this pipeline. A
+    company that ends up with zero verified references is kept (nothing here
+    ever drops it), just honestly reported as unevidenced rather than backed by
+    citations already known to be wrong.
     """
     refs = output.get("references")
     if not isinstance(refs, list):
         return output
-    original_url_refs = [
-        str(r).strip()
-        for r in refs
-        if isinstance(r, str) and str(r).strip() and extract_http_urls(str(r))
-    ]
+    original_count = len([r for r in refs if isinstance(r, str) and str(r).strip()])
     cleaned = filter_references_anchor_conflicts(refs, anchor_hostname)
     cleaned = filter_references_by_company_relevance(
         cleaned,
@@ -685,17 +693,16 @@ def finalize_scout_references(
         anchor_hostname=anchor_hostname,
         identity_context=identity_context or output.get("company_resolution"),
     )
+    if lenient and not cleaned and original_count:
+        logger.warning(
+            "reference_verify: all %d reference(s) failed anchor/company-relevance "
+            "checks -- leaving references empty rather than restoring citations "
+            "already identified as likely about a different company",
+            original_count,
+        )
     output["references"] = cleaned
     output = filter_references_by_url_probe(output, timeout=probe_timeout, lenient=lenient)
     final_refs = output.get("references")
-    if lenient and (not isinstance(final_refs, list) or not final_refs) and original_url_refs:
-        logger.warning(
-            "reference_verify: lookup fallback — all references were pruned; keeping %d "
-            "unverified citation(s) so the requested company is not dropped",
-            len(original_url_refs),
-        )
-        output["references"] = original_url_refs[:8]
-        final_refs = output["references"]
     if isinstance(final_refs, list):
         output["source_evidence"] = build_source_evidence(
             [str(r) for r in final_refs if isinstance(r, str)],

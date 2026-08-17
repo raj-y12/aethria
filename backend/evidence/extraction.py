@@ -138,6 +138,19 @@ async def extract_claims_from_evidence(
         return {"claims_created": 0, "dimensions_attempted": 0}
 
     valid_item_ids = {str(item["evidence_item_id"]) for item in evidence_items}
+    # Fixed 2026-08-17 (audit CRITICAL-4): support_strength used to be the
+    # model's own claim confidence, reused -- one self-reported number gating
+    # both "how sure is the model about this claim" and "how well does this
+    # specific evidence support it," which are different questions. source_quality
+    # is a deterministic signal (retrieval.py: 1.0 official domain, 0.6
+    # corroborated) about the evidence itself, independent of anything the
+    # extraction model says. Falls back to the model's confidence only for
+    # evidence items that predate this field (verified_items without it).
+    source_quality_by_item = {
+        str(item["evidence_item_id"]): item["source_quality"]
+        for item in evidence_items
+        if "source_quality" in item
+    }
     client = build_openai_client(api_key)
 
     created = 0
@@ -177,6 +190,15 @@ async def extract_claims_from_evidence(
                 normalized_value["score_band"] = score_band
             if score_justification:
                 normalized_value["score_justification"] = score_justification
+            # This dimension may be here precisely because the retry gap fix
+            # (audit CRITICAL-3) re-attempted a claim_type whose only current
+            # claim was too low-confidence to ever score -- supersede it now
+            # so the new one doesn't just sit alongside it as a duplicate
+            # "current" claim (audit HIGH-B5: evaluate_snapshot averages
+            # every current claim of a type).
+            await evidence_repository.supersede_current_claims(
+                user_id=user_id, opportunity_id=opportunity_id, claim_type=claim_type,
+            )
             await evidence_repository.create_claim(
                 ClaimInput(
                     user_id=user_id,
@@ -194,7 +216,7 @@ async def extract_claims_from_evidence(
                         user_id=user_id,
                         evidence_item_id=item_id,
                         relationship=EvidenceRelationship.SUPPORTS,
-                        support_strength=confidence,
+                        support_strength=source_quality_by_item.get(item_id, confidence),
                     )
                     for item_id in supporting_ids
                 ],

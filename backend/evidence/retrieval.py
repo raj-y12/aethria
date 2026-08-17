@@ -23,10 +23,17 @@ from evidence.models import (
 from evidence.service import detect_prompt_injection
 from utils.retrieval_grounding import retrieve_source_pack_merged
 
-# Bounds this to roughly the spec's ~12s interactive retrieval budget
-# (§9.13) -- matches how Scout's own retrieval is already count-bounded
-# rather than dollar-gated (CostController doesn't cover search spend).
-MAX_QUERIES = 3
+# Fixed 2026-08-17 (audit CRITICAL-2): this used to be 3, silently capping
+# plan.search_questions[:3] -- but the plan has one search question *per
+# missing rubric dimension*, and the rubric has exactly 5 dimensions
+# (market/product/technical/execution/defensibility). Capping below that
+# guaranteed dimensions past the third got zero targeted retrieval, ever,
+# regardless of how many were actually missing -- a likely direct cause of
+# the low canonical-coverage numbers observed after the first backfill.
+# 5 still bounds worst-case query volume (one query per dimension, never
+# more, since compute_missing_evidence never emits more than 5 questions);
+# it isn't an unbounded change, just wide enough to guarantee coverage.
+MAX_QUERIES = 5
 
 
 def _domain(url: Optional[str]) -> str:
@@ -143,6 +150,11 @@ async def execute_evidence_plan(
                 {
                     "evidence_item_id": str(items[0].evidence_item_id),
                     "display_excerpt": items[0].display_excerpt,
+                    # Threaded through so extraction can derive a claim-evidence
+                    # link's support_strength from this deterministic signal
+                    # instead of reusing the model's own claim confidence
+                    # (audit CRITICAL-4 -- one number was gating both).
+                    "source_quality": source_quality,
                 }
             )
 

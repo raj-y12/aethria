@@ -55,6 +55,7 @@ async def _backfill_opportunity(
     evidence_repository = EvidenceRepository(pool)
     current_claim_types = await evidence_repository.list_current_claim_types(
         user_id=user_id, opportunity_id=opportunity_id,
+        min_confidence=evaluation_prerequisites.policy.decision_safety.claim_confidence.minimum_eligible,
     )
     missing_evidence, search_questions = compute_missing_evidence(
         evaluation_prerequisites.policy, current_claim_types,

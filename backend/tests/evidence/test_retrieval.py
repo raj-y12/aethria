@@ -110,6 +110,34 @@ async def test_queries_are_capped_regardless_of_a_longer_plan():
 
 
 @pytest.mark.asyncio
+async def test_every_rubric_dimension_gets_a_dedicated_query():
+    """Regression (audit CRITICAL-2): MAX_QUERIES used to be 3, silently
+    dropping targeted retrieval for the 4th/5th missing dimension on a real
+    plan (the rubric has exactly 5 dimensions -- market/product/technical/
+    execution/defensibility). All 5 must now get a query."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan(
+        missing_evidence=["market", "product", "technical", "execution", "defensibility"],
+        search_questions=[
+            "What is the total addressable market?",
+            "What is the product's value proposition?",
+            "How complex is the technology?",
+            "What is the growth velocity?",
+            "How defensible is this business?",
+        ],
+    )
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value={"provider": "exa", "sources": []}) as mock_retrieve:
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+        )
+
+    _, kwargs = mock_retrieve.call_args
+    assert len(kwargs["queries"]) == 5
+
+
+@pytest.mark.asyncio
 async def test_companys_own_domain_is_official_and_verified_unconditionally():
     repo = _FakeEvidenceRepository()
     plan = _plan()

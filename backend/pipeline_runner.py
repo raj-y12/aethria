@@ -1813,6 +1813,7 @@ async def _run_on_demand_lookup_inner(
                     try:
                         current_claim_types = await EvidenceRepository(postgres_pool).list_current_claim_types(
                             user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
+                            min_confidence=evaluation_prerequisites.policy.decision_safety.claim_confidence.minimum_eligible,
                         )
                         missing_evidence, search_questions = compute_missing_evidence(
                             evaluation_prerequisites.policy, current_claim_types,

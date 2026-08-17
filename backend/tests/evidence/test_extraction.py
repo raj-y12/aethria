@@ -86,10 +86,15 @@ def _items():
 class _FakeEvidenceRepository:
     def __init__(self):
         self.claims: list = []
+        self.superseded: list = []
 
     async def create_claim(self, claim, *, links, created_by):
         self.claims.append((claim, list(links), created_by))
         return {"claim_id": f"claim-{len(self.claims)}"}
+
+    async def supersede_current_claims(self, *, user_id, opportunity_id, claim_type):
+        self.superseded.append((user_id, opportunity_id, claim_type))
+        return 0
 
 
 class _FakeMessage:
@@ -157,6 +162,42 @@ async def test_valid_extraction_creates_grounded_scored_claims(monkeypatch):
     assert len(links) == 1
     assert links[0].evidence_item_id == "item-1"
     assert created_by == "user_test"
+    # audit CRITICAL-3 companion fix: a retried dimension's old (low-confidence)
+    # claim must be superseded, not left sitting alongside the new one as a
+    # second "current" claim of the same type.
+    assert repo.superseded == [("user_test", "opp-1", "tam")]
+
+
+@pytest.mark.asyncio
+async def test_support_strength_comes_from_source_quality_not_claim_confidence(monkeypatch):
+    """Regression (audit CRITICAL-4): support_strength used to be a copy of
+    the model's own claim confidence -- one number gating two different
+    questions. It must now come from the evidence item's independently
+    computed source_quality (retrieval.py's deterministic official/
+    corroborated signal), which can legitimately differ from confidence."""
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([
+        {"claims": [{
+            "claim_type": "tam", "criterion_score": 8.0, "confidence": 0.95,
+            "display_text": "TAM is $10B, growing 20% YoY.",
+            "supporting_evidence_item_ids": ["item-1"],
+        }]},
+    ])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+
+    items = [
+        {"evidence_item_id": "item-1", "display_excerpt": "TAM is $10B.", "source_quality": 0.6},
+    ]
+    await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["market"], evidence_items=items,
+        rubric=_rubric(), policy=_policy(), evidence_repository=repo,
+        api_key="test-key", model="gpt-5-nano",
+    )
+
+    claim, links, _ = repo.claims[0]
+    assert claim.confidence == 0.95
+    assert links[0].support_strength == 0.6
 
 
 @pytest.mark.asyncio

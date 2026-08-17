@@ -356,12 +356,61 @@ class EvidenceRepository:
             "evidence_plans": rows(plans),
         }
 
-    async def list_current_claim_types(self, *, user_id: str, opportunity_id: str) -> set[str]:
+    async def list_current_claim_types(
+        self, *, user_id: str, opportunity_id: str, min_confidence: float | None = None
+    ) -> set[str]:
+        """Claim types with a *plannable* current claim.
+
+        Fixed 2026-08-17 (audit CRITICAL-3): a claim_type used to count as
+        "covered" the moment any claim existed, regardless of confidence --
+        so a single low-confidence claim (e.g. 0.35, below the policy's
+        eligibility floor) permanently removed that dimension from
+        compute_missing_evidence's retry consideration, forever, even though
+        evaluate_claim_score_eligibility would never actually score it. There
+        was no path back. min_confidence (pass the active policy's
+        claim_confidence.minimum_eligible) now excludes claims that could
+        never clear that floor, so the dimension stays eligible for retry on
+        the next plan/retrieval/extraction pass instead of being silently
+        stuck. This does not replicate every eligibility check (assertion
+        class, verification state, source quality) -- only the confidence
+        floor, which is what a fresh extraction attempt can actually improve.
+        """
         uid = require_user_id(user_id, context="EvidenceRepository.list_current_claim_types")
+        query = (
+            "select distinct claim_type from public.claims "
+            "where user_id = $1 and opportunity_id = $2 and status = 'current'"
+        )
+        args: list[Any] = [uid, opportunity_id]
+        if min_confidence is not None:
+            query += " and confidence >= $3"
+            args.append(min_confidence)
         async with self.pool.acquire() as conn:
-            rows = await conn.fetch(
-                "select distinct claim_type from public.claims "
-                "where user_id = $1 and opportunity_id = $2 and status = 'current'",
-                uid, opportunity_id,
-            )
+            rows = await conn.fetch(query, *args)
         return {str(row["claim_type"]) for row in rows}
+
+    async def supersede_current_claims(
+        self, *, user_id: str, opportunity_id: str, claim_type: str
+    ) -> int:
+        """Mark every current claim of one type as superseded.
+
+        Companion to the min_confidence retry in list_current_claim_types
+        above: retrying a low-confidence claim_type must not leave the old
+        claim sitting alongside the new one, both status='current' --
+        evaluate_snapshot averages every current claim of a type, so an
+        un-superseded duplicate silently drifts the score based on how many
+        times extraction happened to run, not evidence quality. Called
+        immediately before create_claim for a claim_type that's being
+        retried, so there is never more than one current claim per type at
+        a time from this path.
+        """
+        uid = require_user_id(user_id, context="EvidenceRepository.supersede_current_claims")
+        async with self.pool.acquire() as conn:
+            result = await conn.execute(
+                "update public.claims set status = 'superseded', updated_at = now() "
+                "where user_id = $1 and opportunity_id = $2 and claim_type = $3 and status = 'current'",
+                uid, opportunity_id, claim_type,
+            )
+        try:
+            return int(str(result).split()[-1])
+        except (ValueError, IndexError):
+            return 0

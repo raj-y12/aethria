@@ -341,6 +341,30 @@ def test_finalize_lenient_lookup_restores_refs_when_all_pruned(monkeypatch):
     assert all("http" in r for r in output["references"])
 
 
+def test_finalize_lenient_lookup_does_not_restore_anchor_rejected_citations(monkeypatch):
+    """Regression (audit CRITICAL-1): lenient mode must never resurrect a
+    reference the anchor-conflict/company-relevance filters correctly rejected
+    as being about a different company -- only network-probe leniency (already
+    covered by test_finalize_lenient_lookup_restores_refs_when_all_pruned) is
+    the intended fallback. Before the fix, every one of these citations -- all
+    genuinely about "Linearity", not the target "Linear" -- would have been
+    restored wholesale once relevance filtering pruned them to zero."""
+    monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
+    from utils.reference_verify import finalize_scout_references
+
+    output = {
+        "name": "Linear",
+        "references": [
+            "Linearity launches design suite - https://techcrunch.com/2025/linearity-design",
+            "Linearity raises seed - https://news.example/linearity-seed",
+        ],
+    }
+
+    finalize_scout_references(output, company_name="Linear", anchor_hostname="linear.app", lenient=True)
+
+    assert output["references"] == []
+
+
 def test_finalize_strict_still_drops_when_all_pruned(monkeypatch):
     # Default (autonomous pipeline) behavior is unchanged: no fallback, refs are dropped.
     from utils.reference_verify import finalize_scout_references
