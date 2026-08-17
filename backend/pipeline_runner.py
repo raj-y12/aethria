@@ -15,7 +15,7 @@ import resource
 import time
 from utils.timeutil import utcnow
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 from uuid import uuid4
 
 try:
@@ -1739,6 +1739,8 @@ async def _run_on_demand_lookup_inner(
                 startup_id=startup_id,
             )
         canonical_recommendation_state: Optional[str] = None
+        canonical_criteria: Optional[List[Dict[str, Any]]] = None
+        canonical_confidence: Optional[float] = None
         if postgres_pool is not None and handoff_startup is not None:
             canonical_scout_output = handoff_startup.scout_info.model_dump(mode="json")
             canonical_scout_output["id"] = startup_id
@@ -1796,9 +1798,10 @@ async def _run_on_demand_lookup_inner(
                         policy=evaluation_prerequisites.policy,
                         thesis_version_id=evaluation_prerequisites.thesis_version_id,
                     )
-                    canonical_recommendation_state = (
-                        canonical_evaluation.get("recommendation") or {}
-                    ).get("state")
+                    canonical_recommendation_payload = canonical_evaluation.get("recommendation") or {}
+                    canonical_recommendation_state = canonical_recommendation_payload.get("state")
+                    canonical_confidence = canonical_recommendation_payload.get("confidence")
+                    canonical_criteria = canonical_evaluation.get("criteria")
                 except EvaluationLifecycleError as exc:
                     logger.info(
                         "[%s] Canonical evaluation skipped opportunity_id=%s: %s",
@@ -1894,6 +1897,8 @@ async def _run_on_demand_lookup_inner(
             bypass_agent_enabled_gate=True,
             startup=handoff_startup,
             canonical_recommendation=canonical_recommendation_state,
+            canonical_criteria=canonical_criteria,
+            canonical_confidence=canonical_confidence,
         )
         metrics.observe_pipeline_stage(
             time.perf_counter() - partner_stage_started,

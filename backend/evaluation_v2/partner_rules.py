@@ -161,6 +161,10 @@ class ScoreThresholds(StrictRulesModel):
     max_avg_borderline_high: Score
     grey_zone_min: Score
     grey_zone_max: Score
+    # Canonical recommendation.confidence at or below this triggers the same
+    # LLM deep-dive as the score-based grey zone above (Sub-project 2, Task 3)
+    # — used only when a canonical evaluation confidence is available.
+    grey_zone_confidence_max: Probability
     minimum_scored_weight: PositiveProbability
     boundary_semantics: BoundarySemantics
 
@@ -205,6 +209,10 @@ class ScoreThresholdsV4(StrictRulesModel):
     max_avg_borderline_high: Score
     grey_zone_min: Score
     grey_zone_max: Score
+    # Canonical recommendation.confidence at or below this triggers the same
+    # LLM deep-dive as the score-based grey zone above (Sub-project 2, Task 3)
+    # — used only when a canonical evaluation confidence is available.
+    grey_zone_confidence_max: Probability
     minimum_scored_weight: PositiveProbability
 
     @model_validator(mode="after")

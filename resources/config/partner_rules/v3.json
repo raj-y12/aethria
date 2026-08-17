@@ -52,6 +52,7 @@
     "max_avg_borderline_high": 7.0,
     "grey_zone_min": 6.5,
     "grey_zone_max": 7.5,
+    "grey_zone_confidence_max": 0.75,
     "minimum_scored_weight": 0.5,
     "boundary_semantics": {
       "advance": "greater_than_or_equal",

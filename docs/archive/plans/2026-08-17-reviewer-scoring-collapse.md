@@ -97,6 +97,35 @@ The master plan's acceptance criteria ("Assessment reads canonical criteria, rev
 
 ---
 
-### Tasks 3+ — blocked
+### Task 3: Replace Partner's three Reviewer-score dependencies with canonical signals — DONE
 
-Not written yet. Depends on your answers to the three replacement-signal questions above. Once you decide what the evidence-coverage gate, grey-zone trigger, and disagreement trigger read from canonically, I'll write the task-level plan for: replacing those three Partner dependencies, then removing per-persona `structured_scoring` production from `reviewer/engine.py`/`base.py`, then deleting the reviewer-only `services/scoring/` files (after carving `EXPECTED_COMPONENTS` out of `extraction_layer.py` into a shared location `policy_compiler.py` can still import from).
+**Decisions taken (2026-08-17):** evidence-coverage gate → canonical `evidence_sufficiency`; grey-zone trigger → canonical `recommendation.confidence`; disagreement trigger → canonical `contradicting_claim_ids`. All three "Recommended" options from the plan's open-decision list.
+
+**Files:**
+- `backend/evaluation_v2/partner_rules.py` — added `grey_zone_confidence_max: Probability` to both `ScoreThresholds` (v3) and `ScoreThresholdsV4` (v4), alongside the existing `grey_zone_min`/`grey_zone_max`.
+- `resources/config/partner_rules/v3.json`, `v4.json` — `"grey_zone_confidence_max": 0.75` (same proportion as the existing 6.5-7.5 score band relative to the 6.0-8.0 pass/advance range).
+- `backend/partner/decision.py`:
+  - New `_dimension_scored()` static helper — canonical `evidence_sufficiency`/`score` takes precedence when `canonical_criteria` is supplied; legacy `structured_scoring` is the fallback. Single choke point reused by both `_avg_score_and_dims()` and the evidence-coverage gate's `missing_dimensions` list (previously two separate, duplicated inspections of `structured_scoring`).
+  - `_avg_score_and_dims()` — added `canonical_criteria` param.
+  - Grey-zone computation — canonical `confidence <= grey_zone_confidence_max` supersedes the score-band check when `canonical_confidence` is supplied. `grey_zone_basis` (new) carries a basis-aware description string into both `trigger_reason` message sites.
+  - `reviewer_disagreement` computation — `any(criterion.contradicting_claim_ids)` across canonical criteria supersedes the legacy `review_output.get("reviewer_disagreement")` flag when `canonical_criteria` is supplied.
+  - `decide()`/`decide_with_execution_identity()` — added `canonical_criteria: Optional[List[Dict[str, Any]]]` and `canonical_confidence: Optional[float]` params, same threading pattern as Sub-project 1's `canonical_recommendation`.
+- `backend/partner/engine.py` — threaded through `_decide_and_save()` and the public `run_startup()`.
+- `backend/pipeline_runner.py` — extracts `canonical_evaluation.get("criteria")` and `.get("recommendation", {}).get("confidence")` alongside the existing `canonical_recommendation_state` extraction, passes both into `partner_engine.run_startup(...)`. Added missing `List` import.
+- Test: `backend/tests/test_partner_canonical_scoring_signals.py` (new, 7 tests) — evidence gate fires on canonical-insufficient even when legacy structured_scoring is fully populated; fully-scored canonical doesn't fire it; legacy fallback still works with no canonical criteria; low canonical confidence escalates even at a clear score; high canonical confidence doesn't force escalation; canonical contradicting evidence triggers the disagreement path; legacy `reviewer_disagreement` flag still works as fallback.
+- Test registry: `backend/tests/evaluation_v2/test_partner_rules_v4_authority.py` — registered `grey_zone_confidence_max` in `_CONSUMER_GROUPS["score_ladder_and_evaluator"]` and `_NUMERIC_MUTATIONS` (the existing "every config leaf needs an explicit runtime consumer" contract test, same registration Sub-project 1 Task 2 needed for `critical_risk_pass_conviction`).
+
+**Bug found and fixed during implementation:** the first draft referenced `grey_zone_score`/`grey_zone_min`/`grey_zone_max` in the trigger-reason message unconditionally, but those were only assigned in the legacy (non-canonical) branch — a live `UnboundLocalError` on the canonical-confidence path, caught immediately by a manual repro before it reached the test suite. Fixed by having both branches set a `grey_zone_basis` description string.
+
+**Verification:**
+- [x] `python3 -c "import api"` — clean (validates the config schema changes too).
+- [x] New test file: 7/7 passed.
+- [x] Full targeted suite (`test_partner_canonical_recommendation.py`, `test_partner_critical_risk_conviction.py`, `test_partner_silent_conviction_facts.py`, `evaluation_v2/`, `test_partner_decision_fallback.py`): 605/605 passed, zero regressions.
+- [x] Full backend suite: 2220 passed, 43 failed — all 43 are the pre-existing `aethria_test` Postgres-container-unavailable failures from earlier in this session (unrelated to this change, same failures existed before it).
+- [ ] **Not live-verified.** Per the investigated-and-parked finding above, no opportunity in the current database has non-null canonical criteria/confidence — a live dispatch today would only exercise the (unchanged) legacy fallback path, not the new canonical branches. Live verification of the canonical path is blocked on the same upstream finding, not on this task.
+
+---
+
+### Tasks 4+ — not started
+
+Removing per-persona `structured_scoring` production from `reviewer/engine.py`/`base.py`, then deleting the reviewer-only `services/scoring/` files (after carving `EXPECTED_COMPONENTS` out of `extraction_layer.py` into a shared location `policy_compiler.py` can still import from). Partner no longer needs Reviewer's raw scores for anything as of Task 3 — this is now unblocked, not yet scoped into bite-sized tasks.

@@ -367,11 +367,52 @@ class PartnerDecisionEngine:
             self.logger.warning(f"Could not load portfolio context: {e}")
             return {}
 
-    def _avg_score_and_dims(self, review_output: Dict[str, Any]) -> Tuple[float, int]:
-        """Mean only genuinely scored core dimensions; retain coverage count."""
-        values: List[float] = []
+    @staticmethod
+    def _dimension_scored(
+        dimension: str,
+        review_output: Dict[str, Any],
+        canonical_criteria: Optional[Dict[str, Dict[str, Any]]],
+    ) -> Tuple[bool, Optional[float]]:
+        """True + score when a dimension has a real score for this decision.
+
+        Canonical evidence_sufficiency/score takes precedence when a canonical
+        evaluation was supplied (Sub-project 2, Task 3) — legacy Reviewer
+        structured_scoring is the fallback for opportunities without one yet.
+        """
+        if canonical_criteria is not None:
+            criterion = canonical_criteria.get(dimension)
+            if criterion is None or criterion.get("evidence_sufficiency") == "insufficient":
+                return False, None
+            score = criterion.get("score")
+            if score is None:
+                return False, None
+            try:
+                return True, float(score)
+            except (TypeError, ValueError):
+                return False, None
         structured = review_output.get("structured_scoring")
         structured = structured if isinstance(structured, dict) else None
+        if structured is not None:
+            detail = structured.get(dimension)
+            if not isinstance(detail, dict) or bool(detail.get("unscored")):
+                return False, None
+            raw = detail.get("score")
+        else:
+            raw = review_output.get(f"{dimension}_score")
+        if raw is None:
+            return False, None
+        try:
+            return True, float(raw)
+        except (TypeError, ValueError):
+            return False, None
+
+    def _avg_score_and_dims(
+        self,
+        review_output: Dict[str, Any],
+        canonical_criteria: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Tuple[float, int]:
+        """Mean only genuinely scored core dimensions; retain coverage count."""
+        values: List[float] = []
         prerequisites = self.evaluation_prerequisites
         dimensions = (
             configured_scoring_dimensions(prerequisites)
@@ -379,24 +420,14 @@ class PartnerDecisionEngine:
             else ("market", "product", "technical", "execution")
         )
         for dimension in dimensions:
-            if structured is not None:
-                detail = structured.get(dimension)
-                if not isinstance(detail, dict) or bool(detail.get("unscored")):
-                    continue
-            raw = (
-                structured[dimension].get("score")
-                if structured is not None
-                else review_output.get(f"{dimension}_score")
-            )
-            try:
-                if raw is not None:
-                    values.append(float(raw))
-            except (TypeError, ValueError):
-                continue
+            scored, score = self._dimension_scored(dimension, review_output, canonical_criteria)
+            if scored and score is not None:
+                values.append(score)
         if not values:
             return 0.0, 0
-        if prerequisites is not None and len(values) == len(dimensions):
-            overall = structured.get("overall_score") if structured is not None else None
+        if canonical_criteria is None and prerequisites is not None and len(values) == len(dimensions):
+            structured = review_output.get("structured_scoring")
+            overall = structured.get("overall_score") if isinstance(structured, dict) else None
             if isinstance(overall, (int, float)) and not isinstance(overall, bool):
                 return float(overall), len(values)
         return sum(values) / len(values), len(values)
@@ -792,6 +823,8 @@ class PartnerDecisionEngine:
         context_memo: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
         canonical_recommendation: Optional[str] = None,
+        canonical_criteria: Optional[List[Dict[str, Any]]] = None,
+        canonical_confidence: Optional[float] = None,
     ) -> Tuple[Dict[str, Any], Optional[str]]:
         """Return output plus independently captured model-prompt evidence."""
         token = self._execution_prompt_version.set(None)
@@ -802,6 +835,8 @@ class PartnerDecisionEngine:
                 context_memo=context_memo,
                 fund_thesis=fund_thesis,
                 canonical_recommendation=canonical_recommendation,
+                canonical_criteria=canonical_criteria,
+                canonical_confidence=canonical_confidence,
             )
             return result, self._execution_prompt_version.get()
         finally:
@@ -814,6 +849,8 @@ class PartnerDecisionEngine:
         context_memo: str = "",
         fund_thesis: Optional[Dict[str, Any]] = None,
         canonical_recommendation: Optional[str] = None,
+        canonical_criteria: Optional[List[Dict[str, Any]]] = None,
+        canonical_confidence: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Make an investment decision based on Scout and Reviewer outputs.
@@ -826,6 +863,14 @@ class PartnerDecisionEngine:
             canonical_recommendation: The canonical evaluator's recommendation state
                 (advance/monitor/pass/insufficient_evidence), when already computed for
                 this opportunity. Takes precedence over the score-threshold ladder.
+            canonical_criteria: Canonical evaluate_snapshot() per-criterion assessments
+                (each a dict with at least criterion/score/evidence_sufficiency/
+                contradicting_claim_ids), when available. Supersedes Reviewer's own
+                structured_scoring for the evidence-coverage gate and disagreement
+                detection (Sub-project 2, Task 3).
+            canonical_confidence: The canonical recommendation's confidence (0-1),
+                when available. Supersedes the score-based grey-zone LLM-escalation
+                trigger.
         Returns:
             Partner output dict with decision, conviction_level, rationale, next_action,
             human_review_required, assumption_risks.
@@ -841,6 +886,16 @@ class PartnerDecisionEngine:
         verdict_rules = rules.verdict_rules
         score_thresholds = rules.score_thresholds
         next_actions = rules.next_actions
+
+        canonical_criteria_by_key: Optional[Dict[str, Dict[str, Any]]] = (
+            {
+                str(c.get("criterion")): c
+                for c in canonical_criteria
+                if isinstance(c, dict) and c.get("criterion")
+            }
+            if canonical_criteria
+            else None
+        )
 
         portfolio_context = self._get_portfolio_context() if self.portfolio_store else {}
         thesis_block = ""
@@ -884,19 +939,33 @@ class PartnerDecisionEngine:
         key_risks = review_output.get("key_risks", [])
         assumption_feedback: List[str] = review_output.get("assumption_feedback") or []
 
-        avg_score, avg_dims = self._avg_score_and_dims(review_output)
+        avg_score, avg_dims = self._avg_score_and_dims(review_output, canonical_criteria_by_key)
 
-        # Grey Zone: compute once here; used in MEDIUM rules below
+        # Grey Zone: compute once here; used in MEDIUM rules below. Canonical
+        # recommendation confidence supersedes the score-based band when supplied
+        # (Sub-project 2, Task 3) — same escalation intent, canonical source.
+        # grey_zone_basis feeds the trigger_reason message below either way.
         llm_triggers_global = rules.llm_fallback_triggers
-        grey_zone_score = review_output.get("confidence_adjusted_score")
-        if grey_zone_score is None:
-            grey_zone_score = avg_score
-        grey_zone_min = float(score_thresholds.grey_zone_min)
-        grey_zone_max = float(score_thresholds.grey_zone_max)
-        grey_zone_active = (
-            llm_triggers_global.grey_zone_deep_dive
-            and grey_zone_min <= grey_zone_score <= grey_zone_max
-        )
+        if canonical_confidence is not None:
+            grey_zone_confidence_max = float(score_thresholds.grey_zone_confidence_max)
+            grey_zone_active = (
+                llm_triggers_global.grey_zone_deep_dive
+                and canonical_confidence <= grey_zone_confidence_max
+            )
+            grey_zone_basis = (
+                f"canonical confidence={canonical_confidence:.2f} <= {grey_zone_confidence_max}"
+            )
+        else:
+            grey_zone_score = review_output.get("confidence_adjusted_score")
+            if grey_zone_score is None:
+                grey_zone_score = avg_score
+            grey_zone_min = float(score_thresholds.grey_zone_min)
+            grey_zone_max = float(score_thresholds.grey_zone_max)
+            grey_zone_active = (
+                llm_triggers_global.grey_zone_deep_dive
+                and grey_zone_min <= grey_zone_score <= grey_zone_max
+            )
+            grey_zone_basis = f"S_adj={grey_zone_score:.2f} in [{grey_zone_min}, {grey_zone_max}]"
 
         if self.evaluation_policy is not None:
             # Governed execution has one immutable threshold authority: the
@@ -952,15 +1021,7 @@ class PartnerDecisionEngine:
             missing_dimensions = [
                 dimension
                 for dimension in required_dimensions
-                if (
-                    not isinstance(review_output.get("structured_scoring"), dict)
-                    or not isinstance(
-                        review_output["structured_scoring"].get(dimension), dict
-                    )
-                    or review_output["structured_scoring"][dimension].get("unscored")
-                    or review_output["structured_scoring"][dimension].get("score")
-                    is None
-                )
+                if not self._dimension_scored(dimension, review_output, canonical_criteria_by_key)[0]
             ]
             evidence_risk = (
                 "Insufficient evidence coverage for required dimensions: "
@@ -1084,7 +1145,18 @@ class PartnerDecisionEngine:
         score_recommendation = self._canonical_recommendation(avg_score)
         if has_critical_risk:
             score_recommendation = "PASS"
-        reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
+        # Canonical evidence contradiction supersedes persona score-variance
+        # disagreement when a canonical evaluation is available (Sub-project 2,
+        # Task 3) — a criterion with contradicting evidence is disagreement in
+        # canonical terms, reusing the architecture's existing contradiction
+        # mechanism rather than a new computation.
+        if canonical_criteria_by_key is not None:
+            reviewer_disagreement = any(
+                criterion.get("contradicting_claim_ids")
+                for criterion in canonical_criteria_by_key.values()
+            )
+        else:
+            reviewer_disagreement = bool(review_output.get("reviewer_disagreement", False))
         handoff_quality = self._handoff_quality_from_review(review_output)
 
         tags = derive_situation_tags(
@@ -1340,10 +1412,7 @@ class PartnerDecisionEngine:
             llm_triggers = rules.llm_fallback_triggers
             trigger_reason = ""
             if grey_zone_active:
-                trigger_reason = (
-                    f"Grey zone deep dive: S_adj={grey_zone_score:.2f} in "
-                    f"[{grey_zone_min}, {grey_zone_max}]"
-                )
+                trigger_reason = f"Grey zone deep dive: {grey_zone_basis}"
             elif has_contradiction and llm_triggers.contradictory_scores:
                 trigger_reason = "Contradictory scores detected (gap >= threshold)"
             elif has_missing_assumptions and llm_triggers.missing_assumptions_affecting_decision:
@@ -1429,7 +1498,7 @@ class PartnerDecisionEngine:
             )
             if use_llm:
                 trigger_reason = (
-                    f"Grey zone deep dive: S_adj={grey_zone_score:.2f} in [{grey_zone_min}, {grey_zone_max}]"
+                    f"Grey zone deep dive: {grey_zone_basis}"
                     if grey_zone_active
                     else "MEDIUM verdict with borderline average score"
                 )
