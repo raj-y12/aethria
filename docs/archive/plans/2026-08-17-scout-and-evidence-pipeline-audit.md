@@ -367,3 +367,45 @@ call.
    code, clean up duplicates, or both.
 7. Remaining MEDIUM items (A6-A12, B3, B6, B7) — smaller, lower urgency,
    batchable once the above are decided.
+
+## NEW — description stolen from a same-named different company, found and fixed 2026-08-17
+
+Not one of the 15 findings above. Found live: after fixing A10/A12, live-
+dispatched Anthropic to validate, and the memo's "Snapshot / What it does"
+described a completely different company — a UK venture capital fund at
+anthropic.io ("Anthropic is a Venture Capital and Private Equity Principals
+company... Headquartered in Semley, Dorset, United Kingdom") — even though
+`resolution.website` correctly resolved to `anthropic.com` (the real AI
+lab) and the memo's actual scored claims were genuinely about the real
+Anthropic (Claude, enterprise LLM market). One opportunity, internally
+contradicting itself between sections.
+
+**Root cause:** `resolver/company_resolver.py`'s `_profile_matches_anchor`
+only enforced the anchor-host check for `linkedin`/`crunchbase`/`dealroom`/
+`yc` source types — an `"official_site"`-classified source was treated as
+anchor-matching unconditionally. But `_score_and_collect_sources` classifies
+*any* domain whose slug closely resembles the company name as
+`"official_site"` via `slug_sim >= 0.55`, independent of whether it actually
+matches the resolved anchor. Confirmed directly:
+`_slug_similarity("Anthropic", "anthropic.io") == 1.0`. So a same-named,
+unrelated company's domain could win `_pick_description`'s priority search
+(which looks for the first `"official_site"`-typed source) purely by name
+similarity, with no anchor check ever applied.
+
+**Fix:** `_profile_matches_anchor` now enforces the anchor-host check for
+`"official_site"` sources too, when an anchor is known — falls back to
+permissive only when no anchor exists at all. New regression test
+(`test_description_is_not_stolen_from_a_same_named_different_company`) using
+the existing `lyra.ie`/`lyra.com` collision fixture already in the file. All
+21 tests in `test_company_resolver.py` pass.
+
+**Live re-validation:** re-dispatching the exact same "Anthropic" observation
+didn't show the fix at first — traced to `StartupRepository.create_startup`'s
+deliberate idempotency ("Insert a discovery without replacing an existing
+startup row" — a repeat dispatch of the same display name reuses the
+existing row without ever writing fresh scout_info). Not a bug; working as
+designed. Dispatched under a distinct name ("Anthropic PBC anthropic.com")
+to force a fresh row: `company_resolution.description` came back genuinely
+about the real Anthropic ("$65 billion in Series H funding... $965 billion
+post-money"), `website` correctly `anthropic.com`, no trace of the UK VC
+fund anywhere.

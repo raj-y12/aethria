@@ -434,6 +434,27 @@ def test_website_hint_collapses_to_single_candidate(monkeypatch):
     assert [c.website for c in res.candidates] == ["https://lyra.ie"]
 
 
+def test_description_is_not_stolen_from_a_same_named_different_company(monkeypatch):
+    """Regression: live-observed on Anthropic. The user picked anthropic.com
+    (the real AI lab) via an explicit website hint -- resolution.website
+    correctly resolved to it -- but resolution.description was silently
+    filled from anthropic.io (a same-named, unrelated UK venture fund),
+    because _profile_matches_anchor treated every "official_site" source as
+    anchor-matching unconditionally, and _score_and_collect_sources classifies
+    ANY domain whose slug resembles the company name as "official_site"
+    regardless of the actual anchor. The description must come from the
+    hinted domain, or be absent -- never from the wrong company."""
+    sources = [
+        {"title": "Lyra IE", "url": "https://lyra.ie", "snippet": "Lyra automates Irish payroll for SMEs, based in Dublin."},
+        {"title": "Lyra US", "url": "https://lyra.com", "snippet": "Lyra is a US healthcare analytics platform for hospitals."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Lyra", user_id=USER, website_hint="lyra.ie")
+    assert res.website == "https://lyra.ie"
+    assert "healthcare analytics" not in (res.description or "")
+    assert res.description is None or "payroll" in res.description
+
+
 def test_no_candidates_when_no_evidence(monkeypatch):
     monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack([]))
     res = resolve_company("Totally Nonexistent Startup Zzz", user_id=USER)

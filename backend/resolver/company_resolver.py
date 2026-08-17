@@ -383,6 +383,22 @@ def _profile_matches_anchor(
     slugs are the stable cross-source identifier available without fetching a
     page, and exact normalized equality avoids substring collisions.
     """
+    if source.source_type == "official_site":
+        # Fixed 2026-08-17 (live-observed on Anthropic): _score_and_collect_sources
+        # classifies ANY domain whose slug resembles the company name as
+        # "official_site" via `slug_sim >= 0.55` -- independent of whether it
+        # actually matches the resolved anchor domain. Without this check, a
+        # same-named different company (anthropic.io, a UK VC fund) got
+        # "official_site" purely by name similarity, and this function used
+        # to treat every official_site source as anchor-matching unconditionally
+        # -- so its description overwrote the real company's (anthropic.com,
+        # the AI lab) even though the resolver's own website field was
+        # correctly anchored. Only enforce when an anchor is actually known;
+        # without one there's nothing to check against.
+        if not anchor_host:
+            return True
+        host = _host_of(source.url)
+        return bool(host) and (host == anchor_host or host.endswith("." + anchor_host))
     if source.source_type not in {"linkedin", "crunchbase", "dealroom", "yc"}:
         return True
     target = registrable_domain(_host_of(anchor_host or "")) if anchor_host else ""
