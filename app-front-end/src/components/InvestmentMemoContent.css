@@ -1492,6 +1492,11 @@
   cursor: default;
 }
 
+.memoScoreRow:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.5);
+  outline-offset: -2px;
+}
+
 .memoScoreName,
 .memoScoreVal {
   color: var(--memo-ink);

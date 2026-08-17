@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type {
   ScoringDimensionKey,
@@ -61,6 +61,7 @@ export default function AssessmentScorecard({
   reduceMotion = false,
 }: AssessmentScorecardProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const idPrefix = useId();
   const toggle = (key: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -137,12 +138,14 @@ export default function AssessmentScorecard({
       </li>
     );
 
+    const detailId = `${idPrefix}-${dim.key}-detail`;
     return (
       <li key={dim.key}>
         <button
           type="button"
           onClick={() => hasDetail && toggle(dim.key)}
           aria-expanded={isOpen}
+          aria-controls={hasDetail ? detailId : undefined}
           disabled={!hasDetail}
           className="memoScoreRow"
         >
@@ -179,7 +182,7 @@ export default function AssessmentScorecard({
               transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
               style={{ overflow: 'hidden' }}
             >
-              <div className="memoScoreDetail">
+              <div id={detailId} role="region" aria-label={`${dim.label} detail`} className="memoScoreDetail">
                 {evidence.length > 0 && (
                   <div>
                     {gaps.length > 0 && <p className="memoScoreGroupLabel">Evidence</p>}

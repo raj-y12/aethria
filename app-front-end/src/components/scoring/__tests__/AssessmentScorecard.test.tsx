@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import AssessmentScorecard, { type ScorecardDimensionDef } from '../AssessmentScorecard';
 import type { PresentationDimension, ScoringDimension, ScoringPresentation, StructuredScoring } from '../../../types/startup';
@@ -34,6 +34,75 @@ function scoring(overrides: Partial<StructuredScoring> = {}): StructuredScoring 
     ...overrides,
   };
 }
+
+describe('AssessmentScorecard accessibility and robustness', () => {
+  it('links each expandable dimension button to its detail panel via aria-controls', () => {
+    const structured = scoring({
+      market: dimension({ reasoning: ['A specific reason the score landed here.'] }),
+    });
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={structured}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+      />
+    );
+
+    const marketButton = screen.getByRole('button', { name: /Market/ });
+    const controlsId = marketButton.getAttribute('aria-controls');
+    expect(controlsId).toBeTruthy();
+    expect(marketButton.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(marketButton);
+
+    expect(marketButton.getAttribute('aria-expanded')).toBe('true');
+    expect(document.getElementById(controlsId!)).toBeInTheDocument();
+  });
+
+  it('a row with nothing to expand has no aria-controls and stays disabled', () => {
+    // A dimension with a plain score, no reasoning/components/flags at all has
+    // hasDetail=false — it must not claim to control a panel that never renders.
+    const structured = scoring({
+      market: { score: 6, confidence: 0.9, components: {} },
+    });
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={structured}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+      />
+    );
+
+    const marketButton = screen.getByRole('button', { name: /Market/ });
+    expect(marketButton).toBeDisabled();
+    expect(marketButton.getAttribute('aria-controls')).toBeNull();
+  });
+
+  it('renders without error when every dimension is unscored and there are no reviewer rows', () => {
+    const unscoredDim = dimension({ score: 0, unscored: true, components: {}, reasoning: null });
+    const structured = scoring({
+      market: unscoredDim,
+      product: unscoredDim,
+      technical: unscoredDim,
+      execution: unscoredDim,
+      defensibility: unscoredDim,
+      overall_score: 0,
+    });
+
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={structured}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+      />
+    );
+
+    expect(screen.getAllByText('Not scored').length).toBe(5);
+  });
+});
 
 describe('AssessmentScorecard persona-divergence flag', () => {
   it('flags a dimension whose personas materially diverged', () => {
