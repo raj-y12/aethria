@@ -28,7 +28,8 @@ from founder_context import apply_founder_grounding_guard, resolved_founder_name
 
 logger = logging.getLogger(__name__)
 MISSING_TOKEN_RE = re.compile(r"^\s*\[?\s*missing(?::[^\]]*)?\]?\s*$", re.IGNORECASE)
-DEFAULT_MAX_COMPLETION_TOKENS = 8192
+DEFAULT_MAX_COMPLETION_TOKENS = 16384
+MAX_RETRY_COMPLETION_TOKENS = 32768
 
 
 def _as_plain_obj(value: Any) -> Any:
@@ -1065,8 +1066,8 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             # doesn't silently fail the whole review.
             base_budget = _reviewer_max_completion_tokens()
             budgets = [base_budget]
-            if base_budget < 16384:
-                budgets.append(min(base_budget * 2, 16384))
+            if base_budget < MAX_RETRY_COMPLETION_TOKENS:
+                budgets.append(min(base_budget * 2, MAX_RETRY_COMPLETION_TOKENS))
 
             self._last_token_usage = 0
             content, diagnostic = "", {}
@@ -1079,6 +1080,7 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                     ],
                     response_format={"type": "json_object"},
                     max_completion_tokens=budget,
+                    reasoning_effort="low",
                 )
                 if hasattr(response, 'usage') and response.usage:
                     self._last_token_usage += getattr(response.usage, 'total_tokens', 0) or 0
