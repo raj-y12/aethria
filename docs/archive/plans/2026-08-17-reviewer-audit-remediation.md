@@ -87,9 +87,25 @@ out insufficient.
 
 ## Status
 
-- [ ] Item 1 — delete dead resolution call + zombie fields
-- [ ] Item 2 — validate score_band against actual score/rubric range
-- [ ] Item 3 — fix "% evidenced" label or computation
-- [ ] Item 4 — disclose personas as AI lenses
-- [ ] Item 5 — consolidate the two reviewer-row renderers
-- [ ] Item 6 — states/a11y/test coverage
+- [x] Item 1 — remove the zombie `resolution_notes`/`disagreement_summary` fields.
+  **Correction made while implementing:** `apply_resolution_to_primary`'s score
+  mutation is not universally dead as first described — it's the real fallback
+  when there's no active thesis (`_refresh_derived_after_dimension_changes`
+  reads, not overwrites, `primary[score]` in that branch). Only overwritten by
+  the governed trace when a thesis is active. The call itself was kept; only
+  its two unread output fields were removed. `abb8adba`.
+- [x] Item 2 — `score_band` is now always computed deterministically from the
+  score and the rubric's numeric ranges, never trusted from the model's own
+  claim. `abb8adba`.
+- [x] Item 3 — relabelled "% evidenced" → "% data coverage" in both renderers,
+  with a code comment on what the metric actually measures. `abb8adba`.
+- [x] Item 4 — added a one-line disclosure ("One model, one evidence packet,
+  three prompted postures — not independent reviews.") to both reviewer-row
+  renderers, plus a per-row tooltip naming each persona's actual instructed
+  posture. `abb8adba`.
+- [ ] Item 5 — consolidate the two reviewer-row renderers.
+- [ ] Item 6 — states/a11y/test coverage.
+
+Verified: full backend suite (same 39 pre-existing Postgres-container failures,
+zero regressions), full frontend suite (469/469), `tsc`, `eslint --max-warnings
+0`, production build, and `check:bundle` all clean after items 1-4.
