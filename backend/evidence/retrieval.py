@@ -52,10 +52,10 @@ async def execute_evidence_plan(
     evidence_repository: Any,
     company_name: str,
     company_website: Optional[str] = None,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     queries = [f"{company_name} {q}".strip() for q in plan.search_questions[:MAX_QUERIES]]
     if not queries:
-        return {"artifacts_ingested": 0, "queries_run": 0}
+        return {"artifacts_ingested": 0, "queries_run": 0, "verified_items": []}
 
     pack = await asyncio.to_thread(
         retrieve_source_pack_merged,
@@ -86,6 +86,10 @@ async def execute_evidence_plan(
     corroborated = len(independent_domains) >= 2
 
     ingested = 0
+    # Only verified items can ever support a scored claim (the same
+    # eligibility gate evaluate_claim_score_eligibility enforces later) --
+    # no point spending extraction tokens on evidence that can't help.
+    verified_items: list[dict[str, Any]] = []
     for source, domain in zip(sources, domains):
         content = str(source.get("snippet") or "").strip()
         if not content:
@@ -97,7 +101,15 @@ async def execute_evidence_plan(
             if is_official or corroborated
             else VerificationState.UNVERIFIED
         )
-        await evidence_repository.ingest_artifact(
+        # decision_safety.evidence_eligibility.min_source_quality gates claim
+        # eligibility on this same source_quality value (service.py); it
+        # defaults to 0.0 on EvidenceItemInput and was never being set here,
+        # so every retrieved item was silently permanently ineligible.
+        # First-party is full quality; corroborated third-party sits above
+        # the eligibility floor but below full_confidence_at (0.8), which
+        # correctly caps confidence rather than granting it outright.
+        source_quality = 1.0 if is_official else (0.6 if corroborated else 0.0)
+        _artifact, items = await evidence_repository.ingest_artifact(
             EvidenceArtifactInput(
                 user_id=user_id,
                 company_id=company_id,
@@ -121,9 +133,17 @@ async def execute_evidence_plan(
                     display_excerpt=content[:2000],
                     source_locator=source.get("url"),
                     verification_state=verification_state,
+                    source_quality=source_quality,
                 )
             ],
         )
         ingested += 1
+        if verification_state == VerificationState.VERIFIED and items:
+            verified_items.append(
+                {
+                    "evidence_item_id": str(items[0].evidence_item_id),
+                    "display_excerpt": items[0].display_excerpt,
+                }
+            )
 
-    return {"artifacts_ingested": ingested, "queries_run": len(queries)}
+    return {"artifacts_ingested": ingested, "queries_run": len(queries), "verified_items": verified_items}

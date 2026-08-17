@@ -1,10 +1,11 @@
 """Sub-project 4, Phase B: bounded evidence retrieval against a plan."""
 
+from itertools import count
 from unittest.mock import patch
 
 import pytest
 
-from evidence.models import EvidencePlanRecord, TrustClass, VerificationState
+from evidence.models import EvidenceItemRecord, EvidencePlanRecord, TrustClass, VerificationState
 from evidence.retrieval import MAX_QUERIES, execute_evidence_plan
 
 
@@ -31,10 +32,17 @@ def _plan(**overrides):
 class _FakeEvidenceRepository:
     def __init__(self):
         self.ingested: list = []
+        self._ids = count(1)
 
     async def ingest_artifact(self, artifact, *, items=()):
-        self.ingested.append((artifact, list(items)))
-        return artifact, list(items)
+        # Mirror the real repository: an EvidenceItemInput becomes an
+        # EvidenceItemRecord (gains an evidence_item_id) only once "stored".
+        stored_items = [
+            EvidenceItemRecord(**item.model_dump(), artifact_id=f"artifact-{next(self._ids)}")
+            for item in items
+        ]
+        self.ingested.append((artifact, stored_items))
+        return artifact, stored_items
 
 
 @pytest.mark.asyncio
@@ -78,7 +86,11 @@ async def test_no_sources_ingests_nothing_and_does_not_error():
             plan=plan, evidence_repository=repo, company_name="Acme",
         )
 
-    assert result == {"artifacts_ingested": 0, "queries_run": len(plan.search_questions[:MAX_QUERIES])}
+    assert result == {
+        "artifacts_ingested": 0,
+        "queries_run": len(plan.search_questions[:MAX_QUERIES]),
+        "verified_items": [],
+    }
     assert repo.ingested == []
 
 
@@ -118,6 +130,7 @@ async def test_companys_own_domain_is_official_and_verified_unconditionally():
     artifact, items = repo.ingested[0]
     assert artifact.trust_class == TrustClass.OFFICIAL
     assert items[0].verification_state == VerificationState.VERIFIED
+    assert items[0].source_quality == 1.0
 
 
 @pytest.mark.asyncio
@@ -168,6 +181,9 @@ async def test_two_independent_domains_corroborate_each_other():
     for artifact, items in repo.ingested:
         assert artifact.trust_class == TrustClass.INDEPENDENT
         assert items[0].verification_state == VerificationState.VERIFIED
+        # Above min_source_quality (0.4) so the claim can be eligible, but
+        # below full_confidence_at (0.8) so it's capped, not full-strength.
+        assert items[0].source_quality == 0.6
 
 
 @pytest.mark.asyncio
@@ -245,6 +261,60 @@ async def test_no_company_website_never_marks_anything_official():
 
 
 @pytest.mark.asyncio
+async def test_verified_source_quality_clears_the_eligibility_floor():
+    """EvidenceItemInput.source_quality defaults to 0.0, and this function
+    never set it -- every retrieved item was silently below the policy's
+    min_source_quality (0.4), making claims linked to it permanently
+    ineligible for scoring regardless of verification_state."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Acme homepage", "url": "https://acme.com/about", "snippet": "Acme builds widgets."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    _, items = repo.ingested[0]
+    assert items[0].source_quality > 0.4
+
+
+@pytest.mark.asyncio
+async def test_verified_items_returned_for_extraction_unverified_excluded():
+    """Only verified items are worth handing to Phase C's extraction --
+    unverified evidence can never support a scored claim anyway."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Official", "url": "https://acme.com/about", "snippet": "Acme builds widgets."},
+            {"title": "Lone blog", "url": "https://randomblog.com/x", "snippet": "Some opinion piece."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        result = await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    # Official is verified unconditionally; the lone blog has no corroboration
+    # (only 1 non-official domain) so it stays unverified and is excluded.
+    assert len(result["verified_items"]) == 1
+    assert result["verified_items"][0]["display_excerpt"] == "Acme builds widgets."
+    assert "evidence_item_id" in result["verified_items"][0]
+
+
+@pytest.mark.asyncio
 async def test_empty_plan_skips_retrieval_entirely():
     repo = _FakeEvidenceRepository()
     plan = _plan(missing_evidence=[], search_questions=[])
@@ -256,4 +326,4 @@ async def test_empty_plan_skips_retrieval_entirely():
         )
 
     mock_retrieve.assert_not_called()
-    assert result == {"artifacts_ingested": 0, "queries_run": 0}
+    assert result == {"artifacts_ingested": 0, "queries_run": 0, "verified_items": []}

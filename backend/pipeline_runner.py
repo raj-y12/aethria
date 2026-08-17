@@ -63,6 +63,7 @@ from people.repository import PeopleRepository
 from evidence.repository import EvidenceRepository
 from evidence.planning import compute_missing_evidence
 from evidence.retrieval import execute_evidence_plan
+from evidence.extraction import extract_claims_from_evidence
 from identity.repository import IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
@@ -1824,7 +1825,7 @@ async def _run_on_demand_lookup_inner(
                                 missing_evidence=missing_evidence,
                                 search_questions=search_questions,
                             )
-                            await execute_evidence_plan(
+                            retrieval_result = await execute_evidence_plan(
                                 user_id=user_id,
                                 company_id=canonical_admission.company_id,
                                 opportunity_id=canonical_admission.opportunity_id,
@@ -1833,6 +1834,39 @@ async def _run_on_demand_lookup_inner(
                                 company_name=company,
                                 company_website=website or handoff_startup.scout_info.lookup_website,
                             )
+                            # Sub-project 4, Phase C (spec §9.5): only now is
+                            # there something new for a second evaluate() to
+                            # find. Re-evaluating with nothing new would just
+                            # add latency for an identical result.
+                            verified_items = retrieval_result.get("verified_items") or []
+                            if verified_items:
+                                from core.policy_resolver import get_evaluation_rubric
+
+                                extraction_result = await extract_claims_from_evidence(
+                                    user_id=user_id,
+                                    company_id=canonical_admission.company_id,
+                                    opportunity_id=canonical_admission.opportunity_id,
+                                    missing_evidence=missing_evidence,
+                                    evidence_items=verified_items,
+                                    rubric=get_evaluation_rubric(),
+                                    policy=evaluation_prerequisites.policy,
+                                    evidence_repository=EvidenceRepository(postgres_pool),
+                                    api_key=api_key,
+                                    model=reviewer_engine.model,
+                                )
+                                if extraction_result.get("claims_created"):
+                                    canonical_evaluation = await EvaluationRepository(postgres_pool).evaluate(
+                                        user_id=user_id,
+                                        opportunity_id=canonical_admission.opportunity_id,
+                                        actor_id=user_id,
+                                        trigger_type="dispatch_post_extraction",
+                                        policy=evaluation_prerequisites.policy,
+                                        thesis_version_id=evaluation_prerequisites.thesis_version_id,
+                                    )
+                                    canonical_recommendation_payload = canonical_evaluation.get("recommendation") or {}
+                                    canonical_recommendation_state = canonical_recommendation_payload.get("state")
+                                    canonical_confidence = canonical_recommendation_payload.get("confidence")
+                                    canonical_criteria = canonical_evaluation.get("criteria")
                     except Exception:
                         logger.exception(
                             "[%s] Evidence-plan computation failed opportunity_id=%s",
