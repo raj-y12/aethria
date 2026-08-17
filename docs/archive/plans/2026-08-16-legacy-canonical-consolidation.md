@@ -82,6 +82,14 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 **Prohibited:** re-adding a "reviewer agreement" concept to the canonical model — this session already established it's redundant with evidence coverage.
 
+**Deferred, larger scope found 2026-08-17 — a full Rams-principle design audit predates this sub-project and is still open:** `docs/archive/DESIGN-IS-2026-08-15-reviewer-section/` (dated 2026-08-15, two days before this sub-project shipped) scored the reviewer/Assessment panel **7/30**, verdict **REDESIGN**, with principles #2 Useful, #4 Understandable, #6 Honest, #8 Thorough, and #9/#10 Efficient/Minimal all scoring 0-1. Checked 2026-08-17: only a narrow slice of #4 (canonical score source) has since shipped, via this sub-project's Tasks 1-3. Everything else in the audit remains untouched:
+- **#6 Honest** — the three reviewer "personas" are still presented as independent reviewers; they remain three same-model, same-evidence-packet LLM calls differentiated only by prompt posture (`reviewer/engine.py:342-349`), never disclosed as such to the user.
+- **#2 Useful** — no disagreement matrix or evidence drill-down exists; reviewer rows are still reduced to name/scalar/verdict/one sentence.
+- **#8 Thorough** — no reviewer-specific empty/loading/error/focus states; no behavioral tests for tie-handling, disagreement, or score comparability.
+- **#9/#10 Efficient/Minimal** — the duplicate scorecard renderers (`AssessmentScorecard.tsx` vs. the inline fallback in `InvestmentMemoContent.tsx`) both still exist; still 3 LLM calls per review with most persona-specific provenance discarded before it reaches the frontend.
+
+The audit's own `04-handoff-prompt.md` is a ready-to-use `/make-plan` handoff for a full redesign, not a patch. This is a real, unaddressed, pre-existing scope — larger than and only partially overlapping with what this sub-project's Tasks 1-3 delivered. Not scheduled; logged here so it isn't lost.
+
 ---
 
 ### Sub-project 3: Portfolio store consolidation — CLOSED, no changes (2026-08-17)
@@ -117,6 +125,18 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 The one persona that does run per dispatch has no canonical equivalent and stays necessary: it's the sole source of the memo's narrative prose (`one_line`/`problem`/`solution`/`target_users`/`why_now`, all rendered directly by `memo_generator.py`) — canonical extraction produces scored claims, not narrative text, a different job entirely. Founder/company identity resolution (`resolver/company_resolver.py`, `resolver/founder_resolver.py`) is a wholly separate deterministic pathway that runs *before* the LLM Scout call and doesn't depend on it at all.
 
 The one genuinely-now-redundant piece found: `canonical_scout_claims.py`'s regex bridge promotes only 4 narrow claim types (`funding_stage`, `est_tam`, `traction_revenue`, `product_capability`) from Scout's narrative text by string-matching. Sub-project 4's grounded extraction now produces better versions of overlapping claim types (a real evidence-linked score vs. a regex guess). Retiring/shrinking that bridge is a small, well-scoped task if ever wanted — not a persona cut. **Decision (2026-08-17): close, no changes** — same call as Sub-project 3, for the same reason (the assumed cost/duplication problem doesn't exist where assumed). The 3 dormant personas only matter if the periodic pipeline is ever reactivated, an out-of-scope product decision.
+
+---
+
+### Follow-on: Direction 2 Phase 6/7 build-state check — investigated, deferred (2026-08-17)
+
+Not a sub-project of this plan — a scoping check on what's next after Sub-projects 1-4 closed out Direction 2's phases 0-5 (spec `docs/archive/specs/2026-07-15-evidence-decision-platform-design.md` §21). Logged here rather than acted on; no code changed.
+
+**Phase 7 (Fund Intelligence) is substantially built, not "not started."** `backend/fund_intelligence/` (7 modules, 1,785 lines) has real persisted `LearningSignal`/`PolicyProposal` records, a working human-approval workflow (`ProposalInbox`/`ProposalReviewDrawer`, reachable from main nav `/app/fund`), impact-preview gating that blocks acceptance on a stale policy hash, all wired to live data. Genuinely missing: counterfactual replay against past decisions — a deliberate, tested, fail-closed stub (`fund_intelligence/replay.py`'s `REPLAYABLE_FAMILIES` is empty, raises rather than fakes a result), and a weighted memory of past rejections beyond exact-fingerprint dedup.
+
+**Phase 6 (attention-triggered enrichment) is scaffolded but inert — the real gap.** `backend/monitoring/` has real models, a real budget-reservation system, and real material-change-detection logic. But nothing automatic ever triggers it: `MonitoringRepository.reserve_and_enqueue`'s only caller is a manual `/refresh` API endpoint; no scheduler ever produces `MONITOR_DUE`. Even the one relevant job type, `JobType.EVIDENCE_REFRESH`, doesn't work when manually triggered — its handler (`jobs/handlers.py:359-427`) creates an evidence plan then abandons it without calling `execute_evidence_plan`, always settling its budget reservation at `$0`. The exit criteria ("no unbounded monitoring spend") are trivially true only because nothing spends anything automatically, not because bounding was proven under real automatic activity.
+
+**Deferred, not scheduled.** If picked up, Phase 6 needs three specific fixes, not a from-scratch build: (1) something to schedule/trigger refreshes for MONITOR-level opportunities, (2) fix `evidence_refresh_handler` to call the real `execute_evidence_plan`, (3) a re-evaluation call after refresh (mirroring Sub-project 4 Phase C's dispatch-path pattern).
 
 ---
 
