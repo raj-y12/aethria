@@ -449,7 +449,7 @@ async def extract_claims_from_evidence(
 
 ---
 
-### Task 3: Wire it inline after Phase B, then re-run evaluate()
+### Task 3: Wire it inline after Phase B, then re-run evaluate() — DONE
 
 **Files:**
 - Modify: `backend/pipeline_runner.py` — same best-effort block, after `execute_evidence_plan(...)`.
@@ -490,14 +490,18 @@ async def extract_claims_from_evidence(
 
 **Acceptance:** a dispatch that retrieves evidence in Phase B and finds a genuine claim for it shows a *different*, non-`insufficient_evidence` criterion result than it would have pre-extraction. A dispatch where extraction finds nothing usable (empty `claims` from every call) leaves the original evaluate() result untouched — no regression to "worse than before."
 
+**Second eligibility-gate blocker found live, same class as Phase B's trust_class fix**: a first live dispatch (Figma) created a real, correctly-shaped `tam` claim, and the second (`dispatch_post_extraction`) `evaluate()` call did fire — but `market`'s `criterion_assessment` still showed `score: None, evidence_sufficiency: 'insufficient'`, identical to the pre-extraction run. Root cause: `EvidenceItemInput.source_quality` defaults to `0.0` (`evidence/models.py:126`) and `execute_evidence_plan` never set it, so every retrieved item was permanently below `decision_safety.evidence_eligibility.min_source_quality` (`0.4`) regardless of `trust_class`/`verification_state`. Fixed in `evidence/retrieval.py` alongside the existing trust/verification rule: `source_quality = 1.0` for the company's own domain, `0.6` for corroborated third-party sources (above the `0.4` eligibility floor, below `full_confidence_at: 0.8` so the score is capped rather than full-strength — correctly conservative). Locked in with a dedicated regression test plus assertions on the existing official/corroborated tests. Committed `6cbbdfcd`.
+
+**Live-verified against a fresh Vercel dispatch after the fix**: `market`'s `criterion_assessment` in the `dispatch_post_extraction` run moved to `score: 7.99, confidence: 0.5, evidence_sufficiency: 'sufficient'`, supported by a `growth_rate` claim (`criterion_score: 8.5`, `confidence: 0.5`, `externally_verified`) that extraction created and linked to a verified evidence item. The recommendation's `decision_drivers` grew from `[]` to `["market"]` and confidence rose from `0.0` to `0.1` (overall state stayed `insufficient_evidence` since only 1 of 5 dimensions scored this round — correct, not a regression). **This is the first point all session where a canonical criterion score moved off `null` end-to-end.**
+
 ---
 
 ### Task 4: Full verification gate
 
-- [ ] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v`
-- [ ] Full backend suite — confirm no regressions beyond the pre-existing Postgres-container failures.
-- [ ] Live-verify: dispatch a company, confirm claims appear in `claims` table with real `criterion_score`/`claim_evidence_links` after Phase B's artifacts ingest, confirm the criterion(s) that got a new claim now show a non-null `score`/`evidence_sufficiency != 'insufficient'` in `criterion_assessments`, confirm the masthead/Assessment scorecard (Sub-project 2, Tasks 1-2) now renders a real number instead of "Not scored" for at least one dimension — the first time that's been true all session.
-- [ ] Measure and report actual added dispatch latency (Phase B's retrieval + this extraction call + the second `evaluate()`) against a real dispatch, honestly, not assumed.
+- [x] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v` — 33 passed.
+- [x] Full backend suite — 2251 passed, 39 pre-existing Postgres-container failures (need a live Postgres on 5432, unrelated to this change), zero regressions.
+- [x] Live-verify: dispatched Vercel; `growth_rate` claim created with real `criterion_score`/link to a verified evidence item; `market`'s `criterion_assessment` moved from `insufficient`/`None` to `sufficient`/`7.99` between the pre- and post-extraction evaluation runs. Masthead/Assessment scorecard check deferred — see note below.
+- [x] Measured real added latency on the live Vercel dispatch: evidence plan created at `12:44:29.762`, `dispatch_post_extraction` evaluate() completed at `12:44:57.144` — **Phase B retrieval + Phase C extraction + the second evaluate() added ~27s** to the dispatch critical path (total job 12:43:13→12:45:23, ~130s, on top of Scout/Reviewer/Partner). Against spec §9.13's 30s budget for this portion (12s retrieval + 18s extraction/verification), this is close but real, not the interactive p50/p90 the spec assumes — worth watching under concurrent load, not re-architected now.
 
 ---
 
