@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchOpportunityByLegacyStartup, type Opportunity } from '../api/identity';
 import { fetchEvidenceLedger, type EvidenceLedger } from '../api/evidence';
-import { fetchCurrentEvaluation, type RecommendationState } from '../api/evaluations';
+import { fetchCurrentEvaluation, type EvaluationRecord, type RecommendationState } from '../api/evaluations';
 import { listHumanRulings, type HumanRuling } from '../api/decisions';
 import { buildMemoDecisionBrief, type MemoDecisionBrief } from '../lib/memoDecisionBrief';
 
@@ -14,6 +14,7 @@ function nestedString(value: unknown, key: string): string | null {
 export interface UseMemoDecisionBriefResult {
   opportunity: Opportunity | null | undefined;
   evidence: EvidenceLedger | undefined;
+  evaluation: EvaluationRecord | undefined;
   rulings: HumanRuling[] | undefined;
   brief: MemoDecisionBrief;
   stateMessage: string | undefined;
@@ -100,6 +101,7 @@ export function useMemoDecisionBrief(startupId: string): UseMemoDecisionBriefRes
   return {
     opportunity: opportunity.data,
     evidence: evidence.data,
+    evaluation: evaluation.data,
     rulings: rulings.data,
     brief,
     stateMessage,

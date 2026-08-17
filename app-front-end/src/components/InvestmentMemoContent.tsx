@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
 import type { ScoringDimensionKey, SignalItem, Startup } from '../types/startup';
 import { normalizeStructuredScoring } from '../lib/reviewScoring';
+import { canonicalCriteriaToStructuredScoring } from '../lib/canonicalScoring';
 import { getPipelineReplaySteps } from '../lib/memoIcPack';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
@@ -208,7 +209,7 @@ function InvestmentMemoContent(
   // Shared with OpportunityIntelligence below — same React Query keys, so this
   // is one fetch, not two, and the masthead verdict can never drift from the
   // decision workspace's canonical state.
-  const { brief: mastheadBrief } = useMemoDecisionBrief(displayStartup?.id ?? '');
+  const { brief: mastheadBrief, evaluation: canonicalEvaluation } = useMemoDecisionBrief(displayStartup?.id ?? '');
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
 
@@ -331,14 +332,23 @@ function InvestmentMemoContent(
     [displayStartup, peerStartups]
   );
 
+  // Canonical evaluate_snapshot() criteria are the score authority when present;
+  // legacy reviewer structured_scoring is the fallback for opportunities without
+  // one yet (see docs/archive/plans/2026-08-17-reviewer-scoring-collapse.md).
+  const canonicalStructuredScoring = useMemo(
+    () => canonicalCriteriaToStructuredScoring(canonicalEvaluation),
+    [canonicalEvaluation]
+  );
   const structuredScoring = useMemo(
-    () => normalizeStructuredScoring(displayStartup?.review ?? null),
-    [displayStartup?.review]
+    () => canonicalStructuredScoring ?? normalizeStructuredScoring(displayStartup?.review ?? null),
+    [canonicalStructuredScoring, displayStartup?.review]
   );
 
+  // scoring_presentation is a legacy narrative layer built from reviewer's own
+  // dimension values — only valid alongside the legacy scoring, never canonical's.
   const scoringPresentation = useMemo(
-    () => displayStartup?.review?.scoring_presentation ?? null,
-    [displayStartup?.review]
+    () => (canonicalStructuredScoring ? null : (displayStartup?.review?.scoring_presentation ?? null)),
+    [canonicalStructuredScoring, displayStartup?.review]
   );
   const thesisSection = useMemo(() => {
     const review = displayStartup?.review;
