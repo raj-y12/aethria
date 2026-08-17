@@ -38,6 +38,12 @@ class StartupCompatibilityProjectionRepository:
     _JSON_COLUMNS = frozenset(
         {"scout_info", "review_info", "partner_info", "human_resolution", "agent_trace"}
     )
+    # review_info/partner_info are strict-schema documents (backend/models.py
+    # ReviewInfo, PartnerInfo) — a canonical-event patch merged onto a still-null
+    # column produces a document with only canonical_* fields, which fails
+    # Startup.model_validate wherever the row is next loaded (memo, rerun).
+    # Only enrich an existing full write; never originate one from a patch alone.
+    _STRICT_SCHEMA_JSON_COLUMNS = frozenset({"review_info", "partner_info"})
     _SCALAR_COLUMNS = frozenset({"investment_memo_markdown"})
 
     def __init__(self, pool: Any):
@@ -148,7 +154,13 @@ class StartupCompatibilityProjectionRepository:
                 parameter = 3
                 for column in sorted(values):
                     value = values[column]
-                    if column in self._JSON_COLUMNS:
+                    if column in self._STRICT_SCHEMA_JSON_COLUMNS:
+                        assignments.append(
+                            f"{column}=case when {column} is null then {column} "
+                            f"else {column} || ${parameter}::jsonb end"
+                        )
+                        arguments.append(json.dumps(value))
+                    elif column in self._JSON_COLUMNS:
                         assignments.append(
                             f"{column}=coalesce({column},'{{}}'::jsonb) || ${parameter}::jsonb"
                         )
