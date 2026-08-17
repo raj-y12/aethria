@@ -288,6 +288,59 @@ dispatch — exactly 5 artifacts ingested from a 5-query plan capped at 5,
 despite 20 available sources. New regression test:
 `test_max_artifacts_budget_is_respected_across_queries`.
 
+## MEDIUM — A10 and A12 fixed and live-validated, 2026-08-17; A9/A11/B6/B7 deferred
+
+Scoped down from all 6 MEDIUM findings after inspecting each: A10 and A12
+are surgical bug fixes with the same shape as the HIGH batch. A9, A11, B6,
+and B7 turned out larger or more ambiguous than a same-day fix once actually
+read:
+
+- **A9** (hardcoded thresholds) needs a new versioned-config category
+  (`resources/config/scout_thresholds/`) and a loader wired through 4 files
+  — mechanical but a genuinely bigger diff, deferred rather than rushed.
+- **A11** (query volume) isn't an independent bug — already partially
+  mitigated by A2, no concrete fix beyond that exists.
+- **B6** (uncalibrated `criterion_score`) is the evidence-pipeline instance
+  of the same disease A6/A7 explicitly flagged as unfixed: an LLM's raw
+  self-reported score, never cross-checked against evidence strength. A
+  heuristic patch here risks being worse than today's honest-but-uncalibrated
+  number; needs a real design, not a guess.
+- **B7** (extraction skips CostController) is a bigger finding than stated —
+  checked directly and `can_make_call`/`record_call` (the actual enforcement
+  methods) are never invoked **anywhere in the codebase**, not just in
+  extraction. Scout, Reviewer, and Partner all skip the gate too;
+  `pipeline_runner.py` only uses `CostController` for usage metrics, never
+  enforcement. Wiring evidence extraction alone into a gate that's dead
+  everywhere else would be a partial, misleading fix.
+
+**A10 (weak lookup-identity token match):** `_matches_lookup_identity` used
+to pass on `any` expected token matching, so a wrong company sharing one
+common word (e.g. "General Motors" vs expected "General Electric") could
+slip through undetected. Now requires `all` expected tokens present — the
+common single-token case (most company names collapse to one token after
+stopword stripping) is unaffected; verified against 8 realistic name-pair
+cases (Ramp, Stripe, Bank of America, JPMorgan Chase, Notion — all still
+match; Facebook/Meta and Alphabet/Google still correctly fail, unchanged
+from before). Live-dispatched Anthropic (a real multi-domain-collision case:
+anthropic.io, anthropic.in, anthropics.com, anthropicidentity.com all
+surfaced as candidates) — confirmed directly that
+`_matches_lookup_identity("Anthropic", expected_company="Anthropic", ...)`
+still returns `True`; the dispatch's `NEEDS_REVIEW` flag came from a
+separate, pre-existing "similarly-named alternative domain" mechanism, not
+this fix.
+
+**A12 (financials allowlist fail-open):** `_build_sources_by_url`'s
+`allowlist and nu not in allowlist` short-circuited to trusting every
+source when the allowlist was empty but `sources` wasn't. Checked the one
+production caller (`scout/base.py:608`) — `url_allowlist` is always built
+directly from the same `sources` list, so this was latent, not live; fixed
+to `nu not in allowlist` unconditionally so an empty allowlist fails closed
+(trusts nothing) rather than open. Live-dispatched Anthropic; no crash
+through the financials-grounding path.
+
+Full backend suite: 2278 passed, same 39 pre-existing Postgres-container
+failures, zero regressions.
+
 ## Suggested sequencing (not started)
 
 Same principle as the reviewer audit: smallest-safe-fix-first, but this list

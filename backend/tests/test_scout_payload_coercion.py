@@ -60,6 +60,42 @@ class DummyScout(Scout):
     pass
 
 
+def _scout() -> "DummyScout":
+    return DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+
+
+def test_matches_lookup_identity_rejects_a_different_company_sharing_one_word():
+    """Regression (audit MEDIUM-A10): `any(tok in cand ...)` passed as soon as
+    a single expected token matched, even when the expected name has other
+    distinctive tokens the candidate lacks -- live-observed the same day: a
+    "Perplexity AI" lookup surfaced "Perplexity Fund", "Perplexityonline",
+    and "Perplexitymeet" as equally "strong" matches purely on the shared
+    "perplexity" token. Requiring every expected token narrows this."""
+    scout = _scout()
+    assert not scout._matches_lookup_identity(
+        "General Motors", expected_company="General Electric", website_hint=None
+    )
+
+
+def test_matches_lookup_identity_keeps_the_single_token_common_case():
+    scout = _scout()
+    assert scout._matches_lookup_identity(
+        "Ramp Business Corporation", expected_company="Ramp", website_hint=None
+    )
+
+
+def test_matches_lookup_identity_requires_all_distinctive_tokens_present():
+    scout = _scout()
+    assert scout._matches_lookup_identity(
+        "General Electric Company", expected_company="General Electric", website_hint=None
+    )
+
+
 class _FakeMessage:
     def __init__(self, content):
         self.content = content

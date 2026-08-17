@@ -157,7 +157,15 @@ def _build_sources_by_url(source_pack: Optional[Dict[str, Any]]) -> Dict[str, st
         if not isinstance(src, dict):
             continue
         nu = _norm_url(src.get("url") or "")
-        if not nu or (allowlist and nu not in allowlist):
+        # Fixed 2026-08-17 (audit MEDIUM-A12): `allowlist and nu not in allowlist`
+        # short-circuited to False when the allowlist was empty but `sources`
+        # wasn't, silently trusting every source instead of none. Every
+        # current caller keeps url_allowlist and sources in sync (empty
+        # together), so this was latent, not live -- but a caller that
+        # doesn't keep them in sync would have every source treated as
+        # allowlisted, defeating the trust boundary this function exists to
+        # enforce. Fail closed: an empty allowlist trusts nothing.
+        if not nu or nu not in allowlist:
             continue
         snippet = _norm(f"{src.get('title') or ''} {src.get('snippet') or ''}")
         if snippet:

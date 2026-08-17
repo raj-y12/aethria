@@ -182,3 +182,17 @@ def test_sources_by_url_excludes_non_allowlisted():
     by_url = _build_sources_by_url(pack)
     assert "techcrunch.com/acme-raises" in by_url
     assert "evil.com" not in by_url
+
+
+def test_sources_by_url_trusts_nothing_when_allowlist_is_empty_but_sources_are_not():
+    """Regression (audit MEDIUM-A12): `allowlist and nu not in allowlist` used to
+    short-circuit to accepting every source when url_allowlist was empty but
+    sources wasn't -- an empty allowlist must mean "trust nothing", not "no
+    restriction". Every current caller keeps them in sync, so this was latent,
+    not live -- but the trust boundary must fail closed regardless."""
+    pack = {
+        "sources": [SRC],
+        "url_allowlist": set(),
+    }
+    by_url = _build_sources_by_url(pack)
+    assert by_url == {}

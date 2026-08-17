@@ -862,7 +862,15 @@ class Scout(ABC):
         expected_tokens = self._lookup_anchor_tokens(expected_company)
 
         if expected_tokens:
-            if not any(tok in cand or tok in cand_tokens for tok in expected_tokens):
+            # Fixed 2026-08-17 (audit MEDIUM-A10): a single shared token used
+            # to pass this check even when the expected name has other,
+            # distinctive tokens the candidate doesn't contain -- e.g.
+            # expected "General Electric" (tokens: general, electric) matched
+            # a returned "General Motors" because "general" alone satisfied
+            # `any`. Requiring every expected token narrows this without
+            # changing the common single-token case (most company names
+            # collapse to one significant token after stopword stripping).
+            if not all(tok in cand or tok in cand_tokens for tok in expected_tokens):
                 return False
 
         host = hostname_from_user_hint(website_hint)
