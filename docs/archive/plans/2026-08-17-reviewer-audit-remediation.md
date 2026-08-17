@@ -112,7 +112,14 @@ out insufficient.
   unmodified. `3b8112b6`. See
   [2026-08-17-reviewer-panel-consolidation.md](2026-08-17-reviewer-panel-consolidation.md)
   for the full task-level plan.
-- [ ] Item 6 — states/a11y/test coverage.
+- [~] Item 6 — states/a11y/test coverage, partial. Shipped: `aria-controls`
+  wiring dimension buttons to their detail panels, a focus-visible outline on
+  `memoScoreRow` (previously none), and 3 new robustness/a11y tests
+  (aria-controls presence, disabled-with-no-detail case, renders without error
+  on an all-unscored/no-reviewers payload). `b8e0b713`. **Not done:** dedicated
+  loading/error state UI (the section hides entirely when empty — a deliberate
+  call, not an oversight) and a full keyboard-nav audit beyond native
+  `<button>` support.
 
 Verified: full backend suite (same 39 pre-existing Postgres-container failures,
 zero regressions), full frontend suite (469/469), `tsc`, `eslint --max-warnings
