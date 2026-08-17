@@ -305,7 +305,7 @@ async def execute_evidence_plan(*, user_id, company_id, opportunity_id, plan, ev
 
 ---
 
-### Task 3: Wire it inline into the dispatch pipeline
+### Task 3: Wire it inline into the dispatch pipeline — DONE
 
 **Files:**
 - Modify: `backend/pipeline_runner.py` — inside the same best-effort block Phase A added (right after `create_plan(...)` succeeds).
@@ -337,14 +337,13 @@ async def execute_evidence_plan(*, user_id, company_id, opportunity_id, plan, ev
 
 **Acceptance:** a dispatch with missing evidence now takes measurably longer (bounded to ~3 queries) and produces new `evidence_artifacts`/`evidence_items` rows for the opportunity. A dispatch with no missing evidence is unaffected (no retrieval call at all — `execute_evidence_plan` only runs inside `if missing_evidence:`). A retrieval failure (provider down, zero results) does not fail the dispatch — same best-effort contract as everything else in this block.
 
----
+Shipped exactly as sketched — `plan = await create_plan(...)` now captures the return value (previously discarded), and `execute_evidence_plan(...)` is called immediately after with it.
 
-### Task 4: Full verification gate
-
-- [ ] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v`
-- [ ] Full backend suite — confirm no regressions beyond the pre-existing Postgres-container failures.
-- [ ] `python3 -c "import api"` — confirms the migration's new columns don't break model validation anywhere else that reads `evidence_artifacts` rows.
-- [ ] Live-verify: dispatch a company with no existing claims, confirm new `evidence_artifacts` rows appear with `retrieval_provider`/`retrieval_query` populated, confirm the dispatch completes (slower, but successfully), confirm a company with full coverage triggers no retrieval call at all (check the log — no `retrieve_source_pack_merged` invocation).
+**Verification:**
+- [x] Full backend suite: 2228 passed (unchanged from Task 2 — no new tests for this wiring, matching Phase A's Task 3 precedent: no dedicated pytest exists for `_run_on_demand_lookup_inner`, verified via full suite + live dispatch instead), 43 pre-existing failures, zero regressions.
+- [x] `python3 -c "import api"` — clean.
+- [x] **Live-verified** against a real dispatch (notion.so, no test/mock data). Confirmed the full sequence: `evidence_plans` row created at 10:39:36 with all 5 criteria missing → `execute_evidence_plan` ran and ingested **5 new `evidence_artifacts`** at 10:39:44 (8s later — real Exa retrieval, not instant/mocked), each with `retrieval_provider='exa'` and a real `retrieval_query` populated. The 11 other artifacts on the same opportunity (Scout's own pre-existing ingestion, same timestamp as the plan) correctly have `retrieval_provider=None` — confirms Task 1's "existing callers unaffected" held in production, not just in tests. Clean backend log, no tracebacks, dispatch completed successfully (slower than before, as expected).
+- [x] **Honest limitation found in the live data, not a bug**: all 5 ingested artifacts show the *same* `retrieval_query` (the first of the 3 capped queries), even though `retrieve_source_pack_merged` runs all 3 queries and merges their results into one flat `sources` list before this code sees them — there's no per-source query mapping in the merged pack to attribute more precisely. The data is genuinely retrieved, real evidence; only the query-attribution field's precision is coarser than ideal (says "found by the market query" for a source that may have actually surfaced via the product or technical query). Not fixed here — recording it honestly rather than overclaiming what the attribution field means today.
 
 ---
 

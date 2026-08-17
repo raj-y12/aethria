@@ -62,6 +62,7 @@ from reviewer.engine import ReviewerEngine
 from people.repository import PeopleRepository
 from evidence.repository import EvidenceRepository
 from evidence.planning import compute_missing_evidence
+from evidence.retrieval import execute_evidence_plan
 from identity.repository import IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
@@ -1803,10 +1804,11 @@ async def _run_on_demand_lookup_inner(
                     canonical_recommendation_state = canonical_recommendation_payload.get("state")
                     canonical_confidence = canonical_recommendation_payload.get("confidence")
                     canonical_criteria = canonical_evaluation.get("criteria")
-                    # Sub-project 4, Phase A (spec §9.3): a fine-grained gap the
-                    # coarse per-criterion missing_evidence above can't express —
-                    # which specific claim types would satisfy each still-missing
-                    # criterion. Best-effort: nothing reads evidence_plans yet.
+                    # Sub-project 4, Phase A+B (spec §9.3-9.4): a fine-grained gap
+                    # the coarse per-criterion missing_evidence above can't express
+                    # — which specific claim types would satisfy each still-missing
+                    # criterion — then a bounded, inline retrieval pass against it.
+                    # Best-effort: a failure here must not fail the dispatch.
                     try:
                         current_claim_types = await EvidenceRepository(postgres_pool).list_current_claim_types(
                             user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
@@ -1815,12 +1817,20 @@ async def _run_on_demand_lookup_inner(
                             evaluation_prerequisites.policy, current_claim_types,
                         )
                         if missing_evidence:
-                            await EvidenceRepository(postgres_pool).create_plan(
+                            plan = await EvidenceRepository(postgres_pool).create_plan(
                                 user_id=user_id,
                                 opportunity_id=canonical_admission.opportunity_id,
                                 trigger_type="dispatch",
                                 missing_evidence=missing_evidence,
                                 search_questions=search_questions,
+                            )
+                            await execute_evidence_plan(
+                                user_id=user_id,
+                                company_id=canonical_admission.company_id,
+                                opportunity_id=canonical_admission.opportunity_id,
+                                plan=plan,
+                                evidence_repository=EvidenceRepository(postgres_pool),
+                                company_name=company,
                             )
                     except Exception:
                         logger.exception(
