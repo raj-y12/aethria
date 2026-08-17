@@ -289,6 +289,26 @@ def _score(claim: Dict[str, Any]) -> float | None:
         return None
 
 
+def _criterion_reasoning(scored: list[tuple[Dict[str, Any], float, ScoreEligibility]]) -> str:
+    """Deterministic, claim-specific audit trail for a criterion's score.
+
+    Replaces a static placeholder that gave no way to trace an 8 vs a 2 back to
+    the evidence behind it -- every scored criterion cited the identical string
+    regardless of company or claim.
+    """
+    if len(scored) == 1:
+        claim, value, _ = scored[0]
+        text = str(claim.get("display_text") or claim.get("claim_type") or "").strip()
+        confidence = claim["confidence_at_snapshot"]
+        return f'Scored {value:.1f}/10 from one claim ({confidence:.0%} confidence): "{text}"'
+    parts = [
+        f'"{str(claim.get("display_text") or claim.get("claim_type") or "").strip()}" '
+        f'(scored {value:.1f}, {claim["confidence_at_snapshot"]:.0%} confidence)'
+        for claim, value, _ in scored
+    ]
+    return f"Confidence-weighted average of {len(scored)} claims: " + "; ".join(parts)
+
+
 def decisive_policy_outcome(
     snapshot: Sequence[Dict[str, Any]],
     policy: EvaluationPolicy,
@@ -437,7 +457,7 @@ def evaluate_snapshot(
                 score=round(score, 4),
                 confidence=round(confidence, 4),
                 evidence_sufficiency="partial" if contradicted else "sufficient",
-                reasoning="Deterministic confidence-weighted claim score.",
+                reasoning=_criterion_reasoning(scored),
                 supporting_claim_ids=[claim["claim_id"] for claim, _, _ in scored],
                 contradicting_claim_ids=contradicted,
                 quality_flags=sorted(

@@ -132,6 +132,48 @@ def test_same_snapshot_and_policy_produce_same_deterministic_result():
     assert first.snapshot_hash == digest
 
 
+def test_scored_criterion_reasoning_cites_the_actual_claim_not_a_placeholder():
+    snapshot, _ = snapshot_claims(
+        _claims(),
+        links=[_verified_link("claim-market"), _verified_link("claim-execution")],
+        evaluation_at=EVALUATION_AT,
+    )
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    market = next(item for item in result.criteria if item.criterion == "market")
+    assert "Market growth is supported by two independent sources." in market.reasoning
+    assert "90%" in market.reasoning
+    # Regression: every scored criterion used to carry this identical, company-blind
+    # string regardless of which claim or evidence produced the score.
+    assert market.reasoning != "Deterministic confidence-weighted claim score."
+
+
+def test_multi_claim_criterion_reasoning_cites_every_contributing_claim():
+    claims = _claims() + [
+        {
+            "claim_id": "claim-market-2",
+            "claim_type": "market",
+            "normalized_value": {"criterion_score": 6.0},
+            "display_text": "A second, independent market-size estimate.",
+            "assertion_class": "externally_verified",
+            "status": "current",
+            "confidence": 0.7,
+        }
+    ]
+    links = [
+        _verified_link("claim-market"),
+        _verified_link("claim-execution"),
+        _verified_link("claim-market-2"),
+    ]
+    snapshot, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    market = next(item for item in result.criteria if item.criterion == "market")
+    assert "Market growth is supported by two independent sources." in market.reasoning
+    assert "A second, independent market-size estimate." in market.reasoning
+    assert "2 claims" in market.reasoning
+
+
 def test_missing_evidence_is_unscored_not_converted_to_zero():
     snapshot, _ = snapshot_claims(_claims()[:1], links=[])
     result = evaluate_snapshot(snapshot, _policy())
