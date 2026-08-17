@@ -139,3 +139,33 @@ describe('AssessmentScorecard persona-divergence flag', () => {
     expect(screen.getByText('personas diverged')).toBeInTheDocument();
   });
 });
+
+describe('AssessmentScorecard reviewer panel honesty', () => {
+  it('discloses that the reviewer panel is one model over shared evidence, not independent reviews', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[{ key: 'SkepticalReviewer', name: 'Skeptical', score: 5, take: 'A read.' }]}
+        reviewerConsensus={{ min: 5, max: 5, spread: 0, split: false }}
+      />
+    );
+
+    expect(
+      screen.getByText('One model, one evidence packet, three prompted postures — not independent reviews.')
+    ).toBeInTheDocument();
+  });
+
+  it('names each persona\'s prompted posture on its row', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[{ key: 'SkepticalReviewer', name: 'Skeptical', score: 5, take: 'A read.' }]}
+        reviewerConsensus={{ min: 5, max: 5, spread: 0, split: false }}
+      />
+    );
+
+    expect(screen.getByText('Skeptical').getAttribute('title')).toMatch(/assume the worst/);
+  });
+});

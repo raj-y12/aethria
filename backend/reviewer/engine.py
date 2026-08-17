@@ -1156,12 +1156,16 @@ class ReviewerEngine:
                     review_output = dict(successful_results[0])
 
                 self._blend_numeric_scores_into_primary(review_output, successful_results)
+                # apply_resolution_to_primary's dimension-score mutation only survives when
+                # there's no active thesis (_refresh_derived_after_dimension_changes falls back
+                # to _recompute_derived_from_primary, which reads rather than overwrites); the
+                # governed path immediately overwrites it via _project_governed_trace. Its return
+                # values are not stored on review_output -- resolution_notes/disagreement_summary
+                # had zero frontend consumers (typed on startup.ts, never read).
                 resolution_notes, disagreement_summary = apply_resolution_to_primary(
                     review_output, successful_results
                 )
                 self._refresh_derived_after_dimension_changes(review_output, successful_results)
-                review_output["resolution_notes"] = resolution_notes
-                review_output["disagreement_summary"] = disagreement_summary
                 sig_primary = self._pick_primary_structured_signals(successful_results)
                 if sig_primary is not None:
                     review_output["structured_signals"] = sig_primary
@@ -1452,8 +1456,6 @@ class ReviewerEngine:
                 review_output, successful_results
             )
             self._refresh_derived_after_dimension_changes(review_output, successful_results)
-            review_output["resolution_notes"] = resolution_notes
-            review_output["disagreement_summary"] = disagreement_summary
             sig_primary = self._pick_primary_structured_signals(successful_results)
             if sig_primary is not None:
                 review_output["structured_signals"] = sig_primary

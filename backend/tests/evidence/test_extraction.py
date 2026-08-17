@@ -151,7 +151,8 @@ async def test_valid_extraction_creates_grounded_scored_claims(monkeypatch):
     assert result == {"claims_created": 1, "dimensions_attempted": 2}
     claim, links, created_by = repo.claims[0]
     assert claim.claim_type == "tam"
-    assert claim.normalized_value == {"criterion_score": 7.5}
+    assert claim.normalized_value["criterion_score"] == 7.5
+    assert claim.normalized_value["score_band"] == "mid"
     assert claim.confidence == 0.8
     assert len(links) == 1
     assert links[0].evidence_item_id == "item-1"
@@ -159,12 +160,12 @@ async def test_valid_extraction_creates_grounded_scored_claims(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_score_band_and_justification_are_captured_when_the_model_provides_them(monkeypatch):
+async def test_score_band_is_computed_from_the_score_not_trusted_from_the_model(monkeypatch):
     repo = _FakeEvidenceRepository()
     client, _ = _fake_client([
         {"claims": [{
             "claim_type": "tam", "criterion_score": 8.5, "confidence": 0.8,
-            "score_band": "high", "score_justification": "Meets the high-band $3B+ TAM criterion; "
+            "score_justification": "Meets the high-band $3B+ TAM criterion; "
                 "not a 10 because growth rate is unquantified.",
             "display_text": "TAM is $10B, growing 20% YoY.",
             "supporting_evidence_item_ids": ["item-1"],
@@ -179,18 +180,25 @@ async def test_score_band_and_justification_are_captured_when_the_model_provides
         api_key="test-key", model="gpt-5-nano",
     )
 
+    # _rubric()'s market dimension: high >= 8, mid >= 5, low >= 1. 8.5 falls in high.
     claim, _, _ = repo.claims[0]
     assert claim.normalized_value["score_band"] == "high"
     assert "high-band" in claim.normalized_value["score_justification"]
 
 
 @pytest.mark.asyncio
-async def test_invalid_score_band_from_the_model_is_dropped_not_stored(monkeypatch):
+async def test_a_lying_model_claimed_band_is_ignored_real_score_wins(monkeypatch):
+    """Regression: extraction used to trust the model's own "score_band" field
+    outright. A model claiming "high" for a 6.0 (the rubric's mid band, 5-7)
+    would have shipped a self-contradictory audit trail. The band is now always
+    derived from the score and the rubric's numeric ranges, so a lying or
+    confused model can't produce a mismatched label."""
     repo = _FakeEvidenceRepository()
     client, _ = _fake_client([
         {"claims": [{
-            "claim_type": "tam", "criterion_score": 8.5, "confidence": 0.8,
-            "score_band": "extremely high", "score_justification": "  ",
+            "claim_type": "tam", "criterion_score": 6.0, "confidence": 0.8,
+            "score_band": "high",  # wrong -- 6.0 is mid (5-7), not high (8-10)
+            "score_justification": "Solid but unremarkable market size.",
             "display_text": "TAM is $10B, growing 20% YoY.",
             "supporting_evidence_item_ids": ["item-1"],
         }]},
@@ -205,7 +213,7 @@ async def test_invalid_score_band_from_the_model_is_dropped_not_stored(monkeypat
     )
 
     claim, _, _ = repo.claims[0]
-    assert claim.normalized_value == {"criterion_score": 8.5}
+    assert claim.normalized_value["score_band"] == "mid"
 
 
 @pytest.mark.asyncio

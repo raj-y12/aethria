@@ -447,8 +447,6 @@ export interface Review {
   derived_verdict?: 'STRONG' | 'MEDIUM' | 'WEAK' | null;
   /** Primary-row normalized structured_signals (DefaultReviewer when available). */
   structured_signals?: Record<string, unknown>;
-  resolution_notes?: string[] | null;
-  disagreement_summary?: string | null;
   aethria_view?: AethriaView | null;
 }
 

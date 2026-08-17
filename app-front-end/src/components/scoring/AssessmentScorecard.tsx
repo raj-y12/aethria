@@ -20,6 +20,14 @@ export type ScorecardDimensionDef = {
   id: string;
 };
 
+// The prompted posture behind each row's name (audit 2026-08-15/17: "name each
+// prompt posture" — same model, same evidence packet, differ only by instruction).
+const REVIEWER_POSTURES: Record<string, string> = {
+  DefaultReviewer: 'Balanced read of the same evidence packet.',
+  SkepticalReviewer: 'Instructed to assume the worst on missing data and weight risk higher.',
+  OpportunistReviewer: 'Instructed to give benefit of the doubt on early-stage gaps and weight upside higher.',
+};
+
 export type ScorecardReviewerRow = {
   key: string;
   name: string;
@@ -314,10 +322,15 @@ export default function AssessmentScorecard({
               </p>
             ) : null}
           </div>
+          <p className="memoScoreSub">
+            One model, one evidence packet, three prompted postures — not independent reviews.
+          </p>
           <ul className="memoConsensusList">
             {reviewerRows.map((row) => (
               <li key={row.key} className="memoConsensusRow">
-                <span className="memoConsensusName">{row.name}</span>
+                <span className="memoConsensusName" title={REVIEWER_POSTURES[row.key]}>
+                  {row.name}
+                </span>
                 <span className="memoConsensusScore">
                   {row.score != null ? renderNumbers(row.score.toFixed(1)) : '—'}
                 </span>

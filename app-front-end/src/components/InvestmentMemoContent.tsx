@@ -99,6 +99,15 @@ const REVIEWER_LABELS: Record<string, string> = {
   OpportunistReviewer: 'Opportunist',
 };
 
+// The prompted posture behind each row's name — same model, same evidence packet,
+// differ only by instruction. Duplicated in AssessmentScorecard.tsx pending the
+// two reviewer-row renderers being consolidated into one (audit item #11).
+const REVIEWER_POSTURES: Record<string, string> = {
+  DefaultReviewer: 'Balanced read of the same evidence packet.',
+  SkepticalReviewer: 'Instructed to assume the worst on missing data and weight risk higher.',
+  OpportunistReviewer: 'Instructed to give benefit of the doubt on early-stage gaps and weight upside higher.',
+};
+
 
 /** A list that shows the first `cap` items and reveals the rest in place via "Show N more".
  *  Used for long memo lists so the collapsed view stays tight without ever truncating content. */
@@ -443,9 +452,13 @@ function InvestmentMemoContent(
         // Lead sentence only — the reviewer's full read lives in Reviewer detail. Keeps the
         // consensus panel compact instead of stacking a full paragraph per reviewer.
         take: leadSentences(rv.overall_summary, 140),
-        // A low score on thin evidence is a measurement, not a verdict. Without
-        // this the panel showed a bare "2.0" beside an upbeat sentence and the
-        // two read as a contradiction.
+        // A low score on thin data is a measurement, not a verdict. Without this
+        // the panel showed a bare "2.0" beside an upbeat sentence and the two read
+        // as a contradiction. Despite its backend name, evidence_coverage is the
+        // fraction of rubric sub-criteria that had ANY extractable signal (not
+        // missing_data_applied) -- it says nothing about whether that signal was
+        // independently verified. Labelled "data coverage" below, not "evidenced",
+        // so it never reads as a verification claim.
         coverage: typeof rv.evidence_coverage === 'number' ? rv.evidence_coverage : null,
       }))
       .filter((row) => row.score != null || row.take);
@@ -729,15 +742,20 @@ function InvestmentMemoContent(
                           <span className="memoConsensusVerdictTag">{` · ${reviewerConsensus.verdict}`}</span>
                         ) : null}
                       </p>
+                      <p className="memoScoreSub">
+                        One model, one evidence packet, three prompted postures — not independent reviews.
+                      </p>
                       <ul className="memoConsensusList">
                         {reviewerConsensusRows.map((row) => (
                           <li key={row.key} className="memoConsensusRow">
-                            <span className="memoConsensusName">{row.name}</span>
+                            <span className="memoConsensusName" title={REVIEWER_POSTURES[row.key]}>
+                              {row.name}
+                            </span>
                             <span className="memoConsensusScore">
                               {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
                               {row.coverage != null ? (
                                 <span className="memoConsensusCoverage">
-                                  {`${Math.round(row.coverage * 100)}% evidenced`}
+                                  {`${Math.round(row.coverage * 100)}% data coverage`}
                                 </span>
                               ) : null}
                             </span>
