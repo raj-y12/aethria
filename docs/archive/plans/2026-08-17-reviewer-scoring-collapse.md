@@ -126,6 +126,29 @@ The master plan's acceptance criteria ("Assessment reads canonical criteria, rev
 
 ---
 
-### Tasks 4+ — not started
+### Correction to Task 3's verification note
 
-Removing per-persona `structured_scoring` production from `reviewer/engine.py`/`base.py`, then deleting the reviewer-only `services/scoring/` files (after carving `EXPECTED_COMPONENTS` out of `extraction_layer.py` into a shared location `policy_compiler.py` can still import from). Partner no longer needs Reviewer's raw scores for anything as of Task 3 — this is now unblocked, not yet scoped into bite-sized tasks.
+Task 3's commit said a live dispatch "only exercises the unchanged legacy fallback path." That's wrong. `pipeline_runner.py` sets `canonical_criteria = canonical_evaluation.get("criteria")` whenever the canonical evaluation call succeeds at all — which it does on every dispatch — so `canonical_criteria` is a **non-empty list**, not `None`, even when every score inside it is `null`. `decision.py`'s canonical branch (`canonical_criteria_by_key is not None`) is therefore already live on every dispatch today; it just always resolves every dimension to "insufficient" because every canonical score is null. The *legacy fallback* path (`canonical_criteria_by_key is None`) only runs when canonical evaluation didn't happen at all (missing prerequisites, no postgres pool, etc.) — that's the actual rare case, not the common one.
+
+---
+
+## Blocking risk found before writing Task 4 — read before starting
+
+**Whole-database check (2026-08-17): 0 of 25 canonical `criterion_assessments` rows have a non-null score.** Combined with the correction above, this means: on every live dispatch today, Partner's evidence-coverage gate already sees canonical criteria, and every one of them is "insufficient" — so the gate already fires on effectively everything. Right now this is harmless because `_dimension_scored()` only takes the canonical branch when `canonical_criteria` is truthy, and Partner's `avg_score` still has Reviewer's own `structured_scoring` as a real, populated number for the narrative and LLM-escalation call sites (`decision.py:864-867` and others) that Task 3 deliberately did not touch — those still read Reviewer's raw scores unconditionally, independent of canonical.
+
+**If Task 4 removes Reviewer's own per-persona scoring now, this changes:** `_avg_score_and_dims()` would have *only* the canonical path to fall back to for every one of those still-unconverted call sites — and canonical is at 0% real coverage. The evidence-coverage gate would force `MONITOR`/`PASS` with `human_review_required=True` on essentially every decision, and the score-threshold ladder (`_canonical_recommendation`, used whenever no canonical recommendation is supplied) would never see a real `avg_score` to threshold against. This is not "Assessment shows Not scored more often" (the outcome you already accepted as working-as-designed) — this is Partner losing the ability to reach INVEST at all, system-wide, silently, the moment Task 4 ships.
+
+**This directly conflicts with your earlier "leave it, it's working as designed" decision** on the canonical-coverage gap — that decision was scoped to the frontend display consequence. It was not a decision to remove Reviewer's independent scoring pipeline out from under Partner while canonical coverage is still near zero. Sub-project 2's original goal (Reviewer becomes narrative-only, scoring moves entirely to canonical) is only safe once canonical coverage is actually real — which needs the coverage gap addressed first, the same gap you chose not to touch this session.
+
+**Recommendation: Task 4 as originally scoped is blocked**, not because of missing information this time, but because doing it now would ship a regression. Two ways forward:
+
+1. **Revisit the canonical-coverage decision** — reopen "persist Reviewer's gap-retrieval evidence as claims" or "broaden Scout's claim extraction" (the two options declined earlier) as a prerequisite, then come back to Task 4.
+2. **Descope Task 4** — keep Reviewer producing scores indefinitely (accept it's not purely narrative per ADR-0012's original intent), and treat Sub-project 2 as complete at Task 3 (Assessment reads canonical when available, Partner prefers canonical signals when available, Reviewer keeps producing the real numbers everything still depends on).
+
+I'm not choosing between these by default — same category of call as the earlier three.
+
+**Decision (2026-08-17): descope Task 4, close Sub-project 2 at Task 3.** Assessment reads canonical criteria when available (Tasks 1-2); Partner prefers canonical evidence/confidence/contradiction signals when available (Task 3); Reviewer keeps producing per-persona `structured_scoring` indefinitely — it's still the real number everything downstream (Assessment's legacy fallback, Partner's `avg_score`, the LLM-escalation narrative call sites) depends on while canonical coverage is near zero. `services/scoring/`'s reviewer-only files stay; nothing there is dead while Reviewer still scores.
+
+Revisit only if the canonical-coverage gap (persisting Reviewer's gap-retrieval evidence as claims, or broadening Scout's claim extraction — both declined this session) is separately addressed later. Until then, ADR-0012's "Reviewer becomes purely narrative" is not fully realized — Reviewer's investment-read fields (`founder_fluency`/`capability_slope`/`reframe`) are narrative-only as designed, but its dimension scores remain load-bearing, not yet redundant.
+
+## Sub-project 2 status: complete (Tasks 1-3 shipped, Task 4 descoped)
