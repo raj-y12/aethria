@@ -61,6 +61,7 @@ from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from people.repository import PeopleRepository
 from evidence.repository import EvidenceRepository
+from evidence.planning import compute_missing_evidence
 from identity.repository import IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
@@ -1802,6 +1803,31 @@ async def _run_on_demand_lookup_inner(
                     canonical_recommendation_state = canonical_recommendation_payload.get("state")
                     canonical_confidence = canonical_recommendation_payload.get("confidence")
                     canonical_criteria = canonical_evaluation.get("criteria")
+                    # Sub-project 4, Phase A (spec §9.3): a fine-grained gap the
+                    # coarse per-criterion missing_evidence above can't express —
+                    # which specific claim types would satisfy each still-missing
+                    # criterion. Best-effort: nothing reads evidence_plans yet.
+                    try:
+                        current_claim_types = await EvidenceRepository(postgres_pool).list_current_claim_types(
+                            user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
+                        )
+                        missing_evidence, search_questions = compute_missing_evidence(
+                            evaluation_prerequisites.policy, current_claim_types,
+                        )
+                        if missing_evidence:
+                            await EvidenceRepository(postgres_pool).create_plan(
+                                user_id=user_id,
+                                opportunity_id=canonical_admission.opportunity_id,
+                                trigger_type="dispatch",
+                                missing_evidence=missing_evidence,
+                                search_questions=search_questions,
+                            )
+                    except Exception:
+                        logger.exception(
+                            "[%s] Evidence-plan computation failed opportunity_id=%s",
+                            user_id[:12],
+                            canonical_admission.opportunity_id,
+                        )
                 except EvaluationLifecycleError as exc:
                     logger.info(
                         "[%s] Canonical evaluation skipped opportunity_id=%s: %s",

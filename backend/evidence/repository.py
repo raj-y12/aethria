@@ -354,3 +354,13 @@ class EvidenceRepository:
             "claims": rows(claims), "claim_evidence_links": rows(links),
             "evidence_plans": rows(plans),
         }
+
+    async def list_current_claim_types(self, *, user_id: str, opportunity_id: str) -> set[str]:
+        uid = require_user_id(user_id, context="EvidenceRepository.list_current_claim_types")
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(
+                "select distinct claim_type from public.claims "
+                "where user_id = $1 and opportunity_id = $2 and status = 'current'",
+                uid, opportunity_id,
+            )
+        return {str(row["claim_type"]) for row in rows}
