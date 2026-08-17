@@ -90,6 +90,18 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 The audit's own `04-handoff-prompt.md` is a ready-to-use `/make-plan` handoff for a full redesign, not a patch. This is a real, unaddressed, pre-existing scope — larger than and only partially overlapping with what this sub-project's Tasks 1-3 delivered. Not scheduled; logged here so it isn't lost.
 
+**Follow-up audit and sequenced remediation plan, same day:** a fresh, code-verified
+audit (not a restatement of the above) found two additional, more severe issues on
+top of the four still-open principles: `services/reviewer_resolution.py`'s
+`apply_resolution_to_primary` is provably dead compute in the live governed path
+(its output is overwritten within three lines on every single review, traced call
+by call), and `resolution_notes`/`disagreement_summary` are zombie fields —
+computed, persisted, typed to the frontend, read by nothing. Full findings and a
+smallest-safe-fix-first sequencing (dead-code deletion → validate today's own
+score_band fix → fix the misleading "% evidenced" label → disclose personas as AI
+lenses → consolidate the duplicate renderers → states/a11y last) are in
+[2026-08-17-reviewer-audit-remediation.md](2026-08-17-reviewer-audit-remediation.md).
+
 ---
 
 ### Sub-project 3: Portfolio store consolidation — CLOSED, no changes (2026-08-17)
