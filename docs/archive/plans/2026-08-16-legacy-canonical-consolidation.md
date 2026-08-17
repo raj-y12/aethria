@@ -100,11 +100,13 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 ---
 
-### Sub-project 4: Canonical evidence extraction
+### Sub-project 4: Canonical evidence extraction — DONE (2026-08-17)
 
 **Objective:** Give the canonical evidence layer its own retrieval/extraction capability (the spec's Phase 3 "evidence-planning stage" and "retrieval stage," never built) so it stops depending entirely on scout's narrative prose via the regex-based `canonical_scout_claims.py` bridge. Only once this exists does simplifying `scout/`'s four personas become possible without breaking the product's only sourcing mechanism.
 
-**Do not start this sub-project's detailed planning until 1–3 have shipped.** It's the largest, riskiest piece, and the first three sub-projects will change what "the canonical side" looks like in ways that should inform this one's design. Revisit the source spec's §9.3 (evidence-planning stage), §9.4 (retrieval stage), and §9.5 (extraction stage) when this sub-project is actually scoped.
+**Detailed task-level plan:** [2026-08-17-canonical-evidence-extraction.md](2026-08-17-canonical-evidence-extraction.md) — three phases (A: evidence planning/gap computation, B: bounded retrieval with deterministic trust/verification, C: LLM extraction + re-evaluation), all tasks DONE, live-verified end-to-end against a real dispatch (Vercel) — a canonical criterion score moved off `null` for the first time all session.
+
+**Two eligibility-gate blockers found and fixed while live-verifying, not caught by unit tests alone:** retrieved evidence defaulted to `trust_class=unknown`/`verification_state=unverified` (fixed with a deterministic official-domain + corroboration rule) and separately defaulted `source_quality=0.0` (fixed alongside it) — both silently below the active policy's eligibility thresholds regardless of extraction quality. `scout/`'s persona-shrink work this sub-project was meant to unblock is a separate, not-yet-scoped follow-on.
 
 ---
 
