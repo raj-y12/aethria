@@ -486,6 +486,36 @@ class DurableJobRepository:
                 raise RuntimeError("Checkpoint upsert returned no row")
             return checkpoint
 
+    async def get_latest_checkpoint(
+        self,
+        *,
+        user_id: str,
+        job_id: str,
+        stage: str,
+        status: CheckpointStatus | str = CheckpointStatus.SUCCEEDED,
+    ) -> Optional[JobCheckpoint]:
+        """Most recent checkpoint for one job/stage/status, across every attempt.
+
+        Used to detect resumable work from a prior attempt (e.g. a completed
+        Scout stage) before a retry re-does it from scratch.
+        """
+        uid = require_user_id(user_id, context="DurableJobRepository.get_latest_checkpoint")
+        status_value = CheckpointStatus(status).value
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(
+                """
+                select * from public.agent_job_checkpoints
+                where user_id=$1 and job_id=$2 and stage=$3 and status=$4
+                order by attempt desc, created_at desc
+                limit 1
+                """,
+                uid,
+                job_id,
+                str(stage).strip(),
+                status_value,
+            )
+        return _checkpoint_from_row(row)
+
     async def succeed(
         self,
         *,

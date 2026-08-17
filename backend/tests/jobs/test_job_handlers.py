@@ -56,11 +56,15 @@ def _prerequisites():
 class _Repository:
     pool = object()
 
-    def __init__(self):
+    def __init__(self, latest_checkpoint=None):
         self.checkpoints = []
+        self._latest_checkpoint = latest_checkpoint
 
     async def write_checkpoint(self, **kwargs):
         self.checkpoints.append(kwargs)
+
+    async def get_latest_checkpoint(self, **kwargs):
+        return self._latest_checkpoint
 
 
 @pytest.fixture(autouse=True)
@@ -208,6 +212,202 @@ async def test_lookup_handler_writes_pipeline_checkpoints_and_reconstructs_resol
     assert repository.checkpoints[-1]["output_metadata"]["state"] == "completed"
     assert _capture_lookup_attempt_outcomes == []
     assert terminal_outcome.disposition.value == "succeeded"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_resumes_from_prior_scout_checkpoint_on_retry(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    """A retry after a mid-pipeline failure (e.g. Reviewer) must resume from the
+    startup Scout already created, not re-scout and create an orphan duplicate
+    that collides with the opportunity already linked to the first one."""
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository(
+        latest_checkpoint=SimpleNamespace(output_metadata={"startup_id": "prior-startup-1"})
+    )
+    calls = []
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            return None
+
+        async def link_legacy_projection(self, **kwargs):
+            return object()
+
+    class IdentityService:
+        def __init__(self, repository):
+            pass
+
+        async def admit(self, observation):
+            return type(
+                "Admission",
+                (),
+                {
+                    "observation_id": "observation-1",
+                    "status": type("Status", (), {"value": "resolved"})(),
+                    "company_id": "company-1",
+                    "opportunity_id": "opportunity-1",
+                    "identity_case_id": None,
+                    "confidence": 1.0,
+                    "blocks_evaluation": False,
+                },
+            )()
+
+    async def run(user_id, company_name, **kwargs):
+        calls.append((user_id, company_name, kwargs))
+        return PipelineExecutionResult.completed(
+            code="lookup_completed",
+            detail="Lookup completed.",
+            startup_id="prior-startup-1",
+            projection_id="opportunity-1",
+        )
+
+    async def load(**kwargs):
+        return _prerequisites()
+
+    monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup-1",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-1",
+        ),
+        attempts=2,
+        status="running",
+        lease_owner="worker-a",
+    )
+
+    await handlers.company_lookup_handler(repository, job)
+
+    assert calls[0][2]["replace_startup_id"] == "prior-startup-1"
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_does_not_resume_on_first_attempt(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository(
+        latest_checkpoint=SimpleNamespace(output_metadata={"startup_id": "should-not-be-used"})
+    )
+    calls = []
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            return None
+
+        async def link_legacy_projection(self, **kwargs):
+            return object()
+
+    class IdentityService:
+        def __init__(self, repository):
+            pass
+
+        async def admit(self, observation):
+            return type(
+                "Admission",
+                (),
+                {
+                    "observation_id": "observation-1",
+                    "status": type("Status", (), {"value": "resolved"})(),
+                    "company_id": "company-1",
+                    "opportunity_id": "opportunity-1",
+                    "identity_case_id": None,
+                    "confidence": 1.0,
+                    "blocks_evaluation": False,
+                },
+            )()
+
+    async def run(user_id, company_name, **kwargs):
+        calls.append((user_id, company_name, kwargs))
+        return PipelineExecutionResult.completed(
+            code="lookup_completed", detail="Lookup completed.",
+            startup_id="s1", projection_id="opportunity-1",
+        )
+
+    async def load(**kwargs):
+        return _prerequisites()
+
+    monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
+    monkeypatch.setattr(handlers, "IdentityService", IdentityService)
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup-1",
+        payload=CompanyLookupPayload(user_id="user-a", company_name="Acme", lookup_id="lookup-1"),
+        attempts=1,
+        status="running",
+        lease_owner="worker-a",
+    )
+
+    await handlers.company_lookup_handler(repository, job)
+
+    assert calls[0][2]["replace_startup_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_lookup_handler_never_overrides_an_explicit_replace_startup_id(
+    monkeypatch, _capture_lookup_attempt_outcomes
+):
+    """An operator-initiated re-review must not be clobbered by the automatic
+    retry-resume logic even if it happens to run on attempts > 1."""
+    handlers = importlib.import_module("jobs.handlers")
+    repository = _Repository(
+        latest_checkpoint=SimpleNamespace(output_metadata={"startup_id": "wrong-startup"})
+    )
+    calls = []
+
+    class IdentityRepository:
+        async def get_opportunity_by_legacy_projection(self, **kwargs):
+            return type(
+                "Opportunity",
+                (),
+                {"opportunity_id": "opportunity-1", "company_id": "company-1", "latest_observation_id": "observation-1"},
+            )()
+
+        async def link_legacy_projection(self, **kwargs):
+            return object()
+
+    async def run(user_id, company_name, **kwargs):
+        calls.append((user_id, company_name, kwargs))
+        return PipelineExecutionResult.completed(
+            code="lookup_completed", detail="Lookup completed.",
+            startup_id="explicit-startup", projection_id="opportunity-1",
+        )
+
+    async def load(**kwargs):
+        return _prerequisites()
+
+    monkeypatch.setattr(handlers, "run_on_demand_lookup", run)
+    monkeypatch.setattr(handlers, "load_evaluation_prerequisites", load)
+    monkeypatch.setattr(handlers, "IdentityRepository", lambda pool: IdentityRepository())
+    job = AgentJob(
+        user_id="user-a",
+        job_type=JobType.COMPANY_LOOKUP,
+        idempotency_key="lookup-1",
+        payload=CompanyLookupPayload(
+            user_id="user-a",
+            company_name="Acme",
+            lookup_id="lookup-1",
+            replace_startup_id="explicit-startup",
+            additional_context="Operator-supplied context.",
+        ),
+        attempts=2,
+        status="running",
+        lease_owner="worker-a",
+    )
+
+    await handlers.company_lookup_handler(repository, job)
+
+    assert calls[0][2]["replace_startup_id"] == "explicit-startup"
 
 
 @pytest.mark.asyncio

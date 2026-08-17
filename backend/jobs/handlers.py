@@ -117,6 +117,23 @@ async def pipeline_cycle_handler(repository: Any, job: AgentJob) -> None:
 async def _execute_company_lookup(repository: Any, job: AgentJob) -> PipelineExecutionResult:
     payload = CompanyLookupPayload.model_validate(job.payload)
     await _raise_if_cancelled(repository, job)
+    if not payload.replace_startup_id and job.attempts > 1:
+        # A prior attempt of this same job may have already run Scout and
+        # created a legacy startup row before a later stage (e.g. Reviewer)
+        # failed. Without this, every retry re-scouts from scratch, creating
+        # an orphan duplicate startup row that collides with the opportunity
+        # already linked to the first one. Resume from it instead, the same
+        # way an explicit operator re-review does.
+        prior_scout = await repository.get_latest_checkpoint(
+            user_id=job.user_id, job_id=job.job_id, stage="scout",
+        )
+        prior_startup_id = (
+            str(prior_scout.output_metadata.get("startup_id") or "").strip()
+            if prior_scout is not None
+            else ""
+        )
+        if prior_startup_id:
+            payload = payload.model_copy(update={"replace_startup_id": prior_startup_id})
     resolution = (
         CompanyResolution.model_validate(payload.resolution)
         if payload.resolution
