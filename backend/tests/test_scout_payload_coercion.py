@@ -56,6 +56,81 @@ class _FakeClient:
         self.chat = type("Chat", (), {"completions": _FakeChatCompletions()})()
 
 
+def test_coerce_payload_strips_raw_markdown_from_scraped_content():
+    """A scraped logo carousel's alt text ("Trusted by teams at
+    ![OpenAI](https://...)") occasionally survives verbatim into the model's
+    free-text output instead of prose. The image/link syntax must not reach
+    the operator-facing one_line field."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {
+        "one_line": "Trusted by teams at ![OpenAI](https://www.notion.com/_next/image?url=x&w=3840&q)",
+    }
+    out = scout._coerce_scout_payload(payload)
+    assert out["one_line"] == "Trusted by teams at OpenAI"
+    assert "![" not in out["one_line"]
+    assert "notion.com/_next/image" not in out["one_line"]
+
+
+def test_coerce_payload_drops_dangling_markdown_truncated_mid_url():
+    """A field truncated (by an upstream token/length limit) mid-link never
+    gets its closing ")" -- confirmed against a real production one_line
+    value truncated at 200 chars. Must not leave a raw URL fragment."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {
+        "one_line": (
+            "Trusted by teams at ![OpenAI](https://www.notion.com/_next/image?"
+            "url=https%3A%2F%2Fimages.ctfassets.net%2Fspoqsaf9291f%2F6cil1BDmvfB2sDngU5yLvT"
+            "%2Fa5a5e2333ea68dfdd193a37de76318d9%2Fopenai.png&w=3840&q"
+        ),
+    }
+    out = scout._coerce_scout_payload(payload)
+    assert out["one_line"] == "Trusted by teams at"
+    assert "http" not in out["one_line"]
+
+
+def test_coerce_payload_separates_adjacent_markdown_images():
+    """A real production value had three logo-carousel images back to back
+    with no whitespace in the source markup between them
+    ("...&q=75)![Figma](..."). Stripped alt text must not concatenate into
+    one run-on word."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {
+        "one_line": (
+            "Trusted by teams at ![OpenAI](https://example.com/a.png)"
+            "![Figma](https://example.com/b.svg)![Ramp](https://example.com/c.png)"
+        ),
+    }
+    out = scout._coerce_scout_payload(payload)
+    assert out["one_line"] == "Trusted by teams at OpenAI Figma Ramp"
+
+
+def test_coerce_payload_preserves_plain_urls_without_markdown_brackets():
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {"one_line": "See https://example.com/product for details"}
+    out = scout._coerce_scout_payload(payload)
+    assert out["one_line"] == "See https://example.com/product for details"
+
+
 def test_coerce_payload_fixes_missing_name_and_target_users():
     scout = DummyScout(
         scout_type="market_driven",

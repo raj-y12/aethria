@@ -298,19 +298,43 @@ class Scout(ABC):
         data["id"] = generate_id()
         data["scout_type"] = self.scout_type
 
-    @staticmethod
-    def _coerce_text(value: Any) -> str:
+    # Scraped page markdown (e.g. a logo carousel's alt text) occasionally
+    # survives into an LLM's free-text output verbatim -- "Trusted by teams
+    # at ![OpenAI](https://.../openai.png)" instead of prose. Strip the
+    # markup, keep the readable text (alt/link text) the model actually
+    # meant to say. Images first so the leading "!" is consumed as part of
+    # that match, not left dangling for the link pattern to re-match.
+    _MARKDOWN_IMAGE_RE = re.compile(r"!\[([^\]]*)\]\([^)]*\)")
+    _MARKDOWN_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+    # A field truncated (by a token/length limit upstream) mid-link never
+    # gets its closing ")" -- e.g. "...teams at ![OpenAI](https://...&q".
+    # The two patterns above require a closing paren and can't touch this;
+    # drop the dangling fragment outright rather than leave a raw URL tail.
+    _DANGLING_MARKDOWN_RE = re.compile(r"!?\[[^\]]*\]\([^)]*$")
+
+    @classmethod
+    def _strip_markdown_links(cls, text: str) -> str:
+        # Trailing space so adjacent tags with no source whitespace between
+        # them ("...)![Figma](...") don't collapse into "OpenAIFigma" --
+        # the final whitespace-collapse below normalizes any doubling.
+        text = cls._MARKDOWN_IMAGE_RE.sub(lambda m: m.group(1) + " ", text)
+        text = cls._MARKDOWN_LINK_RE.sub(lambda m: m.group(1) + " ", text)
+        text = cls._DANGLING_MARKDOWN_RE.sub("", text)
+        return re.sub(r"\s+", " ", text).strip()
+
+    @classmethod
+    def _coerce_text(cls, value: Any) -> str:
         if value is None:
             return ""
         if isinstance(value, str):
-            return value.strip()
+            return cls._strip_markdown_links(value.strip())
         if isinstance(value, list):
             parts = [str(v).strip() for v in value if str(v).strip()]
-            return ", ".join(parts)
+            return cls._strip_markdown_links(", ".join(parts))
         if isinstance(value, dict):
             parts = [str(v).strip() for v in value.values() if str(v).strip()]
-            return ", ".join(parts)
-        return str(value).strip()
+            return cls._strip_markdown_links(", ".join(parts))
+        return cls._strip_markdown_links(str(value).strip())
 
     def _coerce_scout_payload(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Best-effort deterministic coercion before strict schema validation."""
