@@ -198,6 +198,36 @@ per-tenant dollar ceiling at all.
 
 ---
 
+## CRITICALS — all 4 fixed and live-validated, 2026-08-17
+
+Fixed in one pass (`86e77a9a`), 12 new/updated tests, full backend suite
+(2265 passed, same 39 pre-existing Postgres-container failures, zero
+regressions), then live-dispatched a real company (Ramp) to validate against
+real data, not just fixtures.
+
+- **C1 (reference fail-open):** live-verified — Ramp's founders resolved
+  correctly (Eric Glyman, Karim Atiyeh) and every reference is a real Ramp
+  URL (TechCrunch, Bloomberg, PRNewswire, Ramp's own site); no wrong-company
+  citation was restored.
+- **C2 (global vs per-dimension query cap):** `evidence_plans.missing_evidence`
+  correctly listed all 5 dimensions with 5 search questions; code-level
+  confirmed via `test_every_rubric_dimension_gets_a_dedicated_query`. Live DB
+  can't show per-query attribution directly — `retrieval_query` is always
+  stamped `queries[0]` regardless of which query found a source (a separate,
+  already-documented coarse-attribution limitation, not new).
+- **C3 (stuck-forever retry gap):** code-level confirmed via the repository
+  test; not directly observable on this dispatch since Ramp had no
+  pre-existing low-confidence claim to retry (a fresh company). Needs a
+  second dispatch of an already-partially-scored company to observe live.
+- **C4 (confidence/support_strength decoupling):** live-verified on real
+  data — re-ran extraction against Ramp's actual retrieved evidence, got a
+  real `growth_rate` claim: `confidence=0.8` (model's own) vs.
+  `support_strength=0.6` (the evidence's deterministic `source_quality`),
+  genuinely different values from the same extraction call. Re-ran
+  `evaluate()`: `market` scored `7.99`, `evidence_sufficiency='sufficient'`,
+  with the full real-claim reasoning trail visible (today's earlier
+  reasoning fix + C4 all confirmed together in one live output).
+
 ## Suggested sequencing (not started)
 
 Same principle as the reviewer audit: smallest-safe-fix-first, but this list
