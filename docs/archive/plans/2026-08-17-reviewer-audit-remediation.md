@@ -103,7 +103,15 @@ out insufficient.
   three prompted postures — not independent reviews.") to both reviewer-row
   renderers, plus a per-row tooltip naming each persona's actual instructed
   posture. `abb8adba`.
-- [ ] Item 5 — consolidate the two reviewer-row renderers.
+- [x] Item 5 — consolidated into `components/scoring/ReviewerPanel.tsx`, used by
+  both `AssessmentScorecard.tsx` and `InvestmentMemoContent.tsx`'s fallback.
+  Kept the more complete head design (spread line + conviction-diverges hint,
+  not the fallback's simpler "Split"/"Aligned"), folded `coverage` in so
+  nothing existing was lost. Orphaned CSS (`memoConsensusVerdict`/
+  `memoConsensusVerdictTag`) removed. 8 new tests; existing tests pass
+  unmodified. `3b8112b6`. See
+  [2026-08-17-reviewer-panel-consolidation.md](2026-08-17-reviewer-panel-consolidation.md)
+  for the full task-level plan.
 - [ ] Item 6 — states/a11y/test coverage.
 
 Verified: full backend suite (same 39 pre-existing Postgres-container failures,
