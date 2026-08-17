@@ -106,7 +106,17 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 **Detailed task-level plan:** [2026-08-17-canonical-evidence-extraction.md](2026-08-17-canonical-evidence-extraction.md) — three phases (A: evidence planning/gap computation, B: bounded retrieval with deterministic trust/verification, C: LLM extraction + re-evaluation), all tasks DONE, live-verified end-to-end against a real dispatch (Vercel) — a canonical criterion score moved off `null` for the first time all session.
 
-**Two eligibility-gate blockers found and fixed while live-verifying, not caught by unit tests alone:** retrieved evidence defaulted to `trust_class=unknown`/`verification_state=unverified` (fixed with a deterministic official-domain + corroboration rule) and separately defaulted `source_quality=0.0` (fixed alongside it) — both silently below the active policy's eligibility thresholds regardless of extraction quality. `scout/`'s persona-shrink work this sub-project was meant to unblock is a separate, not-yet-scoped follow-on.
+**Two eligibility-gate blockers found and fixed while live-verifying, not caught by unit tests alone:** retrieved evidence defaulted to `trust_class=unknown`/`verification_state=unverified` (fixed with a deterministic official-domain + corroboration rule) and separately defaulted `source_quality=0.0` (fixed alongside it) — both silently below the active policy's eligibility thresholds regardless of extraction quality.
+
+### Follow-on: Scout persona-shrink — investigated, closed no changes (2026-08-17)
+
+**Original premise:** now that canonical evidence extraction can source and score claims independently, `scout/`'s four LLM personas (`MarketDrivenScout`/`BuilderTechnicalScout`/`PainPointScout`/`ContrarianScout`, `scout/scouts.py`) could be shrunk to cut redundant LLM cost.
+
+**What investigation found — the premise doesn't hold on the live path.** Every on-demand dispatch already runs exactly **one** persona, not four: `pipeline_runner.py:1692` hardcodes `scout_type="market_driven"`, and `ScoutEngine.run_named_lookup` (`scout/engine.py:546-548`) selects only that one. The 4-persona parallel fan-out (`_select_scouts_for_cycle`, `engine.py:140-176`) only runs inside `run_cycle` — the periodic autonomous pipeline, which Sub-project 3 already established has been off for the entire session. There is no 4x cost on the dispatch path to shrink.
+
+The one persona that does run per dispatch has no canonical equivalent and stays necessary: it's the sole source of the memo's narrative prose (`one_line`/`problem`/`solution`/`target_users`/`why_now`, all rendered directly by `memo_generator.py`) — canonical extraction produces scored claims, not narrative text, a different job entirely. Founder/company identity resolution (`resolver/company_resolver.py`, `resolver/founder_resolver.py`) is a wholly separate deterministic pathway that runs *before* the LLM Scout call and doesn't depend on it at all.
+
+The one genuinely-now-redundant piece found: `canonical_scout_claims.py`'s regex bridge promotes only 4 narrow claim types (`funding_stage`, `est_tam`, `traction_revenue`, `product_capability`) from Scout's narrative text by string-matching. Sub-project 4's grounded extraction now produces better versions of overlapping claim types (a real evidence-linked score vs. a regex guess). Retiring/shrinking that bridge is a small, well-scoped task if ever wanted — not a persona cut. **Decision (2026-08-17): close, no changes** — same call as Sub-project 3, for the same reason (the assumed cost/duplication problem doesn't exist where assumed). The 3 dormant personas only matter if the periodic pipeline is ever reactivated, an out-of-scope product decision.
 
 ---
 
