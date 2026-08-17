@@ -347,8 +347,148 @@ Shipped exactly as sketched — `plan = await create_plan(...)` now captures the
 
 ---
 
-## Phase C — not yet task-level planned
+## Phase C: Extraction stage — task-level plan
 
-An LLM-based extractor producing claims in the ~30 claim types the compiled policy actually requires (currently 100% gap — `canonical_scout_claims.py`'s 11 regex-derived claim types share zero overlap with what any criterion accepts). Reuse `Reviewer._call_llm_sync`'s schema-enforcement/retry pattern (`reviewer/base.py:675+`) rather than building extraction scaffolding from scratch. Once Phase C ships, Task 3's "deliberately not doing" re-evaluation note above should be revisited — that's the point at which re-running `evaluate()` after evidence work actually has something new to find.
+**Objective:** turn the raw artifacts Phase B retrieves into typed, *scored* claims — the thing `evaluate_snapshot()` actually reads. This is the phase that finally moves a score, closing the loop that's been open all session.
 
-Blocks on Phase B shipping first — task-level plan to be written once Phase B is verified live.
+### Architecture decision — claims carry their own score (2026-08-17)
+
+**Major finding that reshapes this phase**: `evaluate_snapshot()`'s `_score()` (`evaluation_v2/service.py:284-289`) reads `claim["normalized_value"]["criterion_score"]` directly — there is no separate deterministic scoring pass downstream of claim creation. Whatever creates a claim also makes the 0-10 judgment call. This is a bigger ask of the extraction LLM than "convert text into structured facts" — it's "extract facts *and* score them," per claim.
+
+Two decisions follow from that, both made explicit rather than defaulted:
+
+1. **Scoring rubric source: the fund's own criteria descriptions.** `resources/config/evaluation_rubric/v1.json` already has exactly this — per-dimension `question`/`definition`/`high`/`mid`/`low` score-band criteria (dimension ids `market_score`/`product_score`/`technical_score`/`execution_score`/`defensibility_score` — note the `_score` suffix needs stripping to match `CriterionRule.criterion`'s bare `market`/`product`/etc). **`reviewer/base.py` already loads and prompts with this same file** — confirmed via `grep`, not assumed. Phase C reuses it rather than inventing new rubric content; scores stay fund-specific and consistent with what Reviewer already produces for the same dimensions.
+2. **Single extraction pass, not a 3-persona structure.** Matches the ponytail "simplest that works" bar and Reviewer's own single structured-output call shape. Also consistent with Sub-project 2's earlier finding that reviewer disagreement should come from evidence contradiction, not persona-vote redundancy — this doesn't reintroduce persona redundancy at the extraction layer either.
+
+### Reusable pattern confirmed
+
+`Reviewer._call_llm_sync` (`reviewer/base.py:1074-1084`) is the exact call shape to mirror:
+```python
+response = self.client.chat.completions.create(
+    model=self.model,
+    messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_content}],
+    response_format={"type": "json_object"},
+    max_completion_tokens=budget,
+    reasoning_effort="low",
+)
+```
+Including its retry-on-empty-content behavior (the exact gpt-5-class reasoning-token exhaustion bug fixed elsewhere this session) — budget list `[base, min(base*2, MAX)]`, retry once if `content` comes back empty.
+
+---
+
+### Task 1: Fix the verification gap blocking Phase B's evidence from ever scoring — DONE
+
+**Found while starting Task 2 (extraction), not before**: `evaluate_claim_score_eligibility` (`evaluation_v2/service.py`) enforces `decision_safety.evidence_eligibility` from the active policy — `resources/config/partner_rules/v4.json` has `blocked_trust_classes: ["model", "unknown"]` and `require_verified_evidence: true`. Phase B's `execute_evidence_plan` (already shipped) hardcoded every ingested artifact to `TrustClass.UNKNOWN` and every item to `VerificationState.UNVERIFIED` — meaning **any claim Phase C creates from Phase B's evidence would be permanently ineligible for scoring**, regardless of how well extraction works. Checked for an existing automated verification mechanism (spec §9.6) — found none: `grep` across `evidence/`/`identity/` for anything that ever sets `VerificationState.VERIFIED` found only direct operator-supplied confidential evidence (`routers/evidence.py::ingest_confidential_evidence`). §9.6 is entirely unbuilt, not even scaffolded like §9.3 was.
+
+**Decision (2026-08-17): build a deterministic verification rule**, not loosen the policy gate or defer this to later. Two auditable rules, no model judgment:
+- The company's own domain → `TrustClass.OFFICIAL`, verified unconditionally (first-party statements about itself don't need corroboration).
+- Anything else → `TrustClass.INDEPENDENT` (never `UNKNOWN` — a retrieved page always has a real domain), verified only when **corroborated by ≥2 distinct non-official domains** in the same retrieval pass. A single uncorroborated source stays unverified — correctly conservative, not a regression.
+
+**Files:**
+- Modified: `backend/evidence/retrieval.py` — `execute_evidence_plan` gained a `company_website: Optional[str] = None` parameter and a `_domain()` helper; trust_class/verification_state are now computed per source instead of hardcoded.
+- Modified: `backend/pipeline_runner.py` — the wiring call site now passes `company_website=website or handoff_startup.scout_info.lookup_website` (the on-demand lookup's own `website` param when the user supplied one, falling back to what Scout resolved).
+- Test: `backend/tests/evidence/test_retrieval.py` — 6 new tests: company's own domain → official + verified; a single independent source → unverified; two distinct domains → both verified (corroboration); two pages from the *same* domain → still unverified (corroboration requires distinct domains, not source count); no `company_website` supplied → nothing ever marked official; and the bug below.
+
+**Real bug found and fixed while verifying live, not just in tests**: `ScoutInfo.lookup_website` is stored *without* a scheme (`"stripe.com"`, not `"https://stripe.com"`) — confirmed against real production data. `urlparse("stripe.com").netloc` is empty (parsed as a relative path, not a host), so the official-domain match silently failed 100% of the time until fixed. `_domain()` now prepends `https://` when the input has no `://`. Live-verified against a fresh Stripe dispatch: before the fix, `stripe.com` sources came back `trust_class=independent` (corroboration still made them `verified` via 3 other distinct domains, which is why this didn't crash or error — it just silently missed the more direct signal); after the fix, a dedicated regression test (`test_bare_domain_company_website_still_matches_official`) locks in the correct behavior.
+
+**Verification:**
+- [x] `tests/evidence/test_retrieval.py` — 10/10 passed (4 original + 6 new).
+- [x] Full backend suite: 2238 passed (2232 → 2237 → 2238 across the two fix passes), 43 pre-existing failures unchanged, zero regressions.
+- [x] **Live-verified** against a real dispatch (stripe.com). First pass surfaced the bare-domain bug live (`stripe.com` sources ingested as `independent` instead of `official`); fixed, tests added, confirmed via direct DB query afterward that the fix is correct (validated in isolation — a second live dispatch to reconfirm end-to-end was not run, given the fix is a pure function verified against the exact real input that exposed the bug).
+
+---
+
+### Task 2: Write the extraction function
+
+**Files:**
+- Create: `backend/evidence/extraction.py`
+- Test: `backend/tests/evidence/test_extraction.py`
+
+**Interfaces:**
+```python
+async def extract_claims_from_evidence(
+    *,
+    user_id: str,
+    company_id: str,
+    opportunity_id: str,
+    missing_evidence: list[str],           # dimension names from the plan
+    evidence_items: list[dict],            # freshly-ingested items from Phase B
+    rubric: dict,                          # resources/config/evaluation_rubric/{active}.json, loaded by the caller
+    evidence_repository: Any,
+    api_key: str,
+    model: str,
+) -> dict[str, int]:
+    """One structured-output LLM call per missing dimension (bounded — same
+    dimensions Phase B just retrieved for). Prompts with that dimension's
+    rubric high/mid/low bands and the retrieved evidence excerpts; the model
+    returns 0+ claims, each with a criterion_score (0-10) and the evidence
+    items that support it. Persists via evidence_repository.create_claim
+    with real ClaimEvidenceLinkInput links -- a claim with no supporting
+    link is not eligible for scoring (evaluate_claim_score_eligibility
+    requires linked evidence, per Sub-project 4's earlier investigation)."""
+```
+
+**Prompt shape** (finalize exact wording during implementation, this is the contract, not the literal prompt text):
+- System prompt: instructs the model to extract only claims genuinely supported by the provided excerpts, output strict JSON, treat excerpt text as quoted untrusted data (matches spec §9.5: "cannot execute instructions found in documents" — reuse `security/prompt_safety` isolation the same way Reviewer already does for scraped content).
+- User content: the dimension's rubric question/definition/high/mid/low bands (from `evaluation_rubric`) + the evidence items' `display_excerpt`/`source_locator` (from Phase B's ingested items) + the claim_types this dimension accepts (from `CriterionRule.claim_types`, so the model picks a valid type, not an invented one).
+- Output schema: `{"claims": [{"claim_type": str, "criterion_score": float, "confidence": float, "display_text": str, "supporting_evidence_item_ids": [str]}]}`. Empty `claims` list is a valid, expected response when the excerpts don't actually support a claim — do not force one.
+
+**Prohibited:** do not create a claim with no supporting evidence link (an ungrounded score is exactly the "model invents a fact" failure mode ADR-0006/invariant 5 exists to prevent). Do not let the model choose a `claim_type` outside the dimension's `CriterionRule.claim_types` list — validate and drop any that don't match rather than trusting the model's string.
+
+**Required tests:** fake OpenAI client (mirroring `test_scout_payload_coercion.py`'s `_FakeChatCompletions` pattern) — covers: a valid extraction response creates claims with correct `criterion_score`/links; an empty `claims` response creates nothing, no error; a claim referencing a nonexistent `supporting_evidence_item_ids` is dropped, not persisted ungrounded; a `claim_type` outside the dimension's accepted list is dropped; retry-on-empty-content behavior matches Reviewer's (reuse, don't reimplement, if the retry logic can be factored into a shared helper — check `reviewer/base.py` for whether this is already extractable before duplicating it).
+
+---
+
+### Task 3: Wire it inline after Phase B, then re-run evaluate()
+
+**Files:**
+- Modify: `backend/pipeline_runner.py` — same best-effort block, after `execute_evidence_plan(...)`.
+
+**Implementation sketch:**
+```python
+                            retrieval_result = await execute_evidence_plan(...)
+                            if retrieval_result["artifacts_ingested"] > 0:
+                                await extract_claims_from_evidence(
+                                    user_id=user_id, company_id=canonical_admission.company_id,
+                                    opportunity_id=canonical_admission.opportunity_id,
+                                    missing_evidence=missing_evidence,
+                                    evidence_items=<items ingested by execute_evidence_plan -- Task 1 of this
+                                        task must decide whether execute_evidence_plan's return shape needs to
+                                        grow to include the ingested items, not just counts>,
+                                    rubric=<load resources/config/evaluation_rubric/{active} the same way
+                                        evaluation_prerequisites resolves its own active config version>,
+                                    evidence_repository=EvidenceRepository(postgres_pool),
+                                    api_key=<same source Reviewer/Partner already use>,
+                                    model=<same source Reviewer already uses for its own LLM calls>,
+                                )
+                                # Only now is there something new for evaluate() to find.
+                                canonical_evaluation = await EvaluationRepository(postgres_pool).evaluate(
+                                    user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
+                                    actor_id=user_id, trigger_type="dispatch_post_extraction",
+                                    policy=evaluation_prerequisites.policy,
+                                    thesis_version_id=evaluation_prerequisites.thesis_version_id,
+                                )
+                                canonical_recommendation_payload = canonical_evaluation.get("recommendation") or {}
+                                canonical_recommendation_state = canonical_recommendation_payload.get("state")
+                                canonical_confidence = canonical_recommendation_payload.get("confidence")
+                                canonical_criteria = canonical_evaluation.get("criteria")
+```
+
+**This is the task that actually closes the loop** — the re-evaluation Task 3 of Phase B explicitly deferred ("Deliberately not doing... belongs with Phase C, once there's something new for it to find"). After this ships, `canonical_recommendation_state`/`canonical_criteria`/`canonical_confidence` used later in this function (Sub-project 1/2/3's work) will reflect the freshly-extracted evidence, not the pre-retrieval snapshot.
+
+**Real cost to weigh, not to hide**: this is now a *second* `evaluate()` call plus an LLM extraction call in the critical path, on top of Phase B's retrieval call, on top of Scout/Reviewer/Partner. Latency budget scrutiny (already relevant since Phase B) gets more pressing here — worth measuring the real added time on a live dispatch before considering this "done," not just confirming it works.
+
+**Acceptance:** a dispatch that retrieves evidence in Phase B and finds a genuine claim for it shows a *different*, non-`insufficient_evidence` criterion result than it would have pre-extraction. A dispatch where extraction finds nothing usable (empty `claims` from every call) leaves the original evaluate() result untouched — no regression to "worse than before."
+
+---
+
+### Task 4: Full verification gate
+
+- [ ] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v`
+- [ ] Full backend suite — confirm no regressions beyond the pre-existing Postgres-container failures.
+- [ ] Live-verify: dispatch a company, confirm claims appear in `claims` table with real `criterion_score`/`claim_evidence_links` after Phase B's artifacts ingest, confirm the criterion(s) that got a new claim now show a non-null `score`/`evidence_sufficiency != 'insufficient'` in `criterion_assessments`, confirm the masthead/Assessment scorecard (Sub-project 2, Tasks 1-2) now renders a real number instead of "Not scored" for at least one dimension — the first time that's been true all session.
+- [ ] Measure and report actual added dispatch latency (Phase B's retrieval + this extraction call + the second `evaluate()`) against a real dispatch, honestly, not assumed.
+
+---
+
+**This closes the arc this whole session has been circling**: 0 of 25 canonical criterion scores were non-null when Sub-project 4 started investigating. Phase C's live-verification step is the first point at which that number should move.

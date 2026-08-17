@@ -1831,6 +1831,7 @@ async def _run_on_demand_lookup_inner(
                                 plan=plan,
                                 evidence_repository=EvidenceRepository(postgres_pool),
                                 company_name=company,
+                                company_website=website or handoff_startup.scout_info.lookup_website,
                             )
                     except Exception:
                         logger.exception(

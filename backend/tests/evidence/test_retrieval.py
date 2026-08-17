@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from evidence.models import EvidencePlanRecord
+from evidence.models import EvidencePlanRecord, TrustClass, VerificationState
 from evidence.retrieval import MAX_QUERIES, execute_evidence_plan
 
 
@@ -95,6 +95,153 @@ async def test_queries_are_capped_regardless_of_a_longer_plan():
 
     _, kwargs = mock_retrieve.call_args
     assert len(kwargs["queries"]) == MAX_QUERIES
+
+
+@pytest.mark.asyncio
+async def test_companys_own_domain_is_official_and_verified_unconditionally():
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Acme homepage", "url": "https://www.acme.com/product", "snippet": "Acme builds widgets."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    artifact, items = repo.ingested[0]
+    assert artifact.trust_class == TrustClass.OFFICIAL
+    assert items[0].verification_state == VerificationState.VERIFIED
+
+
+@pytest.mark.asyncio
+async def test_single_independent_source_stays_unverified():
+    """No corroboration, not the company's own domain -- must not be
+    upgraded to verified just because it was retrieved."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "A blog post", "url": "https://someblog.com/post", "snippet": "Acme raised a round."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    artifact, items = repo.ingested[0]
+    assert artifact.trust_class == TrustClass.INDEPENDENT
+    assert items[0].verification_state == VerificationState.UNVERIFIED
+
+
+@pytest.mark.asyncio
+async def test_two_independent_domains_corroborate_each_other():
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "News A", "url": "https://techcrunch.com/acme", "snippet": "Acme raised $10M."},
+            {"title": "News B", "url": "https://reuters.com/acme", "snippet": "Acme closed a $10M round."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    assert len(repo.ingested) == 2
+    for artifact, items in repo.ingested:
+        assert artifact.trust_class == TrustClass.INDEPENDENT
+        assert items[0].verification_state == VerificationState.VERIFIED
+
+
+@pytest.mark.asyncio
+async def test_two_sources_from_the_same_domain_do_not_corroborate():
+    """Corroboration requires distinct domains -- two pages from the same
+    site are one source repeated, not independent confirmation."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Page A", "url": "https://someblog.com/a", "snippet": "Acme is great."},
+            {"title": "Page B", "url": "https://someblog.com/b", "snippet": "More about Acme."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    for artifact, items in repo.ingested:
+        assert items[0].verification_state == VerificationState.UNVERIFIED
+
+
+@pytest.mark.asyncio
+async def test_bare_domain_company_website_still_matches_official():
+    """ScoutInfo.lookup_website is stored without a scheme ("stripe.com",
+    not "https://stripe.com") -- confirmed against real production data.
+    urlparse("stripe.com").netloc is empty (parsed as a relative path, not
+    a host), which silently broke every official-domain match until fixed."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Stripe homepage", "url": "https://stripe.com/", "snippet": "Payments infrastructure."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Stripe",
+            company_website="stripe.com",
+        )
+
+    artifact, items = repo.ingested[0]
+    assert artifact.trust_class == TrustClass.OFFICIAL
+    assert items[0].verification_state == VerificationState.VERIFIED
+
+
+@pytest.mark.asyncio
+async def test_no_company_website_never_marks_anything_official():
+    repo = _FakeEvidenceRepository()
+    plan = _plan()
+    pack = {
+        "provider": "exa",
+        "sources": [
+            {"title": "Some page", "url": "https://example.com/a", "snippet": "Content."},
+        ],
+    }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", return_value=pack):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website=None,
+        )
+
+    artifact, _ = repo.ingested[0]
+    assert artifact.trust_class == TrustClass.INDEPENDENT
 
 
 @pytest.mark.asyncio
