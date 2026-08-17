@@ -13,35 +13,17 @@ import {
   dimensionBriefTake,
 } from '../../lib/scoringRationale';
 import Popover from '../ui/Popover';
+import ReviewerPanel, {
+  type ScorecardReviewerConsensus,
+  type ScorecardReviewerRow,
+} from './ReviewerPanel';
+
+export type { ScorecardReviewerConsensus, ScorecardReviewerRow };
 
 export type ScorecardDimensionDef = {
   key: ScoringDimensionKey;
   label: string;
   id: string;
-};
-
-// The prompted posture behind each row's name (audit 2026-08-15/17: "name each
-// prompt posture" — same model, same evidence packet, differ only by instruction).
-const REVIEWER_POSTURES: Record<string, string> = {
-  DefaultReviewer: 'Balanced read of the same evidence packet.',
-  SkepticalReviewer: 'Instructed to assume the worst on missing data and weight risk higher.',
-  OpportunistReviewer: 'Instructed to give benefit of the doubt on early-stage gaps and weight upside higher.',
-};
-
-export type ScorecardReviewerRow = {
-  key: string;
-  name: string;
-  score: number | null;
-  verdict?: string;
-  take?: string;
-};
-
-export type ScorecardReviewerConsensus = {
-  min: number | null;
-  max: number | null;
-  spread: number | null;
-  split: boolean;
-  verdict?: string | null;
 };
 
 interface AssessmentScorecardProps {
@@ -101,14 +83,6 @@ export default function AssessmentScorecard({
       : dispersion
         ? `Balanced profile — drivers within ${dispersion.range.toFixed(1)} pts`
         : null;
-
-  const { min, max, spread, split, verdict } = reviewerConsensus;
-  const spreadLine =
-    min != null && max != null
-      ? min === max
-        ? `${min.toFixed(1)}/10 across the panel`
-        : `${min.toFixed(1)}–${max.toFixed(1)}/10 spread`
-      : null;
 
   // Defensibility is a moat SIGNAL, not a driver — it is excluded from the overall mean
   // (OVERALL_SCORE_DIMENSIONS). Render it apart from the four drivers so the layout never
@@ -303,43 +277,7 @@ export default function AssessmentScorecard({
         </div>
       )}
 
-      {/* Reviewer panel — same treatment as the prior Reviewer Consensus block. */}
-      {reviewerRows.length > 0 && (
-        <div className="memoScorePanel">
-          <div className="memoConsensusHead">
-            {/* Flag only the exception: a split panel is the signal worth surfacing; an
-                aligned panel is the expected case, so it gets a quiet label, not a verdict. */}
-            {split ? (
-              <p className="memoConsensusFlag">Reviewers split</p>
-            ) : (
-              <p className="memoConsensusLabel">Reviewer panel</p>
-            )}
-            {spreadLine ? (
-              <p className="memoConsensusSpread">
-                {renderNumbers(spreadLine)}
-                {verdict ? `  ·  ${verdict}` : ''}
-                {spread != null && spread >= 2 ? '  ·  conviction diverges' : ''}
-              </p>
-            ) : null}
-          </div>
-          <p className="memoScoreSub">
-            One model, one evidence packet, three prompted postures — not independent reviews.
-          </p>
-          <ul className="memoConsensusList">
-            {reviewerRows.map((row) => (
-              <li key={row.key} className="memoConsensusRow">
-                <span className="memoConsensusName" title={REVIEWER_POSTURES[row.key]}>
-                  {row.name}
-                </span>
-                <span className="memoConsensusScore">
-                  {row.score != null ? renderNumbers(row.score.toFixed(1)) : '—'}
-                </span>
-                <span className="memoConsensusTake">{renderNumbers(row.take || row.verdict || '—')}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <ReviewerPanel rows={reviewerRows} consensus={reviewerConsensus} renderNumbers={renderNumbers} />
     </div>
   );
 }

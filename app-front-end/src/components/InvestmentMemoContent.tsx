@@ -10,6 +10,7 @@ import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
+import ReviewerPanel from './scoring/ReviewerPanel';
 import MemoMasthead from './memo/MemoMasthead';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
@@ -97,15 +98,6 @@ const REVIEWER_LABELS: Record<string, string> = {
   DefaultReviewer: 'Default',
   SkepticalReviewer: 'Skeptical',
   OpportunistReviewer: 'Opportunist',
-};
-
-// The prompted posture behind each row's name — same model, same evidence packet,
-// differ only by instruction. Duplicated in AssessmentScorecard.tsx pending the
-// two reviewer-row renderers being consolidated into one (audit item #11).
-const REVIEWER_POSTURES: Record<string, string> = {
-  DefaultReviewer: 'Balanced read of the same evidence packet.',
-  SkepticalReviewer: 'Instructed to assume the worst on missing data and weight risk higher.',
-  OpportunistReviewer: 'Instructed to give benefit of the doubt on early-stage gaps and weight upside higher.',
 };
 
 
@@ -735,37 +727,11 @@ function InvestmentMemoContent(
                       />
                     </div>
                   ) : hasPanel ? (
-                    <div className="memoConsensusHead">
-                      <p className="memoConsensusVerdict">
-                        {reviewerConsensus.split ? 'Split' : 'Aligned'}
-                        {reviewerConsensus.verdict ? (
-                          <span className="memoConsensusVerdictTag">{` · ${reviewerConsensus.verdict}`}</span>
-                        ) : null}
-                      </p>
-                      <p className="memoScoreSub">
-                        One model, one evidence packet, three prompted postures — not independent reviews.
-                      </p>
-                      <ul className="memoConsensusList">
-                        {reviewerConsensusRows.map((row) => (
-                          <li key={row.key} className="memoConsensusRow">
-                            <span className="memoConsensusName" title={REVIEWER_POSTURES[row.key]}>
-                              {row.name}
-                            </span>
-                            <span className="memoConsensusScore">
-                              {row.score != null ? renderWithMonoNumbers(row.score.toFixed(1)) : '—'}
-                              {row.coverage != null ? (
-                                <span className="memoConsensusCoverage">
-                                  {`${Math.round(row.coverage * 100)}% data coverage`}
-                                </span>
-                              ) : null}
-                            </span>
-                            <span className="memoConsensusTake">
-                              {renderWithMonoNumbers(row.take || row.verdict || '—')}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    <ReviewerPanel
+                      rows={reviewerConsensusRows}
+                      consensus={reviewerConsensus}
+                      renderNumbers={renderWithMonoNumbers}
+                    />
                   ) : null}
                   {hasDeepDive && (
                     <div className="memoScoringMore">

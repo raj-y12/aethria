@@ -1599,7 +1599,6 @@
 .memoScoreMoatLabel,
 .memoConsensusLabel,
 .memoConsensusFlag,
-.memoConsensusVerdict,
 .memoEvStatLine {
   margin: 0;
   color: var(--memo-ink-faint);
@@ -1621,8 +1620,7 @@
   gap: 18px;
 }
 
-.memoConsensusSpread,
-.memoConsensusVerdictTag {
+.memoConsensusSpread {
   margin: 0;
   color: var(--memo-ink-faint);
   font-family: var(--memo-font-mono);
