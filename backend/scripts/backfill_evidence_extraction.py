@@ -135,9 +135,9 @@ async def _run(database_url: str, *, limit: int | None) -> list[dict]:
                 continue
             result = await _backfill_opportunity(
                 pool,
-                user_id=row["user_id"],
-                opportunity_id=row["opportunity_id"],
-                company_id=row["company_id"],
+                user_id=str(row["user_id"]),
+                opportunity_id=str(row["opportunity_id"]),
+                company_id=str(row["company_id"]),
                 company_name=company["canonical_name"],
                 company_website=company["canonical_domain"],
                 api_key=api_key,
