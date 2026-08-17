@@ -225,6 +225,13 @@ export interface ScoringComponent {
   /** True for judgment components with no objective anchor (P3.4): a qualitative 8 is
    *  not the same as an evidence-backed 8. Set by the backend scoring engine. */
   qualitative?: boolean | null;
+  /** Present only on the synthetic "persona_resolution" component the governed scoring
+   *  engine writes per dimension: "mean" when personas agreed, "conservative_mean_floor"
+   *  when they diverged >= the material-spread threshold and the score was pulled toward
+   *  the lowest persona's read instead of a straight average. */
+  strategy?: string | null;
+  /** Max - min across personas' scores for this dimension, only on "persona_resolution". */
+  spread?: number | null;
 }
 
 export interface ScoringCriterion {

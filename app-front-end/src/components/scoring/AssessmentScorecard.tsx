@@ -119,6 +119,17 @@ export default function AssessmentScorecard({
         ? presDim.score.toFixed(1)
         : dimension.score.toFixed(1);
     const lowConfidence = !presDim && !unscored && isLowEvidence(dimension.confidence);
+    // The governed scoring engine resolves three personas' reads per dimension; when they
+    // diverge past the material-spread threshold it pulls the score toward the lowest read
+    // instead of a straight average and records that as "conservative_mean_floor". Surface
+    // that as a flag on the specific dimension it happened to, not just an aggregate panel
+    // spread — a reader needs to know WHICH number to distrust, not just that some pair of
+    // reviewers disagreed somewhere.
+    // Independent of presDim: the legacy presentation overlay's text is a generic
+    // sufficiency message, not a disagreement signal, so it must not suppress this flag
+    // the way it suppresses lowConfidence's overlapping "evidence is thin" message.
+    const personaResolution = dimension.components?.persona_resolution;
+    const disputed = !unscored && personaResolution?.strategy === 'conservative_mean_floor';
     const take = unscored
       ? 'No supporting evidence — excluded from the overall.'
       : dimensionBriefTake(dimension, presDim);
@@ -132,7 +143,7 @@ export default function AssessmentScorecard({
     const weaknesses = cleanReasoningList(dimension.weaknesses);
     const isOpen = expanded.has(dim.key);
     const hasDetail =
-      evidence.length > 0 || gaps.length > 0 || reasoning.length > 0 || weaknesses.length > 0 || lowConfidence || unscored;
+      evidence.length > 0 || gaps.length > 0 || reasoning.length > 0 || weaknesses.length > 0 || lowConfidence || unscored || disputed;
 
     const renderDriver = (d: (typeof allDrivers)[number]) => (
       <li key={d.id} className="memoScoreDriverItem">
@@ -168,6 +179,7 @@ export default function AssessmentScorecard({
           <span className="memoScoreTake">
             {renderNumbers(take)}
             {lowConfidence && <span className="memoScoreTakeFlag">low evidence</span>}
+            {disputed && <span className="memoScoreTakeFlag">personas diverged</span>}
           </span>
           {hasDetail && (
             <span aria-hidden className={isOpen ? 'memoScoreChevron memoScoreChevron--open' : 'memoScoreChevron'}>
@@ -220,6 +232,16 @@ export default function AssessmentScorecard({
                     {unscored
                       ? 'No supporting evidence for this dimension.'
                       : `${getEvidenceConfidenceLabel(dimension.confidence)} evidence — score may shift with diligence.`}
+                  </p>
+                )}
+                {disputed && (
+                  <p className="memoScoreEvidenceNote">
+                    Reviewers read this dimension differently
+                    {typeof personaResolution?.spread === 'number'
+                      ? ` (spread ${personaResolution.spread.toFixed(1)} pts)`
+                      : ''}
+                    ; the score was pulled toward the most conservative read rather than
+                    averaged straight — treat it as less settled than the number implies.
                   </p>
                 )}
               </div>
