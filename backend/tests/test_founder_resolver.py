@@ -235,6 +235,23 @@ def test_company_pages_are_not_mistaken_for_people():
     assert resolve_founders("Acme", user_id="u1", search=_search(sources)).founders == []
 
 
+def test_a_persons_other_role_at_a_different_company_is_not_extracted_as_a_name():
+    """Regression: live-verified on Vercel. Malte Ubl's LinkedIn bio correctly
+    identifies him as "CTO at Vercel" earlier in the same snippet, but also
+    lists an unrelated past/side role, "CEO - YUR.tv AG". The role-then-name
+    pattern matched "YUR.tv AG" (a company name, domain-shaped) as if it were
+    a person, and it became the resolved founder instead of Malte Ubl."""
+    sources = [
+        {
+            "title": "Malte Ubl",
+            "url": "https://linkedin.com/in/malteubl",
+            "snippet": "CTO at Vercel. ### CEO - YUR.tv AG",
+        }
+    ]
+    result = resolve_founders("Vercel", user_id="u1", search=_search(sources))
+    assert "YUR.tv AG" not in [f.name for f in result.founders]
+
+
 # --------------------------------------------------------------------------- #
 # Conflicts and confidence
 # --------------------------------------------------------------------------- #

@@ -74,6 +74,50 @@ _LOOKUP_NAME_STOPWORDS = {
     "systems",
 }
 
+# "<Name> [is the] co-founder|founder of <OtherCompany>" appearing near a model-
+# claimed founder name in the retrieved evidence -- the same misattribution shape
+# resolver/company_resolver.py's _extract_founders guards against, applied here to
+# whatever the model itself proposed rather than only the deterministic fallback.
+_FOUNDER_ROLE_OF_COMPANY_RE = re.compile(
+    r"(?i:is\s+the\s+)?(?i:co-?founder|founder)\s+(?i:of)\s+"
+    r"([A-Z][\w&.,'’-]*(?:\s+[A-Z][\w&.,'’-]*){0,3})"
+)
+
+
+def _reject_misattributed_founder_names(
+    names: list, source_pack: Dict[str, Any], company: str
+) -> list:
+    if not names or not company:
+        return names
+    from resolver.company_resolver import _compact_name
+
+    target_compact = _compact_name(company)
+    if not target_compact:
+        return names
+    combined = " ".join(
+        f"{s.get('title') or ''}. {s.get('snippet') or ''}"
+        for s in (source_pack.get("sources") or [])
+        if isinstance(s, dict)
+    )
+    kept = []
+    for name in names:
+        name_str = str(name or "").strip()
+        if not name_str:
+            kept.append(name)
+            continue
+        rejected = False
+        for m in re.finditer(re.escape(name_str), combined):
+            trailing = combined[m.end():m.end() + 80]
+            role_of = _FOUNDER_ROLE_OF_COMPANY_RE.match(trailing.lstrip(",: -–—"))
+            if role_of:
+                mentioned_compact = _compact_name(role_of.group(1))
+                if mentioned_compact and mentioned_compact != target_compact:
+                    rejected = True
+                    break
+        if not rejected:
+            kept.append(name)
+    return kept
+
 
 class Scout(ABC):
     """
@@ -439,6 +483,17 @@ class Scout(ABC):
         gate: it only applies when there is an allowlist to enforce against.
         """
         out = dict(data)
+        if out.get("founder_names"):
+            # The model can name a real person who is genuinely unrelated to this
+            # company -- e.g. a BusinessWire headline "Vercel Appoints Mitchell
+            # Hashimoto, Co-Founder of HashiCorp, to Board of Directors" is
+            # unambiguously about Vercel, but the model can still read "Mitchell
+            # Hashimoto" + "Co-Founder" as naming a Vercel founder. Cross-check
+            # each claimed name against the retrieved evidence for exactly that
+            # misattribution pattern (live-verified on Vercel, 2026-08-17).
+            out["founder_names"] = _reject_misattributed_founder_names(
+                out["founder_names"], source_pack, str(out.get("name") or "")
+            )
         if not out.get("founder_names"):
             # Keep founder extraction deterministic even when the model omits the
             # optional field. Resolver and open-discovery paths share this evidence
@@ -470,7 +525,7 @@ class Scout(ABC):
                     )
                 )
             ]
-            out["founder_names"] = _extract_founders(evidence)
+            out["founder_names"] = _extract_founders(evidence, company=str(out.get("name") or ""))
         allowlist_urls = set(source_pack.get("url_allowlist") or set())
         if explicit_website and str(explicit_website).strip():
             site = str(explicit_website).strip()

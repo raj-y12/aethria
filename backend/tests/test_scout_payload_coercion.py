@@ -1,5 +1,33 @@
-from scout.base import Scout
+from scout.base import Scout, _reject_misattributed_founder_names
 import json
+
+
+def test_reject_misattributed_founder_names_drops_a_different_companys_founder():
+    """Regression: live-verified on Vercel. The model read a BusinessWire headline
+    genuinely about Vercel ("Vercel Appoints Mitchell Hashimoto, Co-Founder of
+    HashiCorp ... to Board of Directors") and named Mitchell Hashimoto as a Vercel
+    founder in its own founder_names output -- he's HashiCorp's co-founder joining
+    Vercel's board, not a Vercel founder."""
+    source_pack = {
+        "sources": [
+            {
+                "title": "Vercel Appoints Mitchell Hashimoto, Co-Founder of HashiCorp, to Board of Directors",
+                "snippet": "Vercel today announced Mitchell Hashimoto, Co-Founder of HashiCorp, has joined its board.",
+            }
+        ]
+    }
+    assert _reject_misattributed_founder_names(["Mitchell Hashimoto"], source_pack, "Vercel") == []
+
+
+def test_reject_misattributed_founder_names_keeps_the_real_founder():
+    source_pack = {"sources": [{"title": "x", "snippet": "Guillermo Rauch, founder of Vercel, said today."}]}
+    assert _reject_misattributed_founder_names(["Guillermo Rauch"], source_pack, "Vercel") == ["Guillermo Rauch"]
+
+
+def test_reject_misattributed_founder_names_keeps_names_with_no_role_mention_nearby():
+    # No "founder of <company>" pattern at all near the name -- nothing to reject on.
+    source_pack = {"sources": [{"title": "x", "snippet": "Guillermo Rauch spoke at the conference today."}]}
+    assert _reject_misattributed_founder_names(["Guillermo Rauch"], source_pack, "Vercel") == ["Guillermo Rauch"]
 
 
 class DummyScout(Scout):

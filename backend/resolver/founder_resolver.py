@@ -103,6 +103,12 @@ _FOUNDED_BY_RE = re.compile(
 
 _ORG = r"[A-Z][\w&.'’-]*(?:\s+(?:of|de|van|the)\s+[A-Z][\w&.'’-]*|\s+[A-Z][\w&.'’-]*){0,3}"
 
+# A domain-shaped token ("YUR.tv", "example.com") -- 2+ letters, a literal
+# dot, then a short lowercase TLD-looking suffix. Distinguishes company/domain
+# fragments from abbreviated initials ("J.K."), which never have 2+ letters
+# immediately before the dot.
+_DOMAIN_SHAPED_WORD_RE = re.compile(r"[A-Za-z]{2,}\.[a-z]{2,4}$")
+
 _PREVIOUS_EMPLOYMENT_RES = (
     re.compile(rf"(?i:previously|formerly|prior to that)\s+(?i:a\s+|an\s+|the\s+)?(?i:[\w\s]{{0,24}}?\s)?(?i:at|with|of)\s+({_ORG})"),
     re.compile(rf"\b(?i:ex)[-\s]({_ORG})"),
@@ -234,6 +240,16 @@ _ORG_NAME_MARKERS = (
     "llc",
     "ltd",
     "gmbh",
+    "ag",
+    "sa",
+    "nv",
+    "bv",
+    "kg",
+    "oy",
+    "ab",
+    "spa",
+    "sarl",
+    "plc",
     "corp",
     "labs",
     "capital",
@@ -433,6 +449,13 @@ def _is_person_name(name: str) -> bool:
     if words[0].lower().strip(".") in _NON_NAME_LEADING_WORDS:
         return False
     if any(w.lower().strip(".") in _ORG_NAME_MARKERS for w in words):
+        return False
+    # A word shaped like a domain ("YUR.tv") is a company, not a person -- a
+    # LinkedIn bio's *other* role line ("CEO - YUR.tv AG") reads as a
+    # capitalized 2-word phrase and otherwise passes every check above.
+    # Real names don't contain 2+ letters, a literal dot, then 2-4 lowercase
+    # letters; abbreviated initials ("J.K.") never have 2+ letters before the dot.
+    if any(_DOMAIN_SHAPED_WORD_RE.search(w) for w in words):
         return False
     for w in words:
         if not re.fullmatch(r"[A-Z][\w'’.-]*", w):

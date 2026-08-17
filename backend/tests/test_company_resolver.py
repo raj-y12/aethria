@@ -31,6 +31,33 @@ def _pack(sources: List[Dict[str, str]], provider: str = "exa") -> Dict[str, Any
     }
 
 
+def test_extract_founders_rejects_role_attributed_to_a_different_company():
+    """Regression: live-verified on Vercel. A BusinessWire headline genuinely
+    about Vercel ("Vercel Appoints Mitchell Hashimoto, Co-Founder of HashiCorp
+    ... to Board of Directors") matched the founder-role pattern and credited
+    Mitchell Hashimoto as a Vercel founder -- he's HashiCorp's co-founder,
+    joining Vercel's board, not founding Vercel."""
+    sources = [
+        EvidenceSource(
+            url="https://www.businesswire.com/vercel-hashimoto",
+            title="Vercel Appoints Mitchell Hashimoto, Co-Founder of HashiCorp, to Board of Directors",
+            snippet="Vercel today announced Mitchell Hashimoto, Co-Founder of HashiCorp, has joined its board.",
+        ),
+    ]
+    assert cr._extract_founders(sources, company="Vercel") == []
+
+
+def test_extract_founders_still_finds_a_real_founder_of_the_target_company():
+    sources = [
+        EvidenceSource(
+            url="https://example.com/acme",
+            title="Acme announces new funding round",
+            snippet="Jane Smith, co-founder of Acme, announced the round today.",
+        ),
+    ]
+    assert cr._extract_founders(sources, company="Acme") == ["Jane Smith"]
+
+
 def test_not_found_when_no_evidence(monkeypatch):
     monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack([]))
     res = resolve_company("Totally Nonexistent Startup Zzz", user_id=USER)

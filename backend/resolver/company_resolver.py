@@ -176,6 +176,14 @@ _FOUNDER_PATTERNS = (
     ),
 )
 
+# Guards a founder-role match against attribution to a company mentioned in the
+# same sentence: "Mitchell Hashimoto, Co-Founder of HashiCorp" must not credit
+# Mitchell Hashimoto as a founder of the *target* company just because the
+# sentence itself is about that target (e.g. a board-appointment announcement).
+_FOUNDER_OF_OTHER_COMPANY_RE = re.compile(
+    r"^\s*of\s+([A-Z][\w&.,'’-]*(?:\s+[A-Z][\w&.,'’-]*){0,3})"
+)
+
 _FOUNDER_NAME_REJECT = frozenset(
     {
         "the company",
@@ -473,12 +481,20 @@ def _build_queries(company: str, *, phase: int, website_hint: Optional[str]) -> 
     ]
 
 
-def _extract_founders(sources: List[EvidenceSource]) -> List[str]:
+def _extract_founders(sources: List[EvidenceSource], *, company: str = "") -> List[str]:
+    target_compact = _compact_name(company) if company else ""
     found: List[str] = []
     for src in sources:
         text = f"{src.title}. {src.snippet}"
         for pattern in _FOUNDER_PATTERNS:
             for match in pattern.finditer(text):
+                if target_compact:
+                    trailing = text[match.end():match.end() + 60]
+                    of_match = _FOUNDER_OF_OTHER_COMPANY_RE.match(trailing)
+                    if of_match:
+                        mentioned_compact = _compact_name(of_match.group(1))
+                        if mentioned_compact and mentioned_compact != target_compact:
+                            continue
                 blob = match.group(1)
                 for raw in re.split(r"\s*(?:,|and)\s*", blob):
                     name = raw.strip(" .,'’-")
@@ -899,7 +915,8 @@ def resolve_company(
                 s for s in all_sources if s.source_type in ("official_site", "linkedin", "crunchbase")
             ]
             if len(strong) >= 3 and anchors and _extract_founders(
-                _founder_sources(all_sources, company=company, anchor_host=anchor_host)
+                _founder_sources(all_sources, company=company, anchor_host=anchor_host),
+                company=company,
             ):
                 _log_stage(
                     resolution,
@@ -933,7 +950,8 @@ def resolve_company(
             resolution.evidence_sources,
             company=company,
             anchor_host=profile_anchor,
-        )
+        ),
+        company=company,
     )
     resolution.description = _pick_description(
         _founder_sources(
