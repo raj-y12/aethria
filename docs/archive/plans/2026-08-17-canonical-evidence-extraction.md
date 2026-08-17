@@ -398,7 +398,7 @@ Including its retry-on-empty-content behavior (the exact gpt-5-class reasoning-t
 
 ---
 
-### Task 2: Write the extraction function
+### Task 2: Write the extraction function — DONE
 
 **Files:**
 - Create: `backend/evidence/extraction.py`
@@ -436,6 +436,16 @@ async def extract_claims_from_evidence(
 **Prohibited:** do not create a claim with no supporting evidence link (an ungrounded score is exactly the "model invents a fact" failure mode ADR-0006/invariant 5 exists to prevent). Do not let the model choose a `claim_type` outside the dimension's `CriterionRule.claim_types` list — validate and drop any that don't match rather than trusting the model's string.
 
 **Required tests:** fake OpenAI client (mirroring `test_scout_payload_coercion.py`'s `_FakeChatCompletions` pattern) — covers: a valid extraction response creates claims with correct `criterion_score`/links; an empty `claims` response creates nothing, no error; a claim referencing a nonexistent `supporting_evidence_item_ids` is dropped, not persisted ungrounded; a `claim_type` outside the dimension's accepted list is dropped; retry-on-empty-content behavior matches Reviewer's (reuse, don't reimplement, if the retry logic can be factored into a shared helper — check `reviewer/base.py` for whether this is already extractable before duplicating it).
+
+**Implementation notes:**
+- The retry-on-empty-content logic (`_chat_completion_content`, `_reviewer_max_completion_tokens`) turned out to be private, module-scoped functions in `reviewer/base.py` — not already extractable without refactoring a working, tested file for a tangential reason. Per the task's own instruction ("check before duplicating"), wrote a small local equivalent in `evidence/extraction.py` instead — a two-budget retry list `[4096, 8192]`, smaller than Reviewer's `[16384, 32768]` since extraction's output schema is far smaller than a full review.
+- Rubric loading: `core.policy_resolver.get_evaluation_rubric()` is the existing loader Reviewer itself uses (confirmed via `grep`) — passed in by the caller (Task 3's job) rather than loaded inside `extract_claims_from_evidence` itself, keeping the function testable without touching the config-loading singleton.
+- `_rubric_dimension()` strips the rubric's `_score` suffix (`market_score` → `market`) to match `CriterionRule.criterion`'s bare dimension names — a real naming mismatch between the two config files, handled at the one call site that bridges them.
+
+**Verification:**
+- [x] `tests/evidence/test_extraction.py` — 7/7 passed (all from the required-tests list above, plus an explicit "no missing_evidence" and "no evidence_items" early-exit test).
+- [x] Full backend suite: 2245 passed (2238 + 7 new), 43 pre-existing failures unchanged, zero regressions.
+- [x] **Verified the exact claim shape against real Postgres**, not just the fake repository: called `EvidenceRepository.create_claim` directly with Stripe's real (Task 1-verified, `verification_state='verified'`) evidence item, using the exact `ClaimInput`/`ClaimEvidenceLinkInput` construction `extract_claims_from_evidence` uses. Confirmed `normalized_value: {"criterion_score": 8.0}` round-trips correctly — the exact shape `evaluate_snapshot()`'s `_score()` reads. Test row cleaned up after.
 
 ---
 
