@@ -84,23 +84,19 @@ Four sub-projects, in this order. Each is independently shippable and testable �
 
 ---
 
-### Sub-project 3: Portfolio store consolidation
+### Sub-project 3: Portfolio store consolidation — CLOSED, no changes (2026-08-17)
 
-**Objective:** One portfolio persistence path (`portfolio/repository.py`, canonical, asyncpg) instead of two (`portfolio/store.py`, legacy, Supabase-client).
+**Original objective:** One portfolio persistence path (`portfolio/repository.py`, canonical, asyncpg) instead of two (`portfolio/store.py`, legacy, Supabase-client). Written 2026-08-16.
 
-**Files to read fully before writing a task-level plan:**
-- `backend/portfolio/store.py` (531 lines) — current call sites, confirmed this session: `pipeline_runner.py`, `api.py`, `routers/deps.py`, `routers/analytics.py`, `partner/engine.py`, `partner/decision.py`, `portfolio/signals.py`, `portfolio/feedback.py`, `portfolio/execution.py`, `portfolio/health.py`, `portfolio/engine.py` — every one of these needs to move to `repository.py` deliberately, not have `store.py` deleted out from under it.
-- `backend/portfolio/repository.py` (151 lines) — what it currently supports vs. what `store.py`'s callers need; this sub-project likely needs to *extend* `repository.py`'s surface before callers can move, not just redirect imports.
-- `backend/portfolio/canonical_projection.py` (48 lines) — may already be a partial bridge; read it before assuming one needs to be built from scratch.
+**What investigation on 2026-08-17 found — the premise was stale:**
 
-**Acceptance criteria:**
-- Every listed call site reads/writes through `portfolio/repository.py`.
-- `portfolio/store.py` is deleted, not left as unused dead code (AGENTS.md: clean up orphans a change creates).
-- No portfolio row is silently dropped or duplicated during the migration — this sub-project should include a one-time backfill/reconciliation check (matching the pattern used for Phase 2's identity backfill) before `store.py` is removed, not after.
+1. **`portfolio/store.py` is already on Postgres, not Supabase.** It reads/writes through `batch2_state`/`batch3_state` (`backend/batch2/repository.py`, `backend/batch3/repository.py`), both asyncpg, both in the provider-neutral migration tree (`db/migrations/20260811000015`, `...000016`). Local JSON is dev-fallback only. The "legacy Supabase-client" framing this sub-project was named for no longer describes the code.
 
-**Required tests:** contract test that every call site's read/write behavior is unchanged after moving to `repository.py`; a reconciliation test comparing row counts/content between the two stores before cutover.
+2. **`repository.py` and `store.py` don't represent the same data.** `repository.py` owns exactly one canonical table, `canonical_portfolio_positions` (keyed by `opportunity_id`+`company_id`). `store.py` owns five distinct legacy collections — decisions, positions, rejections, watchlist, signals — plus agent_metrics, keyed by legacy `startup_id`. Checked the migrations directly: **no canonical table exists for rejections, watchlist, signals, or agent_metrics.** `repository.py`'s own `list_decision_history` already UNIONs `store.py`'s `portfolio_decisions` table alongside canonical `human_rulings` as one of three read sources — partial, read-side consolidation is already deliberately underway, not something to build from scratch. "Delete `store.py`" was never achievable without first designing four undesigned canonical concepts — a product decision, not this sub-project's to make.
 
-**Prohibited:** deleting `store.py` before every caller has moved and been verified — this is a common way strangler migrations quietly lose data.
+3. **Every write path in `store.py` is dead in the product's current operating mode.** `add_to_portfolio`/`add_rejection`/`add_to_watchlist`/`add_signal`/`add_agent_metric` are reached exclusively through `ExecutionAgent`/`SignalTracker`/`FeedbackLoop`/`HealthMonitor` (`portfolio/execution.py`, `signals.py`, `feedback.py`, `health.py`), reached exclusively through `PortfolioEngine.run_cycle()`, reached exclusively through the periodic autonomous pipeline (`_user_agent_loop` in `api.py`) — gated behind `agent_config.partners_enabled` and off for the entire duration of this session (`active_agent_loops=0` in every log line, "Pipeline: OFF" in every UI screenshot). The live, verified product flow (on-demand dispatch — Equal1/Fire1/Vanta, all verified this session) only *reads* `portfolio_store` (`partner/decision.py`'s sector-concentration check, Sub-project 1 Task 4) — never writes to it. The product's current operating model is human-ruling-centric ("AWAITING YOUR RULING" is the primary UI state), not the autonomous accept/reject/watchlist model `ExecutionAgent` was built for.
+
+**Decision (2026-08-17): close, no changes.** The data-migration risk this sub-project was written to address (Supabase vs. Postgres) is already resolved elsewhere. What's left — whether the dormant autonomous-pipeline subsystem should be deprecated, and what canonical rejections/watchlist/signals/agent-metrics should even mean — is a product-scope decision bigger than a consolidation task, out of scope here. Revisit only if the autonomous pipeline is reactivated as a product direction.
 
 ---
 
