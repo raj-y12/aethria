@@ -211,7 +211,7 @@ class EvidenceArtifactInput(_TenantModel):
 
 ---
 
-### Task 2: Write the bounded retrieval-execution function
+### Task 2: Write the bounded retrieval-execution function — DONE (with a corrected design)
 
 **Files:**
 - Create: `backend/evidence/retrieval.py`
@@ -289,7 +289,19 @@ async def execute_evidence_plan(*, user_id, company_id, opportunity_id, plan, ev
 
 **Prohibited:** do not attempt claim extraction here — display_excerpt/normalized_value stay raw; turning this into typed claims is Phase C, not this task.
 
-**Required tests:** `test_retrieval.py` with a fake `evidence_repository`/mocked `retrieve_source_pack_merged` (patch at the `evidence.retrieval` import site) — covers: sources found → artifacts ingested with attribution fields set; zero sources → `persist_failure` called, zero artifacts; queries capped at `MAX_QUERIES` regardless of a longer `search_questions` list; a source with an empty snippet is skipped, not ingested as a blank artifact.
+**Corrections found during implementation (the sketch above is what was planned, not what shipped):**
+
+1. **The manual `persist_failure` call was wrong and got removed.** `retrieve_source_pack`/`retrieve_source_pack_merged` (`retrieval_grounding.py:375-393`) already call `cache.persist_success`/`cache.persist_failure` *internally*, non-fatally, on every call — Task 2's sketch would have duplicated that. `evidence/retrieval.py` as shipped has no manual failure-persistence call at all; it just returns `{"artifacts_ingested": 0, "queries_run": N}` when `sources` is empty and lets the already-existing internal mechanism handle bookkeeping.
+2. **New gap found, out of scope for this task**: `api.py` (the actual running server process) never calls `configure_retrieval_cache(...)` — only `run_system.py` (the standalone worker script) does. So in the live app today, the process-wide `_RETRIEVAL_CACHE` singleton stays `None`, and `persist_success`/`persist_failure` silently no-op (they're gated behind `if cache:`). Retrieval itself still works correctly either way — this only means cache-layer success/failure bookkeeping isn't actually happening in the live process right now. Not fixed here (it's a pre-existing gap in `api.py`'s startup sequence, not something this task touched or broke) — flagged as a real follow-up.
+3. `persist_failure` also turned out to be a **method on a `RetrievalCache` instance**, not a standalone function as the sketch imported it — moot given point 1, but worth recording so a future reader doesn't hit the same wrong import.
+
+**Files as actually shipped:**
+- `backend/evidence/retrieval.py` — `execute_evidence_plan()`, matching the interface above; internals differ from the sketch per the corrections.
+- `backend/tests/evidence/test_retrieval.py` (new, 4 tests) — sources found → ingested with attribution and the empty-snippet source skipped; zero sources → zero artifacts, no error (not "persist_failure called," corrected per above); queries capped at `MAX_QUERIES` regardless of a longer plan; an empty plan (`missing_evidence`/`search_questions` both `[]`) skips the retrieval call entirely — `retrieve_source_pack_merged` never invoked.
+
+**Verification:**
+- [x] `tests/evidence/test_retrieval.py` — 4/4 passed.
+- [x] Full backend suite: 2228 passed (2224 + 4 new), 43 pre-existing failures (unchanged), zero regressions.
 
 ---
 
