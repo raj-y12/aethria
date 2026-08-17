@@ -151,10 +151,193 @@ def compute_missing_evidence(
 
 ---
 
-## Phase B and C — not yet task-level planned
+## Phase B: Retrieval stage — task-level plan
 
-**Phase B (Retrieval stage):** bridge `retrieval_grounding.py`'s provider chain to `EvidenceRepository.ingest_artifact`, driven by the `evidence_plans` rows Phase A now produces. Needs to close four gaps found in investigation: unified canonical-URL + content-hash dedup (currently split across two inconsistent implementations, and canonical storage has no URL-based dedup at all); provider/query attribution reaching canonical storage (currently discarded before `ingest_artifact`); real cost gating (a reserve/settle ledger already exists in `monitoring/repository.py` but is wired to a hardcoded `$0`); independent failure storage on the canonical side (currently exists only in the ad-hoc retrieval cache).
+**Objective:** when Phase A's dispatch-triggered plan has non-empty `missing_evidence`, actually go retrieve something for it — inline, synchronous, bounded — before the dispatch finishes, and store what's found as canonical evidence artifacts.
 
-**Phase C (Extraction stage):** an LLM-based extractor producing claims in the ~30 claim types the compiled policy actually requires (currently 100% gap — `canonical_scout_claims.py`'s 11 regex-derived claim types share zero overlap with what any criterion accepts). Reuse `Reviewer._call_llm_sync`'s schema-enforcement/retry pattern (`reviewer/base.py:675+`) rather than building extraction scaffolding from scratch.
+### Architecture decision — inline/synchronous, not a background job (2026-08-17)
 
-Both phases block on Phase A shipping first, and their own task-level plans should be written once Phase A is verified live.
+Two designs were considered:
+
+1. **Async background job.** Reuse the existing but never-enqueued `JobType.EVIDENCE_REFRESH` job (`backend/jobs/handlers.py::evidence_refresh_handler`) and `MonitoringRepository.reserve_and_enqueue` (already builds a reservation + enqueues + notifies the worker in one call — real, working plumbing, just never triggered). Matches current real dispatch latency (already 1-3 minutes, well past the spec's 45s target) — adding more synchronous work would compound an already-blown budget.
+2. **Inline, synchronous, bounded.** The spec's own §9.13 critical-path budget table (lines 649-658) buckets "Parallel retrieval and source probes" at 12s as one line item *within* the 45s median target for the first recommendation — the reference architecture's literal intent is retrieval as part of the interactive path, not deferred.
+
+**Decision: inline.** Rationale (user's own words): there's no point deferring retrieval to an async follow-up if the user already saw and reacted to the first, incomplete evaluation — a silent later improvement nobody is told about isn't a real improvement. Matches the spec's literal target architecture, not just current practice.
+
+**Important scope boundary to set correctly:** Phase B alone retrieves and stores *artifacts* (`evidence_artifacts`/`evidence_items`) — it does not produce *claims*. `evaluate_snapshot()` only ever reads claims. So Phase B, even fully shipped, will not visibly change any score or recommendation by itself — that only happens once Phase C (extraction: artifacts → typed claims) also ships. Phase B's payoff is that when Phase C ships, the evidence to extract from will already be there; shipping B before C is still worth doing (each is independently testable and reviewable), but say so plainly rather than implying B alone closes the loop.
+
+### What was found investigating the four gaps
+
+- **Dedup**: `EvidenceRepository.ingest_artifact` already dedups by `(user_id, content_hash, access_class)` at the DB level (`on conflict ... do nothing`, `evidence/repository.py:83`) — sufficient for Phase B's minimal bar. Full canonical-URL dedup (closing the "two inconsistent normalizers" gap between `retrieval_grounding.py`'s merge dedup and `retrieval_cache.py`'s cache dedup) is a real but separable refinement, not blocking — noted as a follow-up, not built here.
+- **Attribution**: `EvidenceArtifactInput`/`evidence_artifacts` has no `retrieval_provider`/`retrieval_query` columns at all — real gap, needs a migration (Task 1).
+- **Cost gating**: `CostController` (`portfolio/cost_control.py`) is LLM-token/call-shaped (`{"scout":..., "reviewer":..., "partner":...}` budgets) — Scout's own retrieval calls already bypass it entirely (`scout/base.py:935,1120` call `retrieve_source_pack_merged` directly, ungated). Retrofitting a dollar-based reservation system onto Phase B would be inventing a pattern nothing else in the codebase follows. Decision: bound by **count** (few queries, few artifacts — matching the spec's 12s budget), same as Scout already does. Real dollar-based gating stays a known, named gap — not a false-complete solution.
+- **Failure storage**: `retrieval_cache.persist_failure` (`utils/retrieval_cache.py:110-116`) already exists and needs no new schema — reusable as-is for a canonical-triggered query that returns nothing.
+- **Async-safety** (found during this investigation, not in the original four): `retrieval_cache.py`'s internal `_run_async` calls `asyncio.run()`, which raises if called from a thread that already has a running event loop. Calling `retrieve_source_pack`/`_merged` directly from `pipeline_runner.py` (already inside an async function, already inside a running loop) would crash. **Must wrap the call in `asyncio.to_thread(...)`.**
+- **Reusable ingestion pattern**: `canonical_scout_claims.py::persist_scout_claims` (lines 120-145) already does exactly the "source dict → `EvidenceArtifactInput`/`EvidenceItemInput` → `ingest_artifact`" conversion Phase B needs — content hashing, trust/access class defaulting, prompt-injection detection. Mirror it rather than reinventing; it has the same attribution gap (no provider/query fields passed through either), confirming Task 1 is a real, shared gap, not something Phase B invents new.
+
+---
+
+### Task 1: Add retrieval attribution to canonical evidence storage — DONE
+
+**Files:**
+- Create: `db/migrations/20260817000001_evidence_artifact_retrieval_attribution.sql`
+- Modify: `backend/evidence/models.py` — `EvidenceArtifactInput`/`EvidenceArtifactRecord`.
+
+**Migration:**
+```sql
+alter table public.evidence_artifacts
+  add column if not exists retrieval_provider text,
+  add column if not exists retrieval_query text;
+```
+
+**Model change:**
+```python
+class EvidenceArtifactInput(_TenantModel):
+    ...
+    retrieval_provider: Optional[str] = Field(default=None, max_length=100)
+    retrieval_query: Optional[str] = Field(default=None, max_length=500)
+```
+
+**Modify `EvidenceRepository.ingest_artifact`** (`evidence/repository.py:60-143`) — add `retrieval_provider`/`retrieval_query` to the insert column list and values tuple (both the `insert` and the two `select`/`fetchrow` fallback paths already return `*`, so no read-path change needed).
+
+**Acceptance:** an artifact ingested via Scout's existing `persist_scout_claims` path (which won't pass these fields) still works — both new columns nullable, no behavior change for existing callers.
+
+**Verification:**
+- [x] Migration applied against the real dev Postgres via `python3 scripts/migrate_postgres.py` — `Applied migrations: 20260817000001`. Confirmed both columns exist.
+- [x] Verified `ingest_artifact` directly against real Postgres both ways: without attribution (mirrors `persist_scout_claims`'s existing calls) → `retrieval_provider`/`retrieval_query` both `None`, no error; with attribution → both fields round-trip correctly. Test rows cleaned up after.
+- [x] Full backend suite: 2224 passed (unchanged from before this task), 43 pre-existing failures (unchanged), zero regressions.
+- [x] `python3 -c "import api"` — clean.
+- [x] `tests/evidence/` — 14/14 passed, including the existing model-contract test (`test_artifact_and_item_contracts_are_tenant_scoped_and_bounded`), confirming the new optional fields didn't break any existing contract assertion.
+
+---
+
+### Task 2: Write the bounded retrieval-execution function
+
+**Files:**
+- Create: `backend/evidence/retrieval.py`
+- Test: `backend/tests/evidence/test_retrieval.py`
+
+**Interfaces:**
+```python
+async def execute_evidence_plan(
+    *,
+    user_id: str,
+    company_id: str,
+    opportunity_id: str,
+    plan: EvidencePlanRecord,
+    evidence_repository: Any,
+    company_name: str,
+) -> dict[str, int]:
+    """Bounded, synchronous (from the caller's perspective) retrieval against a
+    plan's search_questions. Ingests found sources as canonical evidence
+    artifacts/items; does not produce claims (Phase C's job). Bounded by count,
+    not dollar cost -- matches how Scout's own retrieval is already ungated."""
+```
+
+**Implementation sketch:**
+```python
+from utils.retrieval_grounding import retrieve_source_pack_merged
+from utils.retrieval_cache import persist_failure
+from evidence.models import (
+    AccessClass, ArtifactType, EvidenceArtifactInput, EvidenceItemInput,
+    TrustClass, VerificationState,
+)
+from evidence.service import detect_prompt_injection
+import asyncio, hashlib
+
+MAX_QUERIES = 3  # bounds this to the spec's ~12s retrieval budget
+
+async def execute_evidence_plan(*, user_id, company_id, opportunity_id, plan, evidence_repository, company_name):
+    queries = [f"{company_name} {q}" for q in plan.search_questions[:MAX_QUERIES]]
+    if not queries:
+        return {"artifacts_ingested": 0, "queries_run": 0}
+    pack = await asyncio.to_thread(
+        retrieve_source_pack_merged,
+        queries=queries, user_id=user_id, max_per_query=4, max_total_sources=plan.max_artifacts,
+    )
+    sources = pack.get("sources") or []
+    if not sources:
+        await asyncio.to_thread(
+            persist_failure, user_id=user_id, query=queries[0], category=None,
+            time_range=None, days=None, provider=str(pack.get("provider") or ""),
+            diagnostics=pack.get("provider_diagnostics") or [],
+        )
+        return {"artifacts_ingested": 0, "queries_run": len(queries)}
+    ingested = 0
+    for source in sources:
+        content = str(source.get("snippet") or "").strip()
+        if not content:
+            continue
+        await evidence_repository.ingest_artifact(
+            EvidenceArtifactInput(
+                user_id=user_id, company_id=company_id, opportunity_id=opportunity_id,
+                artifact_type=ArtifactType.WEB_PAGE, source_uri=source.get("url"),
+                title=source.get("title"), content_hash=hashlib.sha256(content.encode()).hexdigest(),
+                trust_class=TrustClass.UNKNOWN, access_class=AccessClass.PUBLIC,
+                untrusted_input=True, prompt_injection_detected=detect_prompt_injection(content),
+                retrieval_provider=str(pack.get("provider") or ""), retrieval_query=queries[0],
+            ),
+            items=[EvidenceItemInput(
+                user_id=user_id, item_type="retrieval_excerpt", normalized_value={},
+                display_excerpt=content[:2000], source_locator=source.get("url"),
+                verification_state=VerificationState.UNVERIFIED,
+            )],
+        )
+        ingested += 1
+    return {"artifacts_ingested": ingested, "queries_run": len(queries)}
+```
+
+**Prohibited:** do not attempt claim extraction here — display_excerpt/normalized_value stay raw; turning this into typed claims is Phase C, not this task.
+
+**Required tests:** `test_retrieval.py` with a fake `evidence_repository`/mocked `retrieve_source_pack_merged` (patch at the `evidence.retrieval` import site) — covers: sources found → artifacts ingested with attribution fields set; zero sources → `persist_failure` called, zero artifacts; queries capped at `MAX_QUERIES` regardless of a longer `search_questions` list; a source with an empty snippet is skipped, not ingested as a blank artifact.
+
+---
+
+### Task 3: Wire it inline into the dispatch pipeline
+
+**Files:**
+- Modify: `backend/pipeline_runner.py` — inside the same best-effort block Phase A added (right after `create_plan(...)` succeeds).
+
+**Implementation:**
+```python
+                        if missing_evidence:
+                            plan = await EvidenceRepository(postgres_pool).create_plan(
+                                user_id=user_id,
+                                opportunity_id=canonical_admission.opportunity_id,
+                                trigger_type="dispatch",
+                                missing_evidence=missing_evidence,
+                                search_questions=search_questions,
+                            )
+                            await execute_evidence_plan(
+                                user_id=user_id,
+                                company_id=canonical_admission.company_id,
+                                opportunity_id=canonical_admission.opportunity_id,
+                                plan=plan,
+                                evidence_repository=EvidenceRepository(postgres_pool),
+                                company_name=company,
+                            )
+```
+(`create_plan`'s return value wasn't captured before — Phase A discarded it. Task 3 captures it since Task 2's function needs the plan's `max_artifacts`/`search_questions`.)
+
+**Import to add:** `from evidence.retrieval import execute_evidence_plan`.
+
+**Deliberately not doing:** re-running `EvaluationRepository.evaluate()` after retrieval. Phase B alone produces artifacts, not claims — re-evaluating now would produce an identical `insufficient_evidence` result (nothing new to score against) and just add latency for no visible change. Re-evaluation after evidence work belongs with Phase C, once there's something new for it to find.
+
+**Acceptance:** a dispatch with missing evidence now takes measurably longer (bounded to ~3 queries) and produces new `evidence_artifacts`/`evidence_items` rows for the opportunity. A dispatch with no missing evidence is unaffected (no retrieval call at all — `execute_evidence_plan` only runs inside `if missing_evidence:`). A retrieval failure (provider down, zero results) does not fail the dispatch — same best-effort contract as everything else in this block.
+
+---
+
+### Task 4: Full verification gate
+
+- [ ] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v`
+- [ ] Full backend suite — confirm no regressions beyond the pre-existing Postgres-container failures.
+- [ ] `python3 -c "import api"` — confirms the migration's new columns don't break model validation anywhere else that reads `evidence_artifacts` rows.
+- [ ] Live-verify: dispatch a company with no existing claims, confirm new `evidence_artifacts` rows appear with `retrieval_provider`/`retrieval_query` populated, confirm the dispatch completes (slower, but successfully), confirm a company with full coverage triggers no retrieval call at all (check the log — no `retrieve_source_pack_merged` invocation).
+
+---
+
+## Phase C — not yet task-level planned
+
+An LLM-based extractor producing claims in the ~30 claim types the compiled policy actually requires (currently 100% gap — `canonical_scout_claims.py`'s 11 regex-derived claim types share zero overlap with what any criterion accepts). Reuse `Reviewer._call_llm_sync`'s schema-enforcement/retry pattern (`reviewer/base.py:675+`) rather than building extraction scaffolding from scratch. Once Phase C ships, Task 3's "deliberately not doing" re-evaluation note above should be revisited — that's the point at which re-running `evaluate()` after evidence work actually has something new to find.
+
+Blocks on Phase B shipping first — task-level plan to be written once Phase B is verified live.

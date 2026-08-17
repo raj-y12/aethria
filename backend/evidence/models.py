@@ -111,6 +111,8 @@ class EvidenceArtifactInput(_TenantModel):
     published_at: Optional[datetime] = None
     effective_at: Optional[datetime] = None
     retrieved_at: datetime = Field(default_factory=utcnow)
+    retrieval_provider: Optional[str] = Field(default=None, max_length=100)
+    retrieval_query: Optional[str] = Field(default=None, max_length=500)
 
 
 class EvidenceItemInput(_TenantModel):

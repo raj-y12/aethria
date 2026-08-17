@@ -76,9 +76,9 @@ class EvidenceRepository:
                       content_hash, storage_reference, trust_class, access_class,
                       retention_policy, parser_version, untrusted_input,
                       prompt_injection_detected, published_at, effective_at,
-                      retrieved_at, created_at
+                      retrieved_at, retrieval_provider, retrieval_query, created_at
                     ) values (
-                      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,now()
+                      $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,now()
                     )
                     on conflict (user_id, content_hash, access_class) do nothing
                     returning *
@@ -91,6 +91,7 @@ class EvidenceRepository:
                     artifact.parser_version, artifact.untrusted_input,
                     artifact.prompt_injection_detected, artifact.published_at,
                     artifact.effective_at, artifact.retrieved_at,
+                    artifact.retrieval_provider, artifact.retrieval_query,
                 )
                 if row is None:
                     row = await conn.fetchrow(
