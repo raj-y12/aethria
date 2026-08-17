@@ -50,6 +50,13 @@ def _domain(url: Optional[str]) -> str:
     return netloc[4:] if netloc.startswith("www.") else netloc
 
 
+# Per-query source cap (audit HIGH-B4 fix below runs one retrieval call per
+# query instead of one batched call across all of them -- this bounds each
+# call's own contribution so total worst-case volume across MAX_QUERIES
+# queries stays reasonable).
+_MAX_SOURCES_PER_QUERY = 4
+
+
 async def execute_evidence_plan(
     *,
     user_id: str,
@@ -64,98 +71,136 @@ async def execute_evidence_plan(
     if not queries:
         return {"artifacts_ingested": 0, "queries_run": 0, "verified_items": []}
 
-    pack = await asyncio.to_thread(
-        retrieve_source_pack_merged,
-        queries=queries,
-        user_id=user_id,
-        max_per_query=4,
-        max_total_sources=plan.max_artifacts,
+    # Fixed 2026-08-17 (audit HIGH-B4): corroboration used to be computed once
+    # across every source from every query pooled into a single batched
+    # retrieval call -- so two sources on completely unrelated facts (a
+    # funding page from the market query, an unrelated blog from the
+    # execution query) could satisfy ">= 2 distinct domains" and mark
+    # *everything* in the pass verified, including a single-source claim
+    # about a different fact nothing actually corroborates. Each query now
+    # runs as its own retrieval call, and corroboration is scored only
+    # within that query's own results -- sources that actually responded to
+    # the same question, not whatever else happened to come back this pass.
+    # Real cost tradeoff, not hidden: this is now up to len(queries) separate
+    # provider calls instead of one merged call; run concurrently to bound
+    # wall-clock time, not sequentially.
+    packs = await asyncio.gather(
+        *[
+            asyncio.to_thread(
+                retrieve_source_pack_merged,
+                queries=[query],
+                user_id=user_id,
+                max_per_query=_MAX_SOURCES_PER_QUERY,
+                max_total_sources=_MAX_SOURCES_PER_QUERY,
+            )
+            for query in queries
+        ]
     )
-    provider = str(pack.get("provider") or "")
-    sources = pack.get("sources") or []
 
-    # Deterministic trust/verification (spec §9.6 is otherwise entirely
-    # unbuilt -- nothing else in the codebase ever marks retrieved evidence
-    # VERIFIED). The active policy blocks trust_class="unknown" outright and
-    # requires verification_state="verified" for a claim to ever score
-    # (decision_safety.evidence_eligibility, resources/config/partner_rules).
-    # Two auditable rules, no model judgment involved:
-    #   - the company's own domain is TrustClass.OFFICIAL and verified
-    #     unconditionally (first-party statements about itself);
-    #   - anything else is TrustClass.INDEPENDENT (retrieved, third-party,
-    #     never "unknown" -- it has a real URL/domain); verified only when
-    #     corroborated by >=2 distinct non-official domains in this same
-    #     retrieval pass. A single uncorroborated source stays unverified --
-    #     correctly conservative, not a claim-blocking regression.
     official_domain = _domain(company_website)
-    domains = [_domain(s.get("url")) for s in sources]
-    independent_domains = {d for d in domains if d and d != official_domain}
-    corroborated = len(independent_domains) >= 2
-
+    provider = ""
     ingested = 0
+    seen_urls: set[str] = set()
     # Only verified items can ever support a scored claim (the same
     # eligibility gate evaluate_claim_score_eligibility enforces later) --
     # no point spending extraction tokens on evidence that can't help.
     verified_items: list[dict[str, Any]] = []
-    for source, domain in zip(sources, domains):
-        content = str(source.get("snippet") or "").strip()
-        if not content:
-            continue
-        is_official = bool(domain) and domain == official_domain
-        trust_class = TrustClass.OFFICIAL if is_official else TrustClass.INDEPENDENT
-        verification_state = (
-            VerificationState.VERIFIED
-            if is_official or corroborated
-            else VerificationState.UNVERIFIED
-        )
-        # decision_safety.evidence_eligibility.min_source_quality gates claim
-        # eligibility on this same source_quality value (service.py); it
-        # defaults to 0.0 on EvidenceItemInput and was never being set here,
-        # so every retrieved item was silently permanently ineligible.
-        # First-party is full quality; corroborated third-party sits above
-        # the eligibility floor but below full_confidence_at (0.8), which
-        # correctly caps confidence rather than granting it outright.
-        source_quality = 1.0 if is_official else (0.6 if corroborated else 0.0)
-        _artifact, items = await evidence_repository.ingest_artifact(
-            EvidenceArtifactInput(
-                user_id=user_id,
-                company_id=company_id,
-                opportunity_id=opportunity_id,
-                artifact_type=ArtifactType.WEB_PAGE,
-                source_uri=source.get("url"),
-                title=source.get("title"),
-                content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
-                trust_class=trust_class,
-                access_class=AccessClass.PUBLIC,
-                untrusted_input=True,
-                prompt_injection_detected=detect_prompt_injection(content),
-                retrieval_provider=provider,
-                retrieval_query=queries[0],
-            ),
-            items=[
-                EvidenceItemInput(
-                    user_id=user_id,
-                    item_type="retrieval_excerpt",
-                    normalized_value={},
-                    display_excerpt=content[:2000],
-                    source_locator=source.get("url"),
-                    verification_state=verification_state,
-                    source_quality=source_quality,
-                )
-            ],
-        )
-        ingested += 1
-        if verification_state == VerificationState.VERIFIED and items:
-            verified_items.append(
-                {
-                    "evidence_item_id": str(items[0].evidence_item_id),
-                    "display_excerpt": items[0].display_excerpt,
-                    # Threaded through so extraction can derive a claim-evidence
-                    # link's support_strength from this deterministic signal
-                    # instead of reusing the model's own claim confidence
-                    # (audit CRITICAL-4 -- one number was gating both).
-                    "source_quality": source_quality,
-                }
+    for query, pack in zip(queries, packs):
+        provider = str(pack.get("provider") or "") or provider
+        sources = pack.get("sources") or []
+        # Deterministic trust/verification (spec §9.6 is otherwise entirely
+        # unbuilt -- nothing else in the codebase ever marks retrieved
+        # evidence VERIFIED). Two auditable rules, no model judgment
+        # involved:
+        #   - the company's own domain is TrustClass.OFFICIAL and verified
+        #     unconditionally (first-party statements about itself);
+        #   - anything else is TrustClass.INDEPENDENT; verified only when
+        #     corroborated by >=2 distinct non-official domains that
+        #     answered THIS query. A single uncorroborated source stays
+        #     unverified -- correctly conservative, not a regression.
+        domains = [_domain(s.get("url")) for s in sources]
+        independent_domains = {d for d in domains if d and d != official_domain}
+        corroborated = len(independent_domains) >= 2
+
+        for source, domain in zip(sources, domains):
+            url = str(source.get("url") or "")
+            if url and url in seen_urls:
+                continue
+            content = str(source.get("snippet") or "").strip()
+            if not content:
+                continue
+            if ingested >= plan.max_artifacts:
+                # Fixed 2026-08-17 (audit HIGH-A5/B4 self-audit): the per-query
+                # rewrite dropped the caller's overall max_artifacts budget --
+                # it used to bound the single merged retrieval call, but
+                # nothing capped the sum across the now-separate per-query
+                # calls. A caller-configured budget (routers/evidence.py,
+                # jobs/handlers.py) was silently exceeded (up to
+                # len(queries) * _MAX_SOURCES_PER_QUERY instead). This just
+                # stops ingesting once the plan's own budget is spent.
+                break
+            if url:
+                seen_urls.add(url)
+            is_official = bool(domain) and domain == official_domain
+            trust_class = TrustClass.OFFICIAL if is_official else TrustClass.INDEPENDENT
+            verification_state = (
+                VerificationState.VERIFIED
+                if is_official or corroborated
+                else VerificationState.UNVERIFIED
             )
+            # decision_safety.evidence_eligibility.min_source_quality gates
+            # claim eligibility on this same source_quality value
+            # (service.py); it defaults to 0.0 on EvidenceItemInput and was
+            # never being set here, so every retrieved item was silently
+            # permanently ineligible. First-party is full quality;
+            # corroborated third-party sits above the eligibility floor but
+            # below full_confidence_at (0.8), which correctly caps
+            # confidence rather than granting it outright.
+            source_quality = 1.0 if is_official else (0.6 if corroborated else 0.0)
+            _artifact, items = await evidence_repository.ingest_artifact(
+                EvidenceArtifactInput(
+                    user_id=user_id,
+                    company_id=company_id,
+                    opportunity_id=opportunity_id,
+                    artifact_type=ArtifactType.WEB_PAGE,
+                    source_uri=source.get("url"),
+                    title=source.get("title"),
+                    content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest(),
+                    trust_class=trust_class,
+                    access_class=AccessClass.PUBLIC,
+                    untrusted_input=True,
+                    prompt_injection_detected=detect_prompt_injection(content),
+                    retrieval_provider=provider,
+                    # Fixed alongside B4: this used to always be queries[0]
+                    # regardless of which query actually found the source --
+                    # now correctly attributed since each source is now
+                    # processed within the one query that returned it.
+                    retrieval_query=query,
+                ),
+                items=[
+                    EvidenceItemInput(
+                        user_id=user_id,
+                        item_type="retrieval_excerpt",
+                        normalized_value={},
+                        display_excerpt=content[:2000],
+                        source_locator=source.get("url"),
+                        verification_state=verification_state,
+                        source_quality=source_quality,
+                    )
+                ],
+            )
+            ingested += 1
+            if verification_state == VerificationState.VERIFIED and items:
+                verified_items.append(
+                    {
+                        "evidence_item_id": str(items[0].evidence_item_id),
+                        "display_excerpt": items[0].display_excerpt,
+                        # Threaded through so extraction can derive a claim-evidence
+                        # link's support_strength from this deterministic signal
+                        # instead of reusing the model's own claim confidence
+                        # (audit CRITICAL-4 -- one number was gating both).
+                        "source_quality": source_quality,
+                    }
+                )
 
     return {"artifacts_ingested": ingested, "queries_run": len(queries), "verified_items": verified_items}

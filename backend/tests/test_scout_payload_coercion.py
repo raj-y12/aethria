@@ -30,6 +30,32 @@ def test_reject_misattributed_founder_names_keeps_names_with_no_role_mention_nea
     assert _reject_misattributed_founder_names(["Guillermo Rauch"], source_pack, "Vercel") == ["Guillermo Rauch"]
 
 
+def test_reject_misattributed_founder_names_keeps_a_name_with_one_correct_and_one_bad_mention():
+    """Regression (audit HIGH-A5): the fix for the Vercel/Hashimoto bug was
+    itself over-broad -- the first misattributed mention anywhere rejected
+    the name outright, even when a separate, correct mention of the same
+    person existed elsewhere in the same evidence blob. A real founder
+    correctly named once and merely mentioned near an unrelated company once
+    elsewhere must survive."""
+    source_pack = {
+        "sources": [
+            {"title": "x", "snippet": "Jane Smith, founder of Acme, announced the round."},
+            {"title": "y", "snippet": "Jane Smith was previously an advisor, co-founder of OtherCo."},
+        ]
+    }
+    assert _reject_misattributed_founder_names(["Jane Smith"], source_pack, "Acme") == ["Jane Smith"]
+
+
+def test_reject_misattributed_founder_names_still_rejects_when_every_mention_is_elsewhere():
+    source_pack = {
+        "sources": [
+            {"title": "x", "snippet": "Jane Smith, co-founder of OtherCo, spoke today."},
+            {"title": "y", "snippet": "Later, Jane Smith, founder of OtherCo, added more context."},
+        ]
+    }
+    assert _reject_misattributed_founder_names(["Jane Smith"], source_pack, "Acme") == []
+
+
 class DummyScout(Scout):
     pass
 
@@ -159,7 +185,12 @@ def test_coerce_payload_preserves_plain_urls_without_markdown_brackets():
     assert out["one_line"] == "See https://example.com/product for details"
 
 
-def test_coerce_payload_fixes_missing_name_and_target_users():
+def test_coerce_payload_fixes_target_users_but_leaves_a_missing_name_empty():
+    """Regression (audit HIGH-A7): a missing name used to be silently
+    fabricated ("Unknown Startup" / truncated one_line) so this coercion step
+    never itself surfaced the gap. It's now left empty; validate_scout_output
+    (schema.py) rejects an empty name, routing through the existing
+    repair-pass machinery instead of persisting a guess."""
     scout = DummyScout(
         scout_type="market_driven",
         system_prompt="test",
@@ -174,13 +205,61 @@ def test_coerce_payload_fixes_missing_name_and_target_users():
         "references": "Example - https://example.com",
     }
     out = scout._coerce_scout_payload(payload)
-    assert isinstance(out["name"], str)
-    assert out["name"] != ""
+    assert out["name"] == ""
     assert isinstance(out["target_users"], str)
     assert "ops leaders" in out["target_users"]
     assert isinstance(out["confidence"], float)
-    assert len(out["key_assumptions"]) >= 2
-    assert isinstance(out["references"], list)
+
+
+def test_coerce_payload_leaves_unparseable_confidence_as_none_not_fabricated_default():
+    """Regression (audit HIGH-A6, partial): a genuinely unparseable confidence
+    used to be silently replaced with a fabricated 0.5, indistinguishable
+    from a real model-reported 0.5. It's now left None, which fails
+    validate_scout_output's float type check instead of hiding the gap."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {"name": "Acme", "confidence": "not-a-number"}
+    out = scout._coerce_scout_payload(payload)
+    assert out["confidence"] is None
+
+
+def test_coerce_payload_does_not_pad_a_short_key_assumptions_list_with_filler():
+    """Regression (audit HIGH-A8): fewer than 2 real assumptions used to be
+    silently padded with generic filler text ("Customer demand converts into
+    repeat usage." etc.), indistinguishable from real model output. It's now
+    left short; validate_scout_output's 2-4 count check catches the shortfall."""
+    scout = DummyScout(
+        scout_type="market_driven",
+        system_prompt="test",
+        api_key="test-key",
+        tenant_user_id="user_test_123",
+    )
+    payload = {"name": "Acme", "key_assumptions": ["Only one real assumption."]}
+    out = scout._coerce_scout_payload(payload)
+    assert out["key_assumptions"] == ["Only one real assumption."]
+
+
+def test_validate_scout_output_rejects_empty_name_instead_of_a_fabricated_one():
+    """End-to-end confirmation of A7's fail-closed path: an empty name must
+    actually fail schema validation, not just fail to get fabricated."""
+    from scout.schema import validate_scout_output
+
+    payload = {
+        "id": "s1", "scout_type": "market_driven", "name": "", "one_line": "x",
+        "sector": "x", "problem": "x", "solution": "x", "target_users": "x",
+        "why_now": "x", "confidence": 0.5, "primary_thesis": "x",
+        "key_assumptions": ["a", "b"], "biggest_unknown": "x",
+        "references": ["Example - https://example.com"],
+    }
+    try:
+        validate_scout_output(payload)
+        assert False, "expected ValueError for empty name"
+    except ValueError as e:
+        assert "name" in str(e)
 
 
 def test_call_llm_records_retrieval_no_results_separately_from_model_failure(monkeypatch):

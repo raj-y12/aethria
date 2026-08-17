@@ -228,6 +228,66 @@ real data, not just fixtures.
   with the full real-claim reasoning trail visible (today's earlier
   reasoning fix + C4 all confirmed together in one live output).
 
+## HIGH findings — all 9 fixed and live-validated, 2026-08-17
+
+Fixed in one pass (A2–A8, B4, B5), full backend suite (2274 passed, same 39
+pre-existing Postgres-container failures, zero regressions), then a brutal
+self-audit of the fixes themselves — which caught one genuine regression in
+my own B4 rewrite (below) — before live-dispatching a real company
+(Perplexity AI) to validate against production data.
+
+- **A2 (wasted Founder Resolver pass):** `scout/engine.py` now skips Stage 2
+  only when Stage 1 already `FOUND` founder names. Live-observed correctly
+  *not* skipping: Stage 1 resolved Perplexity's identity (`FOUND`,
+  confidence 0.70) but had no founder names, so Stage 2 ran — and still
+  found none ("No founder could be confirmed"), a genuine pre-existing
+  search-quality gap unrelated to this fix, not a regression from it.
+- **A3 (missing source_type on gap-fill path):** `founder_resolution_from_gap_pack`
+  now classifies `source_type` via `_classify_source`; unit-tested
+  (`test_gap_pack_classifies_source_type_so_official_site_bonus_can_fire`).
+- **A4 (unescaped retrieved titles):** `render_sources_for_prompt` now wraps
+  titles through `isolate_untrusted_text`, same as snippets already did;
+  live-observed clean titles with no injection artifacts in the memo's
+  source list.
+- **A5 (over-broad founder-name rejection):** `_reject_misattributed_founder_names`
+  now rejects a name only when *every* occurrence is misattributed, not the
+  first one found.
+- **A6/A7 (fabricated confidence/name):** unparseable confidence and empty
+  name are no longer silently defaulted (0.5, "Unknown Startup") — they fail
+  `validate_scout_output` and route through the existing repair pass,
+  failing closed if repair can't produce a real value. Live-observed: no
+  fabricated founder or company name anywhere in the Perplexity AI memo.
+- **A8 (padded key_assumptions):** generic filler assumptions are no longer
+  spliced in to satisfy the 2-minimum; a genuine shortfall now fails
+  validation and repairs instead.
+- **B4 (pass-level vs per-query corroboration):** `execute_evidence_plan`
+  runs one retrieval call per query and scores corroboration within that
+  query's own results only. Live-observed: `retrieval_query` on every
+  ingested artifact is the *actual* query that found it (not always
+  `queries[0]` as before), and evidence artifacts for the "market" question
+  are all correctly tagged with the market query.
+- **B5 (no dedup on evidence_items re-ingestion):** new migration
+  (`db/migrations/20260817000002_evidence_items_content_dedup.sql`) adds a
+  `content_hash` column and a unique index on `(user_id, artifact_id,
+  content_hash)`; `ingest_artifact` now does `on conflict ... do nothing`
+  with a re-select fallback, mirroring the existing artifact-level dedup.
+  Applying the migration to the local snapshot DB hit a real pre-existing
+  duplicate (`UniqueViolationError`) — direct confirmation the bug was live,
+  not theoretical; the migration dedupes existing rows (oldest wins) before
+  adding the constraint. Two new Postgres-contract tests
+  (`test_evidence_repository_postgres.py`) prove both the dedup case and the
+  distinct-content case.
+
+**Self-audit catch:** the B4 rewrite (one retrieval call per query instead
+of one batched call) dropped the caller-configured `plan.max_artifacts`
+budget — nothing summed ingestion across the now-separate per-query calls,
+so a plan configured for e.g. 5 artifacts could silently ingest up to
+`len(queries) * 4`. Fixed by re-checking `plan.max_artifacts` before each
+ingest inside the per-query loop; live-verified on the Perplexity AI
+dispatch — exactly 5 artifacts ingested from a 5-query plan capped at 5,
+despite 20 available sources. New regression test:
+`test_max_artifacts_budget_is_respected_across_queries`.
+
 ## Suggested sequencing (not started)
 
 Same principle as the reviewer audit: smallest-safe-fix-first, but this list

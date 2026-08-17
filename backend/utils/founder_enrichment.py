@@ -173,15 +173,24 @@ def founder_resolution_from_gap_pack(
     """
     from resolver.founder_resolver import (
         FounderEvidence,
+        _classify_source,
         build_resolution_from_evidence,
         extract_founder_candidates,
         resolve_founders,
     )
+    from utils.reference_verify import hostname_from_user_hint
 
     company = str(scout.get("name") or "").strip()
     if not company or not is_founder_resolution_enabled():
         return None
     website = str(scout.get("lookup_website") or "").strip() or None
+    # Fixed 2026-08-17 (audit HIGH-A3): source_type used to be left at its
+    # "other" default on this path, so the +0.2 official-site / +0.05
+    # crunchbase-or-news confidence bonuses in _candidate_confidence could
+    # never fire here, even when the reused evidence genuinely was the
+    # company's own team page -- silently under-scoring real founders below
+    # the keep threshold for missing plumbing, not weak evidence.
+    anchor_host = hostname_from_user_hint(website) if website else None
 
     sources = [s for s in list((pack or {}).get("sources") or []) if isinstance(s, dict)]
     if sources:
@@ -190,6 +199,7 @@ def founder_resolution_from_gap_pack(
                 url=str(s.get("url") or "").strip(),
                 title=str(s.get("title") or "").strip(),
                 snippet=str(s.get("snippet") or "").strip()[:12000],
+                source_type=_classify_source(str(s.get("url") or "").strip(), anchor_host=anchor_host),
                 supports="Founder or team evidence",
                 access_class=(
                     str(s.get("access_class") or "public")

@@ -70,6 +70,16 @@ def validate_scout_output(data: dict) -> ScoutOutput:
                 f"Field '{field}' must be of type {field_type.__name__}, "
                 f"got {type(data[field]).__name__}"
             )
+    # Fixed 2026-08-17 (audit HIGH-A7): a missing name used to be silently
+    # fabricated ("Unknown Startup", or the first 4 words of one_line) before
+    # reaching here, producing a plausible-looking row for a company that was
+    # never actually identified. That fabrication is gone -- an empty name now
+    # fails validation here instead, which routes through the existing repair-
+    # pass machinery (_finalize_scout_payload_from_llm), and if repair can't
+    # produce a real name either, the discovery correctly fails closed instead
+    # of persisting a guess (AGENTS.md invariant 5).
+    if not str(data["name"]).strip():
+        raise ValueError("name is required and must not be empty")
     # Reject obvious mega-cap / large incumbent company names
     if is_megacap_company(data["name"]):
         raise ValueError(

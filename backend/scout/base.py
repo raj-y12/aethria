@@ -105,16 +105,28 @@ def _reject_misattributed_founder_names(
         if not name_str:
             kept.append(name)
             continue
-        rejected = False
-        for m in re.finditer(re.escape(name_str), combined):
+        occurrences = list(re.finditer(re.escape(name_str), combined))
+        if not occurrences:
+            kept.append(name)
+            continue
+        # Fixed 2026-08-17 (audit HIGH-A5): the first bad mention anywhere used
+        # to reject the name outright, even if a separate, correct mention of
+        # the same person existed elsewhere in the same evidence blob -- an
+        # over-broad fail-closed that silently deleted real founders. Now
+        # rejects only when EVERY occurrence is attributed to a different
+        # company; a single neutral or correctly-attributed mention is enough
+        # to keep the name.
+        all_misattributed = True
+        for m in occurrences:
             trailing = combined[m.end():m.end() + 80]
             role_of = _FOUNDER_ROLE_OF_COMPANY_RE.match(trailing.lstrip(",: -–—"))
             if role_of:
                 mentioned_compact = _compact_name(role_of.group(1))
                 if mentioned_compact and mentioned_compact != target_compact:
-                    rejected = True
-                    break
-        if not rejected:
+                    continue
+            all_misattributed = False
+            break
+        if not all_misattributed:
             kept.append(name)
     return kept
 
@@ -397,39 +409,50 @@ class Scout(ABC):
         for field in string_fields:
             out[field] = self._coerce_text(out.get(field))
 
-        # Ensure name is never missing/empty; avoid hard-fail on partial LLM payloads.
-        if not out.get("name"):
-            one_line = out.get("one_line") or ""
-            if one_line:
-                out["name"] = " ".join(one_line.split()[:4]).strip(" -,:") or "Unknown Startup"
-            else:
-                out["name"] = "Unknown Startup"
+        # Fixed 2026-08-17 (audit HIGH-A7): a missing name used to be silently
+        # fabricated here ("Unknown Startup", or the first 4 words of
+        # one_line) so this coercion step never itself "failed" -- but that
+        # meant a company that was never actually identified could still
+        # produce a plausible-looking discovery row. "name" is already run
+        # through _coerce_text above (it's in string_fields); an empty result
+        # is left empty now, and validate_scout_output rejects it, routing
+        # through the existing repair-pass machinery instead of guessing.
 
         # target_users is frequently returned as array from LLM; force scalar string.
         if not out.get("target_users"):
             out["target_users"] = "Unknown target users"
 
         # Confidence coercion.
+        # Fixed 2026-08-17 (audit HIGH-A6, partial): a genuinely unparseable
+        # confidence (missing, non-numeric) used to be silently replaced with
+        # 0.5 -- a fabricated middle-ground number indistinguishable from a
+        # real model-reported 0.5. That specific silent substitution is gone:
+        # an unparseable value is left as a non-float sentinel, which fails
+        # validate_scout_output's type check and routes through the existing
+        # repair pass instead. NOT fixed here, and a real remaining gap: even
+        # a value that DOES parse is still an uncalibrated bare LLM number,
+        # never cross-checked against retrieval strength or citation count --
+        # the same disease already found (and only partially fixed) in
+        # Reviewer's scoring. That needs a bigger, separate change.
         try:
-            out["confidence"] = float(out.get("confidence"))
+            out["confidence"] = max(0.0, min(1.0, float(out.get("confidence"))))
         except (TypeError, ValueError):
-            out["confidence"] = 0.5
-        out["confidence"] = max(0.0, min(1.0, out["confidence"]))
+            out["confidence"] = None
 
         # key_assumptions must be list[str] with length 2-4.
+        # Fixed 2026-08-17 (audit HIGH-A8): fewer than 2 real assumptions used
+        # to be silently padded with generic, non-evidence-based filler
+        # ("Customer demand converts into repeat usage." etc.), presented to
+        # reviewers as if company-specific with no marker distinguishing it
+        # from real model output. That padding is gone; a genuine shortfall
+        # now fails validate_scout_output's 2-4 count check and routes
+        # through the existing repair pass instead of fabricating content.
         assumptions = out.get("key_assumptions")
         if isinstance(assumptions, str):
             assumptions = [assumptions]
         elif not isinstance(assumptions, list):
             assumptions = []
         assumptions = [self._coerce_text(a) for a in assumptions if self._coerce_text(a)]
-        if len(assumptions) < 2:
-            assumptions.extend(
-                [
-                    "Customer demand converts into repeat usage.",
-                    "Go-to-market channel remains cost-effective.",
-                ]
-            )
         out["key_assumptions"] = assumptions[:4]
 
         # references must be list[str].

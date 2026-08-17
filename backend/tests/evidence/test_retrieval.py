@@ -69,10 +69,12 @@ async def test_sources_found_are_ingested_with_attribution():
     assert artifact.retrieval_provider == "exa"
     assert artifact.retrieval_query.startswith("Acme ")
     assert items[0].display_excerpt == "TAM is $10B."
-    # Called via asyncio.to_thread, but the underlying function still got the right kwargs.
-    mock_retrieve.assert_called_once()
+    # One call per query now (audit HIGH-B4), not one batched call across all
+    # of them -- the mock returns the same pack every time, so later calls'
+    # sources are recognized as duplicates and deduped, not double-ingested.
+    assert mock_retrieve.call_count == len(plan.search_questions)
     _, kwargs = mock_retrieve.call_args
-    assert kwargs["max_total_sources"] == plan.max_artifacts
+    assert kwargs["max_total_sources"] == 4
 
 
 @pytest.mark.asyncio
@@ -105,8 +107,11 @@ async def test_queries_are_capped_regardless_of_a_longer_plan():
             plan=plan, evidence_repository=repo, company_name="Acme",
         )
 
-    _, kwargs = mock_retrieve.call_args
-    assert len(kwargs["queries"]) == MAX_QUERIES
+    # One retrieval call per query now (audit HIGH-B4), not one batched call
+    # with all queries -- capping still means MAX_QUERIES calls, not more.
+    assert mock_retrieve.call_count == MAX_QUERIES
+    for call in mock_retrieve.call_args_list:
+        assert len(call.kwargs["queries"]) == 1
 
 
 @pytest.mark.asyncio
@@ -133,8 +138,7 @@ async def test_every_rubric_dimension_gets_a_dedicated_query():
             plan=plan, evidence_repository=repo, company_name="Acme",
         )
 
-    _, kwargs = mock_retrieve.call_args
-    assert len(kwargs["queries"]) == 5
+    assert mock_retrieve.call_count == 5
 
 
 @pytest.mark.asyncio
@@ -212,6 +216,79 @@ async def test_two_independent_domains_corroborate_each_other():
         # Above min_source_quality (0.4) so the claim can be eligible, but
         # below full_confidence_at (0.8) so it's capped, not full-strength.
         assert items[0].source_quality == 0.6
+
+
+@pytest.mark.asyncio
+async def test_sources_from_different_queries_do_not_cross_corroborate():
+    """Regression (audit HIGH-B4): corroboration used to be computed once
+    across every source from every query pooled together, so a techcrunch.com
+    source answering one question and a reuters.com source answering a
+    completely different question could "corroborate" each other even though
+    neither actually confirms the other's fact. Each query is now scored on
+    its own results only -- a single source per query never reaches the >=2
+    distinct domains threshold, so both stay unverified."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan(
+        missing_evidence=["market", "execution"],
+        search_questions=["market question", "execution question"],
+    )
+
+    def side_effect(*, queries, **kwargs):
+        if "market" in queries[0]:
+            return {
+                "provider": "exa",
+                "sources": [{"title": "A", "url": "https://techcrunch.com/acme", "snippet": "Market fact."}],
+            }
+        return {
+            "provider": "exa",
+            "sources": [{"title": "B", "url": "https://reuters.com/acme", "snippet": "Unrelated execution fact."}],
+        }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", side_effect=side_effect):
+        await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+            company_website="https://acme.com",
+        )
+
+    assert len(repo.ingested) == 2
+    for artifact, items in repo.ingested:
+        assert items[0].verification_state == VerificationState.UNVERIFIED
+        assert items[0].source_quality == 0.0
+
+
+@pytest.mark.asyncio
+async def test_max_artifacts_budget_is_respected_across_queries():
+    """Regression (B4 self-audit): the per-query rewrite ran one retrieval
+    call per query, each capped at _MAX_SOURCES_PER_QUERY -- but nothing
+    summed those calls against the plan's own max_artifacts budget, so a
+    caller-configured budget (routers/evidence.py, jobs/handlers.py) could be
+    silently exceeded. A plan with a budget of 2 across 4 queries, each
+    returning a distinct never-before-seen source, must still ingest only 2."""
+    repo = _FakeEvidenceRepository()
+    plan = _plan(
+        missing_evidence=["market", "product", "technical", "execution"],
+        search_questions=["q1", "q2", "q3", "q4"],
+        max_artifacts=2,
+    )
+
+    counter = count()
+
+    def side_effect(*, queries, **kwargs):
+        n = next(counter)
+        return {
+            "provider": "exa",
+            "sources": [{"title": f"S{n}", "url": f"https://example{n}.com/a", "snippet": f"Fact {n}."}],
+        }
+
+    with patch("evidence.retrieval.retrieve_source_pack_merged", side_effect=side_effect):
+        result = await execute_evidence_plan(
+            user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+            plan=plan, evidence_repository=repo, company_name="Acme",
+        )
+
+    assert result["artifacts_ingested"] == 2
+    assert len(repo.ingested) == 2
 
 
 @pytest.mark.asyncio

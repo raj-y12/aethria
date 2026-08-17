@@ -606,14 +606,23 @@ def render_sources_for_prompt(sources: List[Dict[str, str]]) -> str:
         prompt_safety_instruction(),
     ]
     for s in sources:
+        # Fixed 2026-08-17 (audit HIGH-A4): a page's <title> is scraped from
+        # the target's own site -- exactly as attacker-controlled as the
+        # snippet -- but only the snippet went through this isolation
+        # boundary; titles were interpolated raw.
+        title = isolate_untrusted_text(
+            s["title"],
+            label=f'{s["source_id"]} title',
+        )
         snippet = isolate_untrusted_text(
             s["snippet"],
             label=f'{s["source_id"]} snippet',
         )
-        safety = flag_prompt_injection(s["snippet"])
-        suffix = " safety=PROMPT_INJECTION_SUSPECTED" if safety.suspicious else ""
+        title_safety = flag_prompt_injection(s["title"])
+        snippet_safety = flag_prompt_injection(s["snippet"])
+        suffix = " safety=PROMPT_INJECTION_SUSPECTED" if (title_safety.suspicious or snippet_safety.suspicious) else ""
         lines.append(
-            f'[{s["source_id"]}] title="{s["title"]}" url="{s["url"]}"{suffix} snippet="{snippet}"'
+            f'[{s["source_id"]}] title="{title}" url="{s["url"]}"{suffix} snippet="{snippet}"'
         )
     return "\n".join(lines)
 

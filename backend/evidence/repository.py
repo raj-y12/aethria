@@ -107,6 +107,13 @@ class EvidenceRepository:
                 stored_artifact = EvidenceArtifactRecord.model_validate(artifact_payload)
                 stored_items: List[EvidenceItemRecord] = []
                 for item in items:
+                    # Audit HIGH-B5: mirrors the artifact-level dedup above --
+                    # re-ingesting byte-identical excerpt content under the
+                    # same artifact used to insert an unconditional new row
+                    # every time, inflating current-claim counts that
+                    # evaluate_snapshot averages over (db/migrations/
+                    # 20260817000002_evidence_items_content_dedup.sql).
+                    content_hash = hashlib.sha256(item.display_excerpt.encode("utf-8")).hexdigest()
                     item_row = await conn.fetchrow(
                         """
                         insert into public.evidence_items (
@@ -114,8 +121,9 @@ class EvidenceRepository:
                           normalized_value, display_excerpt, source_locator,
                           effective_at, expires_at, verification_state, source_quality,
                           extraction_confidence, extractor_version, operator_attribution,
-                          created_at
-                        ) values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,now())
+                          content_hash, created_at
+                        ) values ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,now())
+                        on conflict (user_id, artifact_id, content_hash) do nothing
                         returning *
                         """,
                         str(uuid4()), uid, stored_artifact.artifact_id, item.item_type,
@@ -123,8 +131,18 @@ class EvidenceRepository:
                         item.source_locator, item.effective_at, item.expires_at,
                         item.verification_state.value, item.source_quality,
                         item.extraction_confidence, item.extractor_version,
-                        item.operator_attribution,
+                        item.operator_attribution, content_hash,
                     )
+                    if item_row is None:
+                        item_row = await conn.fetchrow(
+                            """
+                            select * from public.evidence_items
+                            where user_id = $1 and artifact_id = $2 and content_hash = $3
+                            """,
+                            uid, stored_artifact.artifact_id, content_hash,
+                        )
+                    if item_row is None:
+                        raise RuntimeError("Evidence item insert returned no row")
                     payload = db_row(item_row)
                     payload["normalized_value"] = _json(payload.get("normalized_value"), {})
                     stored_items.append(EvidenceItemRecord.model_validate(payload))

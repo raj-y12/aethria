@@ -195,6 +195,33 @@ def test_gap_pack_is_reused_without_any_extra_retrieval(monkeypatch):
     assert resolution.retrieval_provider == "exa"
 
 
+def test_gap_pack_classifies_source_type_so_official_site_bonus_can_fire(monkeypatch):
+    """Regression (audit HIGH-A3): this path used to leave every evidence
+    item's source_type at its "other" default, so the official-site/
+    crunchbase/news confidence bonuses in _candidate_confidence could never
+    apply even when the reused evidence genuinely was the company's own team
+    page -- silently under-scoring real founders for missing plumbing, not
+    weak evidence."""
+    monkeypatch.setattr(
+        "resolver.founder_resolver.resolve_founders",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not retrieve")),
+    )
+    linkedin_source = {
+        "source_id": "S2",
+        "title": "Ada Byron - LinkedIn",
+        "url": "https://linkedin.com/in/adabyron",
+        "snippet": "Ada Byron, Co-founder & CEO of Acme.",
+    }
+    resolution = founder_resolution_from_gap_pack(
+        {"name": "Acme", "lookup_website": "acme.com"},
+        user_id="u1",
+        pack={"provider": "exa", "sources": [_TEAM_SOURCE, linkedin_source]},
+    )
+    source_types = {e.url: e.source_type for e in resolution.founders[0].evidence}
+    assert source_types["https://acme.com/team"] == "official_site"
+    assert source_types["https://linkedin.com/in/adabyron"] == "linkedin"
+
+
 def test_gap_pack_without_founders_can_fall_back_to_retrieval():
     calls: Dict[str, Any] = {}
 

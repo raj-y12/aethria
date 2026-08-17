@@ -601,9 +601,32 @@ class ScoutEngine:
             effective_website = resolution.website
 
         # ── Stage 2: resolve founders (deterministic, anchored on stage 1) ───
-        founder_resolution = await self._resolve_founders_for_lookup(
-            company, resolution=resolution, website=effective_website
+        # Fixed 2026-08-17 (audit HIGH-A2): this used to run unconditionally on
+        # every lookup -- 4-5 queries plus up to 2 page fetches -- even when
+        # Stage 1 already confidently identified the founders itself, in which
+        # case apply_founder_resolution_to_payload's gap-fill merge (below)
+        # would discard the name list anyway. Skipping is conservative: only
+        # when Stage 1's own resolution is FOUND (its highest-confidence
+        # status) and it already has names -- PARTIAL/NEEDS_REVIEW cases still
+        # run Stage 2, since that's exactly when the extra retrieval helps.
+        skip_stage2 = (
+            resolution is not None
+            and resolution.resolution_status == "FOUND"
+            and bool(resolution.founder_names)
         )
+        founder_resolution = (
+            None
+            if skip_stage2
+            else await self._resolve_founders_for_lookup(
+                company, resolution=resolution, website=effective_website
+            )
+        )
+        if skip_stage2:
+            self.logger.info(
+                "[lookup] skipping Founder Resolver stage for %s: "
+                "Stage 1 already FOUND %d founder(s)",
+                company, len(resolution.founder_names),
+            )
 
         # ── Stage 3: enrich via scout LLM (seeded with resolver evidence) ────
         result = await selected.discover_company(
