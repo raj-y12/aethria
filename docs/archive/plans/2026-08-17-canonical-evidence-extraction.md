@@ -496,7 +496,7 @@ async def extract_claims_from_evidence(
 
 ---
 
-### Task 4: Full verification gate
+### Task 4: Full verification gate — DONE
 
 - [x] `python3 -m pytest -o asyncio_mode=auto backend/tests/evidence/ -v` — 33 passed.
 - [x] Full backend suite — 2251 passed, 39 pre-existing Postgres-container failures (need a live Postgres on 5432, unrelated to this change), zero regressions.
