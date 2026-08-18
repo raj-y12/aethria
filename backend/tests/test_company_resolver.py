@@ -545,3 +545,113 @@ def test_candidate_name_is_prettified_for_hyphenated_domain(monkeypatch):
     res = resolve_company("Acme Robotics", user_id=USER)
     names = {c.name for c in res.candidates}
     assert "acme-robotics" not in names  # not the raw slug
+
+
+def test_disambiguation_is_skipped_when_website_hint_given(monkeypatch):
+    called = {"n": 0}
+
+    def fake_disambiguate(*a, **k):
+        called["n"] += 1
+        return object()  # would blow up if actually used -- proves it wasn't
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    sources = [
+        {"title": "Aethria — Home", "url": "https://aethria.co", "snippet": "Aethria."},
+        {"title": "Aethria Labs", "url": "https://aethrialabs.com", "snippet": "Aethria Labs."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    resolve_company("Aethria", user_id=USER, website_hint="aethria.co")
+    assert called["n"] == 0
+
+
+def test_disambiguation_is_skipped_with_a_single_candidate(monkeypatch):
+    called = {"n": 0}
+
+    def fake_disambiguate(*a, **k):
+        called["n"] += 1
+        return object()
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    sources = [
+        {"title": "Acme Robotics — Home", "url": "https://acmerobotics.com", "snippet": "Acme Robotics."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    resolve_company("Acme Robotics", user_id=USER)
+    assert called["n"] == 0
+
+
+def test_disambiguation_confidently_overriding_corrects_the_website(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.9, reasoning="x", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notiontechnologies.com/"
+    assert any(a.website == "https://notion.com" for a in res.alternative_matches)
+    assert res.resolution_status != "NEEDS_REVIEW"
+
+
+def test_disambiguation_low_confidence_disagreement_forces_review(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.4, reasoning="unsure", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"  # heuristic pick stands, not silently swapped
+    assert res.resolution_status == "NEEDS_REVIEW"
+
+
+def test_disambiguation_call_failure_forces_review_not_silent_trust(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(called=False, reasoning="no api key"),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.resolution_status == "NEEDS_REVIEW"
+
+
+def test_disambiguation_agreeing_with_heuristic_proceeds_normally(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notion.com", confidence=0.95, reasoning="matches", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"

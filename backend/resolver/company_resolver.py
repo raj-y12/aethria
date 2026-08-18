@@ -25,6 +25,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from core.policy_resolver import get_identity_disambiguation_rules
+from resolver.identity_disambiguation import disambiguate_identity
 from tenant_context import require_user_id
 from utils.reference_verify import hostname_from_user_hint, registrable_domain
 from utils.retrieval_grounding import retrieve_source_pack_merged
@@ -901,6 +903,8 @@ def resolve_company(
     *,
     user_id: str,
     website_hint: Optional[str] = None,
+    cost_controller: Any = None,
+    api_key: Optional[str] = None,
 ) -> CompanyResolution:
     """
     Resolve a typed company name into a real-company identity with explicit
@@ -1020,6 +1024,56 @@ def resolve_company(
             "Evidence is incomplete — missing: " + (", ".join(resolution.missing_fields) or "none")
             + ". The company is kept and flagged instead of dropped."
         )
+
+    if not website_hint:
+        official_candidates = [
+            s for s in resolution.evidence_sources
+            if s.source_type == "official_site" and s.match_score >= 0.5
+        ]
+        if len(official_candidates) >= 2:
+            rules = get_identity_disambiguation_rules()
+            floor = float(rules.get("auto_correct_confidence_floor", 0.85))
+            heuristic_pick = resolution.website
+            result = disambiguate_identity(
+                company, official_candidates, user_id=uid,
+                cost_controller=cost_controller, api_key=api_key,
+            )
+            if result.called and result.picked_url and result.picked_url != heuristic_pick:
+                if result.confidence >= floor:
+                    if heuristic_pick and all(
+                        a.website != heuristic_pick for a in resolution.alternative_matches
+                    ):
+                        resolution.alternative_matches.append(
+                            AlternativeMatch(
+                                name=registrable_domain(_host_of(heuristic_pick)).split(".", 1)[0],
+                                website=heuristic_pick,
+                                reason="Superseded by LLM identity disambiguation.",
+                                match_score=1.0,
+                            )
+                        )
+                    resolution.website = result.picked_url
+                    resolution.notes.append(
+                        f"Identity corrected by LLM disambiguation: was {heuristic_pick}, "
+                        f"now {result.picked_url}. {result.reasoning}"
+                    )
+                    if resolution.resolution_status == "NEEDS_REVIEW":
+                        # The ambiguity that triggered NEEDS_REVIEW is exactly
+                        # what the LLM just resolved with high confidence --
+                        # re-derive status from confidence alone rather than
+                        # leaving a stale "needs human review" verdict.
+                        resolution.resolution_status = (
+                            "FOUND" if resolution.confidence >= 0.7
+                            else "PARTIAL" if resolution.confidence >= 0.4
+                            else "LOW_CONFIDENCE"
+                        )
+                else:
+                    resolution.notes.append(
+                        f"LLM disambiguation uncertain (confidence={result.confidence:.2f}): {result.reasoning}"
+                    )
+                    resolution.resolution_status = "NEEDS_REVIEW"
+            elif not result.called:
+                resolution.notes.append(f"LLM disambiguation unavailable: {result.reasoning}")
+                resolution.resolution_status = "NEEDS_REVIEW"
 
     _log_stage(
         resolution,
