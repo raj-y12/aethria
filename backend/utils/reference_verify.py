@@ -244,16 +244,23 @@ def probe_url_status(url: str, timeout: float = 4.0) -> str:
         req = Request(url, method="HEAD", headers=headers)
         with urlopen(req, timeout=timeout, context=ctx) as resp:
             code = getattr(resp, "status", None) or resp.getcode()
-            return classify_http_code(int(code))
+            status = classify_http_code(int(code))
     except HTTPError as e:
-        c = e.code
-        if c in (405, 501):
-            return get_fallback()
-        return classify_http_code(int(c))
+        status = classify_http_code(int(e.code))
     except URLError:
         return "inconclusive"
     except Exception:
         return "inconclusive"
+
+    if status == "unreachable":
+        # Some servers reject HEAD outright with a hard-negative code (not just
+        # 405/501) while serving the identical URL fine on GET -- live-verified
+        # 2026-08-18 on thenextweb.com (HEAD 404, GET 200). That was silently
+        # hard-dropping every otherwise-valid reference citing it, starving
+        # Scout discovery of any company with real, live sources. HEAD failing
+        # is not proof the page is dead; only a GET failing the same way is.
+        return get_fallback()
+    return status
 
 
 def http_reachable(url: str, timeout: float = 4.0) -> bool:

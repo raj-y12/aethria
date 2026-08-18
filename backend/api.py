@@ -3068,7 +3068,10 @@ async def agents_status(request: Request):
         "durable_jobs_ready": _durable_job_repository is not None,
         "durable_job_error": durable_status_error or (_durable_job_error if _durable_jobs_required() else None),
         "durable_job_counts": durable_counts,
-        "supabase_configured": supabase_configured,
+        # Field name predates the plain-Postgres migration (invariant #10);
+        # DATABASE_URL is now the primary runtime store, not just the
+        # deprecated USE_SUPABASE_STORAGE switch this used to report alone.
+        "supabase_configured": runtime_store_configured,
         "openai_configured": openai_configured,
         "user_agents_enabled": user_agents_enabled,
         "agents_will_run": (
