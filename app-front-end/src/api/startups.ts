@@ -162,6 +162,23 @@ export async function acknowledgeStartup(startupId: string): Promise<Startup | n
   return data && typeof data === 'object' && typeof data.id === 'string' ? (data as Startup) : null;
 }
 
+export type TriageOverrideStage = 'review' | 'decide';
+
+/** Manual "review it anyway" / "decide it anyway" action for a startup the
+ * periodic pipeline's triage funnel gates (confidence_threshold /
+ * decision_threshold) left unreviewed or reviewed-but-undecided. */
+export async function triageOverride(startupId: string, stage: TriageOverrideStage): Promise<boolean> {
+  const res = await authedFetch(
+    `${API_BASE}/api/startups/${encodeURIComponent(startupId)}/triage-override`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ stage }),
+    }
+  );
+  return res.ok;
+}
+
 export type MemoPartialPayload = {
   scout: Startup['scout'];
   review: Startup['review'] | null;
