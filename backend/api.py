@@ -11,6 +11,16 @@ import inspect
 import json
 import logging
 import os
+
+# Local-dev visibility fix (2026-08-18): uvicorn only attaches handlers to its
+# own "uvicorn"/"uvicorn.error"/"uvicorn.access" loggers (propagate=False by
+# design, so this can't double-log those). Every other module logger --
+# scout.engine among them -- had no handler anywhere in the app and was
+# completely silent in run.py's captured output, unlike reviewer/partner's
+# stage summaries which double-log through pipeline_runner.py's _visible_info
+# helper. That silence looked exactly like "Scout isn't running" when it was
+# actually running fine; this makes every logger visible, same as reviewer/partner.
+logging.basicConfig(level=logging.INFO)
 import env_config
 import re
 import time

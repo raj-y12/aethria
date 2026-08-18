@@ -32,6 +32,37 @@ def test_scout_observation_preserves_channel_persona_and_verified_official_domai
     assert observation.resolution_payload["evidence_sources"][0]["source_type"] == "official_site"
 
 
+def test_autonomous_discovery_dedup_key_is_stable_per_company_not_per_call():
+    """Regression (live-verified 2026-08-18): external_event_key used to be
+    keyed on the discovery's random per-LLM-call id (persist_discoveries=False
+    in the periodic pipeline means there's no persisted row id to key off of
+    instead), so the same real company got a fresh dedup key -- and a fresh
+    identity_resolution_case -- every time Scout rediscovered it. Live: one
+    company had 45 open cases, another 24, for 4 distinct companies total in
+    80 open cases. The key must be stable across different startup_ids AND
+    different scout_type personas discovering the same company name."""
+    same_company_by_two_personas = [
+        observation_from_scout_discovery(
+            user_id="fund-a",
+            discovery=_discovery("startup-1", name="Shiplog", scout_type="market_driven"),
+        ),
+        observation_from_scout_discovery(
+            user_id="fund-a",
+            discovery=_discovery("startup-2", name="Shiplog", scout_type="contrarian"),
+        ),
+    ]
+    assert (
+        same_company_by_two_personas[0].external_event_key
+        == same_company_by_two_personas[1].external_event_key
+    )
+
+    different_company = observation_from_scout_discovery(
+        user_id="fund-a",
+        discovery=_discovery("startup-3", name="Zerolook", scout_type="market_driven"),
+    )
+    assert different_company.external_event_key != same_company_by_two_personas[0].external_event_key
+
+
 def test_same_name_with_different_domains_remains_distinguishable():
     first = observation_from_scout_discovery(
         user_id="fund-a",
