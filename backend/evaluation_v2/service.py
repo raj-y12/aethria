@@ -462,6 +462,28 @@ def evaluate_snapshot(
             min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
             for claim, _, eligibility in scored
         )
+        if weight_sum == 0:
+            # confidence_cap is a policy-configured value (0 <= cap < 1) --
+            # unlike confidence_at_snapshot, nothing prevents a future
+            # partner_rules version from setting one to exactly 0, which
+            # would zero every scored claim's weight here. Fail closed the
+            # same way "no eligible scored claim" above does, rather than
+            # letting the division below raise and crash the evaluation.
+            missing.append(rule.criterion)
+            if rule.required:
+                required_missing.append(rule.criterion)
+            criteria.append(
+                CriterionResult(
+                    criterion=rule.criterion,
+                    score=None,
+                    evidence_sufficiency="insufficient",
+                    reasoning="Every eligible claim's confidence was capped to zero by policy.",
+                    missing_evidence=[rule.criterion],
+                    contradicting_claim_ids=contradicted,
+                    quality_flags=sorted(set(eligibility_flags) | {"confidence_cap_zero"}),
+                )
+            )
+            continue
         score = sum(
             value * min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
             for claim, value, eligibility in scored

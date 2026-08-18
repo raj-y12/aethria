@@ -914,13 +914,13 @@ function InvestmentMemoContent(
               >
                 <ol className="memoAnalystContextList">
                   {analystContext.map((section, i) => {
-                    const isUrl = /^https?:\/\//i.test(section.title);
+                    const href = safeHref(section.title);
                     const clipped = clipText(collapseWhitespace(section.body), 900);
                     return (
                       <li key={`${section.title}-${i}`} className="memoAnalystContextItem">
                         <p className="memoReplayKicker">
-                          {isUrl ? (
-                            <a className="memoLink" href={section.title} target="_blank" rel="noreferrer">
+                          {href ? (
+                            <a className="memoLink" href={href} target="_blank" rel="noreferrer">
                               {renderWithMonoNumbers(section.title)}
                             </a>
                           ) : (

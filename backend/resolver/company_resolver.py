@@ -753,8 +753,16 @@ def _assign_status(resolution: CompanyResolution, *, website_hint: Optional[str]
         # Sources came back but nothing actually matches this name.
         return "NOT_FOUND" if not website_hint else "LOW_CONFIDENCE"
 
-    # Ambiguity: a competing same-name domain with a strong match and no user hint.
-    strong_alternatives = [a for a in resolution.alternative_matches if a.match_score >= 0.8]
+    # Ambiguity: a competing same-name domain with no user hint to disambiguate.
+    # Fixed 2026-08-18 (fresh audit, same class as CRITICAL F1): this used to
+    # require an alternative to score >= 0.8 to trigger review -- but 0.55 is
+    # the bar _score_and_collect_sources uses to call a domain "official_site"
+    # in the first place (line ~609 above). An alternative scoring anywhere
+    # from 0.55 to 0.79 is exactly as plausible a candidate as the one that
+    # got picked, yet silently lost the tie with no human ever told there was
+    # one -- two same-named-but-different companies routinely land in that
+    # band. Use the same 0.55 bar identity anchors are qualified against.
+    strong_alternatives = [a for a in resolution.alternative_matches if a.match_score >= 0.55]
     if strong_alternatives and not website_hint:
         return "NEEDS_REVIEW"
 

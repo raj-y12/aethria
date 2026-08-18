@@ -32,7 +32,16 @@ def test_csv_parser_rejects_unbounded_imports():
         )
 
 
-def test_imported_domain_is_verified_only_when_operator_explicitly_confirms_mapping():
+def test_bulk_csv_import_never_grants_operator_confirmed_identity():
+    """Regression (fresh audit, same class as fixed CRITICAL F1): this test
+    used to assert the opposite -- that verify_domains=True on a bulk CSV
+    import request set operator_confirmed_identity=True, which short-
+    circuits identity/normalization.py's _domain_is_verified past its
+    resolution_status/confidence/official_domains checks entirely. Unlike
+    F1's legitimate case (an operator typing one explicit domain for one
+    lookup they're personally confirming), a CSV import's verify_domains is
+    a single client-supplied bool covering up to 500 rows with zero
+    per-row human confirmation -- it was never a real verification signal."""
     default = parse_csv_candidates(
         "name,domain\nAcme,acme.com\n",
         source=ImportSource.CSV,
@@ -40,7 +49,7 @@ def test_imported_domain_is_verified_only_when_operator_explicitly_confirms_mapp
         name_field="name",
         domain_field="domain",
     )
-    confirmed = parse_csv_candidates(
+    with_flag = parse_csv_candidates(
         "name,domain\nAcme,acme.com\n",
         source=ImportSource.CSV,
         import_id="import-2",
@@ -49,7 +58,7 @@ def test_imported_domain_is_verified_only_when_operator_explicitly_confirms_mapp
         verify_domains=True,
     )
     assert default[0].operator_confirmed_identity is False
-    assert confirmed[0].operator_confirmed_identity is True
+    assert with_flag[0].operator_confirmed_identity is False
 
 
 def test_verified_outcome_requires_evidence_and_never_claims_causality():

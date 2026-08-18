@@ -122,6 +122,21 @@ def get_pipeline_state_row(
         return None
     state = get_batch4a_state()
     if state is not None:
+        # Batch4AState.pipeline_states is scoped by construction (loaded via
+        # Batch4ARepository.load_state(user_id), filtered "where user_id=$1"
+        # at the query level) -- the dict itself never holds another
+        # tenant's rows. But this function accepts and validates its own
+        # user_id param without ever checking it against the ambient
+        # ContextVar-scoped state it actually reads from, so a future caller
+        # that mismatches the two (e.g. a batched/concurrent runner passing
+        # the wrong user_id against an already-set context) would silently
+        # get another tenant's pipeline status with no error. Fail closed.
+        if state.user_id != uid:
+            logger.error(
+                "get_pipeline_state_row: user_id mismatch -- requested=%s ambient_state=%s startup_id=%s",
+                uid, state.user_id, sid,
+            )
+            return None
         return state.get_pipeline_state(sid)
     logger.warning("get_pipeline_state_row: Batch4A state unavailable, returning no state for startup_id=%s", sid)
     return None

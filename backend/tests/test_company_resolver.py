@@ -243,6 +243,34 @@ def test_ambiguous_same_slug_domains_need_review(monkeypatch):
     assert any("disambiguate" in n.lower() for n in res.notes)
 
 
+def test_moderately_similar_alternate_domain_also_needs_review(monkeypatch):
+    """Regression (fresh audit, same class as fixed CRITICAL F1): NEEDS_REVIEW
+    used to require an alternative to score match_score >= 0.8, but 0.55 is
+    the bar this same file uses elsewhere to call a domain "official_site" in
+    the first place. An alternative landing in the 0.55-0.79 band is exactly
+    as plausible a candidate as the one that got picked -- two same-named-
+    but-different companies routinely land there -- yet used to lose the tie
+    silently, with no human ever told there was a competing candidate."""
+    sources = [
+        {
+            "title": "Acme Robotics — Home",
+            "url": "https://acmerobotics.com",
+            "snippet": "Acme Robotics builds warehouse automation robots.",
+        },
+        {
+            "title": "Acme Dynamics — Home",
+            "url": "https://acmedynamics.com",
+            "snippet": "Acme Dynamics is a different robotics company.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    res = resolve_company("Acme Robotics", user_id=USER)
+    assert res.website == "https://acmerobotics.com"
+    assert res.alternative_matches
+    assert 0.55 <= res.alternative_matches[0].match_score < 0.8
+    assert res.resolution_status == "NEEDS_REVIEW"
+
+
 def test_retrieval_error_degrades_gracefully(monkeypatch):
     def boom(**kw):
         raise RuntimeError("provider down")

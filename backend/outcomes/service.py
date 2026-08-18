@@ -62,7 +62,19 @@ def parse_csv_candidates(
                 external_id=external_id or None,
                 source=ImportSource(source),
                 import_id=import_id,
-                operator_confirmed_identity=bool(verify_domains and domain),
+                # Fixed 2026-08-18 (audit HIGH, same class as CRITICAL F1):
+                # this used to be operator_confirmed_identity=True whenever
+                # the caller passed verify_domains=True and the row had a
+                # domain column -- which short-circuits identity/
+                # normalization.py's _domain_is_verified past its
+                # resolution_status/confidence/official_domains checks
+                # entirely. Unlike F1's fix (an operator anchoring ONE
+                # explicit domain to ONE lookup they typed), a bulk CSV
+                # import has no per-row human confirmation at all -- it's a
+                # client-supplied bool on a request that can carry up to 500
+                # rows. Never grant the bypass from this path; let normal
+                # verification apply to every imported candidate.
+                operator_confirmed_identity=False,
             )
         )
     return candidates

@@ -202,6 +202,40 @@ def test_missing_evidence_is_unscored_not_converted_to_zero():
     assert "execution" in result.recommendation.missing_information
 
 
+def test_zero_confidence_cap_fails_closed_instead_of_crashing():
+    """Regression (fresh audit): weighting a criterion's average by
+    min(confidence_at_snapshot, eligibility.confidence_cap) (the M5 fix)
+    divides by weight_sum. confidence_cap is policy-configured and its
+    schema permits 0 (Field(ge=0, lt=1)) -- if a future partner_rules
+    version ever sets one to exactly 0, every scored claim's weight would
+    collapse to 0 and the division would raise ZeroDivisionError, crashing
+    the evaluation instead of failing closed like every other insufficient-
+    evidence case in this function."""
+    claims = [_claims()[0]]
+    claims[0]["confidence"] = 0.7  # between minimum_eligible (0.5) and full_confidence_at (0.8)
+    links = [_verified_link("claim-market")]
+    snapshot, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
+
+    policy = _policy()
+    zero_cap_claim_confidence = policy.decision_safety.claim_confidence.model_copy(
+        update={"recommendation_confidence_cap_below_full_confidence": 0.0}
+    )
+    policy = policy.model_copy(
+        update={
+            "decision_safety": policy.decision_safety.model_copy(
+                update={"claim_confidence": zero_cap_claim_confidence}
+            )
+        }
+    )
+
+    result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
+
+    market = next(item for item in result.criteria if item.criterion == "market")
+    assert market.score is None
+    assert market.evidence_sufficiency == "insufficient"
+    assert "confidence_cap_zero" in market.quality_flags
+
+
 def test_required_unscored_criterion_forces_insufficient_evidence_despite_high_average():
     claims = [_claims()[0]]
     links = [_verified_link("claim-market")]
