@@ -161,3 +161,22 @@ def test_unknown_environment_is_fail_closed_but_local_dev_is_allowed(monkeypatch
     assert env_config.is_production_env() is True
     monkeypatch.setenv("ENVIRONMENT", "local")
     assert env_config.is_production_env() is False
+
+
+def test_unset_environment_logs_a_warning_once(monkeypatch, caplog):
+    """Regression (audit M6): none of ENVIRONMENT/APP_ENV/FASTAPI_ENV set used
+    to silently default to dev with no trace -- a deploy that forgot to set
+    the var (e.g. a new Coolify service) would run wide open with no signal."""
+    import env_config
+
+    monkeypatch.delenv("ENVIRONMENT", raising=False)
+    monkeypatch.delenv("APP_ENV", raising=False)
+    monkeypatch.delenv("FASTAPI_ENV", raising=False)
+    monkeypatch.setattr(env_config, "_warned_unset_environment", False)
+
+    with caplog.at_level("WARNING", logger="env_config"):
+        assert env_config.is_production_env() is False
+        assert env_config.is_production_env() is False
+
+    warnings = [r for r in caplog.records if "none of ENVIRONMENT" in r.message]
+    assert len(warnings) == 1

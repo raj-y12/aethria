@@ -1469,7 +1469,20 @@ class PartnerDecisionEngine:
                     review_output=review_output,
                     scout_output=scout_output,
                     avg_dims=avg_dims,
-                    force_human_review=has_red_flags,
+                    # M1: grey-zone/contradiction/missing-assumption/reviewer-
+                    # disagreement triggers are themselves evidence-quality
+                    # signals, not just a nudge for the model's own judgment --
+                    # only has_red_flags forced escalation before, so the LLM
+                    # could silently decline to flag a contradictory-scores or
+                    # missing-assumptions case for human review.
+                    force_human_review=bool(
+                        has_red_flags
+                        or grey_zone_active
+                        or has_contradiction
+                        or has_missing_assumptions
+                        or has_missing_critical_qualitative
+                        or reviewer_disagreement
+                    ),
                     silent_conviction_facts=silent_conviction_facts,
                 )
 

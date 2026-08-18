@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { escapeHtml, parseHttpsUrl } from '../api/waitlist.ts';
+import { escapeHtml, parseHttpsUrl, isRateLimited } from '../api/waitlist.ts';
 
 assert.equal(
   escapeHtml('<img src=x onerror=alert(1)>'),
@@ -12,5 +12,13 @@ assert.equal(parseHttpsUrl('https://linkedin.com/in/someone'), 'https://linkedin
 assert.equal(parseHttpsUrl('javascript:alert(1)'), null);
 assert.equal(parseHttpsUrl('http://linkedin.com/in/someone'), null);
 assert.equal(parseHttpsUrl('not a url'), null);
+
+// Regression (audit M10): /api/waitlist had no rate limiting at all.
+const rlIp = 'test-ip-' + Date.now();
+const rlNow = Date.now();
+for (let i = 0; i < 5; i++) {
+  assert.equal(isRateLimited(rlIp, rlNow), false, `request ${i + 1} should be allowed`);
+}
+assert.equal(isRateLimited(rlIp, rlNow), true, '6th request within the window should be limited');
 
 console.log('Waitlist escaping/validation checks passed.');

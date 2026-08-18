@@ -1487,8 +1487,22 @@ async def clerk_auth_middleware(request: Request, call_next):
     if (
         request.url.path in _PUBLIC_PATHS
         or request.url.path.rstrip("/") in _PUBLIC_PATHS
-        or request.url.path.startswith(_ADMIN_PATH_PREFIX)
     ):
+        return await call_next(request)
+    if request.url.path.startswith(_ADMIN_PATH_PREFIX):
+        # M7: admin routes use a separate admin-token scheme, not Clerk, so
+        # this middleware always skipped them entirely -- each handler was
+        # individually responsible for calling _require_admin_claims, and
+        # nothing would catch a future admin route that forgot to. Enforce
+        # it centrally here instead; /api/admin/login is exempt since it's
+        # what issues the token in the first place. Handlers still call
+        # _require_admin_claims themselves too -- a cheap, redundant re-check,
+        # not a problem to leave in place.
+        if request.url.path.rstrip("/") != "/api/admin/login":
+            try:
+                request.state.admin_claims = _require_admin_claims(request)
+            except HTTPException as exc:
+                return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
         return await call_next(request)
     auth = request.headers.get("Authorization")
     token = None

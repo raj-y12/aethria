@@ -27,9 +27,13 @@ is one of ``1``/``true``/``yes`` (the prior inline checks used exactly this set)
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import List, Optional
+
+_logger = logging.getLogger(__name__)
+_warned_unset_environment = False
 
 # Truthy tokens — matches the historical inline ``.lower() in ("1","true","yes")``.
 _TRUE_TOKENS = {"1", "true", "yes"}
@@ -413,6 +417,21 @@ def is_production_env() -> bool:
         return True
     if normalized:
         return True
+    # M6: none of ENVIRONMENT/APP_ENV/FASTAPI_ENV is set. Defaulting silently
+    # to dev here disables the admin-dashboard gate, exposes /docs, and
+    # weakens rate limiting with no trace -- log once so a misconfigured
+    # deploy (e.g. a Coolify service missing this var) is visible, without
+    # flipping the default itself, which would treat every unconfigured
+    # local dev machine as production across dozens of other gates.
+    global _warned_unset_environment
+    if not _warned_unset_environment:
+        _warned_unset_environment = True
+        _logger.warning(
+            "is_production_env: none of ENVIRONMENT/APP_ENV/FASTAPI_ENV is "
+            "set; defaulting to non-production (docs/openapi exposed, admin "
+            "dashboard enabled, rate limiting weakened). Set one explicitly "
+            "in any deployed environment."
+        )
     return False
 
 

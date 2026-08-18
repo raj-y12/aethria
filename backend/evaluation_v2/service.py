@@ -451,10 +451,20 @@ def evaluate_snapshot(
                 )
             )
             continue
-        weight_sum = sum(claim["confidence_at_snapshot"] for claim, _, _ in scored)
+        # M5: confidence_at_snapshot is the model's own self-reported number --
+        # weighting the criterion average by it alone let one overconfident
+        # claim dominate even when its evidence was weak/stale (eligibility.
+        # confidence_cap, a deterministic signal independent of the model,
+        # already caps the *composed* confidence below but wasn't applied to
+        # *weighting*). Same fix shape as C4: cross-check the self-reported
+        # number against the independent cap before trusting it.
+        weight_sum = sum(
+            min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
+            for claim, _, eligibility in scored
+        )
         score = sum(
-            value * claim["confidence_at_snapshot"]
-            for claim, value, _ in scored
+            value * min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
+            for claim, value, eligibility in scored
         ) / weight_sum
         confidence = min(
             1.0,

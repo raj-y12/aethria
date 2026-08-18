@@ -11,6 +11,25 @@ interface WaitlistBody {
 const MAX_LENGTHS = { name: 100, email: 320, role: 100, firm: 200, linkedin: 2000 } as const;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// M10: this endpoint was unthrottled -- trivially scriptable, and each
+// accepted submission spends a real Resend send. In-memory fixed window,
+// per serverless instance rather than a shared store (no infra of its own
+// here, unlike backend/security/rate_limiter.py's Supabase-backed limiter):
+// good enough to stop casual scripting of a public marketing form, not a
+// distributed guarantee. Upgrade to a shared store if abuse survives this.
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const requestTimestampsByIp = new Map<string, number[]>();
+
+export function isRateLimited(ip: string, now: number): boolean {
+  const recent = (requestTimestampsByIp.get(ip) ?? []).filter(
+    (ts) => now - ts < RATE_LIMIT_WINDOW_MS
+  );
+  recent.push(now);
+  requestTimestampsByIp.set(ip, recent);
+  return recent.length > RATE_LIMIT_MAX_REQUESTS;
+}
+
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -40,6 +59,11 @@ export async function POST(request: Request) {
         { detail: 'Email service not configured' },
         { status: 503 }
       );
+    }
+
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (isRateLimited(ip, Date.now())) {
+      return Response.json({ detail: 'Too many requests, please try again later' }, { status: 429 });
     }
 
     const resend = new Resend(apiKey);

@@ -1,5 +1,6 @@
 import type { Settings } from '../api/settings';
 import type { Startup } from '../types/startup';
+import { BADGE_TEXT_CONTRAST_COLORS, VERDICT_BADGE_FILL_COLORS } from '../design-system/verdictScoreTokens';
 
 export type CoreDimensionKey =
   | 'market'
@@ -335,12 +336,12 @@ export const DEFAULT_SCORE_BANDS: ScoreBand[] = [
 ];
 
 export const DEFAULT_VERDICT_BADGES: VerdictBadgeConfig[] = [
-  { id: 'INVEST', label: 'Invest', backgroundColor: '#c3d3c9' },
-  { id: 'MONITOR', label: 'Monitor', backgroundColor: '#cfccbb' },
-  { id: 'PASS', label: 'Pass', backgroundColor: '#d6c4c0' },
-  { id: 'STRONG', label: 'Strong', backgroundColor: '#c3d3c9' },
-  { id: 'MEDIUM', label: 'Medium', backgroundColor: '#cfccbb' },
-  { id: 'WEAK', label: 'Weak', backgroundColor: '#d6c4c0' },
+  { id: 'INVEST', label: 'Invest', backgroundColor: VERDICT_BADGE_FILL_COLORS.invest },
+  { id: 'MONITOR', label: 'Monitor', backgroundColor: VERDICT_BADGE_FILL_COLORS.monitor },
+  { id: 'PASS', label: 'Pass', backgroundColor: VERDICT_BADGE_FILL_COLORS.pass },
+  { id: 'STRONG', label: 'Strong', backgroundColor: VERDICT_BADGE_FILL_COLORS.invest },
+  { id: 'MEDIUM', label: 'Medium', backgroundColor: VERDICT_BADGE_FILL_COLORS.monitor },
+  { id: 'WEAK', label: 'Weak', backgroundColor: VERDICT_BADGE_FILL_COLORS.pass },
 ];
 
 export const VERDICT_BADGE_LABELS: Record<VerdictBadgeId, string> = DEFAULT_VERDICT_BADGES.reduce(
@@ -729,16 +730,16 @@ function mergeCanonicalWeights(base: ScoringWeight[], saved?: ScoringWeight[]): 
   });
 }
 
-export function badgeTextColorForBackground(backgroundColor: string): '#1a2b48' | '#fffdf7' {
+export function badgeTextColorForBackground(backgroundColor: string): typeof BADGE_TEXT_CONTRAST_COLORS.ink | typeof BADGE_TEXT_CONTRAST_COLORS.paper {
   const hex = normalizeHexColor(backgroundColor);
-  if (!hex) return '#1a2b48';
+  if (!hex) return BADGE_TEXT_CONTRAST_COLORS.ink;
   const r = Number.parseInt(hex.slice(1, 3), 16) / 255;
   const g = Number.parseInt(hex.slice(3, 5), 16) / 255;
   const b = Number.parseInt(hex.slice(5, 7), 16) / 255;
   const luminance = [r, g, b]
     .map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
     .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
-  return luminance > 0.48 ? '#1a2b48' : '#fffdf7';
+  return luminance > 0.48 ? BADGE_TEXT_CONTRAST_COLORS.ink : BADGE_TEXT_CONTRAST_COLORS.paper;
 }
 
 export function normalizeHexColor(value: unknown): string | null {

@@ -20,10 +20,8 @@ from portfolio.store import PortfolioStore
 from portfolio.execution import ExecutionAgent
 from portfolio.signals import SignalTracker
 from portfolio.feedback import FeedbackLoop
-from portfolio.cost_control import CostController
 from portfolio.health import HealthMonitor
 from portfolio.rejection import RejectionAnalyzer
-from analytics.clustering import ClusterAnalyzer
 from utils.storage import Storage
 from utils.partner_codes import legacy_from_recommendation
 from utils.job_schedule import claim_due_jobs
@@ -98,9 +96,7 @@ class PortfolioEngine:
         self.feedback_loop = FeedbackLoop(
             self.portfolio_store, discovery_storage=discovery_storage,
         )
-        self.cost_controller = CostController(user_id=tenant_uid, settings=settings)
         self.health_monitor = HealthMonitor(self.portfolio_store, discovery_storage=self.discovery_storage)
-        self.cluster_analyzer = ClusterAnalyzer(user_id=offline)
         self.execution_scan_limit = max(
             1,
             min(int(os.getenv("PORTFOLIO_EXECUTION_SCAN_LIMIT", "200")), 500),

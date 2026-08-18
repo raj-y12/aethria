@@ -18,6 +18,7 @@ _MUTATION_LOG_TABLE = "meta_mutation_log"
 CONFIDENCE_FLOOR = 0.2
 CONFIDENCE_CEILING = 0.8
 THRESHOLD_MAX_OFFSET = 1.0
+DEFAULT_WEAK_THRESHOLD = 6.0
 
 DEFAULT_CALIBRATION = {
     "confidence_threshold_override": None,
@@ -77,7 +78,7 @@ class ThresholdCalibrator:
                 })
 
             current_wt = self.state.get("reviewer_weak_threshold_override")
-            default_weak = 6.0
+            default_weak = DEFAULT_WEAK_THRESHOLD
             current_wt = current_wt if current_wt is not None else default_weak
             new_wt = max(default_weak - THRESHOLD_MAX_OFFSET, round(current_wt - 0.3, 2))
             if new_wt != current_wt:
@@ -108,7 +109,7 @@ class ThresholdCalibrator:
                 })
 
             current_wt = self.state.get("reviewer_weak_threshold_override")
-            default_weak = 6.0
+            default_weak = DEFAULT_WEAK_THRESHOLD
             current_wt = current_wt if current_wt is not None else default_weak
             new_wt = min(default_weak + THRESHOLD_MAX_OFFSET, round(current_wt + 0.3, 2))
             if new_wt != current_wt:
@@ -142,7 +143,7 @@ class ThresholdCalibrator:
                 })
 
             wt_override = self.state.get("reviewer_weak_threshold_override")
-            default_weak = 6.0
+            default_weak = DEFAULT_WEAK_THRESHOLD
             if wt_override is not None and wt_override != default_weak:
                 delta = 0.02 if wt_override < default_weak else -0.02
                 new_wt = round(wt_override + delta, 2)

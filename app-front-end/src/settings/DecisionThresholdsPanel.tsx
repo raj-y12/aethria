@@ -8,17 +8,13 @@ import {
   type DecisionThresholdBoundaries,
 } from '../lib/decisionThresholds';
 import type { FundConfiguration } from '../lib/fundConfiguration';
+import { SCORE_BAND_DOT_COLORS } from '../design-system/verdictScoreTokens';
 
 const labelCls = 'type-label-section text-xs text-oxford/70';
 const inputCls =
   'type-data w-full max-w-[5.5rem] rounded-none border-0 border-b border-oxford/[0.12] bg-transparent px-0 py-phi-2 text-oxford outline-none transition-colors focus:border-oxford/45';
 
-// Deep enough to read as dots on the #D9D7D4 paper — pastels disappear at this dot size.
-const bandColors = {
-  pass: '#b4635b',
-  monitor: '#a8862b',
-  invest: '#4a8a6c',
-};
+const bandColors = SCORE_BAND_DOT_COLORS;
 
 /** Clip a full-width layer down to [from, to] on the 0–100 score axis. */
 function bandClip(from: number, to: number): React.CSSProperties {

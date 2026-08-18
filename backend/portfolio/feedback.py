@@ -279,10 +279,6 @@ class FeedbackLoop:
                 sample_size=total,
             )
             
-            import json
-            metrics_file = self.store.files["agent_metrics"]
-            metrics = self.store._read_file(metrics_file)
-            
             dist_record = {
                 "id": "verdict_distribution",
                 "verdict_distribution": counts,
@@ -290,17 +286,12 @@ class FeedbackLoop:
                 "calculated_at": now.isoformat(),
                 "sample_size": total,
             }
-            
-            found = False
-            for i, m in enumerate(metrics):
-                if m.get("id") == "verdict_distribution":
-                    metrics[i] = dist_record
-                    found = True
-                    break
-            if not found:
-                metrics.append(dist_record)
-            
-            self.store._write_file(metrics_file, metrics)
+            # Targeted upsert-by-id (same path add_agent_metric above uses)
+            # instead of reading the whole agent_metrics table into memory and
+            # writing it all back -- that full-table replace raced any
+            # concurrent add_agent_metric call and violated the row-level-
+            # storage invariant against Supabase.
+            self.store._append_record("agent_metrics", dist_record)
             
             if calibration_warning:
                 self.logger.warning(f"Calibration: {calibration_warning}")

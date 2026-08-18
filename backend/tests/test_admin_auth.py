@@ -137,6 +137,26 @@ def test_admin_login_rate_limits_repeated_bad_secrets(monkeypatch):
     assert response.status_code == 429
 
 
+def test_a_future_admin_route_that_forgets_its_own_auth_check_is_still_rejected(monkeypatch):
+    """Regression (audit M7): admin auth used to be opt-in per route -- the
+    middleware skipped Clerk auth for the whole /api/admin/ prefix and trusted
+    each handler to call _require_admin_claims itself. Register a bare route
+    under that prefix with no auth check of its own and confirm the
+    middleware rejects it structurally, not because the handler remembered to."""
+    import api
+
+    monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
+
+    @api.app.get("/api/admin/__test_unguarded_route")
+    def _unguarded():
+        return {"reached_handler": True}
+
+    client = TestClient(api.app)
+    response = client.get("/api/admin/__test_unguarded_route")
+
+    assert response.status_code == 401
+
+
 def test_admin_overview_uses_admin_service_with_valid_token(monkeypatch):
     import api
     from admin_auth import issue_admin_token
