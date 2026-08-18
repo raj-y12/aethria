@@ -4,10 +4,26 @@ import pytest
 
 from resolver.company_resolver import EvidenceSource
 from resolver.identity_disambiguation import (
+    _MAX_COMPLETION_TOKENS,
     DisambiguationResult,
     _build_prompt,
     disambiguate_identity,
 )
+
+
+def test_max_completion_tokens_is_large_enough_for_a_reasoning_model():
+    """Regression (live-dispatch validation, Task 5): gpt-5-nano is a
+    reasoning model that spends completion tokens on internal reasoning
+    before any visible output. A prior value of 1024 was live-observed to be
+    entirely consumed by reasoning alone (finish_reason="length", content="",
+    reasoning_tokens=1024) -- every real call returned empty content and
+    silently fell back to "malformed model response" -> NEEDS_REVIEW, so the
+    disambiguation feature never actually corrected anything in practice.
+    16384 (reviewer/base.py's DEFAULT_MAX_COMPLETION_TOKENS for the same
+    model) was live-confirmed sufficient. This doesn't re-prove sufficiency
+    with a real call (that needs live infra), just guards against silently
+    shrinking the budget back down without re-validating against the model."""
+    assert _MAX_COMPLETION_TOKENS >= 16384
 
 
 def _candidates():

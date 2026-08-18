@@ -21,7 +21,17 @@ from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruc
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "gpt-5-nano"
-_MAX_COMPLETION_TOKENS = 1024  # gpt-5-nano is a reasoning model; too low silently empties content (live-observed, memory 2026-08-17).
+# Fixed after live-dispatch validation (Task 5): gpt-5-nano is a reasoning
+# model that spends completion tokens on internal reasoning before any
+# visible output. 1024 -- believed a safe floor from an earlier reviewer.py
+# bug fix -- was live-observed to be fully consumed by reasoning alone
+# (finish_reason="length", content="", reasoning_tokens=1024), leaving zero
+# tokens for the JSON response and forcing every real call through the
+# "malformed model response" fail-closed path. reviewer/base.py's actual
+# working default for the same model is 16384 (DEFAULT_MAX_COMPLETION_TOKENS);
+# 1024 there is only the floor a caller-supplied override is clamped to, not
+# what's actually used day to day.
+_MAX_COMPLETION_TOKENS = 16384
 
 
 class DisambiguationResult(BaseModel):
