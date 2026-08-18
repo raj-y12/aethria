@@ -23,6 +23,7 @@ from compatibility_projection import project_scout_for_runtime
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from models import EvaluationManifestIdentity
 from pipeline_execution import StageExecutionResult
+from utils.scoring import compute_overall_score
 
 
 logger = logging.getLogger(__name__)
@@ -534,10 +535,27 @@ class PartnerEngine:
             )
         
         self.logger.info(f"Found {len(undecided)} entries awaiting partner decision")
-        
+
+        # Triage funnel gate 2 (product direction, 2026-08-18): reviewed
+        # companies scoring under 55% overall don't get an automatic
+        # decision -- they stay "reviewed, not decided" until a human
+        # requests one explicitly via run_startup (which has no such gate).
+        # Uses the same compute_overall_score() the reviewer/memo layers
+        # already treat as the primary score (avg of market/product/
+        # technical/execution) rather than inventing a new one. Missing
+        # core-dimension data -> None -> fails closed (not decided), per
+        # invariant #5 -- never a plausible guess on incomplete data.
+        try:
+            decision_threshold = max(0.0, min(1.0, float(
+                (self.settings.get("agent_config") or {}).get("decision_threshold", 0.55)
+            )))
+        except (TypeError, ValueError):
+            decision_threshold = 0.55
+
         decided_count = 0
         failed_count = 0
         blocked_count = 0
+        skipped_below_threshold = 0
         self.last_cycle_escalations = 0
 
         # Process each entry
@@ -545,7 +563,12 @@ class PartnerEngine:
             entry_id = entry["id"]
             scout_output = entry["scout"]
             review_output = entry["review"]
-            
+
+            overall_score = compute_overall_score(review_output)
+            if overall_score is None or (overall_score / 10.0) < decision_threshold:
+                skipped_below_threshold += 1
+                continue
+
             try:
                 company_name = scout_output.get("name", "Unknown")
                 self.logger.info(
@@ -607,9 +630,13 @@ class PartnerEngine:
                 continue
         
         self.logger.info(
-            f"Decision cycle complete: {decided_count}/{len(undecided)} decisions successful"
+            f"Decision cycle complete: {decided_count}/{len(undecided)} decisions successful "
+            f"({skipped_below_threshold} below decision_threshold={decision_threshold:.2f}, "
+            "reviewed but not decided)"
         )
-        
+
+        # "attempted" means "considered this cycle", matching reviewer/engine.py's
+        # convention where skipped-for-threshold entries still count as attempted.
         attempted_count = len(undecided)
         if failed_count:
             return StageExecutionResult.failed_result(
@@ -627,6 +654,7 @@ class PartnerEngine:
                 succeeded=decided_count,
                 failed=failed_count,
                 blocked=blocked_count,
+                skipped=skipped_below_threshold,
             )
         if blocked_count:
             if decided_count:
@@ -645,6 +673,7 @@ class PartnerEngine:
                     succeeded=decided_count,
                     failed=0,
                     blocked=blocked_count,
+                    skipped=skipped_below_threshold,
                 )
             return StageExecutionResult.blocked_result(
                 stage="partner",
@@ -656,6 +685,24 @@ class PartnerEngine:
                 ),
                 attempted=attempted_count,
                 blocked=blocked_count,
+                skipped=skipped_below_threshold,
+            )
+        if decided_count == 0:
+            # Every candidate this cycle was below decision_threshold --
+            # "completed" requires succeeded > 0, and this isn't a failure
+            # or a budget block, it's the triage gate correctly doing its
+            # job. Matches the "no eligible work" skipped_result pattern
+            # already used above for the empty-undecided-list case.
+            return StageExecutionResult.skipped_result(
+                stage="partner",
+                code="partner_all_below_decision_threshold",
+                detail=(
+                    f"All {attempted_count} reviewed candidate(s) scored below "
+                    f"decision_threshold={decision_threshold:.2f}; none decided "
+                    "automatically this cycle."
+                ),
+                attempted=attempted_count,
+                skipped=skipped_below_threshold,
             )
         return StageExecutionResult.completed(
             stage="partner",
@@ -663,6 +710,7 @@ class PartnerEngine:
             detail=f"Partner completed {decided_count} eligible candidate(s).",
             attempted=attempted_count,
             succeeded=decided_count,
+            skipped=skipped_below_threshold,
         )
 
     async def run_startup(
