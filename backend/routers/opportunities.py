@@ -3,7 +3,7 @@
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from identity.models import SourceChannel, SourceObservationInput
 from opportunity_pipeline import OpportunityPipeline
@@ -17,12 +17,30 @@ from security.request_guards import require_authenticated_user
 router = APIRouter(tags=["opportunities"])
 
 
+_MANUAL_LOOKUP_ITEM_STRING_MAX_LENGTH = 10_000
+
+
 class ManualLookupBody(BaseModel):
     company_name: str = Field(min_length=1, max_length=300)
     website: Optional[str] = Field(default=None, max_length=2000)
     lookup_id: Optional[str] = Field(default=None, max_length=200)
     references: List[Dict[str, Any]] = Field(default_factory=list, max_length=20)
     claims: List[Dict[str, Any]] = Field(default_factory=list, max_length=50)
+
+    # references/claims are freeform dicts (no nested schema), unlike the
+    # scalar fields above -- so unlike those, nothing capped an individual
+    # string value's length. List length alone doesn't bound payload size:
+    # 50 claims with a single multi-megabyte string field is still 50 items.
+    @field_validator("references", "claims")
+    @classmethod
+    def _reject_oversized_string_values(cls, items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        for item in items:
+            for key, value in item.items():
+                if isinstance(value, str) and len(value) > _MANUAL_LOOKUP_ITEM_STRING_MAX_LENGTH:
+                    raise ValueError(
+                        f"field '{key}' exceeds {_MANUAL_LOOKUP_ITEM_STRING_MAX_LENGTH} characters"
+                    )
+        return items
 
 
 @router.post("/api/opportunities/manual-lookup")

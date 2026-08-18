@@ -1,19 +1,26 @@
 """
 Limit concurrent pipeline / lookup work to protect single-instance hosts (e.g. Render 512MB).
 
-- Global semaphore: cap simultaneous cycles across all users (default 1).
+- Process-local semaphore: caps simultaneous cycles across all users within
+  this one process (default 1) -- NOT a cluster-wide cap. Horizontally
+  scaling to multiple worker processes/pods multiplies the effective
+  concurrency by the process count; this does not coordinate across them.
 - Per-user lock: prevent queue worker + persistent loop from running two cycles for one user.
 """
 from __future__ import annotations
 
 import asyncio
 import os
+import weakref
 from contextlib import asynccontextmanager
-from typing import Dict, Optional
+from typing import Optional
 
 _global_sem: Optional[asyncio.Semaphore] = None
 _lookup_sem: Optional[asyncio.Semaphore] = None
-_user_locks: Dict[str, asyncio.Lock] = {}
+# Weak-valued: once no coroutine holds a strong reference to a tenant's lock
+# (i.e. nothing is currently waiting on/holding it), it's collected on its
+# own. A plain dict grew one entry per distinct user_id ever seen, forever.
+_user_locks: "weakref.WeakValueDictionary[str, asyncio.Lock]" = weakref.WeakValueDictionary()
 
 
 def max_concurrent_pipeline_cycles() -> int:

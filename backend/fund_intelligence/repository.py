@@ -499,13 +499,11 @@ class FundIntelligenceRepository:
                     json.dumps(_json(proposal["limitations"], [])),
                     actor_id,
                 )
-                if row is None:
-                    return {
-                        "governed_policy_version_id": version_id,
-                        "publication_source": "settings",
-                        "policy_hash": str(policy_hash),
-                        "status": "published",
-                    }
+                # A plain `insert ... returning *` (no ON CONFLICT clause above)
+                # always returns exactly one row or raises -- `row` can never be
+                # None here. The removed fallback branch referenced an undefined
+                # `version_id` and would have raised NameError the moment any
+                # future ON CONFLICT change made it reachable.
                 return _public_row(row)
 
     async def review_proposal(

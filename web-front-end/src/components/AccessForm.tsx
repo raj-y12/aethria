@@ -23,7 +23,6 @@ export default function AccessForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState(false);
-  const [position, setPosition] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState(prefilledEmail);
   const [role, setRole] = useState('');
@@ -84,8 +83,6 @@ export default function AccessForm() {
           : (data.detail as { message?: string })?.message || `Request failed (${res.status}).`;
         throw new Error(msg);
       }
-      const resData = await res.json().catch(() => ({}));
-      if (resData.position != null) setPosition(resData.position);
       setLoading(false);
       setProcessing(true);
     } catch (err) {
@@ -111,10 +108,7 @@ export default function AccessForm() {
           You're on the list.
         </h3>
         <p className="max-w-[42ch] font-sans text-[15px] leading-[1.65] text-[var(--text-inverse-secondary)]">
-          {position != null ? (
-            <span className="block font-medium text-[var(--text-inverse)]">Position #{position}</span>
-          ) : null}
-          <span className="mt-1 block">We'll reach out when a spot opens.</span>
+          <span className="block">We'll reach out when a spot opens.</span>
         </p>
         {APP_URL && (
           <a

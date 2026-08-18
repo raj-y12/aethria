@@ -2,7 +2,6 @@ from decisions.models import HumanRulingDecision, InitialHumanRulingDecision, Ov
 from decisions.service import (
     build_workflow_draft,
     classify_override,
-    investment_transition_is_allowed,
     ruling_to_opportunity_state,
     workflow_state_for_ruling,
 )
@@ -112,10 +111,3 @@ def test_advance_enters_active_evidence_workflow():
     assert workflow_state_for_ruling("advance") == "evidence_active"
     assert workflow_state_for_ruling("monitor") == "monitoring"
     assert workflow_state_for_ruling("pass") == "completed"
-
-
-def test_investment_transition_requires_advance_or_active_diligence():
-    assert investment_transition_is_allowed("advance") is True
-    assert investment_transition_is_allowed("monitor") is False
-    assert investment_transition_is_allowed("pass") is False
-    assert investment_transition_is_allowed(None) is False

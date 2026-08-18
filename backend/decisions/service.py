@@ -32,11 +32,6 @@ def workflow_state_for_ruling(decision: HumanRulingDecision | str) -> str:
     }[value]
 
 
-def investment_transition_is_allowed(current_ruling: str | None) -> bool:
-    """Only an opportunity already advanced to diligence can be invested."""
-    return str(current_ruling or "").strip().lower() == "advance"
-
-
 def classify_override(
     *,
     recommendation: Optional[str],
