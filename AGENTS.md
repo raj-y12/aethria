@@ -38,13 +38,22 @@ Breaking one is a bug, not a trade-off. Each has an ADR in `docs/adr/`.
 6. **Configuration is registered.** New env var → `EnvVar(...)` in
    `backend/env_config.py` → regenerate `.env.example`. A bare `os.getenv` for an
    unregistered name fails CI. (ADR-0008)
-7. **Migrations are append-only.** New timestamped file in
-   `supabase/migrations/`. Never edit an applied migration.
+7. **Migrations are append-only.** New timestamped file in `db/migrations/`
+   (the live path — applied against `DATABASE_URL` by
+   `backend/db/migration_runner.py`; see `db/migrations/README.md`).
+   `supabase/migrations/` is historical only — not applied by any running
+   system, kept for record, never edited or re-applied. Never edit an applied
+   migration in either directory. **Known gap:** unlike `supabase/migrations/`,
+   no file under `db/migrations/` has an RLS policy — tenant isolation on the
+   live path rests entirely on application-layer `require_user_id()` with no
+   database-level backstop. Flagged, not yet decided/fixed (audit finding F3,
+   `docs/archive/plans/2026-08-18-full-codebase-audit.md`).
 8. **LLM calls are the dominant cost.** Respect `CostController` budget gates.
    No model call where a rule works. (ADR-0009)
 9. **Prompt versions track prompt changes** via `backend/utils/prompt_version.py`.
-10. **Production requires Supabase.** `USE_SUPABASE_STORAGE=1`; the local JSON
-    store is dev only.
+10. **Production persistence is plain PostgreSQL** via `DATABASE_URL`.
+    `USE_SUPABASE_STORAGE` is a deprecated compatibility switch (see
+    `backend/env_config.py`); the local JSON store remains dev-only fallback.
 
 ## Structure and entry points
 
@@ -55,7 +64,8 @@ app-front-end/            Operator SPA (React + Vite + Clerk + TanStack Query)
 web-front-end/            Marketing site (React + vite-react-ssg, Vercel)
 packages/product-chrome/  Source-only shared React chrome, used by both frontends
 resources/config/         Versioned decision policy, rubrics, thesis templates
-supabase/migrations/      Append-only SQL
+db/migrations/            Append-only SQL — live path, applied via DATABASE_URL
+supabase/migrations/      Historical SQL — not applied by any running system
 .github/workflows/ci.yml  The authoritative definition of "green"
 ```
 
@@ -128,9 +138,11 @@ references are pruned (`remove_startups_without_references`).
 another animation library); named design tokens only, no raw hex or arbitrary
 pixel spacing; ESLint `--max-warnings 0`, a warning is a failure.
 
-**SQL** — one new timestamped migration per change, RLS included. If repository
-code exercises it, add it to the CI list in `.github/workflows/ci.yml` and extend
-the Postgres contract tests.
+**SQL** — one new timestamped migration per change, in `db/migrations/` (the
+live path — see invariant #7), RLS included. If repository code exercises it,
+add it to the CI list in `.github/workflows/ci.yml` and extend the Postgres
+contract tests. Note: existing `db/migrations/` files predate this rule being
+enforced there and currently carry no RLS — see invariant #7's known gap.
 
 ## Testing
 
@@ -153,7 +165,8 @@ genuinely wrong, say why before changing it.
 - Never log API keys, JWTs, or request bodies containing user data.
 - User text reaching an LLM passes through `backend/security/` prompt safety.
 - RLS policies ship with every migration adding a tenant-scoped table. Never
-  edit an applied migration, even to fix a typo — write a follow-up.
+  edit an applied migration, even to fix a typo — write a follow-up. (Existing
+  `db/migrations/` tables predate this being enforced there — invariant #7.)
 
 ## Preserve contracts
 

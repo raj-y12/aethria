@@ -61,6 +61,30 @@ def test_named_lookup_observation_uses_manual_channel_and_stable_lookup_identity
     assert observation.source_metadata["operator_confirmed_identity"] is True
 
 
+def test_operator_confirmation_does_not_apply_to_a_same_named_different_domain():
+    """Regression (audit CRITICAL-F1): operator_confirmed_identity used to be
+    True whenever ANY lookup_website was supplied, regardless of whether it
+    matched the domain this observation actually resolved to. Live-observed
+    class of bug (Anthropic description theft, fixed separately) -- here the
+    same anchor-skip could let a same-named different company's domain
+    inherit the operator's confirmation and bypass identity/normalization.py's
+    other verification checks entirely."""
+    discovery = _scout_output()
+    # The operator confirmed barespace.io, but the only reference the scout
+    # actually found is a different, same-named domain (barespace.co) --
+    # observed_domain resolves to that, not the operator's hint.
+    discovery["lookup_website"] = "https://barespace.io"
+    discovery["references"] = ["https://barespace.co", "https://tech.eu/barespace"]
+
+    observation = observation_from_scout_discovery(
+        user_id="fund-a",
+        discovery=discovery,
+    )
+
+    assert observation.observed_domain == "barespace.co"
+    assert observation.source_metadata["operator_confirmed_identity"] is False
+
+
 @pytest.mark.asyncio
 async def test_named_lookup_canonical_path_admits_then_persists_founders_before_review(
     monkeypatch,

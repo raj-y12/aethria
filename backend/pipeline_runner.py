@@ -64,7 +64,7 @@ from evidence.repository import EvidenceRepository
 from evidence.planning import compute_missing_evidence
 from evidence.retrieval import execute_evidence_plan
 from evidence.extraction import extract_claims_from_evidence
-from identity.repository import IdentityRepository
+from identity.repository import IdentityConflictError, IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
 from portfolio.engine import PortfolioEngine
@@ -98,7 +98,7 @@ from utils.reference_validation import is_generic_reference
 from utils.prompt_version import hash_prompt
 from regulatory_context import CanonicalReviewerRegulatoryContextProvider
 from context_assembler import CanonicalContextProvider
-from identity.repository import IdentityRepository
+from identity.repository import IdentityConflictError, IdentityRepository
 from evidence.repository import EvidenceRepository
 from batch1.context import reset_state, set_state
 from batch1.repository import Batch1Repository
@@ -638,18 +638,51 @@ async def _admit_autonomous_discoveries(
             )
             continue
         if not discoveries_are_persisted:
-            persisted_id = await asyncio.to_thread(
-                storage.add_discovery,
-                discovery,
-                pipeline_run_id=discovery.get("pipeline_run_id"),
+            # Fixed 2026-08-18 (audit CRITICAL-F2): this used to call
+            # storage.add_discovery unconditionally, even when the canonical
+            # admission resolved to an opportunity that ALREADY has a legacy
+            # startups row linked (e.g. a second persona rediscovering the
+            # same company within the same cycle -- proven by
+            # test_two_personas_same_domain_keep_two_observations_one_opportunity).
+            # link_legacy_projection's "already linked to a different id"
+            # guard then raised an uncaught IdentityConflictError, crashing
+            # the whole pipeline cycle (Reviewer/Partner/Portfolio/Meta never
+            # ran) and leaving the never-linked new row permanently orphaned.
+            # Reuse the existing legacy row instead of creating a duplicate.
+            existing_opportunity = await identity_repository.get_opportunity(
+                user_id=user_id, opportunity_id=admission.opportunity_id
             )
-            startup_id = str(persisted_id or startup_id)
+            if existing_opportunity is not None and existing_opportunity.legacy_startup_id:
+                startup_id = str(existing_opportunity.legacy_startup_id)
+            else:
+                persisted_id = await asyncio.to_thread(
+                    storage.add_discovery,
+                    discovery,
+                    pipeline_run_id=discovery.get("pipeline_run_id"),
+                )
+                startup_id = str(persisted_id or startup_id)
             discovery["persisted_startup_id"] = startup_id
-        await link_admission_projection(
-            identity_repository,
-            admission=admission,
-            legacy_startup_id=startup_id,
-        )
+        try:
+            await link_admission_projection(
+                identity_repository,
+                admission=admission,
+                legacy_startup_id=startup_id,
+            )
+        except IdentityConflictError:
+            # Defense in depth against the same race under concurrent
+            # discoveries: treat "already linked" as an expected outcome of
+            # admitting the same company twice, not a stage failure. The
+            # canonical admission (company_id/opportunity_id) already
+            # succeeded regardless -- only the legacy compatibility
+            # projection lost the race -- so fall through and still persist
+            # this discovery's claims rather than skipping real canonical
+            # evidence over a cosmetic-layer conflict.
+            logger.info(
+                "[%s] identity admission already linked opportunity_id=%s startup_id=%s",
+                user_id[:12],
+                admission.opportunity_id,
+                startup_id,
+            )
         if evidence_repository is not None and admission.company_id and admission.opportunity_id:
             from canonical_scout_claims import persist_scout_claims
 

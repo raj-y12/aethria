@@ -1,8 +1,11 @@
+from types import SimpleNamespace
+
 import pytest
 
 import pipeline_runner
 from identity.acquisition import observation_from_scout_discovery
 from identity.models import IdentityAdmission, IdentityStatus
+from identity.repository import IdentityConflictError
 
 
 def _discovery(startup_id, *, name="Acme", website="https://acme.com", scout_type="market_driven"):
@@ -102,9 +105,27 @@ async def test_two_personas_same_domain_keep_two_observations_one_opportunity():
     )
     linked = []
 
+    # Regression (audit CRITICAL-F2): the previous mock's link_legacy_projection
+    # was a no-op that always succeeded, unlike the real DB guard in
+    # identity/repository.py -- which rejects a second link with a DIFFERENT
+    # legacy_startup_id for the same opportunity. That gap is exactly why the
+    # production crash went undetected. This mock faithfully reproduces the
+    # guard so the test proves _admit_autonomous_discoveries survives it.
     class Repository:
-        async def link_legacy_projection(self, **kwargs):
-            linked.append(kwargs)
+        def __init__(self):
+            self._legacy_by_opportunity: dict[str, str] = {}
+
+        async def get_opportunity(self, *, user_id, opportunity_id):
+            return None
+
+        async def link_legacy_projection(self, *, user_id, opportunity_id, legacy_startup_id):
+            existing = self._legacy_by_opportunity.get(opportunity_id)
+            if existing is not None and existing != legacy_startup_id:
+                raise IdentityConflictError(
+                    "Opportunity projection is missing, cross-tenant, or already linked"
+                )
+            self._legacy_by_opportunity[opportunity_id] = legacy_startup_id
+            linked.append({"opportunity_id": opportunity_id, "legacy_startup_id": legacy_startup_id})
 
     results = await pipeline_runner._admit_autonomous_discoveries(
         user_id="fund-a",
@@ -119,8 +140,74 @@ async def test_two_personas_same_domain_keep_two_observations_one_opportunity():
         "market_driven",
         "contrarian",
     }
+    # Both admissions succeed and are returned -- the conflicting second link
+    # is caught and skipped, it does not crash the whole cycle.
+    assert len(results) == 2
     assert {item.opportunity_id for item in results} == {"opportunity-1"}
-    assert len(linked) == 2
+    # Only one legacy startup id can ever occupy the opportunity's single
+    # legacy_startup_id column; the second persona's link legitimately loses.
+    assert len(linked) == 1
+
+
+@pytest.mark.asyncio
+async def test_unpersisted_second_persona_reuses_existing_legacy_row_instead_of_duplicating():
+    """Regression (audit CRITICAL-F2), the not-yet-persisted (autonomous
+    discovery) path: a second persona's discovery resolving to an opportunity
+    that already has a linked legacy startup row must reuse it instead of
+    calling storage.add_discovery again, which used to create a duplicate,
+    permanently orphaned startups row every time this fired."""
+    discoveries = [
+        _discovery("startup-1", scout_type="market_driven"),
+        _discovery("startup-2", scout_type="contrarian"),
+    ]
+    service = _Service(
+        [
+            IdentityAdmission(
+                user_id="fund-a",
+                observation_id="observation-1",
+                status=IdentityStatus.RESOLVED,
+                company_id="company-1",
+                opportunity_id="opportunity-1",
+                confidence=1,
+            ),
+            IdentityAdmission(
+                user_id="fund-a",
+                observation_id="observation-2",
+                status=IdentityStatus.RESOLVED,
+                company_id="company-1",
+                opportunity_id="opportunity-1",
+                confidence=1,
+            ),
+        ]
+    )
+    storage = _Storage(set())
+
+    class Repository:
+        def __init__(self):
+            self._legacy_by_opportunity: dict[str, str] = {}
+
+        async def get_opportunity(self, *, user_id, opportunity_id):
+            legacy = self._legacy_by_opportunity.get(opportunity_id)
+            if legacy is None:
+                return None
+            return SimpleNamespace(legacy_startup_id=legacy)
+
+        async def link_legacy_projection(self, *, user_id, opportunity_id, legacy_startup_id):
+            self._legacy_by_opportunity[opportunity_id] = legacy_startup_id
+
+    results = await pipeline_runner._admit_autonomous_discoveries(
+        user_id="fund-a",
+        discoveries=discoveries,
+        storage=storage,
+        identity_repository=Repository(),
+        identity_service=service,
+        discoveries_are_persisted=False,
+    )
+
+    assert len(results) == 2
+    # Only the first persona's discovery created a legacy row -- the second
+    # reused it instead of duplicating.
+    assert len(storage.persisted) == 1
 
 
 @pytest.mark.asyncio
@@ -194,6 +281,9 @@ async def test_new_discovery_is_admitted_before_legacy_persistence_and_linking()
     storage.add_discovery = add
 
     class Repository:
+        async def get_opportunity(self, *, user_id, opportunity_id):
+            return None
+
         async def link_legacy_projection(self, **kwargs):
             events.append("link")
 

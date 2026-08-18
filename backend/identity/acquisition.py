@@ -123,8 +123,18 @@ def observation_from_scout_discovery(
             "prompt_version": str(discovery.get("prompt_version") or "").strip() or None,
             "pipeline_run_id": str(discovery.get("pipeline_run_id") or "").strip() or None,
             "reference_count": len(references),
+            # Fixed 2026-08-18 (audit CRITICAL-F1): this used to be True whenever
+            # the operator supplied ANY lookup_website, regardless of whether it
+            # matched the domain actually being marked observed/verified here --
+            # so a same-named different company's domain (surfaced independently
+            # by candidate_domains scoring) could inherit the operator's
+            # confirmation and short-circuit _domain_is_verified's other checks
+            # in identity/normalization.py. Now anchored to the domain this
+            # observation itself resolved to.
             "operator_confirmed_identity": bool(
-                is_named_lookup and str(discovery.get("lookup_website") or "").strip()
+                is_named_lookup
+                and observed_domain
+                and observed_domain == normalize_domain(discovery.get("lookup_website"))
             ),
         },
         resolution_payload=resolution_payload,
