@@ -924,25 +924,17 @@ def resolve_company(
             decision="continue",
             reason=f"provider={pack.get('provider')} new_sources={len(fresh)}",
         )
-        # Phase 2 (corroboration: founders/funding/YC) only when phase 1 left identity thin.
-        if phase == 1:
-            strong = [s for s in all_sources if s.match_score >= 0.7]
-            anchors = [
-                s for s in all_sources if s.source_type in ("official_site", "linkedin", "crunchbase")
-            ]
-            if len(strong) >= 3 and anchors and _extract_founders(
-                _founder_sources(all_sources, company=company, anchor_host=anchor_host),
-                company=company,
-            ):
-                _log_stage(
-                    resolution,
-                    stage="search_phase_2",
-                    queries=[],
-                    sources_found=0,
-                    decision="skipped",
-                    reason="Phase 1 evidence already strong; skipping corroboration queries to save budget.",
-                )
-                break
+        # Phase 2 (founders/funding/YC/product-launch queries) used to be
+        # skipped whenever phase 1's official-site/LinkedIn/Crunchbase set
+        # already looked strong and a regex match found a founder name --
+        # exactly the case for well-known companies, whose own institutional
+        # pages score high and often carry "founded by ..." boilerplate. That
+        # meant the founder name came from a single self-published source,
+        # never cross-checked against phase 2's broader web queries (which
+        # aren't restricted to the company's own domain and are the only
+        # queries that can surface independent news/press coverage). Always
+        # run phase 2 now -- one extra search call, not an LLM call, so the
+        # budget tradeoff this used to make no longer applies.
 
     all_sources.sort(key=lambda s: s.match_score, reverse=True)
     resolution.evidence_sources = all_sources[:16]

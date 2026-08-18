@@ -101,6 +101,50 @@ def test_strong_identity_is_found(monkeypatch):
     assert res.description
 
 
+def test_phase_2_corroboration_queries_always_run_even_when_phase_1_is_strong(monkeypatch):
+    """Regression: phase 2 (founder/funding/YC/product-launch queries, not
+    restricted to the company's own domain) used to be skipped whenever phase
+    1's official-site/LinkedIn/Crunchbase set already scored strong and a
+    regex match found a founder name -- exactly the case for well-known
+    companies, whose own institutional pages carry "founded by ..."
+    boilerplate. That left the founder name sourced from a single
+    self-published page, never cross-checked against independent coverage."""
+    sources = [
+        {
+            "title": "Acme Robotics — Home",
+            "url": "https://acmerobotics.com",
+            "snippet": "Acme Robotics builds warehouse automation robots, founded by Jane Smith.",
+        },
+        {
+            "title": "Acme Robotics | LinkedIn",
+            "url": "https://www.linkedin.com/company/acme-robotics",
+            "snippet": "Acme Robotics, founded by Jane Smith. Robotics. 11-50 employees.",
+        },
+        {
+            "title": "Acme Robotics - Crunchbase Company Profile",
+            "url": "https://www.crunchbase.com/organization/acme-robotics",
+            "snippet": "Acme Robotics, founded by Jane Smith, raised $12M Series A.",
+        },
+    ]
+    calls: List[Dict[str, Any]] = []
+
+    def fake_retrieve(**kw):
+        calls.append(kw)
+        return _pack(sources)
+
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", fake_retrieve)
+    res = resolve_company("Acme Robotics", user_id=USER)
+
+    assert res.resolution_status == "FOUND"
+    assert len(calls) == 2  # both phase 1 and phase 2 ran
+    phase_2_queries = calls[1]["queries"]
+    assert any("founder" in q.lower() or "yc" in q.lower() for q in phase_2_queries)
+    assert not any(
+        stage.stage == "search_phase_2" and stage.decision == "skipped"
+        for stage in res.stage_log
+    )
+
+
 def test_profile_from_different_company_is_not_attached_or_used_for_founders(monkeypatch):
     sources = [
         {
