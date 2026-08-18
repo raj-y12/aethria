@@ -1,6 +1,8 @@
 import type { LookupResultSnapshotProps } from '@aethria/product-chrome';
+import type { EvaluationRecord } from '../api/evaluations';
 import { getReviewerQualityBand } from '../design-system/semantics';
 import type { Startup } from '../types/startup';
+import { canonicalCriteriaToStructuredScoring } from './canonicalScoring';
 import { normalizeStructuredScoring } from './reviewScoring';
 import { badgeTextColorForBackground, DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
 
@@ -51,11 +53,19 @@ export function buildLookupSnapshotProps(
   startup: Startup,
   queryLabel?: string,
   verdictBadges?: VerdictBadgeConfig[],
+  evaluation?: EvaluationRecord | null,
 ): LookupResultSnapshotProps | null {
   const review = startup.review;
   if (!review) return null;
 
-  const scoring = normalizeStructuredScoring(review);
+  // Regression: this snapshot used to read only the legacy reviewer's
+  // persona scores, unconditionally -- so a dimension the canonical
+  // evaluation correctly left unscored (insufficient evidence) still showed
+  // a number here, while the full memo (which reads canonical) correctly
+  // showed "Not scored". Canonical evidence-gated scoring takes priority
+  // when a canonical evaluation exists, same as AssessmentScorecard.
+  const canonicalScoring = canonicalCriteriaToStructuredScoring(evaluation);
+  const scoring = canonicalScoring ?? normalizeStructuredScoring(review);
   const band = getReviewerQualityBand(review);
   if (!band && !scoring) return null;
 
@@ -99,12 +109,17 @@ export function buildLookupSnapshotProps(
 
   const dimensions = DIMENSION_KEYS.map((key) => {
     const dim = scoring?.[key];
+    // Canonical's unscored dimensions carry score: 0 (a real number, not
+    // null) as a sentinel -- checking typeof alone would render "0" instead
+    // of the memo's "Not scored", so unscored must be checked explicitly.
     const score =
-      typeof dim?.score === 'number'
+      typeof dim?.score === 'number' && !dim.unscored
         ? dim.score
-        : typeof flatScores[key] === 'number'
-          ? flatScores[key]!
-          : null;
+        : canonicalScoring
+          ? null
+          : typeof flatScores[key] === 'number'
+            ? flatScores[key]!
+            : null;
     return {
       key,
       label: DIMENSION_LABELS[key],

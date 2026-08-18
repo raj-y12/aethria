@@ -19,6 +19,7 @@ from utils.prompt_version import hash_prompt
 from utils.scoring import compute_overall_score
 from utils.settings_loader import DEFAULT_SETTINGS, recommendation_for_score_from_fund_config
 from utils.partner_codes import legacy_from_recommendation, recommendation_from_legacy
+from utils.text_sanitize import strip_markdown_links
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from identity.ownership_gate import check_ownership_conflict
 from evaluation_v2.governed_scoring import (
@@ -2297,10 +2298,21 @@ No markdown. No extra fields. Strictly under 350 words total information density
         except (TypeError, ValueError):
             conf_float = 0.5
 
-        # Snapshot — use LLM output or fall back to scout data
+        # Snapshot — use LLM output or fall back to scout data. LLM narrative
+        # output occasionally carries a scraped page's raw markdown verbatim
+        # (e.g. a logo carousel's "Trusted by teams at ![OpenAI](...)"), same
+        # artifact scout/base.py guards against on its own fields.
         snap_raw = llm_result.get("snapshot")
         if isinstance(snap_raw, dict) and snap_raw.get("one_liner"):
-            snapshot = snap_raw
+            snapshot = {
+                "one_liner": strip_markdown_links(str(snap_raw.get("one_liner") or "")),
+                "stage": snap_raw.get("stage"),
+                "key_signal": (
+                    strip_markdown_links(str(snap_raw["key_signal"]))
+                    if snap_raw.get("key_signal")
+                    else None
+                ),
+            }
         else:
             snapshot = {
                 "one_liner": scout_output.get("one_line", ""),
@@ -2324,11 +2336,11 @@ No markdown. No extra fields. Strictly under 350 words total information density
             "confidence": round(conf_float, 2),
             "decision": legacy_from_recommendation(final_recommendation),
             "conviction_level": _confidence_float_to_conviction_level(conf_float),
-            "thesis": str(llm_result.get("thesis") or scout_output.get("primary_thesis") or scout_output.get("one_line") or "").strip(),
-            "why_this_matters": str(llm_result.get("why_this_matters") or scout_output.get("why_now") or "").strip(),
+            "thesis": strip_markdown_links(str(llm_result.get("thesis") or scout_output.get("primary_thesis") or scout_output.get("one_line") or "")),
+            "why_this_matters": strip_markdown_links(str(llm_result.get("why_this_matters") or scout_output.get("why_now") or "")),
             "snapshot": snapshot,
-            "market_insight": str(llm_result.get("market_insight") or "").strip(),
-            "product_edge": str(llm_result.get("product_edge") or "").strip(),
+            "market_insight": strip_markdown_links(str(llm_result.get("market_insight") or "")),
+            "product_edge": strip_markdown_links(str(llm_result.get("product_edge") or "")),
             "traction_signals": llm_result.get("traction_signals"),
             "risks": llm_risks[:5],
             "decision_rationale": decision_rationale,

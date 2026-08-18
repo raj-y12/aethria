@@ -140,6 +140,50 @@ def test_hard_low_score_stays_deterministic_no():
     assert "minimum pass threshold" in (out.get("rationale") or "").lower()
 
 
+def test_decide_with_llm_strips_raw_markdown_scrape_artifacts_from_narrative_fields():
+    """Regression: the LLM-fallback narrative (snapshot.one_liner, product_edge,
+    market_insight, thesis, why_this_matters) was passed through verbatim from
+    the model's JSON output, unlike scout's fields -- so a scraped page's raw
+    markdown ("Trusted by teams at ![OpenAI](https://.../openai.png)") that
+    survived into the LLM's own output landed in partner_info untouched."""
+    engine = PartnerDecisionEngine(use_llm_fallback=True, api_key="sk-test")
+
+    llm_json = (
+        '{"snapshot": {"one_liner": "Trusted by teams at ![OpenAI](https://x/o.png)", '
+        '"key_signal": "Backed by ![Sequoia](https://x/s.png)"}, '
+        '"thesis": "Loved by ![Notion](https://x/n.png) users", '
+        '"why_this_matters": "As seen in [TechCrunch](https://techcrunch.com)", '
+        '"market_insight": "Used by ![Figma](https://x/f.png) and others", '
+        '"product_edge": "Faster than [Asana](https://asana.com)", '
+        '"risks": [], "confidence": 0.6, "next_action": "Monitor", '
+        '"human_review_required": true}'
+    )
+    fake_message = SimpleNamespace(content=llm_json)
+    fake_response = SimpleNamespace(
+        choices=[SimpleNamespace(message=fake_message, finish_reason="stop")],
+        usage=None,
+    )
+    engine.client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: fake_response))
+    )
+
+    out = engine._decide_with_llm(
+        _base_scout(),
+        _base_review(),
+        assumption_risks=[],
+        trigger_reason="test",
+        avg_score=6.0,
+        final_recommendation="MONITOR",
+    )
+
+    assert out["snapshot"]["one_liner"] == "Trusted by teams at OpenAI"
+    assert out["snapshot"]["key_signal"] == "Backed by Sequoia"
+    assert out["thesis"] == "Loved by Notion users"
+    assert out["why_this_matters"] == "As seen in TechCrunch"
+    assert out["market_insight"] == "Used by Figma and others"
+    assert out["product_edge"] == "Faster than Asana"
+
+
 def test_handoff_quality_recommends_human_review_without_changing_recommendation():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review()

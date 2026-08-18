@@ -11,6 +11,7 @@ import {
   resolveLookupCandidates,
   type LookupCandidate,
 } from '../api/startups';
+import { fetchCurrentEvaluation } from '../api/evaluations';
 import { cancelJob, fetchJob, retryJob, type DurableJob } from '../api/jobs';
 import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
@@ -549,11 +550,35 @@ export function useDispatchLookup({
     ...getQueryConfig('STATIC'),
   });
 
+  // Canonical evidence-gated scoring, same query key as useMemoDecisionBrief so
+  // the two share one cache entry -- without this the snapshot fell back to
+  // legacy reviewer scores even for a dimension canonical left unscored.
+  const snapshotOpportunityId =
+    lookupDetailQuery.data?.canonical_opportunity_id ?? pendingLookupMatch?.canonical_opportunity_id;
+  const snapshotEvaluationQuery = useQuery({
+    queryKey: ['institutional', 'evaluation', snapshotOpportunityId],
+    queryFn: () => fetchCurrentEvaluation(snapshotOpportunityId!),
+    enabled: Boolean(snapshotOpportunityId),
+    retry: false,
+    staleTime: 15_000,
+  });
+
   const snapshotProps = useMemo(() => {
     const src = lookupDetailQuery.data ?? pendingLookupMatch;
     if (!src) return null;
-    return buildLookupSnapshotProps(src, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges);
-  }, [lookupDetailQuery.data, pendingLookupMatch, pendingLookup?.queryLabel, fundConfiguration?.verdictBadges]);
+    return buildLookupSnapshotProps(
+      src,
+      pendingLookup?.queryLabel,
+      fundConfiguration?.verdictBadges,
+      snapshotEvaluationQuery.data,
+    );
+  }, [
+    lookupDetailQuery.data,
+    pendingLookupMatch,
+    pendingLookup?.queryLabel,
+    fundConfiguration?.verdictBadges,
+    snapshotEvaluationQuery.data,
+  ]);
 
   // Active dispatch → drives the takeover's stages screen. Non-null from the
   // moment of submit (identity confirmation / disambiguation) through the
