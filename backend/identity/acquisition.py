@@ -106,7 +106,20 @@ def observation_from_scout_discovery(
     external_key = (
         f"lookup:{lookup_id or startup_id}"
         if is_named_lookup
-        else f"discovery:{startup_id}:{scout_type}"
+        # Autonomous discovery's dedup key must be stable per real-world company,
+        # not per LLM call: `startup_id` here is the raw per-call "id" the model
+        # mints fresh on every discovery (Scout runs with persist_discoveries=False
+        # in the periodic pipeline, so there's no persisted row id to key off of
+        # instead). Keying on it meant the same company got a new key -- and a new
+        # identity_resolution_case -- every single cycle it was rediscovered.
+        # Live-verified 2026-08-18: "Shiplog" alone had 45 open cases, "Optiak" 24,
+        # for 4 distinct companies total across 80 open cases -- Scout was burning
+        # its whole per-cycle discovery budget re-finding the same handful of
+        # companies instead of ever reaching new ones. Naming the key on the
+        # normalized company name (not scout_type) also merges the very common
+        # case of two personas discovering the same company in one cycle into one
+        # case instead of two.
+        else f"discovery:{name_slug}"
     )
     return SourceObservationInput(
         user_id=user_id,
