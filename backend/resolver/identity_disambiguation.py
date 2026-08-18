@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from utils.openai_client import build_openai_client
 from partner.decision import _parse_llm_json_object
+from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -40,11 +41,15 @@ def _build_prompt(company_name: str, candidates: List[Any]) -> tuple[str, str]:
         "real company a user typed a name for. Respond with exactly one JSON object: "
         '{"picked_url": "<one of the candidate URLs, or null if none confidently match>", '
         '"confidence": <0.0-1.0>, "reasoning": "<one sentence>"}. '
-        "No markdown, no other text."
+        "No markdown, no other text. "
+        + prompt_safety_instruction()
     )
-    lines = [f'Typed company name: "{company_name}"', "", "Candidates:"]
-    for c in candidates:
-        lines.append(f"- URL: {c.url}\n  Title: {c.title}\n  Snippet: {c.snippet}")
+    safe_name = isolate_untrusted_text(company_name, label="typed_company_name")
+    lines = [f"Typed company name: {safe_name}", "", "Candidates:"]
+    for i, c in enumerate(candidates):
+        safe_title = isolate_untrusted_text(c.title, label=f"candidate_{i}_title")
+        safe_snippet = isolate_untrusted_text(c.snippet, label=f"candidate_{i}_snippet")
+        lines.append(f"- URL: {c.url}\n  Title: {safe_title}\n  Snippet: {safe_snippet}")
     return system, "\n".join(lines)
 
 
@@ -74,8 +79,8 @@ def disambiguate_identity(
             )
             return _safe_default(f"disambiguation unavailable: {reason}")
 
-    system, user = _build_prompt(company_name, candidates)
     try:
+        system, user = _build_prompt(company_name, candidates)
         client = build_openai_client(api_key)
         response = client.chat.completions.create(
             model=effective_model,

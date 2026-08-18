@@ -19,6 +19,7 @@ resolution and consumes the resolver's evidence pack.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from difflib import SequenceMatcher
 from typing import Any, Dict, List, Literal, Optional
@@ -1097,9 +1098,20 @@ def resolve_company(
             result = disambiguate_identity(
                 company, official_candidates, user_id=uid,
                 cost_controller=cost_controller, api_key=api_key,
+                model=os.getenv("IDENTITY_DISAMBIGUATION_MODEL") or None,
             )
             if result.called and result.picked_url and result.picked_url != heuristic_pick:
-                if result.confidence >= floor:
+                candidate_urls = {c.url for c in official_candidates}
+                if result.picked_url not in candidate_urls:
+                    # The LLM named a URL that was never presented -- hallucinated,
+                    # or steered by injected text in a candidate's content. Never
+                    # let an out-of-candidate-set URL become the trusted anchor.
+                    resolution.notes.append(
+                        "LLM disambiguation returned a URL not among the presented "
+                        "candidates -- treating as inconclusive."
+                    )
+                    resolution.resolution_status = "NEEDS_REVIEW"
+                elif result.confidence >= floor:
                     new_anchor_host = _host_of(result.picked_url)
                     picked_reg = registrable_domain(new_anchor_host)
                     heuristic_reg = (
