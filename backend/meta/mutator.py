@@ -173,10 +173,22 @@ def _append_to_json_list(path: Path, entry: dict, user_id: str) -> None:
 class PromptMutator:
     """Decides which prompts to mutate and rewrites them via OpenAI."""
 
-    def __init__(self, signal_summary: Dict[str, Any], cycle_number: int, user_id: str):
+    def __init__(
+        self,
+        signal_summary: Dict[str, Any],
+        cycle_number: int,
+        user_id: str,
+        *,
+        cost_controller: Optional[Any] = None,
+    ):
         self.signal = signal_summary
         self.cycle_number = cycle_number
         self.user_id = user_id
+        # Fixed 2026-08-18 (audit HIGH-H4): _call_llm fired one prompt-rewrite
+        # completion per mutation target with no budget gate at all -- direct
+        # violation of AGENTS.md invariant #8. Mirrors the same
+        # check_budget/record_usage pattern scout/reviewer/partner already use.
+        self.cost_controller = cost_controller
         self.logger = logging.getLogger("meta.mutator")
         self.model = os.getenv("META_AGENT_MODEL", "gpt-5-nano")
         self.api_key = os.getenv("OPENAI_API_KEY", "")
@@ -386,7 +398,7 @@ class PromptMutator:
         )
 
         try:
-            new_prompt, reasoning = self._call_llm(user_prompt)
+            new_prompt, reasoning = self._call_llm(user_prompt, agent_id=agent_name)
         except Exception as exc:
             raise PromptMutationTargetError(
                 code="prompt_llm_failed",
@@ -512,12 +524,29 @@ class PromptMutator:
             elif agent_name == "OpportunistReviewer":
                 reviewer_engine.opportunist_reviewer.set_prompt(new_prompt)
 
-    def _call_llm(self, user_prompt: str) -> tuple:
+    def _call_llm(self, user_prompt: str, *, agent_id: Optional[str] = None) -> tuple:
         """Call OpenAI to rewrite a prompt. Dependency errors propagate to the target."""
         client = self._get_client()
         if not client:
             self.logger.warning("[Mutator] No OpenAI client, skipping LLM call")
             return None, None
+        # Self-audit catch: CostController's cooldown (60s for "meta") keys on
+        # agent_id, and apply() calls _call_llm once per mutation target,
+        # synchronously, within the same cycle. Using a single shared id
+        # (e.g. self.user_id) for every target would let the FIRST target's
+        # call set the cooldown and silently deny every other target in the
+        # same cycle -- a throttle nobody intended, on top of the daily
+        # ceiling. Per-target agent_id (the agent being mutated) keeps the
+        # cooldown meaningful (don't rewrite the same agent's prompt twice in
+        # a burst) without cross-target interference.
+        resolved_agent_id = agent_id or self.user_id or "mutator"
+        if self.cost_controller:
+            allowed, reason = self.cost_controller.check_budget(
+                "meta", resolved_agent_id, estimated_tokens=8192
+            )
+            if not allowed:
+                self.logger.warning("[Mutator] Budget denied: %s", reason)
+                return None, None
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -527,6 +556,12 @@ class PromptMutator:
             response_format={"type": "json_object"},
             max_completion_tokens=8192,
         )
+        if self.cost_controller:
+            usage = getattr(response, "usage", None)
+            tokens_used = int(getattr(usage, "total_tokens", 0) or 0)
+            self.cost_controller.record_usage(
+                "meta", resolved_agent_id, tokens_used, model=self.model
+            )
         content = response.choices[0].message.content
         if not content:
             return None, None

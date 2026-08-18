@@ -1238,6 +1238,7 @@ async def _run_one_pipeline_cycle_inner_impl(
                 getattr(fund_intelligence_repository or identity_repository, "pool", None)
             ) if getattr(fund_intelligence_repository or identity_repository, "pool", None) is not None else None,
             memory_snapshot=memory_snapshot,
+            cost_controller=engines.cost_controller,
         )
         agents_executed += 1
         await ensure_owned()

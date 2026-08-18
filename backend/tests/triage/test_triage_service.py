@@ -55,3 +55,30 @@ def test_explicit_thesis_exclusion_is_visible_out_of_mandate():
         prerequisites=prerequisites, references=[{"verified": True}], observed_name="Acme",
     )
     assert assessment.disposition is TriageDisposition.OUT_OF_MANDATE
+
+
+def test_priority_and_confidence_cap_come_from_versioned_config_not_python_literals():
+    """Regression (audit HIGH-H6): the identity-confidence floor and every
+    disposition's priority/confidence-cap used to be bare Python literals in
+    triage/service.py -- a direct AGENTS.md invariant #3 violation. Assert
+    the values actually match resources/config/triage_rules/ rather than
+    hardcoding the same numbers twice in this test."""
+    from core.policy_resolver import get_triage_rules
+
+    rules = get_triage_rules()
+    deep_review = rules["dispositions"]["deep_review"]
+    light_monitor = rules["dispositions"]["light_monitor"]
+
+    assessment = TriageService().assess(
+        user_id="fund-a", opportunity_id="opp-1", admission=_admission(),
+        prerequisites=_prerequisites(), references=[{"verified": True}],
+    )
+    assert assessment.priority == deep_review["priority"]
+    assert assessment.confidence == deep_review["confidence_cap"]
+
+    light_assessment = TriageService().assess(
+        user_id="fund-a", opportunity_id="opp-1", admission=_admission(),
+        prerequisites=_prerequisites(), references=[],
+    )
+    assert light_assessment.priority == light_monitor["priority"]
+    assert light_assessment.confidence == light_monitor["confidence_cap"]

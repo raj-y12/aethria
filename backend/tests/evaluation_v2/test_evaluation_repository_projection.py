@@ -11,7 +11,7 @@ from evaluation_v2.models import (
     EvaluationPolicy,
     EvidenceEligibilityPolicy,
 )
-from evaluation_v2.repository import EvaluationRepository
+from evaluation_v2.repository import EvaluationLifecycleError, EvaluationRepository
 
 
 class _ProjectionRepository:
@@ -74,9 +74,11 @@ class _Pool:
 
 
 class _EvaluationConnection:
-    def __init__(self):
+    def __init__(self, *, decision_state="active", workflow_state=None):
         self.fetch_queries = []
         self.execute_calls = []
+        self._decision_state = decision_state
+        self._workflow_state = workflow_state
 
     def transaction(self, **_kwargs):
         return _Acquire(self)
@@ -84,7 +86,8 @@ class _EvaluationConnection:
     async def fetchrow(self, _sql, *_args):
         return {
             "service_level": 1,
-            "decision_state": "active",
+            "decision_state": self._decision_state,
+            "workflow_state": self._workflow_state,
             "legacy_startup_id": "5fa9d11a-5f21-45c1-9ad3-d755990c3164",
             "recommendation_id": None,
         }
@@ -260,6 +263,44 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
     outbox_payload = json.loads(outbox_args[-1])
     assert outbox_payload["legacy_startup_id"] == "5fa9d11a-5f21-45c1-9ad3-d755990c3164"
     assert outbox_payload["compatibility_reason"]
+
+
+@pytest.mark.asyncio
+async def test_evaluate_refuses_to_silently_reopen_an_invested_opportunity():
+    """Regression (audit HIGH-H7): evaluate()'s re-entry guard only checked
+    decision_state == "archived" -- a re-triggered lookup/dispatch on an
+    already-INVESTED opportunity could silently overwrite
+    current_recommendation_id and flip workflow_state back to
+    "ruling_pending", as if the investment decision never happened."""
+    connection = _EvaluationConnection(decision_state="invested")
+    repository = EvaluationRepository(_Pool(connection))
+
+    with pytest.raises(EvaluationLifecycleError, match="Invested opportunities"):
+        await repository.evaluate(
+            user_id="user-a",
+            opportunity_id="opportunity-1",
+            actor_id="actor-a",
+            trigger_type="manual",
+            policy=_evaluation_policy(),
+        )
+
+
+@pytest.mark.asyncio
+async def test_evaluate_refuses_to_silently_reopen_a_completed_workflow():
+    """Regression (audit HIGH-H7): same as above but via workflow_state
+    (a separate column from decision_state) -- "completed" and "monitoring"
+    are the workflow-layer's own terminal states."""
+    connection = _EvaluationConnection(workflow_state="completed")
+    repository = EvaluationRepository(_Pool(connection))
+
+    with pytest.raises(EvaluationLifecycleError, match="completed workflow"):
+        await repository.evaluate(
+            user_id="user-a",
+            opportunity_id="opportunity-1",
+            actor_id="actor-a",
+            trigger_type="manual",
+            policy=_evaluation_policy(),
+        )
 
 
 @pytest.mark.asyncio

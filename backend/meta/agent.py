@@ -32,12 +32,13 @@ _CYCLE_COUNTER_TABLE = "meta_cycle_counters"
 class MetaAgent:
     """Orchestrates the full Meta-Agent optimisation cycle."""
 
-    def __init__(self, scout_engine=None, reviewer_engine=None, user_id: str = "", settings: Optional[Dict[str, Any]] = None, batch1_repository: Optional[Batch1Repository] = None, memory_snapshot: Optional[Dict[str, Any]] = None):
+    def __init__(self, scout_engine=None, reviewer_engine=None, user_id: str = "", settings: Optional[Dict[str, Any]] = None, batch1_repository: Optional[Batch1Repository] = None, memory_snapshot: Optional[Dict[str, Any]] = None, cost_controller: Optional[Any] = None):
         uid = require_user_id(user_id, context="MetaAgent")
         self.user_id = uid
         self.tenant = TenantContext(user_id=uid)
         self.scout_engine = scout_engine
         self.reviewer_engine = reviewer_engine
+        self.cost_controller = cost_controller
         self.settings = settings if isinstance(settings, dict) else {}
         self.batch1_repository = batch1_repository
         self.memory_snapshot = memory_snapshot if isinstance(memory_snapshot, dict) else {}
@@ -200,7 +201,9 @@ class MetaAgent:
                 f"{total_decisions} decisions (need {self.min_decisions})"
             )
         else:
-            mutator = PromptMutator(signal, cycle_number, self.user_id)
+            mutator = PromptMutator(
+                signal, cycle_number, self.user_id, cost_controller=self.cost_controller
+            )
             try:
                 mutation_targets = mutator.decide()
 

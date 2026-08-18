@@ -93,6 +93,22 @@ def validate_partner_output(data: dict) -> PartnerOutput:
     if not data["next_action"].strip():
         raise ValueError("next_action must be a non-empty string")
 
+    # Fixed 2026-08-18 (audit HIGH-H1): confidence must be parsed before the
+    # conviction_level backfill below, which reads `conf` -- this used to
+    # read it before assignment, raising UnboundLocalError instead of the
+    # intended ValueError whenever an LLM repair pass produced a payload
+    # missing conviction_level. UnboundLocalError isn't caught by the
+    # engine's `except ValueError` retry handler, so it propagated as an
+    # unhandled crash instead of a graceful "invalid output" failure.
+    if "confidence" not in data:
+        raise ValueError("Missing required field: confidence")
+    try:
+        conf = float(data["confidence"])
+    except (TypeError, ValueError):
+        raise ValueError(f"confidence must be a number, got {data['confidence']!r}")
+    if not (0.0 <= conf <= 1.0):
+        raise ValueError(f"confidence must be between 0.0 and 1.0, got {conf}")
+
     # Backfill legacy output keys for compatibility.
     if "decision" not in data:
         data["decision"] = RECOMMENDATION_TO_LEGACY.get(data["recommendation"], "MAYBE")
@@ -105,15 +121,6 @@ def validate_partner_output(data: dict) -> PartnerOutput:
         raise ValueError(
             f"recommendation must be one of {VALID_RECOMMENDATIONS}, got {data['recommendation']!r}"
         )
-
-    if "confidence" not in data:
-        raise ValueError("Missing required field: confidence")
-    try:
-        conf = float(data["confidence"])
-    except (TypeError, ValueError):
-        raise ValueError(f"confidence must be a number, got {data['confidence']!r}")
-    if not (0.0 <= conf <= 1.0):
-        raise ValueError(f"confidence must be between 0.0 and 1.0, got {conf}")
 
     if "snapshot" not in data:
         raise ValueError("Missing required field: snapshot")

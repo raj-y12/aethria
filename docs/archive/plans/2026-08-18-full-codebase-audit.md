@@ -258,6 +258,83 @@ undetected. Also out of sync with AGENTS.md's own documented gate.
 
 ---
 
+## HIGH — 11 of 14 fixed and live-validated, 2026-08-18; H5/H10/H13 deferred
+
+Scoped after reading each: H10 (checkpoint-resume for the periodic pipeline
+cycle) requires threading checkpoint state through the entire multi-stage
+orchestration function -- a real architectural change, not a surgical fix,
+comparable in size to yesterday's deferred MEDIUM items. H5 (triage
+escalation surfacing) needs a product decision on what "surface pending
+triage dispositions" actually means UX-wise. H13 (RLS) is the same deferred
+decision as F3 above.
+
+- **H1** (`partner/schema.py` `UnboundLocalError`): moved the `conf = float(...)`
+  parse above the `conviction_level` backfill that reads it.
+- **H2** (`reviewer/base.py` operator_context prompt injection): wrapped in
+  `isolate_untrusted_text` + `prompt_safety_instruction()`, matching the
+  scout-side pattern.
+- **H3** (`portfolio/health.py` dead health checks): confirmed nothing
+  downstream reads a persisted record beyond `len()` of the return list
+  (`engine.py`'s `_run_health_sync`, and an unasserted print-only smoke
+  script) — persisting `SystemHealthRecord`s nobody queries would be unused
+  infrastructure. Checks now return the `check_type` string that fired
+  instead of always `None`, with severity in the log line.
+- **H4** (meta prompt-mutation bypasses `CostController`): registered a
+  `"meta"` budget/cooldown, wired `cost_controller` through
+  `PromptMutator`/`MetaAgent`/`pipeline_runner.py`. **Self-audit catch**:
+  the first version used a single shared `agent_id` (`self.user_id`) for
+  every mutation target in a cycle — since `CostController`'s cooldown keys
+  on `agent_id`, the first target's call would silently deny every sibling
+  target in the same cycle via the cooldown, not just the intended daily
+  ceiling. Fixed to use the per-target agent name as `agent_id`. New
+  regression test proving both budget denial and the per-target fix.
+- **H6** (hardcoded triage thresholds): new `resources/config/triage_rules/v1.json`
+  + `core.policy_resolver.get_triage_rules()`, same pattern as
+  partner_rules/reviewer_rules/evaluation_rubric. `TriageService.assess()`
+  now reads the identity-confidence floor and every disposition's
+  priority/confidence-cap from there.
+- **H7** (`evaluate()` can reopen an INVESTED opportunity): added
+  `decision_state == "invested"` and `workflow_state in ("completed",
+  "monitoring")` to the existing re-entry guard (previously only checked
+  `"archived"`). Two new tests using the file's existing mocked-connection
+  pattern.
+- **H8** (client-controlled evidence trust flags in manual-lookup):
+  `trust_class`/`verification_state`/`assertion_class` are now server-derived
+  (`TrustClass.OPERATOR`, `VerificationState.UNVERIFIED`,
+  `AssertionClass.OPERATOR_ASSERTED`) regardless of what the client sends.
+  Left `UNVERIFIED` rather than the confidential-evidence endpoint's
+  `VERIFIED` deliberately — this path accepts bulk, self-graded, structured
+  data at conviction-bearing volume with no way to verify it server-side, so
+  the existing `require_verified_evidence` policy gate correctly excludes it
+  from automated scoring eligibility, the same mechanism already governing
+  every other evidence path.
+- **H9** (manual-lookup has no rate limit): now shares
+  `LOOKUP_MINUTE_POLICY`/`LOOKUP_DAY_POLICY` with the legacy lookup endpoint.
+- **H11** (`javascript:` URL injection in memo UI): new `safeHref()` helper
+  in `lib/memoReferenceHref.ts` (scheme-allowlists http/https), wired into
+  all genuinely-vulnerable sites in `InvestmentMemoContent.tsx`,
+  `IdentityResolutionDrawer.tsx`, `MemoDecisionBrief.tsx`. One site
+  (`InvestmentMemoContent.tsx`'s `analystContext` link) was already gated by
+  an equivalent scheme check and didn't need touching.
+- **H12** (silent startup-acknowledgement failure): `useAcknowledgeStartup`
+  now rolls the optimistic cache write back to the pre-acknowledgement
+  startup on both a `null` response and a thrown error, plus logs via
+  `console.error` (no toast system exists in this codebase to surface it
+  visually — building one would be new scope, not a surgical fix).
+- **H14** (waitlist XSS guard not run in CI): added `check:waitlist` and
+  `check:marketing` to the `web-frontend` CI job.
+
+**Verification:** full backend suite 2297 passed (same 39 pre-existing
+Postgres-container failures), full frontend suite 489 passed, lint/build/
+bundle-budget clean. Live-dispatched Notion Labs end-to-end through the
+actual running app after restarting the backend — completed cleanly (PASS
+ruling, no crash) exercising H1/H2/H7 and general pipeline stability under
+real traffic. H8/H9 validated via a `TestClient`-based test against the real
+FastAPI app and real rate limiter (the manual-lookup endpoint isn't wired
+into the current UI, so a browser dispatch wouldn't reach it).
+
+---
+
 ## MEDIUM
 
 **M1. LLM-reported `human_review_required` can suppress escalation for

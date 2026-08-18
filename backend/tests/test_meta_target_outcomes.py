@@ -83,7 +83,7 @@ def test_prompt_mutator_reports_persistence_failure_as_failed_target(monkeypatch
     monkeypatch.setattr(
         mutator,
         "_call_llm",
-        lambda *_args: ("rewritten prompt " * 40, "reason"),
+        lambda *_args, **_kwargs: ("rewritten prompt " * 40, "reason"),
     )
 
     with patch(
@@ -113,7 +113,7 @@ def test_prompt_mutator_reports_llm_failure_as_failed_target(monkeypatch) -> Non
     monkeypatch.setattr(
         mutator,
         "_call_llm",
-        lambda *_args: (_ for _ in ()).throw(RuntimeError("LLM unavailable")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("LLM unavailable")),
     )
 
     batch = mutator.apply([_target("MarketDrivenScout")], None, None)

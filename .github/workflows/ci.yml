@@ -78,6 +78,15 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Fixed 2026-08-18 (audit HIGH-H14): check:waitlist and check:marketing
+      # were defined in package.json but never run in CI. check:waitlist in
+      # particular is the only automated guard on api/waitlist.ts's
+      # hand-rolled escapeHtml() -- a future edit that weakens it (e.g.
+      # "simplifying" the escaping) would ship undetected, reopening HTML
+      # injection into the notification email sent via Resend.
+      - name: Waitlist escaping/validation checks
+        run: npm run check:waitlist
+
       - name: Build
         env:
           VITE_API_URL: http://127.0.0.1:8000
@@ -86,6 +95,9 @@ jobs:
 
       - name: Bundle budget
         run: npm run check:bundle
+
+      - name: Marketing content checks
+        run: npm run check:marketing
 
   app-frontend-e2e:
     name: App frontend smoke E2E

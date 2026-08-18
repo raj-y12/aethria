@@ -51,7 +51,9 @@ class HealthMonitor:
         Run all health checks.
         
         Returns:
-            List of health record IDs created
+            List of check_type strings for checks that found an issue
+            (severity/description are logged, not persisted -- see
+            SystemHealthRecord's docstring history for why).
         """
         record_ids = []
         
@@ -94,15 +96,20 @@ class HealthMonitor:
         duplicates = {name: items for name, items in by_name.items() if len(items) > 1}
         
         if duplicates:
+            # Fixed 2026-08-18 (audit HIGH-H3): this used to compute severity
+            # and description and then unconditionally `return None` --
+            # SystemHealthRecord (portfolio/schemas.py) was defined but no
+            # store method to persist one was ever built, and nothing
+            # downstream reads a record_id beyond len() (portfolio/engine.py's
+            # _run_health_sync only logs the count). Persisting real records
+            # nobody queries would be unused infrastructure; the honest fix
+            # is to stop pretending this returns a record id and report the
+            # check type that actually fired, with severity in the log.
             severity = "medium" if len(duplicates) < 5 else "high"
             description = f"Found {len(duplicates)} duplicate startup names: {list(duplicates.keys())[:5]}"
-            
-            self.logger.warning(description)
-            
-            # Could create health record here if we had a store method
-            # For now, just log
-            return None
-        
+            self.logger.warning("[health] duplicate_detection severity=%s %s", severity, description)
+            return "duplicate_detection"
+
         return None
     
     def _check_inactivity(self) -> Optional[str]:
@@ -128,10 +135,9 @@ class HealthMonitor:
         if hours_since > 24:  # No decisions in 24 hours
             severity = "low" if hours_since < 48 else "medium" if hours_since < 72 else "high"
             description = f"No partner decisions in {hours_since:.1f} hours"
-            
-            self.logger.warning(description)
-            return None
-        
+            self.logger.warning("[health] inactivity severity=%s %s", severity, description)
+            return "inactivity"
+
         return None
     
     def _check_queue_depths(self) -> Optional[str]:
@@ -188,8 +194,7 @@ class HealthMonitor:
         if large_files:
             severity = "medium" if max(file_sizes.values()) < 50 else "high"
             description = f"Large files detected: {large_files}"
-            
-            self.logger.warning(description)
-            return None
-        
+            self.logger.warning("[health] memory_bloat severity=%s %s", severity, description)
+            return "memory_bloat"
+
         return None

@@ -87,7 +87,7 @@ class EvaluationRepository:
                 previous = await conn.fetchrow(
                     """
                     select o.service_level, o.decision_state, o.legacy_startup_id,
-                           o.workflow_version, r.*
+                           o.workflow_version, o.workflow_state, r.*
                     from public.opportunities o
                     left join public.recommendations r
                       on r.user_id = o.user_id
@@ -107,6 +107,24 @@ class EvaluationRepository:
                 if str(previous.get("decision_state") or "") == "archived":
                     raise EvaluationLifecycleError(
                         "Archived opportunities cannot be evaluated"
+                    )
+                # Fixed 2026-08-18 (audit HIGH-H7): this guard used to only
+                # check for "archived" -- a re-triggered lookup/dispatch on an
+                # already-INVESTED opportunity could silently overwrite
+                # current_recommendation_id and, further below, unconditionally
+                # transition workflow_state back to "ruling_pending" via
+                # transition_workflow_on_connection (which itself performs no
+                # state-machine legality check), as if the investment decision
+                # never happened. decision_state="invested" and a completed/
+                # monitoring workflow both represent a human decision already
+                # made; re-evaluation must not silently reopen either.
+                if str(previous.get("decision_state") or "") == "invested":
+                    raise EvaluationLifecycleError(
+                        "Invested opportunities cannot be silently re-evaluated"
+                    )
+                if str(previous.get("workflow_state") or "") in ("completed", "monitoring"):
+                    raise EvaluationLifecycleError(
+                        "Opportunities with a completed workflow cannot be silently re-evaluated"
                     )
                 previous_payload = (
                     dict(previous) if previous.get("recommendation_id") else None

@@ -7,6 +7,11 @@ from pydantic import BaseModel, Field
 
 from identity.models import SourceChannel, SourceObservationInput
 from opportunity_pipeline import OpportunityPipeline
+from routers.deps import (
+    LOOKUP_DAY_POLICY as _LOOKUP_DAY_POLICY,
+    LOOKUP_MINUTE_POLICY as _LOOKUP_MINUTE_POLICY,
+    enforce_rate_limits as _enforce_rate_limits,
+)
 from security.request_guards import require_authenticated_user
 
 router = APIRouter(tags=["opportunities"])
@@ -23,6 +28,16 @@ class ManualLookupBody(BaseModel):
 @router.post("/api/opportunities/manual-lookup")
 async def manual_lookup(request: Request, body: ManualLookupBody):
     user_id = require_authenticated_user(request)
+    # Fixed 2026-08-18 (audit HIGH-H9): this endpoint triggers a canonical
+    # evaluate() call (an LLM-driven pipeline stage) with no rate limit at
+    # all, unlike the legacy /api/lookup endpoint's LOOKUP_MINUTE_POLICY/
+    # LOOKUP_DAY_POLICY -- an authenticated user could loop it with distinct
+    # company names for unbounded LLM cost (AGENTS.md invariant #8).
+    limited = await _enforce_rate_limits(
+        f"user:{user_id}:manual_lookup", [_LOOKUP_MINUTE_POLICY, _LOOKUP_DAY_POLICY]
+    )
+    if limited is not None:
+        return limited
     pipeline = getattr(request.app.state, "opportunity_pipeline", None)
     if not isinstance(pipeline, OpportunityPipeline):
         raise HTTPException(status_code=503, detail="Opportunity pipeline unavailable")

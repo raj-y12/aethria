@@ -39,3 +39,23 @@ def test_validate_partner_output_rejects_out_of_bounds_conviction():
     payload["conviction_level"] = 11
     with pytest.raises(ValueError, match="must be between 1 and 10"):
         validate_partner_output(payload)
+
+
+def test_validate_partner_output_backfills_conviction_level_without_crashing():
+    """Regression (audit HIGH-H1): a "new-schema" payload (confidence set,
+    conviction_level absent -- e.g. from an LLM repair pass) used to raise
+    UnboundLocalError instead of the intended graceful backfill, because the
+    confidence parse happened AFTER the code that reads it to compute
+    conviction_level. UnboundLocalError isn't a ValueError, so the engine's
+    retry handler never caught it -- it crashed the whole decide-and-save
+    call instead of retrying."""
+    payload = {
+        "thesis": "x", "why_this_matters": "x", "market_insight": "x", "product_edge": "x",
+        "recommendation": "MONITOR", "decision_rationale": "x", "next_action": "x",
+        "confidence": 0.5,
+        "snapshot": {"one_liner": "x"},
+        "risks": [],
+        "human_review_required": True,
+    }
+    out = validate_partner_output(payload)
+    assert out["conviction_level"] == 5

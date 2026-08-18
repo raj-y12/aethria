@@ -26,6 +26,7 @@ import {
   formatMissingFounderFields,
 } from '../lib/founderMemo';
 import { formatDate } from '../lib/dates';
+import { safeHref } from '../lib/memoReferenceHref';
 import OpportunityIntelligence from './institutional/OpportunityIntelligence';
 import { useMemoDecisionBrief } from '../hooks/useMemoDecisionBrief';
 const MEMO_POLL_INITIAL_MS = 2000;
@@ -601,13 +602,13 @@ function InvestmentMemoContent(
                         {(f.linkedin_url || f.x_url || f.github_url) ? (
                           <p className="memoFounderLinks">
                             {f.linkedin_url ? (
-                              <a href={f.linkedin_url} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+                              <a href={safeHref(f.linkedin_url)} target="_blank" rel="noopener noreferrer">LinkedIn</a>
                             ) : null}
                             {f.x_url ? (
-                              <a href={f.x_url} target="_blank" rel="noopener noreferrer">X</a>
+                              <a href={safeHref(f.x_url)} target="_blank" rel="noopener noreferrer">X</a>
                             ) : null}
                             {f.github_url ? (
-                              <a href={f.github_url} target="_blank" rel="noopener noreferrer">GitHub</a>
+                              <a href={safeHref(f.github_url)} target="_blank" rel="noopener noreferrer">GitHub</a>
                             ) : null}
                           </p>
                         ) : null}
@@ -953,7 +954,7 @@ function InvestmentMemoContent(
                       <span className="memoBullet">·</span>
                       <span>
                         Website:{' '}
-                        <a className="memoLink" href={companyResolution.website} target="_blank" rel="noreferrer">
+                        <a className="memoLink" href={safeHref(companyResolution.website)} target="_blank" rel="noreferrer">
                           {companyResolution.website}
                         </a>
                       </span>
@@ -964,7 +965,7 @@ function InvestmentMemoContent(
                       <span className="memoBullet">·</span>
                       <span>
                         LinkedIn:{' '}
-                        <a className="memoLink" href={companyResolution.linkedin_url} target="_blank" rel="noreferrer">
+                        <a className="memoLink" href={safeHref(companyResolution.linkedin_url)} target="_blank" rel="noreferrer">
                           {companyResolution.linkedin_url}
                         </a>
                       </span>
@@ -977,7 +978,7 @@ function InvestmentMemoContent(
                         Funding profile:{' '}
                         <a
                           className="memoLink"
-                          href={companyResolution.crunchbase_url || companyResolution.dealroom_url || companyResolution.yc_url || undefined}
+                          href={safeHref(companyResolution.crunchbase_url || companyResolution.dealroom_url || companyResolution.yc_url)}
                           target="_blank"
                           rel="noreferrer"
                         >
@@ -1058,7 +1059,7 @@ function InvestmentMemoContent(
                       <span className="memoBullet">·</span>
                       <span className="min-w-0">
                         {source.href ? (
-                          <a className="memoLink" href={source.href} target="_blank" rel="noreferrer">{renderWithMonoNumbers(source.label)}</a>
+                          <a className="memoLink" href={safeHref(source.href)} target="_blank" rel="noreferrer">{renderWithMonoNumbers(source.label)}</a>
                         ) : (
                           <span>{renderWithMonoNumbers(source.label)}</span>
                         )}

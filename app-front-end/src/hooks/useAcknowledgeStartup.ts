@@ -31,14 +31,36 @@ export function useAcknowledgeStartup(
       queryClient.setQueryData<Startup | null>(['startup', 'detail', startup.id], (prev) =>
         prev ? { ...prev, ...optimistic } : prev,
       );
-      void acknowledgeStartup(startup.id).then((updated) => {
-        if (!updated) return;
-        queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
-          prev?.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) ?? prev,
-        );
-        queryClient.setQueryData<Startup | null>(['startup', 'detail', updated.id], updated);
-        onSynced?.(updated);
-      });
+      // Regression (audit HIGH-H12): acknowledgeStartup() returns null on any
+      // non-2xx response instead of throwing. This used to do nothing on
+      // failure -- no rollback of the optimistic write above, no error
+      // surfaced, and no .catch() for a genuine network throw either -- so
+      // the operator saw the item marked "seen" even when the server never
+      // recorded it. Roll the cache back to the pre-optimistic startup on
+      // any failure so it doesn't silently lie until an unrelated refetch.
+      void acknowledgeStartup(startup.id)
+        .then((updated) => {
+          if (!updated) {
+            queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+              prev?.map((s) => (s.id === startup.id ? startup : s)) ?? prev,
+            );
+            queryClient.setQueryData<Startup | null>(['startup', 'detail', startup.id], startup);
+            console.error(`Failed to acknowledge startup ${startup.id}: server returned no result`);
+            return;
+          }
+          queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+            prev?.map((s) => (s.id === updated.id ? { ...s, ...updated } : s)) ?? prev,
+          );
+          queryClient.setQueryData<Startup | null>(['startup', 'detail', updated.id], updated);
+          onSynced?.(updated);
+        })
+        .catch((error: unknown) => {
+          queryClient.setQueryData<Startup[]>(['startups', 'list'], (prev) =>
+            prev?.map((s) => (s.id === startup.id ? startup : s)) ?? prev,
+          );
+          queryClient.setQueryData<Startup | null>(['startup', 'detail', startup.id], startup);
+          console.error(`Failed to acknowledge startup ${startup.id}:`, error);
+        });
       return optimistic;
     },
     [queryClient, onSynced],

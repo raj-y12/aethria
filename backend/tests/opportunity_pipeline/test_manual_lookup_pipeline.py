@@ -85,6 +85,68 @@ async def test_manual_lookup_ingests_evidence_then_evaluates():
 
 
 @pytest.mark.asyncio
+async def test_manual_lookup_ignores_client_supplied_trust_and_verification_flags():
+    """Regression (audit HIGH-H8): references[].official/verified and
+    claims[].assertion_class used to be forwarded verbatim from the request
+    body into the evidence feeding evaluate() -- any authenticated user could
+    self-declare their own submission "official"/"verified"/"externally
+    verified" fact. All three must now be server-derived regardless of what
+    the client sends."""
+    from evidence.models import AssertionClass, TrustClass, VerificationState
+
+    captured = {}
+
+    class Identity:
+        async def admit(self, _):
+            return IdentityAdmission(
+                user_id="fund-a", observation_id="obs", status=IdentityStatus.RESOLVED,
+                company_id="co", opportunity_id="opp", confidence=1,
+            )
+
+    class Evidence:
+        async def ingest_artifact(self, artifact, *, items):
+            captured["trust_class"] = artifact.trust_class
+            captured["verification_state"] = items[0].verification_state
+            return SimpleNamespace(artifact_id="artifact-1"), items
+
+        async def create_claim(self, claim, *, links, created_by):
+            captured["assertion_class"] = claim.assertion_class
+            return {"claim_id": "claim-1"}
+
+    class Evaluation:
+        async def evaluate(self, **kwargs):
+            return {"recommendation": {"state": "advance"}}
+
+    class Loader:
+        async def __call__(self, **_):
+            return SimpleNamespace(
+                policy=SimpleNamespace(), thesis_version_id="thesis-1",
+                require_tenant=lambda *_args, **_kwargs: None,
+            )
+
+    pipeline = OpportunityPipeline(
+        identity_service=Identity(), evidence_repository=Evidence(),
+        evaluation_repository=Evaluation(), prerequisites_loader=Loader(),
+    )
+    await pipeline.process(
+        user_id="fund-a", observation=observation(),
+        references=[{
+            "url": "https://acme.com", "content": "Acme builds software",
+            "official": True, "verified": True,
+        }],
+        claims=[{
+            "claim_type": "market", "display_text": "Acme has $50M ARR",
+            "confidence": 1.0, "assertion_class": "externally_verified",
+            "evidence_item_ids": ["item-1"], "support_strength": 1.0,
+        }],
+    )
+
+    assert captured["trust_class"] == TrustClass.OPERATOR
+    assert captured["verification_state"] == VerificationState.UNVERIFIED
+    assert captured["assertion_class"] == AssertionClass.OPERATOR_ASSERTED
+
+
+@pytest.mark.asyncio
 async def test_pipeline_persists_triage_and_stops_light_monitor_before_evaluation():
     class Identity:
         async def admit(self, _):

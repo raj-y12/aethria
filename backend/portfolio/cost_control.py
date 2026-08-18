@@ -54,8 +54,14 @@ class CostController:
             "scout": {"calls": 100, "tokens": 100000},
             "reviewer": {"calls": 200, "tokens": 200000},
             "partner": {"calls": 1000, "tokens": 0},
+            # Fixed 2026-08-18 (audit HIGH-H4): meta/mutator.py's prompt-rewrite
+            # LLM calls previously had no budget gate at all -- one call per
+            # mutation target, uncapped. The meta cycle runs at most once per
+            # META_AGENT_INTERVAL_SECONDS (default 24h), so this only needs to
+            # bound a single cycle's worst case, not a high-frequency budget.
+            "meta": {"calls": 50, "tokens": 50000},
         }
-        self.cooldowns = {"scout": 60, "reviewer": 30, "partner": 10}
+        self.cooldowns = {"scout": 60, "reviewer": 30, "partner": 10, "meta": 60}
         self.daily_cost_ceiling = 0.0
         self.weekly_cost_ceiling = 0.0
         self.token_cost_per_1k_usd = self._configured_token_cost()

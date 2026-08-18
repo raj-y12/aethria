@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { safeHref } from '../../lib/memoReferenceHref';
 import {
   resolveIdentityCase,
   type IdentityResolutionCase,
@@ -159,7 +160,7 @@ export default function IdentityResolutionDrawer({
                           {candidate.evidence_urls.map((url) => (
                             <a
                               key={url}
-                              href={url}
+                              href={safeHref(url)}
                               target="_blank"
                               rel="noreferrer"
                               className="type-meta border-b border-oxford/20 text-oxford/65 hover:text-oxford"

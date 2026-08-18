@@ -87,7 +87,15 @@ class OpportunityPipeline:
         if observation.user_id != uid:
             raise ValueError("observation tenant does not match pipeline tenant")
         references = deduplicate_references(references)
-        claims = list(claims)
+        # Fixed 2026-08-18 (audit HIGH-H8): claims arriving through this
+        # parameter come straight from an HTTP request body (the only real
+        # caller is the manual-lookup router) with a fully client-controlled
+        # assertion_class that defaulted to EXTERNALLY_VERIFIED -- the
+        # highest trust tier -- when simply omitted. Force every claim
+        # entering here to operator_asserted before it's merged with the
+        # server-derived scout/regulatory claims below, which set their own
+        # assertion_class deterministically and are left untouched.
+        claims = [{**raw, "assertion_class": "operator_asserted"} for raw in claims]
         if scout_output is not None:
             existing_claim_types = {str(raw.get("claim_type") or "") for raw in claims}
             claims.extend(
@@ -141,7 +149,23 @@ class OpportunityPipeline:
                     artifact_type=ArtifactType.WEB_PAGE,
                     source_uri=uri, title=ref.get("title"),
                     content_hash=hashlib.sha256(content.encode()).hexdigest(),
-                    trust_class=TrustClass.OFFICIAL if ref.get("official") else TrustClass.UNKNOWN,
+                    # Fixed 2026-08-18 (audit HIGH-H8): trust_class/verification_state
+                    # used to be client-settable booleans (ref.get("official")/
+                    # ref.get("verified")) forwarded straight into the evidence
+                    # feeding evaluate() -- any authenticated user could mark
+                    # their own submitted reference "official"/"verified" and
+                    # have the decision engine treat it as externally verified
+                    # fact. Both are now server-derived, matching the same
+                    # TrustClass.OPERATOR/VerificationState.VERIFIED... except
+                    # here UNVERIFIED, since -- unlike the confidential-evidence
+                    # endpoint's single operator-authored note -- this accepts
+                    # bulk, self-graded, structured data at conviction-bearing
+                    # volume with no way to verify it server-side. Leaving it
+                    # UNVERIFIED means the existing require_verified_evidence
+                    # policy gate (evaluation_v2/service.py) correctly excludes
+                    # it from automated scoring eligibility, the same mechanism
+                    # already governing every other evidence path.
+                    trust_class=TrustClass.OPERATOR,
                     access_class=AccessClass(str(ref.get("access_class") or AccessClass.PUBLIC.value)),
                     untrusted_input=True,
                     prompt_injection_detected=detect_prompt_injection(content),
@@ -152,9 +176,10 @@ class OpportunityPipeline:
                     normalized_value=dict(ref.get("normalized_value") or {}),
                     display_excerpt=content[:2000], source_locator=uri,
                     effective_at=ref.get("effective_at"),
-                    verification_state=VerificationState.VERIFIED if ref.get("verified") else VerificationState.UNVERIFIED,
+                    verification_state=VerificationState.UNVERIFIED,
                     source_quality=float(ref.get("source_quality") or 0),
                     extraction_confidence=float(ref.get("confidence") or 0),
+                    operator_attribution=actor_id or uid,
                 )],
             )
             artifact_ids.append(artifact.artifact_id)

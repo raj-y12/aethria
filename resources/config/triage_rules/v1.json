@@ -1,0 +1,21 @@
+{
+  "identity_confidence_floor": 0.5,
+  "dispositions": {
+    "insufficient_evidence": {
+      "priority": 25,
+      "confidence_cap": null
+    },
+    "out_of_mandate": {
+      "priority": 5,
+      "confidence_cap": 0.8
+    },
+    "light_monitor": {
+      "priority": 35,
+      "confidence_cap": 0.6
+    },
+    "deep_review": {
+      "priority": 70,
+      "confidence_cap": 1.0
+    }
+  }
+}

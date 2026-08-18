@@ -6,6 +6,7 @@ import {
   type MemoProvenance,
   type MemoSource,
 } from '../../lib/memoDecisionBrief';
+import { safeHref } from '../../lib/memoReferenceHref';
 
 const PROVENANCE_LABELS: Record<MemoProvenance, string> = {
   verified: 'Verified',
@@ -24,7 +25,7 @@ function SourceLinks({ sources }: { sources: MemoSource[] }) {
       {sources.map((source) => source.href ? (
         <a
           key={source.artifactId}
-          href={source.href}
+          href={safeHref(source.href)}
           target="_blank"
           rel="noreferrer"
         >
