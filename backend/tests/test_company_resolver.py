@@ -621,6 +621,76 @@ def test_disambiguation_low_confidence_disagreement_forces_review(monkeypatch):
     assert res.resolution_status == "NEEDS_REVIEW"
 
 
+def test_disambiguation_confident_correction_reanchors_identity_fields(monkeypatch):
+    """Fix-round finding (Critical #1): a confident correction must re-derive
+    every anchor-dependent field for the NEW company, not just `website`."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+        {
+            "title": "Notion | LinkedIn",
+            "url": "https://www.linkedin.com/company/notion",
+            "snippet": "Notion was founded by Ivan Zhao and Simon Last.",
+        },
+        {
+            "title": "Notion Technologies | LinkedIn",
+            "url": "https://www.linkedin.com/company/notiontechnologies",
+            "snippet": "Notion Technologies was founded by Jane Sensor and John Circuit.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.9, reasoning="x", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+
+    assert res.website == "https://notiontechnologies.com/"
+    # linkedin_url must follow the corrected company, not stay on notion.com's page.
+    assert res.linkedin_url == "https://www.linkedin.com/company/notiontechnologies"
+    # founders must be the corrected company's, not the superseded one's.
+    assert "Jane Sensor" in res.founder_names
+    assert "Ivan Zhao" not in res.founder_names
+    # The corrected pick must not be self-listed as its own alternative.
+    assert all(
+        a.website != "https://notiontechnologies.com/" for a in res.alternative_matches
+    )
+    # The superseded pick is still recorded, for transparency, but not
+    # duplicated with the generic pre-existing ambiguity note.
+    assert any(a.website == "https://notion.com" for a in res.alternative_matches)
+    assert not any(n.startswith("Multiple plausible entities match") for n in res.notes)
+    assert res.resolution_status != "NEEDS_REVIEW"
+
+
+def test_disambiguation_picked_url_none_forces_review(monkeypatch):
+    """Fix-round finding (Critical #2): called=True with picked_url=None (the
+    LLM judged no confident match) must not silently confirm the heuristic
+    pick -- it must force NEEDS_REVIEW like every other uncertain outcome."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url=None, confidence=0.0, reasoning="cannot tell", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"  # heuristic pick stands, untouched
+    assert res.resolution_status == "NEEDS_REVIEW"
+    assert any("no confident match" in n for n in res.notes)
+
+
 def test_disambiguation_call_failure_forces_review_not_silent_trust(monkeypatch):
     from resolver.identity_disambiguation import DisambiguationResult
 

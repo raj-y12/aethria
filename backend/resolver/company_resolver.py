@@ -410,7 +410,14 @@ def _profile_matches_anchor(
         # different_company_is_not_attached_or_used_for_founders: a
         # DIFFERENT company's LinkedIn page mentioning a similar name must
         # not pass just because the target's name-tokens appear in its text).
-        target = registrable_domain(_host_of(anchor_host or "")) if anchor_host else ""
+        # anchor_host is already a bare hostname (from hostname_from_user_hint
+        # or _host_of elsewhere) -- routing it through _host_of() again (which
+        # expects a full URL with a scheme) silently returned "" for every
+        # bare-host anchor and fell back to the company-name slug below. That
+        # fallback is ambiguous for two companies sharing the same typed name
+        # (e.g. "notion.com" vs "notiontechnologies.com" both typed as
+        # "Notion") -- exactly the case LLM disambiguation exists to resolve.
+        target = registrable_domain(anchor_host) if anchor_host else ""
         target_slug = target.split(".", 1)[0] if target else _compact_name(company)
         profile_slug = _compact_name(_profile_slug(source.url))
         if not target_slug or not profile_slug:
@@ -665,6 +672,69 @@ def _score_and_collect_sources(
     return out
 
 
+def _reassign_platform_profiles(
+    resolution: CompanyResolution,
+    company: str,
+    sources: List[EvidenceSource],
+    *,
+    anchor_host: Optional[str],
+) -> None:
+    """(Re)derive linkedin/crunchbase/dealroom/yc URLs for the given anchor host.
+
+    Extracted so it can be re-run for a corrected anchor (see
+    `_finalize_resolution_for_anchor`) without duplicating the matching logic.
+    Resets all four fields first: a stale value from the OLD anchor must never
+    survive a re-anchor just because nothing new matched.
+    """
+    resolution.linkedin_url = None
+    resolution.crunchbase_url = None
+    resolution.dealroom_url = None
+    resolution.yc_url = None
+    for s in sources:
+        if not _profile_matches_anchor(s, company=company, anchor_host=anchor_host):
+            continue
+        if s.source_type == "linkedin" and not resolution.linkedin_url and s.match_score >= 0.34:
+            resolution.linkedin_url = s.url
+        elif s.source_type == "crunchbase" and not resolution.crunchbase_url and s.match_score >= 0.34:
+            resolution.crunchbase_url = s.url
+        elif s.source_type == "dealroom" and not resolution.dealroom_url and s.match_score >= 0.34:
+            resolution.dealroom_url = s.url
+        elif s.source_type == "yc" and not resolution.yc_url and s.match_score >= 0.34:
+            resolution.yc_url = s.url
+
+
+def _finalize_resolution_for_anchor(
+    resolution: CompanyResolution,
+    company: str,
+    *,
+    anchor_host: Optional[str],
+    website_hint: Optional[str],
+) -> None:
+    """Re-derive every anchor-dependent field so the record is internally
+    consistent for whichever company `resolution.website` currently points to.
+
+    Used after an LLM disambiguation correction changes `resolution.website`
+    to a different registrable domain than the heuristic originally picked --
+    without this, linkedin/crunchbase/dealroom/yc URLs, founder_names,
+    description, confidence, missing_fields, candidates, and resolution_status
+    would all stay anchored to the superseded company.
+    """
+    sources = resolution.evidence_sources
+    _reassign_platform_profiles(resolution, company, sources, anchor_host=anchor_host)
+    _extract_attached_profile(resolution, sources, company=company, anchor_host=anchor_host)
+    resolution.founder_names = _extract_founders(
+        _founder_sources(sources, company=company, anchor_host=anchor_host),
+        company=company,
+    )
+    resolution.description = _pick_description(
+        _founder_sources(sources, company=company, anchor_host=anchor_host)
+    )
+    resolution.confidence = _compute_confidence(resolution, website_hint=website_hint)
+    resolution.missing_fields = _compute_missing_fields(resolution)
+    resolution.candidates = _build_candidates(resolution, company, website_hint=website_hint)
+    resolution.resolution_status = _assign_status(resolution, website_hint=website_hint)
+
+
 def _assign_identity_fields(
     resolution: CompanyResolution,
     company: str,
@@ -713,17 +783,7 @@ def _assign_identity_fields(
     resolution.alternative_matches = resolution.alternative_matches[:4]
 
     profile_anchor = anchor_host or (_host_of(resolution.website) if resolution.website else None)
-    for s in sources:
-        if not _profile_matches_anchor(s, company=company, anchor_host=profile_anchor):
-            continue
-        if s.source_type == "linkedin" and not resolution.linkedin_url and s.match_score >= 0.34:
-            resolution.linkedin_url = s.url
-        elif s.source_type == "crunchbase" and not resolution.crunchbase_url and s.match_score >= 0.34:
-            resolution.crunchbase_url = s.url
-        elif s.source_type == "dealroom" and not resolution.dealroom_url and s.match_score >= 0.34:
-            resolution.dealroom_url = s.url
-        elif s.source_type == "yc" and not resolution.yc_url and s.match_score >= 0.34:
-            resolution.yc_url = s.url
+    _reassign_platform_profiles(resolution, company, sources, anchor_host=profile_anchor)
 
 
 def _compute_confidence(resolution: CompanyResolution, *, website_hint: Optional[str]) -> float:
@@ -1040,37 +1100,68 @@ def resolve_company(
             )
             if result.called and result.picked_url and result.picked_url != heuristic_pick:
                 if result.confidence >= floor:
-                    if heuristic_pick and all(
-                        a.website != heuristic_pick for a in resolution.alternative_matches
-                    ):
-                        resolution.alternative_matches.append(
-                            AlternativeMatch(
-                                name=registrable_domain(_host_of(heuristic_pick)).split(".", 1)[0],
-                                website=heuristic_pick,
-                                reason="Superseded by LLM identity disambiguation.",
-                                match_score=1.0,
-                            )
-                        )
+                    new_anchor_host = _host_of(result.picked_url)
+                    picked_reg = registrable_domain(new_anchor_host)
+                    heuristic_reg = (
+                        registrable_domain(_host_of(heuristic_pick)) if heuristic_pick else ""
+                    )
+                    # The corrected pick must not remain listed as its own
+                    # alternative -- it was likely added by
+                    # _assign_identity_fields's "not picked" loop while the
+                    # heuristic still favored the OLD pick. Compare by
+                    # registrable domain, not raw string equality: that loop
+                    # rebuilds URLs from the bare domain while `picked_url`
+                    # is the original candidate URL (may carry a trailing
+                    # slash/path), so string equality would miss the match.
+                    resolution.alternative_matches = [
+                        a for a in resolution.alternative_matches
+                        if not a.website or registrable_domain(_host_of(a.website)) != picked_reg
+                    ]
                     resolution.website = result.picked_url
+                    if heuristic_pick and all(
+                        registrable_domain(_host_of(a.website)) != heuristic_reg
+                        for a in resolution.alternative_matches
+                        if a.website
+                    ):
+                        demoted = AlternativeMatch(
+                            name=_candidate_display_name(heuristic_reg, resolution),
+                            website=heuristic_pick,
+                            reason="Superseded by LLM identity disambiguation.",
+                            # Deliberately below the 0.55 ambiguity bar
+                            # _assign_status() uses: this is now a resolved,
+                            # informational record of what was superseded,
+                            # not a live competing candidate. _assign_status()
+                            # re-runs inside _finalize_resolution_for_anchor
+                            # below and must not re-flag the very ambiguity
+                            # this correction just resolved.
+                            match_score=0.3,
+                        )
+                        resolution.alternative_matches = (
+                            resolution.alternative_matches + [demoted]
+                        )[:4]
+                    resolution.notes = [
+                        n for n in resolution.notes
+                        if not n.startswith(f"Multiple plausible entities match '{company}'")
+                    ]
                     resolution.notes.append(
                         f"Identity corrected by LLM disambiguation: was {heuristic_pick}, "
                         f"now {result.picked_url}. {result.reasoning}"
                     )
-                    if resolution.resolution_status == "NEEDS_REVIEW":
-                        # The ambiguity that triggered NEEDS_REVIEW is exactly
-                        # what the LLM just resolved with high confidence --
-                        # re-derive status from confidence alone rather than
-                        # leaving a stale "needs human review" verdict.
-                        resolution.resolution_status = (
-                            "FOUND" if resolution.confidence >= 0.7
-                            else "PARTIAL" if resolution.confidence >= 0.4
-                            else "LOW_CONFIDENCE"
-                        )
+                    _finalize_resolution_for_anchor(
+                        resolution, company,
+                        anchor_host=new_anchor_host, website_hint=website_hint,
+                    )
                 else:
                     resolution.notes.append(
                         f"LLM disambiguation uncertain (confidence={result.confidence:.2f}): {result.reasoning}"
                     )
                     resolution.resolution_status = "NEEDS_REVIEW"
+            elif result.called and result.picked_url is None:
+                resolution.notes.append(
+                    "LLM disambiguation found no confident match among the "
+                    f"candidates: {result.reasoning}"
+                )
+                resolution.resolution_status = "NEEDS_REVIEW"
             elif not result.called:
                 resolution.notes.append(f"LLM disambiguation unavailable: {result.reasoning}")
                 resolution.resolution_status = "NEEDS_REVIEW"
