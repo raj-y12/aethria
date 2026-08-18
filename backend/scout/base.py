@@ -773,15 +773,34 @@ class Scout(ABC):
         resolution: Optional[CompanyResolution],
     ) -> Dict[str, Any]:
         """Make Company Resolver evidence citable: merge it into the retrieval source pack
-        and allowlist, so the scout LLM can reference what the resolver already verified."""
+        and allowlist, so the scout LLM can reference what the resolver already verified.
+
+        Fixed (live-observed on Notion): this used to merge every one of
+        resolution.evidence_sources unconditionally -- Company Resolver's own
+        search legitimately turns up several unrelated lookalike companies
+        for a common-word name (e.g. "Notion" pulled in "Notion Technologies",
+        "Notionink Design Labs", random people), and all of it flowed into
+        the Scout LLM's citable pool as if it were evidence about the ONE
+        company that was actually picked (resolution.website). The reviewer
+        then correctly couldn't ground anything against a source set mixing
+        several different companies. Only merge sources that anchor to the
+        picked company -- the alternates already live in
+        resolution.alternative_matches for transparency, they just shouldn't
+        also masquerade as evidence for the pick.
+        """
         if resolution is None or not resolution.evidence_sources:
             return source_pack
+        from resolver.company_resolver import _host_of, _profile_matches_anchor
+
+        anchor_host = _host_of(resolution.website) if resolution.website else None
         sources = [s for s in list(source_pack.get("sources") or []) if isinstance(s, dict)]
         existing = {str(s.get("url") or "").strip().lower().rstrip("/") for s in sources}
         added = 0
         for ev in resolution.evidence_sources:
             url = (ev.url or "").strip()
             if not url or url.lower().rstrip("/") in existing:
+                continue
+            if not _profile_matches_anchor(ev, company=resolution.canonical_name, anchor_host=anchor_host):
                 continue
             sources.append(
                 {

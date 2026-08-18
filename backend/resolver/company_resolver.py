@@ -399,21 +399,49 @@ def _profile_matches_anchor(
             return True
         host = _host_of(source.url)
         return bool(host) and (host == anchor_host or host.endswith("." + anchor_host))
-    if source.source_type not in {"linkedin", "crunchbase", "dealroom", "yc"}:
+    if source.source_type == "user_hint":
         return True
-    target = registrable_domain(_host_of(anchor_host or "")) if anchor_host else ""
-    target_slug = target.split(".", 1)[0] if target else _compact_name(company)
-    profile_slug = _compact_name(_profile_slug(source.url))
-    if not target_slug or not profile_slug:
+    if source.source_type in {"linkedin", "crunchbase", "dealroom", "yc"}:
+        # A platform profile has its own stable identity (its slug) --
+        # exact slug equality is the reliable signal here, deliberately
+        # stricter than name-text matching (see test_profile_from_
+        # different_company_is_not_attached_or_used_for_founders: a
+        # DIFFERENT company's LinkedIn page mentioning a similar name must
+        # not pass just because the target's name-tokens appear in its text).
+        target = registrable_domain(_host_of(anchor_host or "")) if anchor_host else ""
+        target_slug = target.split(".", 1)[0] if target else _compact_name(company)
+        profile_slug = _compact_name(_profile_slug(source.url))
+        if not target_slug or not profile_slug:
+            return False
+        if profile_slug == _compact_name(target_slug):
+            return True
+        # A result can corroborate the anchor when the page explicitly names the
+        # anchored domain, even if the platform chose a non-identical slug.
+        if anchor_host:
+            text = f"{source.title} {source.snippet}".lower()
+            return anchor_host.lower() in text or f"www.{anchor_host.lower()}" in text
         return False
-    if profile_slug == _compact_name(target_slug):
+    # Fixed (live-observed on Notion): "news"/"directory"/"other" sources used
+    # to pass unconditionally -- no per-source identifier like a platform
+    # slug exists for them, so this branch was never anchor-checked at all.
+    # For a common-word company name, Company Resolver's own queries
+    # legitimately surface several unrelated lookalike companies (and random
+    # people) at high name-match scores; without this check every one of
+    # them flowed into _founder_sources and _merge_resolution_sources as if
+    # it were evidence about the one company actually picked. Real news
+    # coverage almost never spells out the domain -- it names the company --
+    # so this uses a token match (all of the company's distinctive tokens
+    # present, matching _matches_lookup_identity's fix for the same
+    # "General Electric" vs "General Motors" collision) rather than
+    # requiring the literal domain string. It doesn't fully disambiguate a
+    # single-generic-word company name from a superstring lookalike
+    # ("Notion" vs "Notion Technologies" both contain the "notion" token) --
+    # that needs more than text matching -- but it drops sources that don't
+    # name the company at all, which was the larger share of the pollution.
+    if not anchor_host:
         return True
-    # A result can corroborate the anchor when the page explicitly names the
-    # anchored domain, even if the platform chose a non-identical slug.
-    if anchor_host:
-        text = f"{source.title} {source.snippet}".lower()
-        return anchor_host.lower() in text or f"www.{anchor_host.lower()}" in text
-    return False
+    text = f"{source.title} {source.snippet}"
+    return _text_name_match(company, text) >= 1.0
 
 
 def _founder_sources(
