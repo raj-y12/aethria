@@ -1600,6 +1600,12 @@ def _validate_settings(body: dict) -> list[str]:
                     errors.append("agent_config.confidence_threshold must be a number or string")
                 elif isinstance(v, (int, float)) and (v < 0 or v > 1):
                     errors.append("agent_config.confidence_threshold must be between 0 and 1 when numeric")
+            if "decision_threshold" in ac:
+                v = ac["decision_threshold"]
+                if not isinstance(v, (int, float, str)):
+                    errors.append("agent_config.decision_threshold must be a number or string")
+                elif isinstance(v, (int, float)) and (v < 0 or v > 1):
+                    errors.append("agent_config.decision_threshold must be between 0 and 1 when numeric")
             # Scout-specific config
             if "scout_region" in ac:
                 if not isinstance(ac["scout_region"], str):
