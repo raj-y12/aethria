@@ -51,7 +51,7 @@ export default function FounderSignalsPanel({
                     </blockquote>
                   ))}
                   {evidence.length === 0 ? (
-                    <p className="type-meta mt-phi-2 text-signal">No linked evidence item. Treat as unverified.</p>
+                    <p className="type-meta mt-phi-2 text-escalation">No linked evidence item. Treat as unverified.</p>
                   ) : null}
                 </div>
               </li>

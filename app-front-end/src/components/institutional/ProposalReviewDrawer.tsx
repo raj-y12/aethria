@@ -36,6 +36,7 @@ export default function ProposalReviewDrawer({
   const [rationale, setRationale] = useState('');
   const [editedPatch, setEditedPatch] = useState(JSON.stringify(editablePolicy(fundConfig), null, 2));
   const [reviewResult, setReviewResult] = useState<PolicyReviewResult | null>(null);
+  const [publishConfirming, setPublishConfirming] = useState(false);
   const detail = useQuery({
     queryKey: ['fund-intelligence', 'proposal', proposal.policy_proposal_id],
     queryFn: () => fetchPolicyProposal(proposal.policy_proposal_id),
@@ -135,7 +136,7 @@ export default function ProposalReviewDrawer({
             <button type="button" onClick={() => preview.mutate()} disabled={preview.isPending || action !== 'edit_and_accept' || Boolean(configError)} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Run impact preview</button>
           </div>
           {preview.isSuccess ? <p role="status" className="type-body mt-phi-3 text-oxford/65">Preview complete · {previewCount} opportunities affected · automatic rescore disabled.</p> : null}
-          {preview.isError ? <p role="alert" className="type-body mt-phi-3 text-signal">Impact preview failed. Acceptance remains disabled.</p> : null}
+          {preview.isError ? <p role="alert" className="type-body mt-phi-3 text-escalation">Impact preview failed. Acceptance remains disabled.</p> : null}
         </div>
 
         {!reviewRecorded ? (
@@ -143,7 +144,7 @@ export default function ProposalReviewDrawer({
             <div className="flex flex-wrap gap-phi-2" role="group" aria-label="Proposal disposition">
               {([['edit_and_accept', 'Edit + accept'], ['defer', 'Defer'], ['reject', 'Reject']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={action === value} onClick={() => { setAction(value); preview.reset(); }} className={`type-action border px-3 py-2 ${action === value ? 'border-oxford bg-oxford text-paper' : 'border-oxford/15 text-oxford'}`}>{label}</button>)}
             </div>
-            {action === 'edit_and_accept' ? <><textarea aria-label="Edited scoring policy patch" value={editedPatch} onChange={(event) => { setEditedPatch(event.target.value); preview.reset(); }} rows={8} className="mt-phi-3 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />{configError ? <p role="alert" className="type-body mt-phi-2 text-signal">{configError}</p> : null}</> : null}
+            {action === 'edit_and_accept' ? <><textarea aria-label="Edited scoring policy patch" value={editedPatch} onChange={(event) => { setEditedPatch(event.target.value); preview.reset(); }} rows={8} className="mt-phi-3 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />{configError ? <p role="alert" className="type-body mt-phi-2 text-escalation">{configError}</p> : null}</> : null}
             <textarea aria-label="Review rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} rows={3} placeholder="Attribution, sample quality, limitations, and judgment" className="mt-phi-3 w-full resize-none border border-oxford/15 bg-transparent p-3 text-sm leading-relaxed text-oxford" />
             <button type="button" onClick={() => review.mutate()} disabled={!canReview} className="type-action mt-phi-3 bg-oxford px-4 py-3 text-paper disabled:cursor-not-allowed disabled:opacity-35">
               {action === 'edit_and_accept' ? 'Accept edited proposal' : action === 'defer' ? 'Defer proposal' : 'Reject proposal'}
@@ -153,8 +154,21 @@ export default function ProposalReviewDrawer({
           <div className="mt-phi-5 border-l-2 border-oxford pl-phi-4">
             <p className="type-label-section">Review recorded</p>
             <p className="type-body mt-phi-2 text-oxford/65">Production policy is unchanged. Acceptance created a draft governed policy version; publication is a separate authenticated action.</p>
-            {policyVersionId ? <button type="button" onClick={() => publish.mutate()} disabled={publish.isPending || publish.isSuccess} className="type-action mt-phi-3 border border-oxford/15 px-4 py-3 text-oxford disabled:opacity-40">{publish.isSuccess ? 'Policy published' : 'Publish policy version'}</button> : null}
-            {publish.isError ? <p role="alert" className="type-body mt-phi-2 text-signal">Publication failed. The accepted draft remains unchanged and can be retried.</p> : null}
+            {policyVersionId && !publish.isSuccess ? (
+              publishConfirming ? (
+                <div className="mt-phi-3 border border-oxford/15 p-phi-4">
+                  <p className="type-body text-oxford/65">This makes it the fund's active scoring policy for all future decisions. This cannot be undone from here.</p>
+                  <div className="mt-phi-3 flex flex-wrap gap-phi-2">
+                    <button type="button" onClick={() => publish.mutate()} disabled={publish.isPending} className="type-action bg-oxford px-4 py-3 text-paper disabled:cursor-not-allowed disabled:opacity-40">{publish.isPending ? 'Publishing…' : 'Confirm publish'}</button>
+                    <button type="button" onClick={() => setPublishConfirming(false)} disabled={publish.isPending} className="type-action border border-oxford/15 px-4 py-3 text-oxford disabled:opacity-40">Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setPublishConfirming(true)} className="type-action mt-phi-3 border border-oxford/15 px-4 py-3 text-oxford">Publish policy version</button>
+              )
+            ) : null}
+            {publish.isSuccess ? <p role="status" className="type-body mt-phi-3 text-oxford/65">Policy published.</p> : null}
+            {publish.isError ? <p role="alert" className="type-body mt-phi-2 text-escalation">Publication failed. The accepted draft remains unchanged and can be retried.</p> : null}
           </div>
         )}
       </div>

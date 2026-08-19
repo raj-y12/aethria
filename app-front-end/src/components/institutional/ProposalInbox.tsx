@@ -35,7 +35,7 @@ export default function ProposalInbox({ fundConfig }: { fundConfig: Record<strin
         <button type="button" onClick={() => derive.mutate()} disabled={derive.isPending} className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:opacity-35">Derive override patterns</button>
       </header>
       {proposals.isLoading ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/65">Loading proposals…</p>
-        : proposals.isError ? <p role="alert" className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-signal">Fund Intelligence is unavailable. No production policy was changed.</p>
+        : proposals.isError ? <p role="alert" className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-escalation">Fund Intelligence is unavailable. No production policy was changed.</p>
           : (proposals.data?.length ?? 0) === 0 ? <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-oxford/65">No policy proposals. More attributed human rulings and outcomes may be required.</p>
             : <div className="divide-y divide-oxford/10 border-t border-oxford/10">{proposals.data!.map((proposal) => (
               <article key={proposal.policy_proposal_id} className="grid gap-phi-4 px-phi-5 py-phi-4 lg:grid-cols-[1fr_auto] lg:items-center">

@@ -99,7 +99,7 @@ export function SpineNavButton({
         <motion.span
           layoutId={indicatorId}
           className={`absolute inset-0 ${bgActive}`}
-          transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: [0.77, 0, 0.175, 1] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: tokens.motion.easeInOut }}
           aria-hidden
         />
       ) : null}

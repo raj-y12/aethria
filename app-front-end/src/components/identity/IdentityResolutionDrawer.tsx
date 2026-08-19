@@ -232,7 +232,7 @@ export default function IdentityResolutionDrawer({
         </div>
 
         {resolution.isError ? (
-          <p className="type-body mt-phi-3 text-signal" role="alert">The identity case changed or could not be resolved. Refresh the queue and try again.</p>
+          <p className="type-body mt-phi-3 text-escalation" role="alert">The identity case changed or could not be resolved. Refresh the queue and try again.</p>
         ) : null}
       </div>
 

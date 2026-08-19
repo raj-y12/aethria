@@ -83,7 +83,7 @@ export default function ClaimEvidenceLedger({ ledger, readOnly = false }: { ledg
                         </div>
                       </div>
                     ))}
-                    {sources.length === 0 ? <p className="type-meta text-signal">No supporting source is linked yet.</p> : null}
+                    {sources.length === 0 ? <p className="type-meta text-escalation">No supporting source is linked yet.</p> : null}
                   </div>
                   {correctingClaimId === claim.claim_id ? <ClaimCorrection claim={claim} onDone={() => setCorrectingClaimId(null)} /> : null}
                 </article>

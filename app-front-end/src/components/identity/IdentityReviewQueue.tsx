@@ -8,6 +8,7 @@ import {
 } from '../../api/identity';
 import { retryJob } from '../../api/jobs';
 import IdentityResolutionDrawer from './IdentityResolutionDrawer';
+import { productInteraction } from '../../design-system/productSystem';
 
 export default function IdentityReviewQueue({
   compact = false,
@@ -84,7 +85,7 @@ export default function IdentityReviewQueue({
       </header>
 
       {groups.isError ? (
-        <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-signal" role="alert">
+        <p className="type-body border-t border-oxford/10 px-phi-5 py-phi-4 text-escalation" role="alert">
           Identity review is unavailable. No case state was changed.
         </p>
       ) : rows.length === 0 && !groups.isLoading ? (
@@ -98,7 +99,7 @@ export default function IdentityReviewQueue({
             return (
               <article key={group.group_key} className="flex items-center justify-between gap-phi-4 px-phi-5 py-phi-4">
                 <div className="min-w-0">
-                  <h3 className="truncate font-sans text-sm font-semibold text-oxford">
+                  <h3 className="truncate type-body-emphasis text-oxford">
                     {group.observed_names[0] || observation?.observed_name || 'Observed company'}
                   </h3>
                   <p className="type-meta mt-1 truncate text-oxford/65">
@@ -109,7 +110,7 @@ export default function IdentityReviewQueue({
                 <button
                   type="button"
                   onClick={() => setSelected(group)}
-                  className="type-action shrink-0 border border-oxford/15 px-3 py-2 text-oxford hover:bg-oxford hover:text-paper"
+                  className={`${productInteraction.panelAction} shrink-0 text-oxford`}
                 >
                   Review identity
                 </button>

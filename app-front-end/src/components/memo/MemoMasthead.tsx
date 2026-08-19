@@ -1,4 +1,5 @@
 import type { Startup } from '../../types/startup';
+import { useCopyToClipboard } from '../../hooks';
 import MemoTags from './MemoTags';
 import { renderWithMonoNumbers } from './memoContentHelpers';
 import {
@@ -18,6 +19,8 @@ interface MemoMastheadProps {
   onAddContext?: () => void;
   onDownloadPDF?: () => void;
   onClose?: () => void;
+  /** Scrolls straight to the ruling composer — skips the reading for triage. */
+  onJumpToRuling?: () => void;
   /** Share link / co-GP view: hides Add context. */
   readOnly?: boolean;
 }
@@ -49,9 +52,11 @@ export default function MemoMasthead({
   onAddContext,
   onDownloadPDF,
   onClose,
+  onJumpToRuling,
   readOnly = false,
 }: MemoMastheadProps) {
   const companyName = startup.scout.name?.trim() || '';
+  const { copied, copy } = useCopyToClipboard();
   const location = startup.scout.location?.trim() || '';
   const descriptor = startup.scout.one_line?.trim() || '';
   const discoveredAt = startup.timestamps?.discovered_at;
@@ -73,6 +78,16 @@ export default function MemoMasthead({
               Add context
             </button>
           ) : null}
+          {onJumpToRuling ? (
+            <button
+              type="button"
+              className="memoAction"
+              onClick={onJumpToRuling}
+              aria-label="Jump to the ruling"
+            >
+              Jump to ruling
+            </button>
+          ) : null}
           {onDownloadPDF ? (
             <button
               type="button"
@@ -81,6 +96,16 @@ export default function MemoMasthead({
               aria-label="Download IC pack as PDF"
             >
               IC pack (PDF)
+            </button>
+          ) : null}
+          {companyName ? (
+            <button
+              type="button"
+              className="memoAction"
+              onClick={() => copy(companyName)}
+              aria-label={`Copy company name: ${companyName}`}
+            >
+              {copied ? 'Copied' : 'Copy name'}
             </button>
           ) : null}
           {onClose ? (

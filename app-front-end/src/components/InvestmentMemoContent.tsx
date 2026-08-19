@@ -8,6 +8,7 @@ import { canonicalCriteriaToStructuredScoring } from '../lib/canonicalScoring';
 import { getPipelineReplaySteps } from '../lib/memoIcPack';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
 import { transitionOrReduced } from '../design-system/motion';
+import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
 import ReviewerPanel from './scoring/ReviewerPanel';
@@ -496,7 +497,7 @@ function InvestmentMemoContent(
     initial: reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 },
     whileInView: { opacity: 1, y: 0 },
     viewport: { once: true, margin: '0px 0px -10% 0px' },
-    transition: transitionOrReduced(reduceMotion, { duration: 0.5, ease: [0.16, 1, 0.3, 1] }),
+    transition: transitionOrReduced(reduceMotion, { duration: 0.5, ease: tokens.motion.ease }),
   };
   return (
     <article className={wrapperCls} aria-labelledby="memo-title">
@@ -522,6 +523,9 @@ function InvestmentMemoContent(
             brief={mastheadBrief}
             onAddContext={onAddContext}
             onClose={onClose}
+            onJumpToRuling={() =>
+              document.getElementById('memo-ruling')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+            }
             readOnly={readOnly}
           />
 
@@ -553,7 +557,7 @@ function InvestmentMemoContent(
             // the reader scrolls.
             initial={reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={transitionOrReduced(reduceMotion, { duration: 0.55, ease: [0.16, 1, 0.3, 1] })}
+            transition={transitionOrReduced(reduceMotion, { duration: 0.55, ease: tokens.motion.ease })}
           >
 
             {readOnly ? (
@@ -838,12 +842,14 @@ function InvestmentMemoContent(
             )}
 
             {/* ── Before you rule: evidence coverage, deduplicated risks, and the ruling itself ── */}
-            <OpportunityIntelligence
-              startupId={displayStartup.id}
-              companyName={displayStartup.scout.name}
-              onRulingRecorded={onClose}
-              readOnly={readOnly}
-            />
+            <div id="memo-ruling">
+              <OpportunityIntelligence
+                startupId={displayStartup.id}
+                companyName={displayStartup.scout.name}
+                onRulingRecorded={onClose}
+                readOnly={readOnly}
+              />
+            </div>
 
             {/* ── Appendix ── */}
             <div className="memoDiscGroup">

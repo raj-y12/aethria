@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { animate, motion, useMotionValue, useTransform } from 'framer-motion';
+import { tokens } from '../design-system/tokens';
 
 export default function CountUp({
   to,
@@ -14,7 +15,7 @@ export default function CountUp({
   const display = useTransform(val, (v) => Math.round(v).toLocaleString());
   useEffect(() => {
     if (reduceMotion) return;
-    const ctrl = animate(val, to, { duration: 0.9, delay, ease: [0.25, 1, 0.5, 1] });
+    const ctrl = animate(val, to, { duration: 0.9, delay, ease: tokens.motion.ease });
     return ctrl.stop;
   }, [to, delay, reduceMotion, val]);
   return <motion.span>{display}</motion.span>;

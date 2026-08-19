@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
-import { usePrefersReducedMotion } from '../../hooks';
+import { usePrefersReducedMotion, useCopyToClipboard } from '../../hooks';
+import { productInteraction } from '../../design-system/productSystem';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
 import QueueVerdictLine from './QueueVerdictLine';
 import QueueAttentionBadge from './QueueAttentionBadge';
@@ -34,6 +35,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
+  const { copied, copy } = useCopyToClipboard();
   const {
     startup,
     decisionVariant,
@@ -113,6 +115,19 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
             >
               {startup.scout.name}
             </motion.h2>
+            {isSelected && startup.scout.name ? (
+              <button
+                type="button"
+                className={`${productInteraction.panelActionInline} mt-1 text-oxford/50`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  copy(startup.scout.name);
+                }}
+                aria-label={`Copy company name: ${startup.scout.name}`}
+              >
+                {copied ? 'Copied' : 'Copy name'}
+              </button>
+            ) : null}
           </div>
           <div className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}>
             <QueueVerdictLine

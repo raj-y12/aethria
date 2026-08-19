@@ -176,7 +176,7 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
               <textarea id="csv-import-data" aria-label="CSV data" value={csvText} onChange={(event) => { setCsvText(event.target.value); setPreview(null); setIdempotencyKey(null); commit.reset(); }} rows={10} spellCheck={false} placeholder="company_name,website&#10;Acme,acme.com" className="mt-phi-2 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />
 
               <button type="button" onClick={runPreview} className="type-action mt-phi-3 border border-oxford/15 px-4 py-3 text-oxford">Preview import</button>
-              {previewError ? <p role="alert" className="type-body mt-phi-3 text-signal">{previewError}</p> : null}
+              {previewError ? <p role="alert" className="type-body mt-phi-3 text-escalation">{previewError}</p> : null}
 
               {preview ? (
                 <section className="mt-phi-6 border-y border-oxford/10 py-phi-4" aria-label="Import preview">
@@ -188,7 +188,7 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
               ) : null}
 
               {batch ? <section className="mt-phi-5 border-l-2 border-oxford pl-phi-4" aria-live="polite"><p className="type-label-section">Import {batch.status.replace(/_/g, ' ')}</p><p className="type-body mt-phi-2 text-oxford/65">Batch {batch.id} · {batch.resolved} resolved · {batch.review} need identity review · {batch.errors} errors.</p>{commit.data?.idempotent_replay ? <p className="type-meta mt-phi-2">This was a safe replay of the existing import.</p> : null}</section> : null}
-              {commit.isError ? <p role="alert" className="type-body mt-phi-4 text-signal">The batch was not committed. Your preview remains available to correct or retry.</p> : null}
+              {commit.isError ? <p role="alert" className="type-body mt-phi-4 text-escalation">The batch was not committed. Your preview remains available to correct or retry.</p> : null}
             </div>
           </motion.aside>
         </motion.div>

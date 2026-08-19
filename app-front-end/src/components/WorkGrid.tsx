@@ -52,6 +52,28 @@ interface WorkGridProps {
 
 const EMPTY_WATCHLIST_IDS = new Set<string>();
 
+// Docket sort/filter is a view preference, not tenant data — persisted
+// unscoped across accounts on the same browser, like a UI zoom level.
+const DOCKET_PREFS_KEY = 'aethria.docket.prefs.v1';
+
+interface DocketPrefs {
+  sortFilter: SortFilter;
+  sourceFilters: SourceFilter[];
+  outcomeFilters: OutcomeFilter[];
+  flagFilters: FlagFilter[];
+  reviewFilters: ReviewFilter[];
+}
+
+function loadDocketPrefs(): Partial<DocketPrefs> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(DOCKET_PREFS_KEY);
+    return raw ? (JSON.parse(raw) as Partial<DocketPrefs>) : {};
+  } catch {
+    return {};
+  }
+}
+
 function toggleInSet<T>(prev: Set<T>, value: T): Set<T> {
   const next = new Set(prev);
   if (next.has(value)) next.delete(value);
@@ -181,11 +203,21 @@ const WorkGrid = ({
     params.delete('queue');
     setSearchParams(params, { replace: true });
   }, [searchParams, setSearchParams, onQueueViewChange]);
-  const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(() => new Set());
-  const [outcomeFilters, setOutcomeFilters] = useState<Set<OutcomeFilter>>(() => new Set());
-  const [flagFilters, setFlagFilters] = useState<Set<FlagFilter>>(() => new Set());
-  const [reviewFilters, setReviewFilters] = useState<Set<ReviewFilter>>(() => new Set());
-  const [sortFilter, setSortFilter] = useState<SortFilter>('QUEUE_PRIORITY');
+  const [sourceFilters, setSourceFilters] = useState<Set<SourceFilter>>(
+    () => new Set(loadDocketPrefs().sourceFilters ?? [])
+  );
+  const [outcomeFilters, setOutcomeFilters] = useState<Set<OutcomeFilter>>(
+    () => new Set(loadDocketPrefs().outcomeFilters ?? [])
+  );
+  const [flagFilters, setFlagFilters] = useState<Set<FlagFilter>>(
+    () => new Set(loadDocketPrefs().flagFilters ?? [])
+  );
+  const [reviewFilters, setReviewFilters] = useState<Set<ReviewFilter>>(
+    () => new Set(loadDocketPrefs().reviewFilters ?? [])
+  );
+  const [sortFilter, setSortFilter] = useState<SortFilter>(
+    () => loadDocketPrefs().sortFilter ?? 'QUEUE_PRIORITY'
+  );
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [query, setQuery] = useState('');
   // In the NEW view, a clicked row is acknowledged and would normally drop out
@@ -224,6 +256,22 @@ const WorkGrid = ({
     setReviewFilters(new Set());
     setSortFilter('QUEUE_PRIORITY');
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const prefs: DocketPrefs = {
+        sortFilter,
+        sourceFilters: [...sourceFilters],
+        outcomeFilters: [...outcomeFilters],
+        flagFilters: [...flagFilters],
+        reviewFilters: [...reviewFilters],
+      };
+      window.localStorage.setItem(DOCKET_PREFS_KEY, JSON.stringify(prefs));
+    } catch {
+      // Best-effort — quota or private-mode failures just skip persistence.
+    }
+  }, [sortFilter, sourceFilters, outcomeFilters, flagFilters, reviewFilters]);
 
   const listContainerVariants = useMemo((): Variants | undefined =>
     reduceMotion

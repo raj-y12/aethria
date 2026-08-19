@@ -67,6 +67,7 @@ describe('ProposalInbox governance', () => {
     }));
     expect(await screen.findByText(/Production policy is unchanged/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Publish policy version' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm publish' }));
     await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1'));
     expect(api.previewPolicyProposal).toHaveBeenCalledWith('proposal-1', {
       action: 'edit_and_accept',
@@ -85,6 +86,7 @@ describe('ProposalInbox governance', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Review proposal' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Publish policy version' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Confirm publish' }));
 
     await waitFor(() => expect(api.publishGovernedPolicy).toHaveBeenCalledWith('version-1'));
   });

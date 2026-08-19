@@ -6,6 +6,7 @@ export { useIdleTimeout } from './useIdleTimeout';
 export { useMediaQuery } from './useMediaQuery';
 export { usePrefersReducedMotion } from './usePrefersReducedMotion';
 export { useCountUp } from './useCountUp';
+export { useCopyToClipboard } from './useCopyToClipboard';
 export { useSystemData } from './useSystemData';
 export { useQueryLiveGate } from './useQueryLiveGate';
 export { useAgentsEnabled } from './useAgentsEnabled';

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { workspaceLayout } from '../design-system/workspaceLayout';
+import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion, useCountUp } from '../hooks';
 import { fetchPortfolioPositions } from '../api/portfolio';
 import { fetchOutcomeCoverage } from '../api/channelsOutcomes';
@@ -30,6 +31,9 @@ function Readout({ label, value, tone }: { label: string; value: number | null; 
   const shown = useCountUp(value ?? 0);
   return (
     <div className="flex flex-col gap-phi-1">
+        {/* Deliberate escape from the φ type scale (hero tops at 37px) — this is
+            the one "big instrument number" moment on the page, sized for its own
+            emphasis rather than reused elsewhere. Not scale drift. */}
         <span
         className={`type-data !text-[clamp(32px,3.2vw,46px)] leading-none tabular-nums ${
           tone === 'escalation' ? 'text-escalation' : 'text-oxford'
@@ -303,7 +307,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           style={{ width: `${Math.max(2, entry.pct)}%` }}
                           initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
                           animate={{ scaleX: 1 }}
-                          transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
+                          transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: tokens.motion.ease }}
                         />
                       </span>
                       <span className="type-data text-right text-oxford/65">

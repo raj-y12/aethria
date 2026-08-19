@@ -75,7 +75,7 @@ export function TacticalBar({ pct, delay = 0 }: { pct: number; delay?: number })
         transition={transitionOrReduced(reduceMotion, {
           duration: 1.2,
           delay: reduceMotion ? 0 : delay,
-          ease: [0.16, 1, 0.3, 1],
+          ease: tokens.motion.ease,
         })}
       />
     </div>

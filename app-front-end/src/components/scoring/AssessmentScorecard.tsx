@@ -6,6 +6,7 @@ import type {
   StructuredScoring,
 } from '../../types/startup';
 import { getScoreBand } from '../../design-system/semantics';
+import { tokens } from '../../design-system/tokens';
 import { getEvidenceConfidenceLabel, isLowEvidence } from './ConfidenceIndicator';
 import {
   buildComponentDrivers,
@@ -179,7 +180,7 @@ export default function AssessmentScorecard({
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.22, ease: tokens.motion.ease }}
               style={{ overflow: 'hidden' }}
             >
               <div id={detailId} role="region" aria-label={`${dim.label} detail`} className="memoScoreDetail">

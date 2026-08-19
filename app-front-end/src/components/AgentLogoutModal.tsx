@@ -16,6 +16,9 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useFocusTrap, usePrefersReducedMotion } from '../hooks';
+import { tokens } from '../design-system/tokens';
+
+const EASE = tokens.motion.ease;
 
 interface AgentLogoutModalProps {
   open: boolean;
@@ -94,7 +97,7 @@ export default function AgentLogoutModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: reduceMotion ? 0 : 0.4, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: reduceMotion ? 0 : 0.4, ease: EASE }}
           className="paper-dot-grid fixed inset-0 z-[9999] flex flex-col items-center justify-center p-phi-6 bg-paper"
           role="dialog"
           aria-modal="true"
@@ -104,7 +107,7 @@ export default function AgentLogoutModal({
           <motion.p
             initial={{ opacity: 0, transform: 'translateY(10px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.05 }}
+            transition={{ duration: 0.45, ease: EASE, delay: 0.05 }}
             className="type-label-section mb-phi-3"
           >
             System Notification
@@ -115,7 +118,7 @@ export default function AgentLogoutModal({
             id="agent-logout-title"
             initial={{ opacity: 0, transform: 'translateY(12px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
             className="type-display text-center text-[clamp(28px,4vw,52px)] font-medium text-oxford leading-[1.1] m-0 max-w-[15ch]"
           >
             {agentsEnabled ? 'Pipeline is live' : 'Pipeline is offline'}
@@ -125,7 +128,7 @@ export default function AgentLogoutModal({
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.18 }}
+            transition={{ duration: 0.5, ease: EASE, delay: 0.18 }}
             className="type-body text-center text-oxford/65 mt-phi-3 mb-phi-8 max-w-[34ch]"
           >
             {agentsEnabled
@@ -150,7 +153,7 @@ export default function AgentLogoutModal({
                 <motion.button
                   initial={{ opacity: 0, transform: 'translateY(10px)' }}
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+                  transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
                   className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
@@ -162,7 +165,7 @@ export default function AgentLogoutModal({
                 <motion.button
                   initial={{ opacity: 0, transform: 'translateY(10px)' }}
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
+                  transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
                   onClick={() => void handleTurnOff()}
                   disabled={busy}
                   className="type-action w-full min-h-[44px] hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
@@ -176,7 +179,7 @@ export default function AgentLogoutModal({
                 <motion.button
                   initial={{ opacity: 0, transform: 'translateY(10px)' }}
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+                  transition={{ duration: 0.45, ease: EASE, delay: 0.25 }}
                   onClick={onKeepRunning}
                   disabled={busy}
                   className="w-full btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
@@ -188,7 +191,7 @@ export default function AgentLogoutModal({
                 <motion.button
                   initial={{ opacity: 0, transform: 'translateY(10px)' }}
                   animate={{ opacity: 1, transform: 'translateY(0px)' }}
-                  transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.32 }}
+                  transition={{ duration: 0.45, ease: EASE, delay: 0.32 }}
                   onClick={() => void handleTurnOn()}
                   disabled={busy}
                   className="type-action w-full min-h-[44px] hover:text-oxford btn-interaction transition-colors disabled:cursor-not-allowed disabled:opacity-40"
@@ -202,7 +205,7 @@ export default function AgentLogoutModal({
             <motion.button
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0px)' }}
-              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1], delay: 0.39 }}
+              transition={{ duration: 0.45, ease: EASE, delay: 0.39 }}
               type="button"
               onClick={onCancel}
               disabled={busy}
