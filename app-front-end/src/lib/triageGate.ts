@@ -4,9 +4,18 @@ import type { Startup } from '../types/startup';
  * backend/partner/engine.py's default decision_threshold (utils/scoring.py's
  * compute_overall_score). Per-tenant overrides live server-side only; this
  * is a display heuristic, not the enforcement point -- the backend gate is
- * authoritative and re-checked on every manual-override call. */
-export const DEFAULT_REVIEW_CONFIDENCE_THRESHOLD = 0.3;
+ * authoritative and re-checked on every manual-override call.
+ *
+ * confidence is no longer self-reported (product decision, 2026-08-19):
+ * scout/engine.py now computes it as matched_categories/total_categories
+ * against the mandate's structured fields (sector, stage, geography --
+ * SCOUT_THESIS_FIT_CATEGORIES below), so it only ever lands on 0, 1/3, 2/3,
+ * or 1. 0.5 is a deliberate midpoint threshold, not "50%" -- it sits
+ * strictly between 1/3 and 2/3 so "at least 2 of 3 categories" passes
+ * without relying on exact float equality against a repeating decimal. */
+export const DEFAULT_REVIEW_CONFIDENCE_THRESHOLD = 0.5;
 export const DEFAULT_DECISION_SCORE_THRESHOLD = 0.55;
+export const SCOUT_THESIS_FIT_CATEGORIES = 3;
 
 export type TriageGateStatus =
   | { gated: false }

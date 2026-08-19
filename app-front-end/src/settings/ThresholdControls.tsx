@@ -19,8 +19,11 @@ const controls: Array<{
   {
     key: 'confidence_threshold',
     label: 'Review threshold',
-    helper: 'New scout candidates below this confidence are not reviewed automatically.',
-    defaultPercent: 30,
+    // Scout's confidence is no longer self-reported (2026-08-19): it's
+    // matched-thesis-categories / 3 (sector, stage, geography), so this
+    // only ever lands on 0%, 33%, 67%, or 100%. 50% means "at least 2 of 3".
+    helper: 'Scout candidates matching fewer mandate categories than this are not reviewed automatically.',
+    defaultPercent: 50,
   },
   {
     key: 'decision_threshold',
@@ -43,7 +46,7 @@ export default function ThresholdControls({
 }: ThresholdControlsProps) {
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<Record<ThresholdKey, string>>(() => ({
-    confidence_threshold: String(toPercent(settings.agent_config.confidence_threshold, 30)),
+    confidence_threshold: String(toPercent(settings.agent_config.confidence_threshold, 50)),
     decision_threshold: String(toPercent(settings.agent_config.decision_threshold, 55)),
   }));
   const [pending, setPending] = useState<ThresholdKey | null>(null);
@@ -51,7 +54,7 @@ export default function ThresholdControls({
 
   useEffect(() => {
     setDrafts({
-      confidence_threshold: String(toPercent(settings.agent_config.confidence_threshold, 30)),
+      confidence_threshold: String(toPercent(settings.agent_config.confidence_threshold, 50)),
       decision_threshold: String(toPercent(settings.agent_config.decision_threshold, 55)),
     });
   }, [settings.agent_config.confidence_threshold, settings.agent_config.decision_threshold]);
@@ -69,7 +72,7 @@ export default function ThresholdControls({
       if (result.error || !result.data) {
         setDrafts((prev) => ({
           ...prev,
-          [key]: String(toPercent(settings.agent_config[key], key === 'confidence_threshold' ? 30 : 55)),
+          [key]: String(toPercent(settings.agent_config[key], key === 'confidence_threshold' ? 50 : 55)),
         }));
         setError(
           result.error?.errors[0]
@@ -83,7 +86,7 @@ export default function ThresholdControls({
     } catch (requestError) {
       setDrafts((prev) => ({
         ...prev,
-        [key]: String(toPercent(settings.agent_config[key], key === 'confidence_threshold' ? 30 : 55)),
+        [key]: String(toPercent(settings.agent_config[key], key === 'confidence_threshold' ? 50 : 55)),
       }));
       setError(
         requestError instanceof Error && requestError.message

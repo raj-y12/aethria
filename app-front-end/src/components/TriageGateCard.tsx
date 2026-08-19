@@ -7,7 +7,7 @@
  */
 import { useState } from 'react';
 import type { Startup } from '../types/startup';
-import type { TriageGateStatus } from '../lib/triageGate';
+import { SCOUT_THESIS_FIT_CATEGORIES, type TriageGateStatus } from '../lib/triageGate';
 import { useTriageOverride } from '../hooks/useTriageOverride';
 import { productText } from '../design-system/productSystem';
 
@@ -27,7 +27,7 @@ export default function TriageGateCard({ startup, status, onClose, onOverridden 
   const actionLabel = stage === 'review' ? 'Review it anyway' : 'Decide it anyway';
   const kicker =
     status.reason === 'not_reviewed'
-      ? `Scout's confidence in this match is ${Math.round(status.confidence * 100)}%, below the ${Math.round(status.threshold * 100)}% bar the pipeline reviews at automatically.`
+      ? `Matched ${Math.round(status.confidence * SCOUT_THESIS_FIT_CATEGORIES)} of ${SCOUT_THESIS_FIT_CATEGORIES} mandate categories (sector, stage, geography) -- below the bar the pipeline reviews at automatically.`
       : `Reviewer scored this ${Math.round(status.overallScore * 10)}% overall, below the ${Math.round(status.threshold * 100)}% bar the pipeline decides at automatically.`;
 
   if (dismissed) return null;

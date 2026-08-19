@@ -1,8 +1,13 @@
-"""Regression coverage: triage funnel gate 1 (product direction, 2026-08-18).
-Scout candidates scoring under confidence_threshold (default 0.3, i.e. 30%
-confidence) don't get reviewed in run_cycle -- they stay "not reviewed"
-forever unless a human requests one explicitly via run_startup with
-ignore_confidence_threshold=True (the "review it anyway" manual override)."""
+"""Regression coverage: triage funnel gate 1 (product direction, 2026-08-18,
+threshold redefined 2026-08-19). Scout candidates scoring under
+confidence_threshold (default 0.5 -- a deliberate midpoint meaning "at least
+2 of 3" now that confidence_score is matched_categories/total_categories,
+see scout/engine.py) don't get reviewed in run_cycle -- they stay "not
+reviewed" forever unless a human requests one explicitly via run_startup
+with ignore_confidence_threshold=True (the "review it anyway" manual
+override). These tests set confidence_score directly on a ScoutInfo, so
+they exercise the Reviewer-side gate comparison in isolation, independent
+of how Scout computes that value."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -52,7 +57,7 @@ def _engine(storage: Storage, *, confidence_threshold: float | None = None) -> R
 
 async def test_below_default_threshold_entry_is_not_reviewed(tmp_path):
     storage = Storage(file_path=str(tmp_path / "startups.json"))
-    below_id = storage.add_startup(_scout("BelowBar", confidence=0.25))  # 25% < 30% default
+    below_id = storage.add_startup(_scout("BelowBar", confidence=1 / 3))  # 1 of 3 categories < 0.5 default
 
     engine = _engine(storage)
     with patch.object(ReviewerEngine, "_review_personas", new=AsyncMock(return_value=[_fake_review_result()] * 3)):
@@ -64,7 +69,7 @@ async def test_below_default_threshold_entry_is_not_reviewed(tmp_path):
 
 async def test_above_default_threshold_entry_is_reviewed(tmp_path):
     storage = Storage(file_path=str(tmp_path / "startups.json"))
-    above_id = storage.add_startup(_scout("AboveBar", confidence=0.5))  # 50% > 30% default
+    above_id = storage.add_startup(_scout("AboveBar", confidence=2 / 3))  # 2 of 3 categories > 0.5 default
 
     engine = _engine(storage)
     with patch.object(ReviewerEngine, "_review_personas", new=AsyncMock(return_value=[_fake_review_result()] * 3)):
@@ -76,10 +81,10 @@ async def test_above_default_threshold_entry_is_reviewed(tmp_path):
 
 async def test_confidence_threshold_is_configurable_per_tenant(tmp_path):
     storage = Storage(file_path=str(tmp_path / "startups.json"))
-    mid_id = storage.add_startup(_scout("MidBar", confidence=0.28))  # below default 0.3
+    mid_id = storage.add_startup(_scout("MidBar", confidence=1 / 3))  # below default 0.5
 
-    # A lowered tenant override should let this through.
-    engine = _engine(storage, confidence_threshold=0.2)
+    # A lowered tenant override (e.g. accept 1 of 3 categories) should let this through.
+    engine = _engine(storage, confidence_threshold=0.25)
     with patch.object(ReviewerEngine, "_review_personas", new=AsyncMock(return_value=[_fake_review_result()] * 3)):
         result = await engine.run_cycle()
 
