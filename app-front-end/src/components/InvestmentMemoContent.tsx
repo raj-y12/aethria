@@ -322,9 +322,23 @@ function InvestmentMemoContent(
       }),
     [displayStartup, companyResolution],
   );
-  const founderTeamItems = (displayStartup?.review?.team_analysis ?? []).filter(
-    (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
+  // Canonical evaluate_snapshot() criteria are the score authority when present;
+  // legacy reviewer structured_scoring is the fallback for opportunities without
+  // one yet (see docs/archive/plans/2026-08-17-reviewer-scoring-collapse.md).
+  const canonicalStructuredScoring = useMemo(
+    () => canonicalCriteriaToStructuredScoring(canonicalEvaluation),
+    [canonicalEvaluation]
   );
+  // Legacy team_analysis is free-text with no evidence-citation requirement
+  // (unlike canonical's cited claims) -- it has hallucinated founder identities
+  // ("per canonical claims" against a name absent from every evidence table).
+  // Once canonical evaluation exists for a deal, its founder read replaces
+  // this narrative entirely rather than displaying both.
+  const founderTeamItems = canonicalStructuredScoring
+    ? []
+    : (displayStartup?.review?.team_analysis ?? []).filter(
+        (s) => String(s ?? '').trim() && !/^\[MISSING/i.test(String(s ?? '').trim()),
+      );
   // Investment read (reviewer_rules v2+). Narrative only; the backend has
   // already dropped anything that failed the evidence bar, so anything present
   // here is renderable as-is.
@@ -342,14 +356,6 @@ function InvestmentMemoContent(
   const precedentCandidates = useMemo(
     () => (displayStartup ? findPrecedentCandidates(displayStartup, peerStartups) : []),
     [displayStartup, peerStartups]
-  );
-
-  // Canonical evaluate_snapshot() criteria are the score authority when present;
-  // legacy reviewer structured_scoring is the fallback for opportunities without
-  // one yet (see docs/archive/plans/2026-08-17-reviewer-scoring-collapse.md).
-  const canonicalStructuredScoring = useMemo(
-    () => canonicalCriteriaToStructuredScoring(canonicalEvaluation),
-    [canonicalEvaluation]
   );
   const structuredScoring = useMemo(
     () => canonicalStructuredScoring ?? normalizeStructuredScoring(displayStartup?.review ?? null),
