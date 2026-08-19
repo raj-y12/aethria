@@ -545,3 +545,262 @@ def test_candidate_name_is_prettified_for_hyphenated_domain(monkeypatch):
     res = resolve_company("Acme Robotics", user_id=USER)
     names = {c.name for c in res.candidates}
     assert "acme-robotics" not in names  # not the raw slug
+
+
+def test_disambiguation_is_skipped_when_website_hint_given(monkeypatch):
+    called = {"n": 0}
+
+    def fake_disambiguate(*a, **k):
+        called["n"] += 1
+        return object()  # would blow up if actually used -- proves it wasn't
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    sources = [
+        {"title": "Aethria — Home", "url": "https://aethria.co", "snippet": "Aethria."},
+        {"title": "Aethria Labs", "url": "https://aethrialabs.com", "snippet": "Aethria Labs."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    resolve_company("Aethria", user_id=USER, website_hint="aethria.co")
+    assert called["n"] == 0
+
+
+def test_disambiguation_is_skipped_with_a_single_candidate(monkeypatch):
+    called = {"n": 0}
+
+    def fake_disambiguate(*a, **k):
+        called["n"] += 1
+        return object()
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    sources = [
+        {"title": "Acme Robotics — Home", "url": "https://acmerobotics.com", "snippet": "Acme Robotics."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    resolve_company("Acme Robotics", user_id=USER)
+    assert called["n"] == 0
+
+
+def test_disambiguation_confidently_overriding_corrects_the_website(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.9, reasoning="x", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notiontechnologies.com/"
+    assert any(a.website == "https://notion.com" for a in res.alternative_matches)
+    assert res.resolution_status != "NEEDS_REVIEW"
+
+
+def test_disambiguation_low_confidence_disagreement_forces_review(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.4, reasoning="unsure", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"  # heuristic pick stands, not silently swapped
+    assert res.resolution_status == "NEEDS_REVIEW"
+
+
+def test_disambiguation_confident_correction_reanchors_identity_fields(monkeypatch):
+    """Fix-round finding (Critical #1): a confident correction must re-derive
+    every anchor-dependent field for the NEW company, not just `website`."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+        {
+            "title": "Notion | LinkedIn",
+            "url": "https://www.linkedin.com/company/notion",
+            "snippet": "Notion was founded by Ivan Zhao and Simon Last.",
+        },
+        {
+            "title": "Notion Technologies | LinkedIn",
+            "url": "https://www.linkedin.com/company/notiontechnologies",
+            "snippet": "Notion Technologies was founded by Jane Sensor and John Circuit.",
+        },
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notiontechnologies.com/", confidence=0.9, reasoning="x", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+
+    assert res.website == "https://notiontechnologies.com/"
+    # linkedin_url must follow the corrected company, not stay on notion.com's page.
+    assert res.linkedin_url == "https://www.linkedin.com/company/notiontechnologies"
+    # founders must be the corrected company's, not the superseded one's.
+    assert "Jane Sensor" in res.founder_names
+    assert "Ivan Zhao" not in res.founder_names
+    # The corrected pick must not be self-listed as its own alternative.
+    assert all(
+        a.website != "https://notiontechnologies.com/" for a in res.alternative_matches
+    )
+    # The superseded pick is still recorded, for transparency, but not
+    # duplicated with the generic pre-existing ambiguity note.
+    assert any(a.website == "https://notion.com" for a in res.alternative_matches)
+    assert not any(n.startswith("Multiple plausible entities match") for n in res.notes)
+    assert res.resolution_status != "NEEDS_REVIEW"
+
+
+def test_disambiguation_picked_url_none_forces_review(monkeypatch):
+    """Fix-round finding (Critical #2): called=True with picked_url=None (the
+    LLM judged no confident match) must not silently confirm the heuristic
+    pick -- it must force NEEDS_REVIEW like every other uncertain outcome."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url=None, confidence=0.0, reasoning="cannot tell", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"  # heuristic pick stands, untouched
+    assert res.resolution_status == "NEEDS_REVIEW"
+    assert any("no confident match" in n for n in res.notes)
+
+
+def test_disambiguation_call_failure_forces_review_not_silent_trust(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(called=False, reasoning="no api key"),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.resolution_status == "NEEDS_REVIEW"
+
+
+def test_disambiguation_agreeing_with_heuristic_proceeds_normally(monkeypatch):
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://notion.com", confidence=0.95, reasoning="matches", called=True
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"
+
+
+def test_disambiguation_picked_url_not_in_candidates_forces_review(monkeypatch):
+    """Final-review Critical #1: an LLM-picked URL that isn't one of the
+    presented official_candidates (hallucinated, or steered by injected text
+    in a candidate's snippet) must never become resolution.website -- treat it
+    the same as picked_url=None: force NEEDS_REVIEW."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setattr(
+        cr,
+        "disambiguate_identity",
+        lambda *a, **k: DisambiguationResult(
+            picked_url="https://evil-hallucinated-domain.example",
+            confidence=0.99,
+            reasoning="x",
+            called=True,
+        ),
+    )
+    res = resolve_company("Notion", user_id=USER)
+    assert res.website == "https://notion.com"  # heuristic pick stands, untouched
+    assert res.website != "https://evil-hallucinated-domain.example"
+    assert res.resolution_status == "NEEDS_REVIEW"
+    assert any("not among the presented candidates" in n for n in res.notes)
+
+
+def test_identity_disambiguation_model_env_var_is_threaded_through(monkeypatch):
+    """Important finding (final review): IDENTITY_DISAMBIGUATION_MODEL was
+    registered in env_config.py but never read by resolve_company -- the
+    model parameter to disambiguate_identity was never passed a value."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.setenv("IDENTITY_DISAMBIGUATION_MODEL", "gpt-5-custom")
+    captured: Dict[str, Any] = {}
+
+    def fake_disambiguate(*a, **k):
+        captured.update(k)
+        return DisambiguationResult(
+            picked_url="https://notion.com", confidence=0.95, reasoning="matches", called=True
+        )
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    resolve_company("Notion", user_id=USER)
+    assert captured.get("model") == "gpt-5-custom"
+
+
+def test_identity_disambiguation_model_env_var_unset_passes_none(monkeypatch):
+    """When the env var is unset, resolve_company must pass None -- not
+    duplicate identity_disambiguation.py's own default string -- so that
+    module's `model or _DEFAULT_MODEL` fallback is the single source of truth."""
+    from resolver.identity_disambiguation import DisambiguationResult
+
+    sources = [
+        {"title": "Notion — Home", "url": "https://notion.com", "snippet": "A workspace."},
+        {"title": "Notion Technologies", "url": "https://notiontechnologies.com/", "snippet": "Industrial sensors."},
+    ]
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: _pack(sources))
+    monkeypatch.delenv("IDENTITY_DISAMBIGUATION_MODEL", raising=False)
+    captured: Dict[str, Any] = {}
+
+    def fake_disambiguate(*a, **k):
+        captured.update(k)
+        return DisambiguationResult(
+            picked_url="https://notion.com", confidence=0.95, reasoning="matches", called=True
+        )
+
+    monkeypatch.setattr(cr, "disambiguate_identity", fake_disambiguate)
+    resolve_company("Notion", user_id=USER)
+    assert captured.get("model") is None

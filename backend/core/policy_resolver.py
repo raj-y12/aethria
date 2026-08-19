@@ -20,11 +20,12 @@ _traced_ids: set[str] = set()
 _REPO_CONFIG = Path("resources") / "config"
 _ACTIVE_REL = _REPO_CONFIG / "active.json"
 
-_POLICY_KEYS = ("partner_rules", "reviewer_rules", "evaluation_rubric", "triage_rules")
+_POLICY_KEYS = ("partner_rules", "reviewer_rules", "evaluation_rubric", "identity_disambiguation_rules", "triage_rules")
 _POLICY_DIRS = {
     "partner_rules": "partner_rules",
     "reviewer_rules": "reviewer_rules",
     "evaluation_rubric": "evaluation_rubric",
+    "identity_disambiguation_rules": "identity_disambiguation_rules",
     "triage_rules": "triage_rules",
 }
 
@@ -158,6 +159,12 @@ def get_triage_rules() -> Any:
     _ensure_loaded()
     with _lock:
         return _policy_documents["triage_rules"]
+
+
+def get_identity_disambiguation_rules() -> Any:
+    _ensure_loaded()
+    with _lock:
+        return _policy_documents["identity_disambiguation_rules"]
 
 
 def get_fund_thesis_version() -> str | None:

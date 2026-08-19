@@ -559,6 +559,8 @@ class ScoutEngine:
                     company,
                     user_id=self.tenant_user_id,
                     website_hint=website,
+                    cost_controller=self.cost_controller,
+                    api_key=self.api_key,
                 )
             except Exception as e:
                 self.logger.warning("Company resolver failed for %s: %s", company, e)

@@ -78,6 +78,8 @@ REGISTRY: List[EnvVar] = [
     EnvVar("SCOUT_MODEL", "str", "gpt-5-nano", "OpenAI / models", "Model for scout personas."),
     EnvVar("REVIEWER_MODEL", "str", "gpt-5-nano", "OpenAI / models", "Model for reviewer personas."),
     EnvVar("PARTNER_MODEL", "str", "gpt-5-nano", "OpenAI / models", "Model for partner LLM edge cases."),
+    EnvVar("IDENTITY_DISAMBIGUATION_MODEL", "str", "gpt-5-nano", "OpenAI / models",
+           "Model for LLM-grounded company identity disambiguation."),
     EnvVar("META_AGENT_MODEL", "str", "gpt-5-nano", "OpenAI / models", "Model for the meta-agent."),
 
     # --- Auth (Clerk) --------------------------------------------------------
