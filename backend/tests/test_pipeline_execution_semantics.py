@@ -293,6 +293,10 @@ def _scout_for_stage(
         for index, result in enumerate(results, start=1)
     ]
     engine.storage = storage
+    # ScoutEngine.__new__ bypasses __init__, so active_thesis (always set on
+    # a real engine) needs an explicit default here -- run_cycle now reads
+    # it to compute the deterministic thesis-fit confidence (2026-08-19).
+    engine.active_thesis = None
     engine.cost_controller = cost_controller
     engine.deal_memory = deal_memory
     engine.model = "test-model"

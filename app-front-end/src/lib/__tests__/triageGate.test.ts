@@ -28,17 +28,34 @@ describe('getTriageGateStatus', () => {
       gated: true,
       reason: 'not_reviewed',
       confidence: 0.1,
-      threshold: 0.3,
+      threshold: 0.5,
     });
   });
 
   it('does not gate an unreviewed startup at or above the confidence threshold', () => {
     // Regression: an unreviewed startup used to always report "held by
     // triage funnel" regardless of confidence, so a 64%-confidence startup
-    // that just hadn't had its cycle yet showed "confidence 64% is below
-    // the 30% review bar" -- true, low confidence isn't why it was
-    // unreviewed. Live-reported by Raj 2026-08-19.
+    // that just hadn't had its cycle yet showed a false "below the review
+    // bar" message -- low confidence isn't why it was unreviewed. Live-
+    // reported by Raj 2026-08-19. (0.64 is still above the 0.5 default.)
     const startup = baseStartup({ scout: { ...baseStartup().scout, confidence: 0.64 } });
+    expect(getTriageGateStatus(startup)).toEqual({ gated: false });
+  });
+
+  it('gates a startup matching only 1 of 3 thesis categories', () => {
+    // confidence now only ever lands on 0, 1/3, 2/3, or 1 -- matched
+    // categories / total categories (scout/engine.py). 1/3 < 0.5 default.
+    const startup = baseStartup({ scout: { ...baseStartup().scout, confidence: 1 / 3 } });
+    expect(getTriageGateStatus(startup)).toEqual({
+      gated: true,
+      reason: 'not_reviewed',
+      confidence: 1 / 3,
+      threshold: 0.5,
+    });
+  });
+
+  it('does not gate a startup matching 2 of 3 thesis categories', () => {
+    const startup = baseStartup({ scout: { ...baseStartup().scout, confidence: 2 / 3 } });
     expect(getTriageGateStatus(startup)).toEqual({ gated: false });
   });
 

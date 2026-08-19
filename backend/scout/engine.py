@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 from utils.timeutil import utcnow
 
+from fund_thesis import compute_structured_thesis_fit
 from resolver.company_resolver import (
     CompanyResolution,
     build_fallback_scout_payload,
@@ -324,9 +325,27 @@ class ScoutEngine:
                         result = dict(result)
 
                     result["pipeline_run_id"] = pipeline_run_id
+
+                    # Product decision, 2026-08-19: replace the model's
+                    # self-reported confidence entirely. It was requested as
+                    # a bare "number between 0 and 1" with no rubric, so two
+                    # identical companies could legitimately score
+                    # differently between calls -- there was nothing
+                    # grounding it. confidence_score now comes purely from
+                    # matching Scout's own structured fields (sector,
+                    # funding_stage, location) against the mandate's
+                    # structured categories -- deterministic, same inputs
+                    # always produce the same result. Scoped to periodic
+                    # discovery only: named on-demand lookups already bypass
+                    # this gate entirely (ignore_confidence_threshold=True).
+                    parsed_json = (self.active_thesis or {}).get("parsed_json") or {}
+                    fit = compute_structured_thesis_fit(result, parsed_json)
+                    result["confidence"] = fit["matched_categories"] / fit["total_categories"]
+                    result["thesis_fit"] = fit
+
                     self.logger.info(
                         f"[{scout.scout_type}] Discovered: {result['name']} "
-                        f"(confidence: {result['confidence']:.2f})"
+                        f"(thesis fit: {fit['matched_categories']}/{fit['total_categories']})"
                     )
 
                     if self.cost_controller:

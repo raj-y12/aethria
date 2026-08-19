@@ -994,11 +994,17 @@ class ReviewerEngine:
             self.logger.warning("Reviewer settings unavailable, using defaults: %s", e)
             settings = {"agent_config": {}}
         confidence_threshold = self._coerce_confidence_threshold(
-            # Triage funnel gate 1 (product direction, 2026-08-18): companies
-            # scoring under 30% confidence don't get reviewed. Was 0.2. Still
-            # a per-tenant Settings override, not a hardcoded gate.
-            (settings.get("agent_config") or {}).get("confidence_threshold", 0.3),
-            default=0.3,
+            # Triage funnel gate 1 (product direction, 2026-08-19): confidence
+            # is no longer a self-reported number (scout/engine.py now
+            # computes it from matched_categories/total_categories, currently
+            # 3 structured mandate categories). 0.5 is a deliberate midpoint,
+            # not "50%" -- it sits strictly between 1/3 (0.333) and 2/3
+            # (0.667) so "at least 2 of 3 categories" passes without relying
+            # on exact float equality against a repeating decimal. Was 0.3
+            # (then 0.2) back when this compared a self-reported percentage.
+            # Still a per-tenant Settings override, not a hardcoded gate.
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.5),
+            default=0.5,
         )
 
         # Apply calibration override if present
@@ -1402,11 +1408,17 @@ class ReviewerEngine:
             self.logger.warning("Reviewer settings unavailable for run_startup, using defaults: %s", e)
             settings = {"agent_config": {}}
         confidence_threshold = self._coerce_confidence_threshold(
-            # Triage funnel gate 1 (product direction, 2026-08-18): companies
-            # scoring under 30% confidence don't get reviewed. Was 0.2. Still
-            # a per-tenant Settings override, not a hardcoded gate.
-            (settings.get("agent_config") or {}).get("confidence_threshold", 0.3),
-            default=0.3,
+            # Triage funnel gate 1 (product direction, 2026-08-19): confidence
+            # is no longer a self-reported number (scout/engine.py now
+            # computes it from matched_categories/total_categories, currently
+            # 3 structured mandate categories). 0.5 is a deliberate midpoint,
+            # not "50%" -- it sits strictly between 1/3 (0.333) and 2/3
+            # (0.667) so "at least 2 of 3 categories" passes without relying
+            # on exact float equality against a repeating decimal. Was 0.3
+            # (then 0.2) back when this compared a self-reported percentage.
+            # Still a per-tenant Settings override, not a hardcoded gate.
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.5),
+            default=0.5,
         )
         try:
             from meta.calibrator import load_calibration_state

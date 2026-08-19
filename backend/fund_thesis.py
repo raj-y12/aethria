@@ -340,6 +340,68 @@ def rule_based_thesis_alignment(
     }
 
 
+STRUCTURED_THESIS_FIT_CATEGORIES = ("sector", "stage", "geography")
+
+
+def compute_structured_thesis_fit(
+    scout_output: Dict[str, Any], parsed_json: Dict[str, Any]
+) -> Dict[str, Any]:
+    """
+    Deterministic replacement for Scout's self-reported confidence (product
+    decision, 2026-08-19): the model was asked to invent a bare 0-1 number
+    with no rubric, so two identical companies could legitimately score
+    differently between calls. This matches Scout's own structured fields
+    (sector, funding_stage, location) against the mandate's structured
+    categories (sectors, stage_focus, geography) -- no LLM judgment involved,
+    same inputs always produce the same result.
+
+    Scoped to 3 categories the mandate provides cleanly today. check_size /
+    business_model / minimum_traction / ownership_target exist in the
+    mandate too but Scout doesn't extract matching structured fields for
+    them yet -- adding those as self-reported yes/no would just reintroduce
+    the same self-report problem across more fields, so they're deliberately
+    left out until Scout's extraction schema can back them for real.
+    """
+    sectors = _as_lower_str_list(parsed_json.get("sectors"))
+    stages = _as_lower_str_list(parsed_json.get("stage_focus"))
+    geos = _as_lower_str_list(parsed_json.get("geography"))
+
+    startup_sector = _stage_normalized(str(scout_output.get("sector") or ""))
+    sector_matched = bool(startup_sector) and any(
+        ts and (ts in startup_sector or startup_sector in ts) for ts in sectors
+    )
+
+    stage_raw = scout_output.get("funding_stage")
+    startup_stage = _stage_normalized(str(stage_raw) if stage_raw is not None else "")
+    stage_matched = bool(startup_stage) and any(
+        tf and (tf == startup_stage or tf in startup_stage or startup_stage in tf) for tf in stages
+    )
+
+    geo_aliases = {"us": ["us", "u.s", "united states", "america"], "europe": ["europe", "eu", "uk", "u.k", "emea"]}
+    location = str(scout_output.get("location") or "").strip().lower()
+    geo_matched = False
+    if location:
+        for g in geos:
+            if not g:
+                continue
+            keys = geo_aliases.get(g, [g])
+            if any(k in location for k in keys):
+                geo_matched = True
+                break
+
+    results = [
+        {"category": "sector", "matched": sector_matched},
+        {"category": "stage", "matched": stage_matched},
+        {"category": "geography", "matched": geo_matched},
+    ]
+    matched_count = sum(1 for r in results if r["matched"])
+    return {
+        "matched_categories": matched_count,
+        "total_categories": len(STRUCTURED_THESIS_FIT_CATEGORIES),
+        "category_results": results,
+    }
+
+
 def _resolve_thesis_version_unsafe(
     client: Any, uid: str
 ) -> Tuple[str, str, int, str, Dict[str, Any], Optional[str]]:
