@@ -45,12 +45,22 @@ function computeOverallScore(review: NonNullable<Startup['review']>): number | n
  */
 export function getTriageGateStatus(startup: Startup): TriageGateStatus {
   if (!startup.review) {
-    return {
-      gated: true,
-      reason: 'not_reviewed',
-      confidence: startup.scout.confidence,
-      threshold: DEFAULT_REVIEW_CONFIDENCE_THRESHOLD,
-    };
+    const confidence = startup.scout.confidence;
+    // A startup can be unreviewed simply because its cycle hasn't come up
+    // yet (Reviewer processes a bounded batch per cycle) -- that is not the
+    // same as being held by the confidence gate. Only report "held by
+    // triage funnel" when confidence is actually below the bar; otherwise
+    // this isn't gated, it's just pending, and the memo's normal
+    // generating/empty state should show instead.
+    if (confidence < DEFAULT_REVIEW_CONFIDENCE_THRESHOLD) {
+      return {
+        gated: true,
+        reason: 'not_reviewed',
+        confidence,
+        threshold: DEFAULT_REVIEW_CONFIDENCE_THRESHOLD,
+      };
+    }
+    return { gated: false };
   }
   if (!startup.partner) {
     const overallScore = computeOverallScore(startup.review);

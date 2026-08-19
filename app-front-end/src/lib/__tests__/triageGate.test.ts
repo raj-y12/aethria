@@ -32,6 +32,16 @@ describe('getTriageGateStatus', () => {
     });
   });
 
+  it('does not gate an unreviewed startup at or above the confidence threshold', () => {
+    // Regression: an unreviewed startup used to always report "held by
+    // triage funnel" regardless of confidence, so a 64%-confidence startup
+    // that just hadn't had its cycle yet showed "confidence 64% is below
+    // the 30% review bar" -- true, low confidence isn't why it was
+    // unreviewed. Live-reported by Raj 2026-08-19.
+    const startup = baseStartup({ scout: { ...baseStartup().scout, confidence: 0.64 } });
+    expect(getTriageGateStatus(startup)).toEqual({ gated: false });
+  });
+
   it('does not gate a reviewed-and-decided startup', () => {
     const startup = baseStartup({
       review: { market_score: 8, product_score: 8, technical_score: 8, execution_score: 8 },
