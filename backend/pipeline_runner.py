@@ -1032,9 +1032,19 @@ async def _run_one_pipeline_cycle_inner_impl(
         if scouts_enabled and identity_repository is not None:
             agents_executed += len(getattr(scout_engine, "scouts", []) or [])
             await ensure_owned()
+            # Periodic Scout persists directly to the legacy startups table
+            # (product decision, 2026-08-19: identity verification was
+            # blocking every discovery -- Scout's news-article references
+            # rarely resolve to a "verified identifier", so every discovery
+            # opened an identity_resolution_case and none ever reached the
+            # startups table; the same handful of companies kept reopening
+            # cases every cycle instead of Scout ever finding new ones).
+            # On-demand lookup's own admission path (_admit_named_lookup_before_review)
+            # is untouched -- this only removes identity gating from the
+            # autonomous/periodic discovery path.
             scout_result = await scout_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
-                persist_discoveries=False,
+                persist_discoveries=True,
             )
             if not isinstance(scout_result, ScoutCycleResult):
                 raise RuntimeError("Scout returned an invalid periodic stage result")
@@ -1042,6 +1052,8 @@ async def _run_one_pipeline_cycle_inner_impl(
             if scout_result.diagnostics:
                 stage_diagnostics["scout"] = scout_result.diagnostics
             discoveries = scout_result.discoveries
+            if scout_result.outcome.succeeded > 0:
+                _notify_startups_changed(user_id, "scout")
         elif scouts_enabled:
             stage_results["scout"] = StageExecutionResult.blocked_result(
                 stage="scout",
@@ -1071,27 +1083,6 @@ async def _run_one_pipeline_cycle_inner_impl(
         await ensure_owned()
         await _prune_unreferenced_startups(storage, user_id, startup_repository)
 
-        if scouts_enabled and identity_repository is not None:
-            await ensure_owned()
-            await _admit_autonomous_discoveries(
-                user_id=user_id,
-                discoveries=discoveries,
-                storage=storage,
-                identity_repository=identity_repository,
-                discoveries_are_persisted=False,
-                startup_repository=startup_repository,
-                evidence_repository=EvidenceRepository(postgres_pool) if postgres_pool is not None else None,
-            )
-            _notify_startups_changed(user_id, "scout")
-
-        eligible_startup_ids: set[str] = set()
-        if identity_repository is not None:
-            eligible_startup_ids = set(
-                await identity_repository.list_linked_legacy_startup_ids(
-                    user_id=user_id
-                )
-            )
-
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
@@ -1108,7 +1099,6 @@ async def _run_one_pipeline_cycle_inner_impl(
             await ensure_owned()
             reviewer_result = await reviewer_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
-                eligible_startup_ids=eligible_startup_ids,
             )
             if not isinstance(reviewer_result, StageExecutionResult):
                 raise RuntimeError(
@@ -1159,7 +1149,6 @@ async def _run_one_pipeline_cycle_inner_impl(
             await ensure_owned()
             partner_result = await partner_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
-                eligible_startup_ids=eligible_startup_ids,
             )
             if not isinstance(partner_result, StageExecutionResult):
                 raise RuntimeError(
