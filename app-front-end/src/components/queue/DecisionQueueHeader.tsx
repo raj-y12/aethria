@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { tokens } from '../../design-system/tokens';
 import { productInteraction, productText } from '../../design-system/productSystem';
@@ -19,10 +20,10 @@ export type ReviewFilter = 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
 export type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST';
 
 const SORT_OPTIONS: { value: SortFilter; label: string }[] = [
-  { value: 'QUEUE_PRIORITY', label: 'Queue order' },
-  { value: 'NEWEST', label: 'Newest first' },
-  { value: 'OLDEST', label: 'Oldest first' },
-  { value: 'UNRESOLVED_OLDEST', label: 'Longest unresolved' },
+  { value: 'QUEUE_PRIORITY', label: 'Priority' },
+  { value: 'NEWEST', label: 'Newest' },
+  { value: 'OLDEST', label: 'Oldest' },
+  { value: 'UNRESOLVED_OLDEST', label: 'Unresolved' },
 ];
 
 const SORT_CHEVRON =
@@ -52,6 +53,15 @@ const REVIEW_FILTER_CHIPS: { key: ReviewFilter; label: string }[] = [
   { key: 'WEAK', label: 'WEAK' },
   { key: 'UNREVIEWED', label: 'UNREVIEWED' },
 ];
+
+function SearchIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M9.5 9.5L13 13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function AdvancedChip({
   active,
@@ -102,9 +112,8 @@ export interface DecisionQueueHeaderProps {
 }
 
 /**
- * The docket's single control line — one quiet mono register beneath the room
- * header. Queue views live in the room header readouts (FlowPage); this line
- * carries only ordering and refinement. No second header, no tab strip.
+ * The docket's control line — views on the left, search/sort/filters on the
+ * right, both clusters wrapping independently when space runs out.
  */
 export default function DecisionQueueHeader({
   config,
@@ -128,35 +137,59 @@ export default function DecisionQueueHeader({
   reduceMotion,
   viewsSlot,
 }: DecisionQueueHeaderProps) {
+  const [searchOpen, setSearchOpen] = useState(() => query.length > 0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
   return (
     <div
       className="sticky top-0 z-10 bg-surface-canvas"
       title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
     >
-      {/* One control line, and it doubles as the rule the list hangs from. The
-          views name the place, so no "Docket" label; the select shows the active
-          ordering, so no "Sort" label either. */}
-      <div className="flex min-w-0 flex-nowrap items-center justify-between gap-x-phi-4 border-b border-oxford/[0.14] pb-phi-3">
+      {/* Two clusters that wrap independently: views stay on their own line
+          when there's room, and refinement (search/sort/filters) drops to a
+          second line rather than truncating or overflowing when it isn't --
+          nothing in this row is ever invisible, only ever reflowed. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 border-b border-oxford/[0.14] pb-phi-3">
         <div className="min-w-0 flex-1">{viewsSlot}</div>
 
-        <div className="flex shrink-0 items-center gap-x-phi-4">
-          <label className="flex min-w-0 items-center">
-            <span className="sr-only">Find a company in the docket</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => onQueryChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' && query) {
-                  e.stopPropagation();
-                  onQueryChange('');
-                }
-              }}
-              placeholder="Find a company"
-              autoComplete="off"
-              className="type-meta h-8 w-[9rem] min-w-0 border-0 border-b border-oxford/15 bg-transparent px-0 pb-0.5 text-oxford outline-none transition-colors placeholder:text-oxford/65 focus:border-oxford/40 focus-visible:outline-none sm:w-[12rem] [&::-webkit-search-cancel-button]:appearance-none"
-            />
-          </label>
+        <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2">
+          {searchOpen ? (
+            <label className="flex items-center">
+              <span className="sr-only">Find a company in the docket</span>
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={query}
+                onChange={(e) => onQueryChange(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    if (query) onQueryChange('');
+                    else setSearchOpen(false);
+                  }
+                }}
+                onBlur={() => {
+                  if (!query) setSearchOpen(false);
+                }}
+                placeholder="Find a company"
+                autoComplete="off"
+                className="type-meta h-8 w-[9rem] border-0 border-b border-oxford/15 bg-transparent px-0 pb-0.5 text-oxford outline-none transition-colors placeholder:text-oxford/65 focus:border-oxford/40 focus-visible:outline-none sm:w-[12rem] [&::-webkit-search-cancel-button]:appearance-none"
+              />
+            </label>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="Find a company in the docket"
+              className="type-action inline-flex h-8 w-8 shrink-0 items-center justify-center text-oxford/65 transition-colors btn-interaction btn-interaction--no-press hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+            >
+              <SearchIcon />
+            </button>
+          )}
 
           <select
             value={sortFilter}

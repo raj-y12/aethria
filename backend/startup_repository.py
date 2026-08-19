@@ -129,7 +129,20 @@ class StartupRepository:
         financials: Any | None = None,
         pipeline_run_id: str | None = None,
     ) -> str:
-        """Insert a discovery without replacing an existing startup row."""
+        """Insert a discovery without replacing an existing startup row.
+
+        Exception (product decision, 2026-08-19): if the existing row hasn't
+        been reviewed yet, refresh its confidence_score from this fresh
+        discovery. Without this, a startup Scout keeps rediscovering (the
+        common case -- Scout's queries tend to resurface the same handful of
+        companies) is stuck forever on whatever confidence its first-ever
+        discovery computed, which is exactly wrong for the triage-funnel
+        gate that compares confidence_score against a threshold: a company
+        that only cleared 1 of 3 mandate categories on day one but 2 of 3
+        today would never re-enter review. Everything else about the row
+        (review_info, partner_info, queue state, other scout_info fields)
+        is untouched -- only confidence_score, and only while unreviewed.
+        """
         uid = require_user_id(user_id, context="StartupRepository.create_startup")
         startup_id = str(scout_info.startup_id)
         name = str(getattr(scout_info, "name", "") or "").strip()
@@ -139,6 +152,7 @@ class StartupRepository:
                 uid, startup_id,
             )
             if existing is not None:
+                await self._refresh_confidence_if_unreviewed(connection, uid, str(existing), scout_info)
                 return str(existing)
             if name:
                 existing = await connection.fetchval(
@@ -147,6 +161,7 @@ class StartupRepository:
                     uid, name.casefold(),
                 )
                 if existing is not None:
+                    await self._refresh_confidence_if_unreviewed(connection, uid, str(existing), scout_info)
                     return str(existing)
 
             now = datetime.now(timezone.utc)
@@ -178,6 +193,7 @@ class StartupRepository:
                 )
                 if raced is None:
                     raise
+                await self._refresh_confidence_if_unreviewed(connection, uid, str(raced), scout_info)
                 return str(raced)
         # Startup insertion is the durable boundary. Pipeline state is a
         # separate, eventual-consistency side effect, matching the legacy
@@ -200,6 +216,23 @@ class StartupRepository:
                 status="pending",
             )
         return startup_id
+
+    async def _refresh_confidence_if_unreviewed(
+        self, connection: Any, user_id: str, startup_id: str, scout_info: Any
+    ) -> None:
+        """Refresh scout_info.confidence_score on a re-discovered startup --
+        see create_startup's docstring. No-ops if the row has since been
+        reviewed (WHERE clause is the authoritative guard, not the caller)."""
+        confidence = getattr(scout_info, "confidence_score", None)
+        if confidence is None:
+            return
+        await connection.execute(
+            "update public.startups set "
+            "scout_info = jsonb_set(scout_info, '{confidence_score}', $3::jsonb), "
+            "updated_at = now() "
+            "where user_id=$1 and startup_id=$2 and review_info is null",
+            user_id, startup_id, json.dumps(float(confidence)),
+        )
 
     async def update_financials(self, user_id: str, startup_id: str, financials: Any) -> bool:
         uid = require_user_id(user_id, context="StartupRepository.update_financials")

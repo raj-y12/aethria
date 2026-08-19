@@ -159,6 +159,60 @@ async def test_targeted_writes_preserve_mature_state_and_text_ids():
 
 
 @pytest.mark.asyncio
+async def test_create_startup_refreshes_confidence_only_while_unreviewed():
+    """Regression (product decision, 2026-08-19): create_startup dedupes a
+    rediscovered company by name and returns the existing row untouched --
+    but Scout's triage-funnel gate compares confidence_score against a
+    threshold, so a company stuck on its first-ever (possibly stale, e.g.
+    pre-deterministic-scorer) confidence would never re-enter review even
+    after a fresh discovery scores it differently. confidence_score must
+    refresh on redup while unreviewed, and must NOT refresh once reviewed."""
+    import asyncpg
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=2)
+    user_id = f"startup-confidence-refresh-{uuid4()}"
+    try:
+        repository = StartupRepository(pool)
+
+        def _scout(startup_id: str, name: str, confidence: float):
+            return SimpleNamespace(
+                startup_id=startup_id,
+                name=name,
+                sector="SaaS",
+                confidence_score=confidence,
+                model_dump=lambda mode="json": {
+                    "startup_id": startup_id,
+                    "name": name,
+                    "sector": "SaaS",
+                    "confidence_score": confidence,
+                },
+            )
+
+        first_id = await repository.create_startup(user_id, _scout("id-1", "Rediscovered Co", 0.33))
+        assert first_id == "id-1"
+
+        rediscovery = _scout("id-2", "Rediscovered Co", 0.67)
+        assert await repository.create_startup(user_id, rediscovery) == first_id
+        row = await repository.get_row(user_id, first_id)
+        assert row["scout_info"]["confidence_score"] == 0.67
+
+        async with pool.acquire() as connection:
+            await connection.execute(
+                "update public.startups set review_info=$3::jsonb where user_id=$1 and startup_id=$2",
+                user_id, first_id, '{"verdict": "PASS"}',
+            )
+
+        post_review_rediscovery = _scout("id-3", "Rediscovered Co", 0.1)
+        assert await repository.create_startup(user_id, post_review_rediscovery) == first_id
+        row = await repository.get_row(user_id, first_id)
+        assert row["scout_info"]["confidence_score"] == 0.67
+    finally:
+        async with pool.acquire() as connection:
+            await connection.execute("delete from public.startups where user_id=$1", user_id)
+        await pool.close()
+
+
+@pytest.mark.asyncio
 async def test_scalar_write_whitelist_rejects_generated_and_shared_fields():
     import asyncpg
 
