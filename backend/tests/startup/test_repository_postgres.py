@@ -107,6 +107,50 @@ async def test_generated_columns_are_database_owned_and_not_writable():
 
 
 @pytest.mark.asyncio
+async def test_list_score_averages_only_scored_dimensions():
+    """Regression (2026-08-19): list_score used to COALESCE unscored dimensions
+    to 0.0 but always divide by a fixed 4, so a startup scored on only 2 of 4
+    dimensions got two phantom zeros averaged in -- the docket row (list_score)
+    disagreed sharply with every other scoring path, which excludes unscored
+    dimensions instead of failing them. technical=4.31 + execution=5.562833,
+    market/product unscored should average to (4.31+5.562833)/2, not /4."""
+    import asyncpg
+
+    pool = await asyncpg.create_pool(os.environ["TEST_DATABASE_URL"], min_size=1, max_size=2)
+    user_id = f"startup-list-score-{uuid4()}"
+    try:
+        async with pool.acquire() as connection:
+            await connection.execute(
+                """insert into public.startups
+                   (user_id,startup_id,scout_info,review_info,partner_info,financials,agent_trace)
+                   values ($1,$2,$3::jsonb,$4::jsonb,null,'{}','{}')""",
+                user_id,
+                "partial-scored",
+                json.dumps({"name": "Partial Co", "one_line": "x", "sector": "SaaS", "scout_type": "market_driven", "confidence_score": 0.5, "problem": "p", "solution": "s", "target_users": "u", "why_now": "n"}),
+                json.dumps({"technical_score": 4.31, "execution_score": 5.562833}),
+            )
+            row = await connection.fetchrow(
+                "select list_score from public.startups where user_id=$1 and startup_id=$2",
+                user_id, "partial-scored",
+            )
+            assert row["list_score"] == pytest.approx((4.31 + 5.562833) / 2, abs=1e-6)
+
+            await connection.execute(
+                "update public.startups set review_info=$3::jsonb where user_id=$1 and startup_id=$2",
+                user_id, "partial-scored", json.dumps({}),
+            )
+            row = await connection.fetchrow(
+                "select list_score from public.startups where user_id=$1 and startup_id=$2",
+                user_id, "partial-scored",
+            )
+            assert row["list_score"] is None
+    finally:
+        async with pool.acquire() as connection:
+            await connection.execute("delete from public.startups where user_id=$1", user_id)
+        await pool.close()
+
+
+@pytest.mark.asyncio
 async def test_targeted_writes_preserve_mature_state_and_text_ids():
     import asyncpg
 
