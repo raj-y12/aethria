@@ -994,8 +994,11 @@ class ReviewerEngine:
             self.logger.warning("Reviewer settings unavailable, using defaults: %s", e)
             settings = {"agent_config": {}}
         confidence_threshold = self._coerce_confidence_threshold(
-            (settings.get("agent_config") or {}).get("confidence_threshold", 0.2),
-            default=0.2,
+            # Triage funnel gate 1 (product direction, 2026-08-18): companies
+            # scoring under 30% confidence don't get reviewed. Was 0.2. Still
+            # a per-tenant Settings override, not a hardcoded gate.
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.3),
+            default=0.3,
         )
 
         # Apply calibration override if present
@@ -1399,8 +1402,11 @@ class ReviewerEngine:
             self.logger.warning("Reviewer settings unavailable for run_startup, using defaults: %s", e)
             settings = {"agent_config": {}}
         confidence_threshold = self._coerce_confidence_threshold(
-            (settings.get("agent_config") or {}).get("confidence_threshold", 0.2),
-            default=0.2,
+            # Triage funnel gate 1 (product direction, 2026-08-18): companies
+            # scoring under 30% confidence don't get reviewed. Was 0.2. Still
+            # a per-tenant Settings override, not a hardcoded gate.
+            (settings.get("agent_config") or {}).get("confidence_threshold", 0.3),
+            default=0.3,
         )
         try:
             from meta.calibrator import load_calibration_state

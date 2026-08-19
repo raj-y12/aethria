@@ -29,6 +29,8 @@ import { formatDate } from '../lib/dates';
 import { safeHref } from '../lib/memoReferenceHref';
 import OpportunityIntelligence from './institutional/OpportunityIntelligence';
 import { useMemoDecisionBrief } from '../hooks/useMemoDecisionBrief';
+import { getTriageGateStatus } from '../lib/triageGate';
+import TriageGateCard from './TriageGateCard';
 const MEMO_POLL_INITIAL_MS = 2000;
 const MEMO_POLL_MAX_MS = 15000;
 const MEMO_POLL_MAX_ATTEMPTS = 60;
@@ -208,6 +210,14 @@ function InvestmentMemoContent(
     [startup, memoPartial]
   );
 
+  // Triage funnel (product direction, 2026-08-18): a startup the periodic
+  // pipeline never reviewed or decided (see getTriageGateStatus) shows this
+  // gate instead of the memo -- no memo content is fetched or rendered.
+  const gateStatus = useMemo(
+    () => (startup ? getTriageGateStatus(startup) : { gated: false as const }),
+    [startup]
+  );
+
   // Shared with OpportunityIntelligence below — same React Query keys, so this
   // is one fetch, not two, and the masthead verdict can never drift from the
   // decision workspace's canonical state.
@@ -216,7 +226,7 @@ function InvestmentMemoContent(
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
 
   useEffect(() => {
-    if (!startup?.id) {
+    if (!startup?.id || gateStatus.gated) {
       setMemoPipeline('idle');
       setMemoPartial(null);
       setMemoGateError(null);
@@ -281,7 +291,7 @@ function InvestmentMemoContent(
       cancelled = true;
       if (t) clearTimeout(t);
     };
-  }, [startup?.id, startup?.partner?.recommendation, onMemoPipelineReady]);
+  }, [startup?.id, startup?.partner?.recommendation, gateStatus.gated, onMemoPipelineReady]);
 
   const showJudgment = !!displayStartup?.partner?.recommendation;
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
@@ -493,6 +503,8 @@ function InvestmentMemoContent(
             <div className="memoEmptyHint">{UI_DETAIL_EMPTY_HINT}</div>
           </div>
         </div>
+      ) : gateStatus.gated ? (
+        <TriageGateCard startup={displayStartup} status={gateStatus} onClose={onClose} />
       ) : (
         <div
           className={`memoScroll relative${embedded ? '' : ' memo-scroll-root'}`}

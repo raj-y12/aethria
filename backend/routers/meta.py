@@ -11,8 +11,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel
 
-from routers.deps import get_startup_repository as _get_startup_repository
+from routers.deps import get_startup_repository as _get_startup_repository, enforce_rate_limits
+from security.rate_limiter import RateLimitPolicy
+from security.request_guards import validate_route_id
 from batch1.store import list_get_all
 from meta.prompt_gating import (
     VALID_PROMOTE_AGENT_TARGETS,
@@ -30,6 +33,7 @@ from meta.evaluator import run_prompt_evaluation
 from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
 from reviewer.engine import ReviewerEngine
+from partner.engine import PartnerEngine
 from fund_thesis import (
     FundThesisIncompleteError,
     bootstrap_default_thesis_with_repository,
@@ -508,3 +512,88 @@ async def get_meta_calibration(request: Request):
     if not isinstance(state, dict):
         return {}
     return state
+
+
+class TriageOverrideBody(BaseModel):
+    stage: str  # "review" | "decide"
+
+
+_TRIAGE_OVERRIDE_MINUTE_POLICY = RateLimitPolicy("triage_override_minute", limit=10, window_seconds=60)
+_TRIAGE_OVERRIDE_HOUR_POLICY = RateLimitPolicy("triage_override_hour", limit=100, window_seconds=3600)
+
+
+@router.post("/api/startups/{startup_id}/triage-override")
+async def post_startup_triage_override(request: Request, startup_id: str, body: TriageOverrideBody):
+    """
+    Manual "review it anyway" / "decide it anyway" action for a periodic-pipeline
+    startup that the triage funnel gates (confidence_threshold / decision_threshold)
+    left unreviewed or reviewed-but-undecided. Bypasses only that one gate -- the
+    reviewers_enabled/partners_enabled agent-enabled gate is bypassed too, since this
+    is an explicit human-triggered action, not an autonomous cycle.
+    """
+    startup_id = validate_route_id(startup_id, field_name="startup_id")
+    if body.stage not in ("review", "decide"):
+        raise HTTPException(status_code=400, detail="stage must be 'review' or 'decide'")
+    uid = request.state.user_id
+    limited = await enforce_rate_limits(
+        f"user:{uid}:triage_override",
+        [_TRIAGE_OVERRIDE_MINUTE_POLICY, _TRIAGE_OVERRIDE_HOUR_POLICY],
+    )
+    if limited is not None:
+        return limited
+
+    startup_repository = _get_startup_repository(request)
+    storage = StartupReadStorageAdapter(None, await startup_repository.load_snapshot(uid))
+    startup = storage.get_startup(startup_id)
+    if startup is None:
+        raise HTTPException(status_code=404, detail="Startup not found")
+
+    intelligence = getattr(request.app.state, "fund_intelligence_repository", None)
+    thesis_repository = getattr(intelligence, "thesis_repository", None)
+    if thesis_repository is None:
+        raise HTTPException(status_code=503, detail="PostgreSQL thesis repository is unavailable")
+    thesis = await get_active_thesis_from_repository(thesis_repository, uid)
+    if thesis is None:
+        await bootstrap_default_thesis_with_repository(thesis_repository, uid)
+        thesis = await get_active_thesis_from_repository(thesis_repository, uid)
+    thesis_ctx = thesis.as_engine_context() if thesis else None
+
+    try:
+        if body.stage == "review":
+            api_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for review")
+            reviewer_engine = ReviewerEngine(
+                api_key=api_key,
+                storage=storage,
+                tenant_user_id=uid,
+                model=os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
+                active_thesis=thesis_ctx,
+                startup_repository=startup_repository,
+            )
+            done = await reviewer_engine.run_startup(
+                startup_id,
+                ignore_confidence_threshold=True,
+                bypass_agent_enabled_gate=True,
+                startup=startup,
+            )
+        else:
+            if startup.review_info is None:
+                raise HTTPException(status_code=409, detail="Startup has not been reviewed yet")
+            partner_engine = PartnerEngine(
+                storage=storage,
+                tenant_user_id=uid,
+                fund_thesis=thesis_ctx,
+                startup_repository=startup_repository,
+            )
+            done = await partner_engine.run_startup(
+                startup_id,
+                bypass_agent_enabled_gate=True,
+                startup=startup,
+            )
+    except FundThesisIncompleteError as e:
+        raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
+
+    if not done:
+        raise HTTPException(status_code=422, detail=f"Could not complete {body.stage} for this startup")
+    return {"success": True, "startup_id": startup_id, "stage": body.stage}

@@ -564,7 +564,15 @@ def _partner_entry(startup_id="startup-1"):
     return {
         "id": startup_id,
         "scout": {"name": "Typed Stage Co", "primary_thesis": ""},
-        "review": {},
+        # Scores clear the decision_threshold gate (default 0.55) so these
+        # cases exercise budget/persistence/exception accounting, not the
+        # unrelated score-threshold gate.
+        "review": {
+            "market_score": 8,
+            "product_score": 8,
+            "technical_score": 8,
+            "execution_score": 8,
+        },
     }
 
 
