@@ -24,6 +24,9 @@ export interface AgentConfig {
   partners_enabled: boolean;
   max_agents_per_run: number;
   confidence_threshold: number | string;
+  // Reviewed-but-undecided candidates below this overall score (0-1, avg of
+  // market/product/technical/execution) aren't auto-decided by Partner.
+  decision_threshold?: number | string;
   // Scout-specific config
   scout_region: string; // "europe" | "global"
   scout_grounded_citations_enabled?: boolean;

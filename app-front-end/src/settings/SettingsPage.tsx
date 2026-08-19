@@ -28,6 +28,7 @@ import SettingsActionDialog from './SettingsActionDialog';
 import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
+import ThresholdControls from './ThresholdControls';
 import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
 import { MetaCommandTab } from '../components/system/internals';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
@@ -966,6 +967,11 @@ export default function SettingsPage() {
               onSettingsChange={setSettings}
             />
           </div>
+          <ThresholdControls
+            settings={settings}
+            storageUnavailable={storageNotReady}
+            onSettingsChange={setSettings}
+          />
           {/* The room's own arrival is the page transition on the root; a second
               entrance here just re-faded content that had already arrived. */}
           <main
