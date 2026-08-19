@@ -594,6 +594,11 @@
   .escalation-dot-active {
     animation: aethria-accent-pulse 2s var(--motion-ease) infinite;
   }
+  /* Draws the eye to unread new-company arrivals -- same rhythm as
+     escalation-dot-active, oxford tone instead of escalation (not urgency). */
+  .new-arrival-pulse {
+    animation: aethria-accent-pulse 2s var(--motion-ease) infinite;
+  }
   /* Canonical button interaction — specify exact properties, never `transition: all` */
   .btn-interaction {
     transition:
@@ -1084,6 +1089,7 @@
   /* Kept: these set explicit resting states the final keyframe doesn't give. */
   .escalation-pulse,
   .escalation-dot-active,
+  .new-arrival-pulse,
   .skeleton-shimmer,
   .page-transition-enter,
   .signal-dot-breathe,

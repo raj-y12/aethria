@@ -42,10 +42,29 @@ function ViewKey({
   label: string;
   count?: string;
   active: boolean;
-  tone?: 'escalation';
+  tone?: 'escalation' | 'new';
   onClick: () => void;
 }) {
   const reduceMotion = usePrefersReducedMotion();
+  // 'new' claims the same solid oxford/paper treatment as the app's primary
+  // CTA buttons (.btn-aethria-solid) -- it's the one view that says "look at
+  // this" rather than "here's where you are", so it skips the shared sliding
+  // selection overlay other tabs use.
+  if (tone === 'new') {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        aria-pressed={active}
+        className="type-action new-arrival-pulse inline-flex min-h-[32px] shrink-0 cursor-pointer items-center bg-oxford px-phi-4 py-phi-1 text-paper btn-interaction btn-interaction--no-press transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 hover:opacity-90"
+      >
+        <span className="inline-flex items-baseline gap-phi-2">
+          {label}
+          {count != null ? <span className="tabular-nums">{count}</span> : null}
+        </span>
+      </button>
+    );
+  }
   const idle =
     tone === 'escalation'
       ? 'text-escalation/80 hover:bg-oxford/[0.04] hover:text-escalation'
@@ -337,6 +356,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                       <ViewKey
                         label="New"
                         count={(viewCounts?.NEW ?? newCount).toLocaleString()}
+                        tone={(viewCounts?.NEW ?? newCount) > 0 ? 'new' : undefined}
                         active={queueView === 'NEW'}
                         onClick={() => selectView('NEW')}
                       />
