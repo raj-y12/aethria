@@ -316,11 +316,14 @@ def get_system_health(
     calibration_warning = None
     metrics_file = portfolio_store.files.get("agent_metrics") if portfolio_store else None
     if portfolio_store and metrics_file is not None:
-        metrics = portfolio_store._read_file(metrics_file)
-        for m in metrics:
-            if m.get("id") == "verdict_distribution":
-                calibration_warning = m.get("calibration_warning")
-                break
+        try:
+            metrics = portfolio_store._read_file(metrics_file)
+            for m in metrics:
+                if m.get("id") == "verdict_distribution":
+                    calibration_warning = m.get("calibration_warning")
+                    break
+        except Exception:
+            health_errors.append("calibration_warning_unavailable")
 
     # Pending escalations based on startups requiring human review
     if pending_escalations is None:
