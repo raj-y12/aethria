@@ -61,14 +61,6 @@ function HomeDoor({
         aria-hidden
         className={`pointer-events-none absolute inset-0 z-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
       />
-      {/* An editorial hairline that draws in from the centre. */}
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute inset-x-phi-5 bottom-[14px] z-10 h-px origin-center scale-x-0 transition-transform duration-[420ms] ${EASE} group-hover:scale-x-100 ${
-          tone === 'escalation' ? 'bg-escalation/70' : 'bg-oxford/45'
-        }`}
-      />
-
       <span className="relative z-10 inline-block px-[3px]">
         <span
           className={`type-action type-action-strong block transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[1px] group-hover:text-oxford`}
@@ -80,7 +72,7 @@ function HomeDoor({
         className={`type-meta relative z-10 text-center leading-snug tabular-nums transition-colors duration-300 ${EASE} ${
           tone === 'escalation'
             ? 'text-escalation/90 group-hover:text-escalation-bright'
-            : 'text-oxford/65 group-hover:text-oxford/70'
+            : 'text-oxford/50 group-hover:text-oxford'
         }`}
       >
         {detail}
@@ -95,10 +87,10 @@ function HomeDoor({
  * actually running — it has to stay honest, especially about 'Issue'.
  */
 const PIPELINE_PAPER_TONE: Record<SpinePipelineState, { dot: string; text: string }> = {
-  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/65' },
-  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/65' },
-  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/65' },
-  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/65' },
+  Live: { dot: 'bg-oxford signal-dot-breathe', text: 'text-oxford/50' },
+  Idle: { dot: 'bg-oxford/35', text: 'text-oxford/50' },
+  Off: { dot: 'bg-oxford/[0.18]', text: 'text-oxford/50' },
+  Stopping: { dot: 'bg-oxford/40 pulse-soft', text: 'text-oxford/50' },
   Issue: { dot: 'bg-escalation escalation-dot-active', text: 'text-escalation' },
 };
 
@@ -128,25 +120,6 @@ function PipelineIndicator({ state }: { state: SpinePipelineState }) {
           Pipeline {state.toLowerCase()}
         </span>
       )}
-    </span>
-  );
-}
-
-/**
- * A caption rail — the marketing plate's vertical side furniture, carrying live
- * state rather than decoration. Hidden below 900px exactly like the gallery's
- * `.plate-cap-l/-r`. aria-hidden: every reading here is already spoken by the
- * subline or the Fund door, so the rail is a visual echo, not new information.
- */
-function HomeRail({ side, text }: { side: 'left' | 'right'; text: string }) {
-  return (
-    <span
-      aria-hidden
-      className={`pointer-events-none absolute top-1/2 z-10 hidden -translate-y-1/2 font-mono text-[10px] uppercase tracking-[0.24em] text-oxford/65 [text-orientation:mixed] [writing-mode:vertical-rl] min-[900px]:block ${
-        side === 'left' ? 'left-phi-5' : 'right-phi-5'
-      }`}
-    >
-      {text}
     </span>
   );
 }
@@ -237,13 +210,6 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
     .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
     .toUpperCase()} · ${now.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
 
-  // The rails read the same state the briefing does — no separate source.
-  const railLeft = `Pipeline — ${openCount.toLocaleString()} open`;
-  const railRight =
-    mandateVersion != null
-      ? `Mandate v${mandateVersion}${mandateAmended ? ` — amended ${mandateAmended}` : ''}`
-      : 'No mandate';
-
   // First-run: no mandate published yet. Show a quiet editorial prompt.
   // We wait until the readiness check resolves (loading=false) to avoid a
   // flash for returning users. An unreadable readiness check is not treated
@@ -262,10 +228,6 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
   return (
     <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
-      {/* ── The plate's caption rails ── */}
-      <HomeRail side="left" text={railLeft} />
-      <HomeRail side="right" text={railRight} />
-
       {/* sm:px-phi-7 (55px) clears the focus-frame brackets, which reach 40px
           past the framed body; px-phi-6 (34px) would not. */}
       <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
@@ -278,7 +240,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
 
         {/* ── The dateline + pipeline readout. No rule — the headline carries the page. ── */}
         <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
-          <p className="type-label-section flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
+          <p className="type-label-section text-oxford/50 flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
             <span>{eyebrow}</span>
             {/* Always laid out, only hidden — the line is centre-justified, so
                 letting the readout appear from nothing re-centred the dateline
@@ -298,7 +260,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         {showFundReadinessUnavailable ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Reading the mandate.
               </h1>
             </Reveal>
@@ -311,7 +273,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         ) : showFirstRun ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Define your mandate.
               </h1>
             </Reveal>
@@ -334,7 +296,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         ) : showPublishPrompt ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Publish your mandate.
               </h1>
             </Reveal>
@@ -357,13 +319,13 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         ) : (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(32px,4.8vw,62px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 {headline}
               </h1>
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-meta flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 text-center tabular-nums">
+              <p className="type-meta text-oxford/50 flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 text-center tabular-nums">
                 <span>{totalUp.toLocaleString()} in pipeline</span>
                 <span aria-hidden className="text-oxford/20">·</span>
                 <span>{openUp.toLocaleString()} open</span>
@@ -391,35 +353,35 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                   type="button"
                   onClick={() => navigate('/v1/flow')}
                   aria-label={`On the desk: ${attention.map((s) => s.scout.name).join(', ')}. Open Flow.`}
-                  className={`group relative block w-full overflow-hidden border-y border-oxford/[0.12] px-phi-5 py-phi-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30`}
+                  className={`group relative block w-full overflow-hidden px-phi-2 py-phi-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30`}
                 >
                   {/* The same whisper of oxford tint as the doors. */}
                   <span
                     aria-hidden
                     className={`pointer-events-none absolute inset-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
                   />
-                  <span className="relative flex items-baseline justify-between">
-                    <span className="type-label-section">
+                  <span className="relative flex items-baseline justify-between border-b border-oxford/[0.1] pb-phi-2">
+                    <span className="type-label-section text-oxford/50">
                       On the desk
                     </span>
                     <span
-                      className={`type-action transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
+                      className={`type-action text-oxford/60 transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
                     >
                       Flow →
                     </span>
                   </span>
-                  <span className="relative mt-phi-4 block divide-y divide-oxford/[0.06]">
+                  <span className="relative mt-phi-3 block divide-y divide-oxford/[0.04]">
                     {attention.map((s) => {
                       const reason = getDealAttentionReason(s);
                       const urgent = Boolean(s.partner?.human_review_required);
                       return (
                         <span key={s.id} className="flex flex-col gap-phi-1 py-phi-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-phi-4">
-                          <span className="type-display truncate text-[15px] font-medium leading-snug text-oxford">
+                          <span className="type-display truncate text-[19px] font-medium leading-snug text-oxford">
                             {s.scout.name}
                           </span>
                           <span
                             className={`type-meta tabular-nums sm:shrink-0 ${
-                              urgent ? 'text-escalation/90' : 'text-oxford/65'
+                              urgent ? 'text-escalation/80' : 'text-oxford/50'
                             }`}
                           >
                             {reason}
@@ -429,7 +391,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
                     })}
                   </span>
                   {attentionOverflow > 0 && (
-                    <span className="type-meta relative mt-phi-2 block tabular-nums">
+                    <span className="type-meta relative mt-phi-2 block tabular-nums text-oxford/45">
                       + {attentionOverflow} more
                     </span>
                   )}
@@ -438,7 +400,7 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
             )}
 
             {/* ── Two quiet doors ── */}
-            <div className="mt-phi-6 w-full max-w-[46rem] border-y border-oxford/[0.12]">
+            <div className="mt-phi-6 w-full max-w-[46rem]">
               <div
                 className="grid grid-cols-2 divide-x divide-oxford/[0.08]"
                 role="navigation"
@@ -466,33 +428,30 @@ export default function HomePage({ data, sinceAway }: { data: SystemData; sinceA
         )}
         </div>
 
-        {/* ── The footer bar — Dispatch's micro-action language ── */}
-        <Reveal delay={0.36} className="mt-phi-7">
-          <div className="flex flex-wrap items-center justify-center gap-x-1 gap-y-1">
-            <span className="type-action border-b border-oxford/10 px-1 pb-0.5">
-              {displayName}
-            </span>
-            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+        {/* ── The footer — identity, quiet, then the few actions, quieter still ── */}
+        <Reveal delay={0.36} className="mt-phi-7 flex flex-col items-center gap-phi-2">
+          <p className="type-meta text-oxford/35">Signed in as {displayName}</p>
+          <div className="flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-1">
             <button
               type="button"
               onClick={openDispatch}
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction"
+              className="type-action text-oxford/50 transition-colors hover:text-oxford btn-interaction"
             >
               {dispatchActive ? 'Lookup running' : 'Dispatch ⌘K'}
             </button>
-            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+            <span aria-hidden className="text-oxford/20">·</span>
             <Link
               to="/v1/settings"
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford btn-interaction"
+              className="type-action text-oxford/50 transition-colors hover:text-oxford btn-interaction"
             >
               Settings
             </Link>
-            <span className="type-meta px-1 text-oxford/20" aria-hidden>·</span>
+            <span aria-hidden className="text-oxford/20">·</span>
             <button
               type="button"
               onClick={requestLogout}
               disabled={agentActionPending}
-              className="type-action border-b border-oxford/10 px-1 pb-0.5 transition-colors hover:border-oxford/40 hover:text-oxford disabled:opacity-50 btn-interaction"
+              className="type-action text-oxford/50 transition-colors hover:text-oxford disabled:opacity-50 btn-interaction"
             >
               {agentActionPending ? 'Updating…' : 'Log out'}
             </button>

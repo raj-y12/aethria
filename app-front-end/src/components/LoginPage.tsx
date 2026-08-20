@@ -64,7 +64,7 @@ function LoginField({
     <div className="flex flex-col">
       <label
         htmlFor={id}
-        className="font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-inverse-muted)]"
+        className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/[0.26]"
       >
         {label}
       </label>
@@ -76,7 +76,7 @@ function LoginField({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         autoComplete={autoComplete}
-        className="mt-2 w-full border-0 border-b border-solid border-[rgba(244,241,234,0.28)] bg-transparent pb-2.5 font-sans text-[15px] text-[var(--text-inverse)] outline-none transition-colors duration-300 placeholder:font-mono placeholder:text-[11px] placeholder:text-[rgba(244,241,234,0.35)] focus:border-[var(--color-brand-mark-inverse)]"
+        className="mt-2 w-full border-0 border-b border-solid border-oxford/[0.26] bg-transparent pb-2.5 font-sans text-[15px] text-oxford/85 outline-none transition-colors duration-300 placeholder:font-mono placeholder:text-[11px] placeholder:text-oxford/[0.26] focus:border-[var(--color-brand-mark-inverse)]"
       />
     </div>
   );
@@ -406,7 +406,7 @@ export default function LoginPage() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
               transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
-              className="type-label-section"
+              className="type-label-section text-oxford/50"
               style={{
                 marginBottom: '16px',
               }}
@@ -469,7 +469,7 @@ export default function LoginPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.05 }}
-                className="type-label-section m-0 mb-phi-5 text-center tabular-nums"
+                className="type-label-section text-oxford/50 m-0 mb-phi-5 text-center tabular-nums"
               >
                 {dateline}
               </motion.p>
@@ -488,7 +488,7 @@ export default function LoginPage() {
                   initial={reduceMotion ? false : { opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.12 }}
-                  className="type-label-section mt-phi-4"
+                  className="type-label-section text-oxford/50 mt-phi-4"
                 >
                   Deal flow operating system
                 </motion.p>
@@ -502,10 +502,10 @@ export default function LoginPage() {
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
                 className="w-full"
               >
-                <div className="bg-oxford p-[clamp(1.25rem,3vw,2rem)]">
+                <div className="bg-surface-selected p-[clamp(1.25rem,3vw,2rem)]">
                   <div
                     ref={formShakeRef}
-                    className="relative border border-dashed border-[rgba(244,241,234,0.3)] p-5 sm:p-6"
+                    className="relative border border-dashed border-oxford/[0.26] p-5 sm:p-6"
                   >
                     <form
                       onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
@@ -554,7 +554,7 @@ export default function LoginPage() {
                         disabled={loading}
                         whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
                         transition={{ duration: 0.1 }}
-                        className="group w-full btn-aethria-solid !bg-[var(--color-paper)] !text-[var(--color-oxford)] hover:!bg-[var(--text-inverse)] disabled:opacity-40"
+                        className="group w-full btn-aethria-solid !bg-[var(--color-oxford)] !text-[var(--color-paper)] hover:!bg-[var(--color-charcoal)] disabled:opacity-40"
                       >
                         <span className="flex items-center justify-center">
                           {loading ? (
