@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "build:demo": "vite build --config vite.demo.config.ts"
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "check:demo-navigation": "node scripts/check-demo-navigation.mjs"
   },
   "dependencies": {
     "@clerk/react": "^6.1.0",

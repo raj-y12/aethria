@@ -117,6 +117,9 @@ function Demo() {
 
   return (
     <div className="min-h-[100dvh]">
+      <a className="demo-exit" href="https://aethria.co/" aria-label="Exit demo">
+        Exit demo <span aria-hidden="true">↗</span>
+      </a>
       <AppFrame data={MOCK_SYSTEM_DATA} startupsError={null} chrome={bare ? 'bare' : 'full'}>
         {isPortfolio ? (
           <PortfolioPage data={MOCK_SYSTEM_DATA} />

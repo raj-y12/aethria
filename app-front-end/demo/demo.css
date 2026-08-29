@@ -4,3 +4,26 @@
 .demo-notice-open .h-\[100dvh\] {
   height: calc(100dvh - var(--demo-notice-h, 0px));
 }
+
+.demo-exit {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 70;
+  border: 1px solid rgb(34 34 34 / 18%);
+  background: rgb(244 241 234 / 92%);
+  color: var(--color-oxford);
+  padding: 0.55rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+
+.demo-exit:hover,
+.demo-exit:focus-visible {
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}

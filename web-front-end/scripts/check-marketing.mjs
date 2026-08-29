@@ -36,6 +36,10 @@ const checks = [
     !['The Market — Plate 01', 'The Record — Plate 02', 'The Review — Plate 03', 'The Newsroom — Plate 04'].some(
       (marker) => html.includes(marker)
     )],
+  ['home includes quiet colophon footer', () =>
+    ['Private-market intelligence for funds that need the evidence trail', 'Dublin, Ireland', 'Specimen Edition'].every(
+      (marker) => html.includes(marker)
+    )],
   ['JSON-LD present', () => html.includes('application/ld+json')],
   ['no fonts.googleapis.com', () => !html.includes('fonts.googleapis.com')],
   ['theme-color grey stock', () => /theme-color" content="#D9D7D4/i.test(html)],

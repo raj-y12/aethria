@@ -15,6 +15,9 @@ export default function HomePage() {
   const reduce = useReducedMotion();
   const [entered, setEntered] = useState(false);
   const [showLoader, setShowLoader] = useState(false);
+  const [year, setYear] = useState<number | null>(null);
+
+  useEffect(() => setYear(new Date().getFullYear()), []);
 
   // Arrival overlay: plays once per session, client-only. Resting state (entered
   // = false) must stay fully visible at rest — see HeroPlate/GalleryFrame's
@@ -68,6 +71,29 @@ export default function HomePage() {
         <QueryPlate />
         <HoldingsPlate />
       </div>
+
+      <footer className="colophon">
+        <div style={{ maxWidth: '32ch' }}>
+          <span className="wm">
+            Aethria<span style={{ color: 'var(--accent)' }}>.</span>
+          </span>
+          <p>Private-market intelligence for funds that need the evidence trail, not another beautiful spreadsheet.</p>
+        </div>
+        <div>
+          <p>
+            Set in Playfair Display,
+            <br />
+            Instrument Sans &amp; Space Mono.
+          </p>
+        </div>
+        <div>
+          <p>
+            Dublin, Ireland
+            <br />
+            Specimen Edition · © {year ?? '—'}
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
