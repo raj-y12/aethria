@@ -10,7 +10,6 @@ import NewsroomPlate from './components/plates/NewsroomPlate';
 import CorrectionsPlate from './components/plates/CorrectionsPlate';
 import QueryPlate from './components/plates/QueryPlate';
 import HoldingsPlate from './components/plates/HoldingsPlate';
-import AccessPlate from './components/plates/AccessPlate';
 
 export default function HomePage() {
   const reduce = useReducedMotion();
@@ -68,7 +67,6 @@ export default function HomePage() {
         <CorrectionsPlate />
         <QueryPlate />
         <HoldingsPlate />
-        <AccessPlate />
       </div>
     </div>
   );

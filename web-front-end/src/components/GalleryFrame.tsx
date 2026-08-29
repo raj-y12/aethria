@@ -13,13 +13,10 @@ export default function GalleryFrame({
   enter = true,
   active,
   quiet = false,
-  onAccess,
 }: {
   enter?: boolean;
   active?: 'home' | 'team';
   quiet?: boolean;
-  /** When set, Access opens this instead of seeking an access plate on the page. */
-  onAccess?: () => void;
 }) {
   const reduce = useReducedMotion();
   const navigate = useNavigate();
@@ -71,19 +68,6 @@ export default function GalleryFrame({
         <Link to="/team" aria-current={active === 'team' ? 'page' : undefined}>
           Team
         </Link>
-        <a
-          href="#access"
-          onClick={(e) => {
-            if (!onAccess) {
-              goToPlate(e, '#access');
-              return;
-            }
-            e.preventDefault();
-            onAccess();
-          }}
-        >
-          Request access
-        </a>
       </div>
 
       <div className={frameCx('bl')}>

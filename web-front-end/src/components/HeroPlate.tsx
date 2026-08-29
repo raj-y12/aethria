@@ -1,5 +1,4 @@
 import DottedMarketMap from './DottedMarketMap';
-import { scrollToAnchor } from '../lib/scrollToAnchor';
 
 /**
  * Full-viewport opening plate (Izanami calm). Classes (.hero/.hero-veil/.hero-center/
@@ -29,9 +28,6 @@ export default function HeroPlate({ enter = true }: { enter?: boolean }) {
             every decision as institutional memory.
           </p>
           <div className="hero-ctas">
-            <a href="#access" className="cta-primary" onClick={(e) => scrollToAnchor(e, '#access')}>
-              Request access
-            </a>
             {/* Points at the live console, not an anchor on this page — the label
                 is only honest if it actually shows the system. */}
             <a href="/demo" className="cta-secondary">

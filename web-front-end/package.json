@@ -8,6 +8,7 @@
     "build": "tsc && vite-react-ssg build && node scripts/postprocess-pages.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "check:marketing": "node scripts/check-marketing.mjs",
+    "check:access-disabled": "node scripts/check-access-disabled.mjs",
     "check:waitlist": "node --experimental-strip-types scripts/check-waitlist-escaping.mjs",
     "check:contrast": "node scripts/check-contrast.mjs",
     "preview": "vite preview",

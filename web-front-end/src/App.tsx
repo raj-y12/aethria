@@ -4,8 +4,7 @@ import { MotionConfig } from 'framer-motion';
 import AnimatedRoutes from './components/AnimatedRoutes';
 
 /**
- * / = gate; /home = home (the application form lives at /home#access).
- * /request-access redirects to /home#access for old links. All other paths → /.
+ * / = gate; /home = home. All other paths → /.
  */
 function App() {
   // Global smooth scroll (Lenis), marketing site only. Client-only: never runs

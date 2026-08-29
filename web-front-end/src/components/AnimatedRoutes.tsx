@@ -24,7 +24,7 @@ for (const key of Object.keys(privateModules)) {
   }
 }
 
-const PUBLIC_PATHS = ['/', '/home', '/request-access', '/team'];
+const PUBLIC_PATHS = ['/', '/home', '/team'];
 
 export default function AnimatedRoutes() {
   const location = useLocation();
@@ -32,17 +32,9 @@ export default function AnimatedRoutes() {
 
   const pathname = location.pathname;
 
-  // The application form now lives at the bottom of /home (#access) instead of its
-  // own route. Redirect any old bookmarked/shared /request-access links there.
-  useEffect(() => {
-    if (pathname !== '/request-access') return;
-    navigate(`/home${location.search}#access`, { replace: true });
-  }, [pathname, location.search, navigate]);
-
   let element: React.ReactNode = null;
   if (pathname === '/' || pathname === '/home') element = <HomePage />;
   else if (pathname === '/team') element = <TeamPage />;
-  else if (pathname === '/request-access') element = null; // mid-redirect, see effect above
   else if (privateRoutes[pathname]) {
     const PrivateComponent = privateRoutes[pathname];
     element = (

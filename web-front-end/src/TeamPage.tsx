@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import AccessModal from './components/AccessModal';
+import { useEffect } from 'react';
 import GalleryFrame from './components/GalleryFrame';
 
 const LINKEDIN = 'https://www.linkedin.com/in/raj-dhanush-yendamuri/';
@@ -22,8 +21,6 @@ const principles = [
 ];
 
 export default function TeamPage() {
-  const [accessOpen, setAccessOpen] = useState(false);
-
   useEffect(() => {
     document.title = 'Aethria — Venture judgment, on the record';
     document.querySelector('meta[name="description"]')?.setAttribute(
@@ -47,7 +44,7 @@ export default function TeamPage() {
 
   return (
     <div className="team-page">
-      <GalleryFrame active="team" quiet onAccess={() => setAccessOpen(true)} />
+      <GalleryFrame active="team" quiet />
       <main className="team-main">
         <section className="team-hero surface-image-led" aria-labelledby="team-title">
           <div className="team-hero-copy">
@@ -149,23 +146,11 @@ export default function TeamPage() {
                 <dt>Based</dt>
                 <dd>Dublin, Ireland</dd>
               </div>
-              <div>
-                <dt>Contact</dt>
-                <dd>
-                  <a href="mailto:raj@aethria.co">raj@aethria.co</a>
-                </dd>
-              </div>
             </dl>
-            <div className="team-final-cta">
-              <a className="team-primary-cta" href="mailto:raj@aethria.co">
-                Start a conversation <span aria-hidden="true">→</span>
-              </a>
-            </div>
           </div>
         </section>
       </main>
 
-      <AccessModal open={accessOpen} onClose={() => setAccessOpen(false)} />
     </div>
   );
 }
