@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-# active.json + default v1 layout (for dev verification scripts).
+# active.json plus legacy v1 paths retained only for direct-load compatibility.
 ACTIVE_JSON = "resources/config/active.json"
 PARTNER_RULES_V1 = "resources/config/partner_rules/v1.json"
 REVIEWER_RULES_V1 = "resources/config/reviewer_rules/v1.json"
@@ -20,7 +20,6 @@ REQUIRED_CONFIG_FILES: tuple[str, ...] = (
     ACTIVE_JSON,
     PARTNER_RULES_V1,
     REVIEWER_RULES_V1,
-    EVALUATION_RUBRIC_V1,
     FUND_THESIS_V1,
 )
 

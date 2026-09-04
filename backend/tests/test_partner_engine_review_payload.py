@@ -63,7 +63,7 @@ def _minimal_scout() -> ScoutInfo:
     )
 
 
-def test_build_entry_forwards_confidence_adjusted_score():
+def test_build_entry_redacts_historical_numeric_reviewer_fields():
     review_info = ReviewInfo(
         market_score=7,
         product_score=7,
@@ -88,7 +88,11 @@ def test_build_entry_forwards_confidence_adjusted_score():
     )
     entry = engine._build_entry(startup)
     assert entry is not None
-    assert entry["review"]["confidence_adjusted_score"] == 6.174
+    assert entry["review"]["confidence_adjusted_score"] is None
+    assert entry["review"]["market_score"] is None
+    assert entry["review"]["derived_verdict"] is None
+    assert entry["review"]["structured_scoring"] is None
+    assert entry["review"]["structured_signals"] is None
 
 
 def test_build_entry_review_keys_match_partner_contract():

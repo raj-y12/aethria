@@ -6,7 +6,7 @@ import hashlib
 import json
 from typing import Any, Dict, Iterable
 
-from evaluation_v2.models import CriterionRule, EvaluationPolicy
+from evaluation_v2.models import CriterionRule, EvaluationPolicy, FactRule
 from evaluation_v2.partner_rules import (
     PartnerRules,
     boundary_comparisons,
@@ -45,6 +45,7 @@ def evaluation_policy_from_compiled(
     compiled_policy: Dict[str, Any],
     *,
     partner_rules: PartnerRules | Dict[str, Any],
+    rubric: Dict[str, Any] | None = None,
 ) -> EvaluationPolicy:
     """Create a deterministic evidence policy from the exact published version."""
     version_id = str(compiled_policy.get("policy_version_id") or "").strip()
@@ -68,6 +69,18 @@ def evaluation_policy_from_compiled(
     if total_weight <= 0:
         raise ValueError("Published policy has no weighted evaluation dimensions")
 
+    fact_rules = [
+        FactRule.model_validate({**raw, "dimension": dimension})
+        for dimension_data in (rubric or {}).get("dimensions", [])
+        if isinstance(dimension_data, dict)
+        for dimension in [str(dimension_data.get("id") or "").removesuffix("_score")]
+        for raw in (dimension_data.get("fact_rules") or [])
+        if isinstance(raw, dict)
+    ]
+    fact_claim_types_by_dimension: dict[str, list[str]] = {}
+    for rule in fact_rules:
+        fact_claim_types_by_dimension.setdefault(rule.dimension, []).append(rule.claim_type)
+
     criteria = []
     for dimension, raw, weight in weighted_dimensions:
         raw_criteria = raw.get("criteria") if isinstance(raw.get("criteria"), list) else []
@@ -77,6 +90,7 @@ def evaluation_policy_from_compiled(
                 continue
             claim_types.append(criterion.get("id"))
             claim_types.extend(criterion.get("source_components") or [])
+        claim_types.extend(fact_claim_types_by_dimension.get(dimension, []))
         criteria.append(
             CriterionRule(
                 criterion=dimension,
@@ -106,4 +120,5 @@ def evaluation_policy_from_compiled(
         minimum_scored_weight=float(thresholds.minimum_scored_weight),
         decision_safety=decision_safety,
         hard_exclusion_claim_types=decision_safety.hard_exclusion_claim_types,
+        fact_rules=fact_rules,
     )

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from evaluation_v2.models import CriterionRule, DecisionSafetyPolicy, EvaluationPolicy, EvidenceEligibilityPolicy
+from evaluation_v2.models import CriterionRule, DecisionSafetyPolicy, EvaluationPolicy, EvidenceEligibilityPolicy, FactRule
 from evidence.extraction import extract_claims_from_evidence
 
 
@@ -255,6 +255,154 @@ async def test_a_lying_model_claimed_band_is_ignored_real_score_wins(monkeypatch
 
     claim, _, _ = repo.claims[0]
     assert claim.normalized_value["score_band"] == "mid"
+
+
+@pytest.mark.asyncio
+async def test_model_cannot_choose_a_decimal_within_a_rubric_band(monkeypatch):
+    """The extractor may classify evidence into a band, never select its decimal."""
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([
+        {"claims": [{
+            "claim_type": "tam",
+            "criterion_score": 6.75,
+            "score_band": "mid",
+            "confidence": 0.8,
+            "display_text": "TAM is $10B, growing 20% YoY.",
+            "supporting_evidence_item_ids": ["item-1"],
+        }]},
+    ])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+
+    rubric = _rubric()
+    rubric["dimensions"][0]["high"]["score"] = 8.0
+    rubric["dimensions"][0]["mid"]["score"] = 5.0
+    rubric["dimensions"][0]["low"]["score"] = 3.0
+    await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["market"], evidence_items=_items(), rubric=rubric,
+        policy=_policy(), evidence_repository=repo, api_key="test-key", model="gpt-5-nano",
+    )
+
+    claim, _, _ = repo.claims[0]
+    assert claim.normalized_value["criterion_score"] == 5.0
+    assert claim.normalized_value["score_band"] == "mid"
+
+
+@pytest.mark.asyncio
+async def test_typed_revenue_fact_uses_published_policy_band_not_model_score(monkeypatch):
+    """$570M is a fact, not a request for the model to choose a 6/6.5 band."""
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([{"claims": [{
+        "claim_type": "annualized_revenue_usd",
+        "fact_value": 570_000_000,
+        "criterion_score": 6.0,
+        "score_band": "mid",
+        "confidence": 0.9,
+        "display_text": "The company reports $570M annualized revenue.",
+        "supporting_evidence_item_ids": ["item-1"],
+    }]}])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+    policy = _policy().model_copy(update={
+        "criteria": [CriterionRule(
+            criterion="execution",
+            claim_types=["annualized_revenue_usd"],
+            weight=1.0,
+        )],
+        "fact_rules": [FactRule(
+            claim_type="annualized_revenue_usd",
+            dimension="execution",
+            unit="usd",
+            bands=[
+                {"minimum": 100_000_000, "score": 8, "label": "high"},
+                {"minimum": 10_000_000, "score": 5, "label": "mid"},
+                {"minimum": 0, "score": 3, "label": "low"},
+            ],
+        )],
+    })
+    rubric = {
+        "dimensions": [{
+            "id": "execution_score", "name": "Execution", "question": "Can it execute?", "definition": "Commercial execution.",
+            "fact_rules": [{"claim_type": "annualized_revenue_usd", "unit": "usd"}],
+            "high": {"range": [8, 10], "score": 8, "criteria": "Strong."},
+            "mid": {"range": [5, 7], "score": 5, "criteria": "Moderate."},
+            "low": {"range": [1, 4], "score": 3, "criteria": "Weak."},
+        }],
+    }
+
+    await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["execution"], evidence_items=_items(), rubric=rubric,
+        policy=policy, evidence_repository=repo, api_key="test-key", model="gpt-5-nano",
+    )
+
+    claim, _, _ = repo.claims[0]
+    assert claim.normalized_value == {
+        "criterion_score": 8,
+        "value": 570_000_000.0,
+        "unit": "usd",
+        "score_origin": "policy_fact_band",
+        "score_band": "high",
+        "score_justification": "Policy-derived from 570000000 usd: high band.",
+    }
+
+
+@pytest.mark.asyncio
+async def test_typed_facts_are_extracted_deterministically_from_verified_excerpt(monkeypatch):
+    """A quoted $570M/99.5% fact must not depend on an extraction-model choice."""
+    repo = _FakeEvidenceRepository()
+    client, _ = _fake_client([{"claims": []}])
+    monkeypatch.setattr("evidence.extraction.build_openai_client", lambda api_key: client)
+    policy = _policy().model_copy(update={
+        "criteria": [
+            CriterionRule(criterion="execution", claim_types=["annualized_revenue_usd"], weight=0.5),
+            CriterionRule(criterion="product", claim_types=["customer_retention_pct"], weight=0.5),
+        ],
+        "fact_rules": [
+            FactRule(
+                claim_type="annualized_revenue_usd", dimension="execution", unit="usd",
+                bands=[
+                    {"minimum": 100_000_000, "score": 8, "label": "high"},
+                    {"minimum": 10_000_000, "score": 5, "label": "mid"},
+                    {"minimum": 0, "score": 3, "label": "low"},
+                ],
+            ),
+            FactRule(
+                claim_type="customer_retention_pct", dimension="product", unit="percentage",
+                bands=[
+                    {"minimum": 95, "score": 8, "label": "high"},
+                    {"minimum": 80, "score": 5, "label": "mid"},
+                    {"minimum": 0, "score": 3, "label": "low"},
+                ],
+            ),
+        ],
+    })
+    rubric = {
+        "dimensions": [
+            {"id": "execution_score", "fact_rules": [{"claim_type": "annualized_revenue_usd", "unit": "usd"}]},
+            {"id": "product_score", "fact_rules": [{"claim_type": "customer_retention_pct", "unit": "percentage"}]},
+        ],
+    }
+    evidence_items = [{
+        "evidence_item_id": "item-1",
+        "source_quality": 0.6,
+        "display_excerpt": "The company has $570 million in annualized revenue and 99.5% annual client retention.",
+    }]
+
+    result = await extract_claims_from_evidence(
+        user_id="user_test", company_id="company-1", opportunity_id="opp-1",
+        missing_evidence=["execution", "product"], evidence_items=evidence_items,
+        rubric=rubric, policy=policy, evidence_repository=repo,
+        api_key="test-key", model="gpt-5-nano",
+    )
+
+    assert result["claims_created"] == 2
+    by_type = {claim.claim_type: claim for claim, _, _ in repo.claims}
+    assert by_type["annualized_revenue_usd"].normalized_value["value"] == 570_000_000.0
+    assert by_type["annualized_revenue_usd"].normalized_value["criterion_score"] == 8
+    assert by_type["annualized_revenue_usd"].display_text == "$570M annualized revenue."
+    assert by_type["customer_retention_pct"].normalized_value["value"] == 99.5
+    assert by_type["customer_retention_pct"].normalized_value["criterion_score"] == 8
+    assert by_type["customer_retention_pct"].display_text == "99.5% customer retention."
 
 
 @pytest.mark.asyncio

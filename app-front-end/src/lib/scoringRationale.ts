@@ -73,12 +73,15 @@ export type ScoringDriverRow = {
   /** The assessed level, e.g. "moderate" — shown as a small tag. Null when missing/none. */
   tag: string | null;
   score: number | null;
+  confidence: number | null;
   text: string;
   /** Evidence status drives the Evidence-vs-Needs-diligence split in the memo. */
   status: 'complete' | 'partial' | 'missing';
   missing: boolean;
   /** True for judgment components with no objective anchor (P3.4). */
   qualitative?: boolean;
+  evidence?: string | null;
+  rule?: string | null;
 };
 
 export function buildComponentDrivers(components: Record<string, ScoringComponent>): ScoringDriverRow[] {
@@ -94,10 +97,13 @@ export function buildComponentDrivers(components: Record<string, ScoringComponen
         label: componentLabel(id),
         tag,
         score: typeof component.score === 'number' ? component.score : null,
+        confidence: typeof component.confidence === 'number' ? component.confidence : null,
         text: text ? clipScoringText(text, 160) : '',
         status,
         missing: status === 'missing',
         qualitative: component.qualitative === true,
+        evidence: sanitizeReasoning(component.evidence),
+        rule: sanitizeReasoning(component.rule),
       };
     })
     .filter((row) => row.text || row.score != null)
@@ -122,6 +128,7 @@ export function buildCriterionDrivers(criteria: Record<string, ScoringCriterion>
         label: collapseWhitespace(String(criterion.name ?? 'Criterion')),
         tag: null,
         score: typeof criterion.score === 'number' ? criterion.score : null,
+        confidence: typeof criterion.confidence === 'number' ? criterion.confidence : null,
         text: text ? clipScoringText(text, 100) : '',
         status: (text ? 'complete' : 'missing') as 'complete' | 'partial' | 'missing',
         missing: !text,

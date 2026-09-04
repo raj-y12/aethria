@@ -24,7 +24,8 @@ def test_build_aethria_view_basic():
         resolution_notes=["market_score: personas diverged"],
     )
     assert "Acme Corp" in view.headline
-    assert "MEDIUM" in view.headline
+    assert "Evidence read" in view.headline
+    assert "MEDIUM" not in view.headline
     assert "Aethria view" not in view.headline
     assert "disagreed" in view.tension_summary.lower() or "diverged" in view.tension_summary.lower()
 
@@ -122,5 +123,5 @@ def test_polish_legacy_headline_and_dedup_thesis():
     }
     out = polish_aethria_view_for_api(review["aethria_view"], review, "VibeFlow")
     assert out is not None
-    assert out["headline"] == "VibeFlow — MEDIUM."
+    assert out["headline"] == "VibeFlow — Evidence read."
     assert out["thesis_fit_line"] == ""

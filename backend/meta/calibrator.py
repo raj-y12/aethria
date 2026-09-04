@@ -33,6 +33,61 @@ CALIBRATION_COOLDOWN_CYCLES = int(os.getenv("META_AGENT_MUTATION_COOLDOWN_CYCLES
 CALIBRATION_PARAM_COOLDOWN = 5
 
 
+def analyze_outcome_calibration(
+    joined_observations: List[Dict[str, Any]],
+    *,
+    minimum_verified_observations: int,
+    score_bands: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Return an analysis-only calibration proposal from explicitly joined data.
+
+    The caller must provide the score/outcome join; this function will never guess an
+    identity match. Disputed and unverified outcomes are excluded, and no policy or
+    persisted calibration state is mutated.
+    """
+    verified = [
+        row for row in joined_observations
+        if isinstance(row, dict)
+        and row.get("outcome_verification") == "verified"
+        and row.get("outcome_valence") in {"positive", "negative"}
+        and isinstance(row.get("overall_score"), (int, float))
+        and not isinstance(row.get("overall_score"), bool)
+    ]
+    if len(verified) < minimum_verified_observations:
+        return {
+            "status": "insufficient_data",
+            "verified_observations": len(verified),
+            "minimum_verified_observations": minimum_verified_observations,
+            "proposals": [],
+        }
+
+    summaries = []
+    for band in score_bands:
+        if not isinstance(band, dict):
+            continue
+        minimum = float(band.get("min", 0))
+        maximum = float(band.get("max", 100))
+        rows = [
+            row for row in verified
+            if minimum <= float(row["overall_score"]) <= maximum
+        ]
+        if not rows:
+            continue
+        positive_rate = sum(row["outcome_valence"] == "positive" for row in rows) / len(rows)
+        summaries.append({
+            "band": band.get("label"),
+            "observations": len(rows),
+            "positive_rate": round(positive_rate, 3),
+        })
+    return {
+        "status": "analysis_ready",
+        "verified_observations": len(verified),
+        "minimum_verified_observations": minimum_verified_observations,
+        "band_outcomes": summaries,
+        "proposals": [],
+    }
+
+
 def load_calibration_state(user_id: str) -> Dict[str, Any]:
     data = doc_get(_CALIBRATION_TABLE, user_id=user_id)
     return data if isinstance(data, dict) else dict(DEFAULT_CALIBRATION)

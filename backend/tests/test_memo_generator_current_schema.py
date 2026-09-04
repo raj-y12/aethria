@@ -81,9 +81,7 @@ def test_local_storage_duplicate_name_returns_existing_startup_id(tmp_path):
     assert [s.startup_id for s in storage.get_all_startups()] == ["startup-1"]
 
 
-def test_dimension_table_never_prints_a_raw_reviewer_mean():
-    """The scores table printed "5.403333/10" above a summary line using one
-    decimal — one memo, two renderings of the same number."""
+def test_memo_never_prints_a_reviewer_score_or_verdict():
     startup = _decided_startup()
     startup.review_info.market_score = 5.68
     startup.review_info.product_score = 5.403333
@@ -92,9 +90,10 @@ def test_dimension_table_never_prints_a_raw_reviewer_mean():
     memo = MemoGenerator().generate_memo(startup)
 
     assert "5.403333" not in memo
-    assert "| Market | 5.7/10 |" in memo
-    assert "| Product | 5.4/10 |" in memo
-    assert "| Execution | 4.8/10 |" in memo
+    assert "5.7/10" not in memo
+    assert "Overall score" not in memo
+    assert "Quality assessment" not in memo
+    assert "## Reviewer Research" in memo
 
 
 def test_traction_read_from_evidence_reaches_the_memo():

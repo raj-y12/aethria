@@ -1,9 +1,7 @@
 /**
  * Shown instead of the full memo when a startup is held back by the
- * periodic pipeline's triage funnel gates (confidence_threshold /
- * decision_threshold) -- see getTriageGateStatus. Just the company name and
- * why it's gated, with a manual "review it anyway" / "decide it anyway"
- * action and a way to back out. No memo content is generated or shown.
+ * periodic pipeline's Scout confidence gate. It offers a manual review and a
+ * way to back out. Partner decisions must come from canonical evidence.
  */
 import { useState } from 'react';
 import type { Startup } from '../types/startup';
@@ -23,12 +21,9 @@ export default function TriageGateCard({ startup, status, onClose, onOverridden 
   const { run, pendingId, error } = useTriageOverride();
   const [dismissed, setDismissed] = useState(false);
   const pending = pendingId === startup.id;
-  const stage = status.reason === 'not_reviewed' ? 'review' : 'decide';
-  const actionLabel = stage === 'review' ? 'Review it anyway' : 'Decide it anyway';
-  const kicker =
-    status.reason === 'not_reviewed'
-      ? `Matched ${Math.round(status.confidence * SCOUT_THESIS_FIT_CATEGORIES)} of ${SCOUT_THESIS_FIT_CATEGORIES} mandate categories (sector, stage, geography) -- below the bar the pipeline reviews at automatically.`
-      : `Reviewer scored this ${Math.round(status.overallScore * 10)}% overall, below the ${Math.round(status.threshold * 100)}% bar the pipeline decides at automatically.`;
+  const stage = 'review';
+  const actionLabel = 'Review it anyway';
+  const kicker = `Matched ${Math.round(status.confidence * SCOUT_THESIS_FIT_CATEGORIES)} of ${SCOUT_THESIS_FIT_CATEGORIES} mandate categories (sector, stage, geography) -- below the bar the pipeline reviews at automatically.`;
 
   if (dismissed) return null;
 

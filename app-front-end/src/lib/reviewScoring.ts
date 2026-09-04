@@ -91,6 +91,8 @@ function presentationDimension(value: unknown): ScoringDimension | null {
             label: hasEvidence ? nullableString(item.band) : null,
             reasoning: interpretation,
             evidence: hasEvidence ? interpretation || null : null,
+            rule: nullableString(item.rule),
+            qualitative: item.qualitative === true,
           }]];
         }),
       )
@@ -149,6 +151,14 @@ function scoringPresentationToStructuredScoring(value: unknown): StructuredScori
     overall_score: presentation.overall_score,
     overall_confidence: presentationConfidence(presentation.confidence_label),
     overall_dispersion: computeDispersion([market.score, product.score, technical.score, execution.score]),
+    policy_version_id: nullableString(presentation.policy_version_id),
+    policy_hash: nullableString(presentation.policy_hash),
+    stage_cohort: nullableString(presentation.stage_cohort),
+    stage_cohort_label: nullableString(presentation.stage_cohort_label),
+    sector_tam_benchmark: nullableString(presentation.sector_tam_benchmark),
+    score_bands: Array.isArray(presentation.score_bands)
+      ? (presentation.score_bands as StructuredScoring['score_bands'])
+      : null,
   };
 }
 
@@ -213,6 +223,7 @@ export function normalizeStructuredScoring(review: Review | null | undefined): S
         stage_cohort: candidate.stage_cohort ?? null,
         stage_cohort_label: candidate.stage_cohort_label ?? null,
         sector_tam_benchmark: candidate.sector_tam_benchmark ?? null,
+        score_bands: candidate.score_bands ?? null,
       };
     }
   }

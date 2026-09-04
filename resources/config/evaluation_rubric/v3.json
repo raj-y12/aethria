@@ -1,0 +1,65 @@
+{
+  "version": "3.0",
+  "description": "Aethria Investment Evaluation Rubric — models locate and cite evidence; policy assigns every score.",
+  "score_range": { "min": 1, "max": 10 },
+  "scoring_overview": {
+    "interpretation": "Scores represent risk-adjusted investment quality, not product polish.",
+    "rule_of_thumb": { "3": "adverse or structurally weak evidence", "5": "plausible but unproven", "8": "strong evidence; complete required coverage still required" },
+    "precision_policy": "A model may identify and cite an evidence fact. It never selects a decimal: qualitative claims receive a configured anchor and typed facts receive the configured policy band."
+  },
+  "score_bands": [
+    { "range": [1, 3], "label": "Weak", "meaning": "High risk, failing, or structurally broken" },
+    { "range": [4, 5], "label": "Concerning", "meaning": "Unproven, material execution or validation gaps" },
+    { "range": [6, 7], "label": "Promising", "meaning": "Reasonable thesis, requires validation" },
+    { "range": [8, 10], "label": "Strong", "meaning": "Investment-grade, clear upside with managed risk" }
+  ],
+  "ui_rules": {
+    "score_display": "Show the policy anchor, cited fact or claim, and applicable quality cap; never show a decimal selected by a model.",
+    "verdict_display": "Show canonical recommendation, required-evidence status, and cited criterion ledger; never infer a verdict from a headline average."
+  },
+  "dimensions": [
+    {
+      "id": "market_score", "name": "Market", "question": "Is this market worth winning, and is now the right time?", "definition": "Market size, growth, timing, structure, and accessibility.",
+      "high": { "range": [8, 10], "score": 8, "criteria": "Large and expanding market, clear demand driver, defensible segment, strong timing tailwinds." },
+      "mid": { "range": [5, 7], "score": 5, "criteria": "Market exists but is moderate, crowded, or timing is unclear." },
+      "low": { "range": [1, 4], "score": 3, "criteria": "Small, stagnant, or unproven market; demand uncertain." }
+    },
+    {
+      "id": "product_score", "name": "Product", "question": "Does this solution clearly and uniquely solve a real problem?", "definition": "Problem clarity, solution fit, differentiation, user pull, and retention.",
+      "fact_rules": [
+        { "claim_type": "customer_retention_pct", "unit": "percentage", "bands": [
+          { "minimum": 95, "score": 8, "label": "high" }, { "minimum": 80, "score": 5, "label": "mid" }, { "minimum": 0, "score": 3, "label": "low" }
+        ] }
+      ],
+      "high": { "range": [8, 10], "score": 8, "criteria": "Clear problem-solution fit, differentiated approach, early usage or strong pull signals." },
+      "mid": { "range": [5, 7], "score": 5, "criteria": "Reasonable fit, but differentiation or value proposition is unclear or early." },
+      "low": { "range": [1, 4], "score": 3, "criteria": "Solution in search of a problem; no clear differentiation." }
+    },
+    {
+      "id": "technical_score", "name": "Technical", "question": "Can this be built and sustained without blowing up?", "definition": "Technical feasibility, complexity, scalability, and defensibility from tech or data.",
+      "high": { "range": [8, 10], "score": 8, "criteria": "Feasible architecture, appropriate complexity, credible moat (data, infra, IP)." },
+      "mid": { "range": [5, 7], "score": 5, "criteria": "Technically feasible but execution risk or moat is unproven." },
+      "low": { "range": [1, 4], "score": 3, "criteria": "Unproven, fragile, or commodity implementation." }
+    },
+    {
+      "id": "execution_score", "name": "Execution", "question": "Can this team actually make it happen?", "definition": "Traction evidence, growth velocity, GTM, team caliber, and operational speed.",
+      "fact_rules": [
+        { "claim_type": "annualized_revenue_usd", "unit": "usd", "bands": [
+          { "minimum": 100000000, "score": 8, "label": "high" }, { "minimum": 10000000, "score": 5, "label": "mid" }, { "minimum": 0, "score": 3, "label": "low" }
+        ] }
+      ],
+      "high": { "range": [8, 10], "score": 8, "criteria": "Credible team, clear GTM, manageable competition, plausible scaling path." },
+      "mid": { "range": [5, 7], "score": 5, "criteria": "Team or GTM unproven; meaningful competitive or scaling risk." },
+      "low": { "range": [1, 4], "score": 3, "criteria": "Team mismatch, no GTM, or implausible execution path." }
+    },
+    {
+      "id": "defensibility_score", "name": "Defensibility", "question": "If this works, can others copy it easily?", "definition": "Moat from technology, data, network effects, regulation, or switching costs.",
+      "high": { "range": [8, 10], "score": 8, "criteria": "Clear moat: proprietary tech, data advantage, network effects, or regulatory lock-in." },
+      "mid": { "range": [5, 7], "score": 5, "criteria": "Some differentiation, but replicable or limited switching cost." },
+      "low": { "range": [1, 4], "score": 3, "criteria": "No moat; easily copied." }
+    }
+  ],
+  "verdict_ui_rule": "A recommendation must be explainable by policy anchors, cited claims, evidence coverage, and named safety gates; numbers alone are never sufficient.",
+  "output_requirements": { "memo_must_include": ["Policy-anchor score and label", "Cited fact or claim per scored criterion", "Explicit recommendation and evidence coverage", "Safety gates, risks, and missing evidence"] },
+  "score_dimension_ids": ["market_score", "product_score", "technical_score", "execution_score", "defensibility_score"]
+}

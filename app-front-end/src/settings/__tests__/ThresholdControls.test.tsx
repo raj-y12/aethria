@@ -18,7 +18,6 @@ const settings: Settings = {
     partners_enabled: true,
     max_agents_per_run: 4,
     confidence_threshold: 0.3,
-    decision_threshold: 0.55,
     scout_region: 'europe',
   },
   cost_budget: {
@@ -60,10 +59,9 @@ describe('ThresholdControls', () => {
     vi.mocked(patchSettings).mockReset();
   });
 
-  it('renders the current thresholds as percentages', () => {
+  it('renders the review threshold as a percentage', () => {
     renderControls();
     expect(screen.getByLabelText('Review threshold')).toHaveValue(30);
-    expect(screen.getByLabelText('Decision threshold')).toHaveValue(55);
   });
 
   it('saves a changed threshold as a 0-1 fraction on blur', async () => {
@@ -83,23 +81,22 @@ describe('ThresholdControls', () => {
 
   it('rolls back to the last saved value and shows an error on failure', async () => {
     vi.mocked(patchSettings).mockResolvedValue({
-      error: { message: 'decision_threshold must be between 0 and 1', errors: [] },
+      error: { message: 'confidence_threshold must be between 0 and 1', errors: [] },
     });
     renderControls();
 
-    const input = screen.getByLabelText('Decision threshold');
+    const input = screen.getByLabelText('Review threshold');
     fireEvent.change(input, { target: { value: '90' } });
     fireEvent.blur(input);
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('decision_threshold must be between 0 and 1');
+      expect(screen.getByRole('alert')).toHaveTextContent('confidence_threshold must be between 0 and 1');
     });
-    expect(input).toHaveValue(55);
+    expect(input).toHaveValue(30);
   });
 
-  it('disables both inputs when storage is unavailable', () => {
+  it('disables the input when storage is unavailable', () => {
     renderControls({ storageUnavailable: true });
     expect(screen.getByLabelText('Review threshold')).toBeDisabled();
-    expect(screen.getByLabelText('Decision threshold')).toBeDisabled();
   });
 });

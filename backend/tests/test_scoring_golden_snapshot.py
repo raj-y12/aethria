@@ -304,6 +304,75 @@ def test_p33_evidence_anchors_match_normalizer_vocabulary():
     assert len(classified) == 25, "all 25 components must be classified exactly once"
 
 
+def test_p51_evidence_anchor_prompt_includes_a_worked_example_for_each_label():
+    from reviewer.base import COMPONENT_EVIDENCE_ANCHORS, _evidence_anchors_block
+
+    block = _evidence_anchors_block()
+    for comp_key, anchors in COMPONENT_EVIDENCE_ANCHORS.items():
+        assert f"{comp_key} examples:" in block
+        for label, condition in anchors:
+            assert f"{label} ← {condition}" in block
+
+
+def test_p52_large_reviewer_score_spread_is_marked_unstable():
+    from reviewer.engine import ReviewerEngine
+
+    engine = ReviewerEngine.__new__(ReviewerEngine)
+    consensus = engine._compute_consensus([
+        {"verdict": "MEDIUM", "market_score": 8},
+        {"verdict": "MEDIUM", "market_score": 5},
+        {"verdict": "MEDIUM", "market_score": 6},
+    ], stability_variance=1.0)
+
+    assert consensus["score_stability"]["market_score"] == "unstable"
+    assert consensus["reviewer_disagreement"] is True
+
+
+def test_p63_sector_component_adjustments_are_explicit_and_default_to_noop():
+    from services.scoring.policy_compiler import compile_policy_from_fund_config
+
+    scout = {"sector": "fintech", "est_tam": "$3B"}
+    review = {"structured_signals": {"market": {"competition": {"label": "moderate", "confidence": 1.0}}, "technical": {"complexity": {"label": "complex", "confidence": 1.0}}}}
+    default = DeterministicScoringEngine().score(scout, review)
+    config = compile_policy_from_fund_config({})
+    runtime = config["scoring_runtime"]
+    runtime["normalization"]["sector_tam_benchmarks"]["fintech"]["component_adjustments"] = {
+        "market.competition": -1.0,
+        "technical.complexity": 1.0,
+    }
+    adjusted_policy = compile_policy_from_fund_config(
+        {"scoringRuntime": runtime}, require_publish_ready=True
+    )
+    adjusted = DeterministicScoringEngine(policy=adjusted_policy).score(scout, review)
+    assert "sector_benchmark_adjustment" not in default["market"]["components"]["competition"]
+    assert adjusted["market"]["components"]["competition"]["sector_benchmark_adjustment"] == -1.0
+    assert adjusted["technical"]["components"]["complexity"]["sector_benchmark_adjustment"] == 1.0
+
+
+def test_p72_outcome_calibration_is_analysis_only_and_fail_closed_until_sample_exists():
+    from meta.calibrator import analyze_outcome_calibration
+
+    result = analyze_outcome_calibration(
+        [{"overall_score": 9, "outcome_verification": "verified", "outcome_valence": "positive"}],
+        minimum_verified_observations=5,
+        score_bands=[{"min": 8, "max": 10, "label": "Strong"}],
+    )
+    assert result["status"] == "insufficient_data"
+    assert result["proposals"] == []
+
+    result = analyze_outcome_calibration(
+        [
+            {"overall_score": 9, "outcome_verification": "verified", "outcome_valence": "positive"},
+            {"overall_score": 8, "outcome_verification": "verified", "outcome_valence": "negative"},
+        ],
+        minimum_verified_observations=2,
+        score_bands=[{"min": 8, "max": 10, "label": "Strong"}],
+    )
+    assert result["status"] == "analysis_ready"
+    assert result["band_outcomes"][0]["positive_rate"] == 0.5
+    assert result["proposals"] == []
+
+
 def test_p34_qualitative_components_are_flagged_in_engine_output():
     """P3.4 (data side): components with no objective anchor are stamped qualitative=True
     so the memo can tell a qualitative 8 from an evidence-backed 8. Fact-derived and

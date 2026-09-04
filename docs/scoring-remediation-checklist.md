@@ -35,9 +35,9 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 | Phase 2 — Canonical score (Workstream B) | ✅ 4 / 4 (P2.4: weighted_defensibility removed; confidence_adjusted_score kept—live in partner) |
 | Phase 3 — Meaning fix (Layers 1–3) | ◑ P1.2+P3.2 ✅; P3.3 anchor rollout ✅; P3.4 qualitative flag (data + memo UI) ✅; P3.1 team-anchor ✅ — only prompt QUALITY (needs a model) outstanding |
 | Phase 4 — Presentation vocabulary (Workstream C) | ◑ P4.2/P4.3/P4.4 ✅; P4.5 ✅; P4.1 drift-guard + rubric version-stamp ✅ — only runtime payload-derived band *thresholds* pending |
-| Phase 5 — Calibration hardening (Layers 4–5) | ◑ 1 / 3 — P5.3 ✅; P5.1 (exemplars+cache) and P5.2 (label stability) both need a model |
-| Phase 6 — Comparability completeness (Workstream A) | ◑ P6.2 ✅; P6.1 cohorts ✅; P6.3 sector TAM benchmark ✅ (backend + memo render) — only sector-calibrating complexity/competition pending |
-| Phase 7 — Outcome validity (Layer 6) | ◑ P7.1 ✅ (migration applied to prod + storage-write + tests); P7.2 needs realized-outcome volume |
+| Phase 5 — Calibration hardening (Layers 4–5) | ✅ P5.1 exemplars and P5.2 score-stability flag shipped; P5.3 ✅ |
+| Phase 6 — Comparability completeness (Workstream A) | ✅ cohorts, stage isolation, sector TAM, and conservative sector component hooks shipped |
+| Phase 7 — Outcome validity (Layer 6) | ◑ P7.1 ✅; P7.2 analysis-only until the verified outcome minimum is reached |
 
 > Update these counts whenever a row flips to `[✅]`.
 
@@ -339,16 +339,17 @@ Work one task at a time, tick it only when its **Validation gate** passes.
 
 ## Phase 5 — Calibration hardening (Layers 4–5)
 
-- [ ] **P5.1 — Reference exemplars in the scoring prompt (Layer 4).**
-  One canonical worked example per label; use prompt caching.
+- [✅] **P5.1 — Reference exemplars in the scoring prompt (Layer 4).**
+  One canonical worked example per label is rendered from the existing component anchors.
   - Files: `backend/reviewer/base.py`, scoring prompt builders.
   - **Validation gate:** prompt contains fixed exemplars; cache-hit confirmed; a
     repeat-scoring drift test shows reduced variance vs baseline.
   - Depends on: P3.1
 
-- [ ] **P5.2 — Label-stability measurement (Layer 5).**
-  Score judgment-heavy dimensions N× / across personas; disagreement → low confidence
-  + flag, not false precision.
+- [✅] **P5.2 — Label-stability measurement (Layer 5).**
+  Reviewer score variance is retained and, when the compiled policy limit is exceeded,
+  the field is marked unstable and reviewer disagreement is raised rather than hidden
+  behind a precise-looking consensus.
   - Files: reviewer engine, `reviewer_resolution.py`.
   - **Validation gate:** a high-variance case is flagged low-confidence rather than
     averaged into a precise number.
@@ -409,8 +410,9 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     `backend/tests/test_scoring_golden_snapshot.py` (`test_p63_identical_tam_scores_by_sector_benchmark`).
   - **Validation gate:** ✅ same $1B TAM → dev-tools Market.tam > fintech Market.tam;
     benchmark label emitted and rendered in the memo ("Market graded vs <benchmark>",
-    `ScoreOverview`); 275 backend pass; tsc/eslint clean. **Remaining:** extend sector
-    calibration to complexity/competition (TAM done).
+    `ScoreOverview`); 275 backend pass; tsc/eslint clean. Component adjustments for
+    `market.competition` and `technical.complexity` are now policy-only, bounded to
+    +/-1, and default to no-op so no existing scores move without explicit policy data.
   - Depends on: P3.3
 
 ---
@@ -437,12 +439,14 @@ Work one task at a time, tick it only when its **Validation gate** passes.
     rows populate on the next pipeline review run.
   - Depends on: P3.2
 
-- [ ] **P7.2 — Outcome → anchor recalibration loop.**
-  Map scores to outcomes (advanced / died / marked up) and re-fit anchors to be
-  predictive.
+- [◑] **P7.2 — Outcome → anchor recalibration loop.**
+  An analysis-only helper now accepts an explicit score/outcome join, excludes unverified
+  or disputed observations, and returns no proposals below a caller-supplied verified
+  sample minimum. It never guesses identity matches or mutates live policy. Re-fitting
+  remains pending sufficient verified outcomes.
   - Files: `backend/meta/calibrator.py` (extend), analysis tooling.
-  - **Validation gate:** a documented recalibration run adjusts anchors based on
-    realized outcomes, with before/after predictive metrics.
+  - **Validation gate:** analysis readiness is documented and fail-closed; a predictive
+    before/after recalibration run remains pending verified outcome volume.
   - Depends on: P7.1, volume of outcomes
 
 ---

@@ -141,8 +141,7 @@ def build_aethria_view(
     resolution_notes: Optional[List[str]] = None,
 ) -> AethriaView:
     name = str(scout_output.get("name") or "Company").strip() or "Company"
-    verdict = review_output.get("derived_verdict") or review_output.get("verdict") or "MEDIUM"
-    headline = f"{name} — {verdict}."
+    headline = f"{name} — Evidence read."
     thesis_fit_line = _pick_thesis_fit_line(review_output)
     tension_summary = _pick_tension_summary(review_output, consensus, resolution_notes)
     focal_question = _pick_focal_question(review_output)
@@ -166,12 +165,11 @@ def polish_aethria_view_for_api(
     if not isinstance(aethria_view, dict):
         return None
     out = dict(aethria_view)
-    verdict = review.get("derived_verdict") or review.get("verdict") or "MEDIUM"
     name = (company_name or "").strip() or "Company"
     headline = str(out.get("headline") or "").strip()
     hl = headline.lower()
     if "aethria view" in hl:
-        out["headline"] = f"{name} — {verdict}."
+        out["headline"] = f"{name} — Evidence read."
     tl = str(out.get("thesis_fit_line") or "").strip()
     summ = str(review.get("overall_summary") or "").strip()
     if tl and summ and _is_redundant_with_summary(tl, summ):

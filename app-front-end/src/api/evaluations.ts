@@ -28,6 +28,7 @@ export interface CriterionAssessment {
   contradicting_claim_ids: string[];
   missing_evidence: string[];
   quality_flags: string[];
+  deterministic_adjustments?: Record<string, unknown>;
 }
 
 export interface RecommendationRecord {
@@ -86,6 +87,7 @@ function normalizeEvaluation(result: EvaluationRecord): EvaluationRecord {
       contradicting_claim_ids: stringArray(criterion.contradicting_claim_ids),
       missing_evidence: stringArray(criterion.missing_evidence),
       quality_flags: stringArray(criterion.quality_flags),
+      deterministic_adjustments: objectValue(criterion.deterministic_adjustments),
     })),
     recommendation: recommendation ? {
       ...recommendation,

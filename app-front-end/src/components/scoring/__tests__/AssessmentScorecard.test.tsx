@@ -102,6 +102,99 @@ describe('AssessmentScorecard accessibility and robustness', () => {
 
     expect(screen.getAllByText('Not scored').length).toBe(5);
   });
+
+  it('shows the evidence and rule behind a scored component', () => {
+    const structured = scoring({
+      market: dimension({
+        components: {
+          tam: {
+            score: 7,
+            confidence: 0.8,
+            label: 'large',
+            value: '$1B',
+            reasoning: 'Market size is supported.',
+            evidence: 'Independent market report.',
+            rule: 'Sector benchmark threshold.',
+          },
+        },
+      }),
+    });
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={structured}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Market/ }));
+    expect(screen.getByText(/Market 6\.0 \+ Product 6\.0 \+ Technical 6\.0 \+ Execution 6\.0/)).toBeInTheDocument();
+    expect(screen.getByText('7.0/10 · 80% confidence')).toBeInTheDocument();
+    expect(screen.getByText('Evidence: Independent market report.')).toBeInTheDocument();
+    expect(screen.getByText('Rule: Sector benchmark threshold.')).toBeInTheDocument();
+  });
+
+  it('renders the canonical formula and cited source beside its score', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+        canonicalCriteria={[{
+          criterion_assessment_id: 'criterion-market',
+          criterion: 'market', score: 3, confidence: 0.8,
+          evidence_sufficiency: 'sufficient', reasoning: 'A constraint is verified.',
+          supporting_claim_ids: ['claim-market'], contradicting_claim_ids: [],
+          missing_evidence: [], quality_flags: [],
+          deterministic_adjustments: { aggregation: 'lowest_eligible_claim_score', eligible_anchor_scores: [3, 8] },
+        }]}
+        canonicalClaims={[{
+          claimId: 'claim-market', criterion: 'market', relationship: 'supports',
+          provenance: 'verified', claim: 'Market access is constrained by a verified rule.',
+          sources: [{ artifactId: 'source-1', title: 'Regulator notice', href: 'https://example.com/notice' }],
+        }]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Market/ }));
+    expect(screen.getByText('Score ledger')).toBeInTheDocument();
+    expect(screen.getByText(/Formula: lowest eligible policy anchor \(3, 8\)\. Result: 3\.0\/10/)).toBeInTheDocument();
+    expect(screen.getByText(/Supports: Market access is constrained/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Regulator notice' })).toHaveAttribute('href', 'https://example.com/notice');
+  });
+
+  it('withholds the overall headline when canonical evidence is insufficient', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+        canonicalRecommendationState="insufficient_evidence"
+      />
+    );
+
+    expect(screen.getByText('Not scored')).toBeInTheDocument();
+    expect(screen.getByText(/Decision blocked by evidence/)).toBeInTheDocument();
+    expect(screen.getByText(/No headline score is shown because required evidence is missing/)).toBeInTheDocument();
+  });
+
+  it('names the active canonical rubric and fixed anchors in the method ledger', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[]}
+        reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+        canonicalRubricVersion="2.0"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'How this was scored' }));
+    expect(screen.getByText('Rubric: 2.0; anchors low 3, mid 5, high 8.')).toBeInTheDocument();
+  });
 });
 
 describe('AssessmentScorecard persona-divergence flag', () => {
@@ -236,5 +329,19 @@ describe('AssessmentScorecard reviewer panel honesty', () => {
     );
 
     expect(screen.getByText('Skeptical').getAttribute('title')).toMatch(/assume the worst/);
+  });
+
+  it('never presents a reviewer verdict as the fallback qualitative read', () => {
+    render(
+      <AssessmentScorecard
+        dimensions={DIMENSIONS}
+        scoring={scoring()}
+        reviewerRows={[{ key: 'DefaultReviewer', name: 'Balanced', score: 5, verdict: 'STRONG' }]}
+        reviewerConsensus={{ min: 5, max: 5, spread: 0, split: false, verdict: 'STRONG' }}
+      />
+    );
+
+    expect(screen.queryByText(/STRONG/)).not.toBeInTheDocument();
+    expect(screen.getByText('No qualitative summary.')).toBeInTheDocument();
   });
 });

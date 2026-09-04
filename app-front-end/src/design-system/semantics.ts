@@ -4,7 +4,7 @@
  * and resources/config/partner_rules/v1.json (via active.json).
  */
 
-import type { Review } from '../types/startup';
+import type { Review, ScoreBand } from '../types/startup';
 
 /**
  * Score band: human-readable meaning of a 1–10 score.
@@ -25,12 +25,15 @@ export const SCORE_BANDS = [
   { range: [8, 10] as [number, number], label: 'Strong', meaning: 'Investment-grade, clear upside with managed risk.' },
 ] as const;
 
-export function getScoreBand(score: number): { label: string; meaning: string } {
+type ScoreBandCandidate = ScoreBand | (typeof SCORE_BANDS)[number];
+
+export function getScoreBand(score: number, bands: readonly ScoreBandCandidate[] = SCORE_BANDS): { label: string; meaning: string } {
   if (!Number.isFinite(score) || score < 1 || score > 10) return { label: '—', meaning: '' };
-  if (score < 4) return { label: SCORE_BANDS[0].label, meaning: SCORE_BANDS[0].meaning };
-  if (score < 6) return { label: SCORE_BANDS[1].label, meaning: SCORE_BANDS[1].meaning };
-  if (score < 8) return { label: SCORE_BANDS[2].label, meaning: SCORE_BANDS[2].meaning };
-  return { label: SCORE_BANDS[3].label, meaning: SCORE_BANDS[3].meaning };
+  const band = bands.find((candidate) => {
+    const [min, max] = 'range' in candidate ? candidate.range : [candidate.min, candidate.max];
+    return score >= min && score <= max;
+  });
+  return band ? { label: band.label, meaning: band.meaning } : { label: '—', meaning: '' };
 }
 
 /**

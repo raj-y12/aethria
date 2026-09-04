@@ -44,17 +44,17 @@ def _engine():
 
 
 def test_strong_company_on_thesis_invests():
-    out = _engine().decide(_scout(), _strong_review(thesis_alignment_score=0.85))
+    out = _engine().decide(_scout(), _strong_review(thesis_alignment_score=0.85), canonical_recommendation="advance")
     assert out["recommendation"] == "INVEST"
     assert out["mandate_gate"] == "clear"
     assert out["fund_fit_label"] == "Strong fit"
-    assert out["company_quality"] >= 8.0
+    assert out["company_quality"] is None
     assert out["fund_fit"] == 8.5
     assert out["mandate_override_required"] is False
 
 
 def test_strong_company_off_thesis_is_held():
-    out = _engine().decide(_scout(), _strong_review(thesis_alignment_score=0.15))
+    out = _engine().decide(_scout(), _strong_review(thesis_alignment_score=0.15), canonical_recommendation="advance")
     # Quality is investment-grade, but fund fit is below the mandate floor → held.
     assert out["recommendation"] == "MONITOR"
     assert out["decision"] == "MAYBE"
@@ -68,7 +68,7 @@ def test_strong_company_off_thesis_is_held():
 
 def test_explicit_exception_lets_off_thesis_company_invest():
     review = _strong_review(thesis_alignment_score=0.15, mandate_exception=True)
-    out = _engine().decide(_scout(), review)
+    out = _engine().decide(_scout(), review, canonical_recommendation="advance")
     # Exception permits the investment, but fit is still honestly off-thesis.
     assert out["recommendation"] == "INVEST"
     assert out["mandate_gate"] == "outside_thesis"
@@ -78,7 +78,7 @@ def test_explicit_exception_lets_off_thesis_company_invest():
 
 def test_thesis_blind_lookup_does_not_gate():
     # No thesis_alignment_score (thesis-blind lookup) → no mandate signals, no gate.
-    out = _engine().decide(_scout(), _strong_review())
+    out = _engine().decide(_scout(), _strong_review(), canonical_recommendation="advance")
     assert out["recommendation"] == "INVEST"
     assert out["mandate_gate"] == "no_mandate"
     assert out["fund_fit"] is None
@@ -95,7 +95,7 @@ def test_acquired_company_with_stale_traction_is_blocked_not_auto_invested():
         thesis_alignment_score=0.85,
     )
 
-    out = _engine().decide(scout, review)
+    out = _engine().decide(scout, review, canonical_recommendation="advance")
 
     assert out["recommendation"] != "INVEST"
     assert out["mandate_gate"] == "ownership_conflict"
@@ -111,7 +111,7 @@ def test_operator_verified_spinout_clears_the_ownership_gate():
     )
     review = _strong_review(thesis_alignment_score=0.85)
 
-    out = _engine().decide(scout, review)
+    out = _engine().decide(scout, review, canonical_recommendation="advance")
 
     assert out["recommendation"] == "INVEST"
     assert out["mandate_gate"] == "clear"

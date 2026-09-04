@@ -48,7 +48,7 @@ function identity(value: unknown): ReactNode {
 export default function ReviewerPanel({ rows, consensus, renderNumbers = identity }: ReviewerPanelProps) {
   if (rows.length === 0) return null;
 
-  const { min, max, spread, split, verdict } = consensus;
+  const { min, max, spread, split } = consensus;
   const spreadLine =
     min != null && max != null
       ? min === max
@@ -69,7 +69,6 @@ export default function ReviewerPanel({ rows, consensus, renderNumbers = identit
         {spreadLine ? (
           <p className="memoConsensusSpread">
             {renderNumbers(spreadLine)}
-            {verdict ? `  ·  ${verdict}` : ''}
             {spread != null && spread >= 2 ? '  ·  conviction diverges' : ''}
           </p>
         ) : null}
@@ -91,7 +90,7 @@ export default function ReviewerPanel({ rows, consensus, renderNumbers = identit
                 </span>
               ) : null}
             </span>
-            <span className="memoConsensusTake">{renderNumbers(row.take || row.verdict || '—')}</span>
+            <span className="memoConsensusTake">{renderNumbers(row.take || 'No qualitative summary.')}</span>
           </li>
         ))}
       </ul>

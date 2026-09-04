@@ -1,12 +1,11 @@
 import type { Startup } from '../../types/startup';
-import type { ReviewerQualityBand } from '../../design-system/semantics';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAttentionDriver';
 
 export interface DocketRowModel {
   startup: Startup;
   sourceBadge: 'LOOKUP' | 'SCOUT';
-  reviewBand: ReviewerQualityBand | null;
+  hasReview: boolean;
   decisionVariant: DecisionBadgeVariant;
   queueContext: QueueRowContext;
   attentionDriver: QueueAttentionDriver;

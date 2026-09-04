@@ -8,6 +8,7 @@ from evaluation_v2.models import (
     DecisionSafetyPolicy,
     EvaluationPolicy,
     EvidenceEligibilityPolicy,
+    FactRule,
     RecommendationState,
 )
 from evaluation_v2.service import (
@@ -148,6 +149,98 @@ def test_scored_criterion_reasoning_cites_the_actual_claim_not_a_placeholder():
     assert market.reasoning != "Deterministic confidence-weighted claim score."
 
 
+def test_criterion_uses_the_lowest_eligible_policy_anchor_not_llm_confidence():
+    """Confidence may gate evidence quality, but must never manufacture a
+    decimal between policy-owned anchors."""
+    claims = deepcopy(_claims())
+    claims[0]["normalized_value"] = {"criterion_score": 8.0, "score_band": "high"}
+    claims.append({
+        "claim_id": "claim-market-risk",
+        "claim_type": "market",
+        "normalized_value": {"criterion_score": 3.0, "score_band": "low"},
+        "display_text": "A source documents a material market-access constraint.",
+        "assertion_class": "externally_verified",
+        "status": "current",
+        "confidence": 0.95,
+    })
+    claims[0]["confidence"] = 0.55
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[
+            _verified_link("claim-market"),
+            _verified_link("claim-market-risk"),
+            _verified_link("claim-execution"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+    market = next(item for item in result.criteria if item.criterion == "market")
+
+    assert market.score == 3.0
+    assert market.deterministic_adjustments["aggregation"] == "lowest_eligible_claim_score"
+
+
+def test_typed_fact_claim_precedes_legacy_generic_score_for_its_dimension():
+    """A legacy traction 6 cannot dilute the policy-owned revenue fact band."""
+    claims = deepcopy(_claims())
+    claims[1].update({
+        "claim_id": "claim-legacy-traction",
+        "claim_type": "traction",
+        "normalized_value": {"criterion_score": 6.0, "score_band": "mid"},
+    })
+    claims.append({
+        "claim_id": "claim-annualized-revenue",
+        "claim_type": "annualized_revenue_usd",
+        "normalized_value": {
+            "criterion_score": 8.0,
+            "value": 570_000_000,
+            "unit": "usd",
+            "score_origin": "policy_fact_band",
+            "score_band": "high",
+        },
+        "display_text": "The company reports $570M annualized revenue.",
+        "assertion_class": "externally_verified",
+        "status": "current",
+        "confidence": 0.9,
+    })
+    policy = _policy().model_copy(update={
+        "criteria": [
+            CriterionRule(criterion="market", claim_types=["market"], weight=0.6),
+            CriterionRule(
+                criterion="execution",
+                claim_types=["traction", "annualized_revenue_usd"],
+                weight=0.4,
+            ),
+        ],
+        "fact_rules": [FactRule(
+            claim_type="annualized_revenue_usd",
+            dimension="execution",
+            unit="usd",
+            bands=[
+                {"minimum": 100_000_000, "score": 8, "label": "high"},
+                {"minimum": 10_000_000, "score": 5, "label": "mid"},
+                {"minimum": 0, "score": 3, "label": "low"},
+            ],
+        )],
+    })
+    snapshot, _ = snapshot_claims(
+        claims,
+        links=[
+            _verified_link("claim-market"),
+            _verified_link("claim-legacy-traction"),
+            _verified_link("claim-annualized-revenue"),
+        ],
+        evaluation_at=EVALUATION_AT,
+    )
+
+    result = evaluate_snapshot(snapshot, policy, evaluation_at=EVALUATION_AT)
+    execution = next(item for item in result.criteria if item.criterion == "execution")
+
+    assert execution.score == 8.0
+    assert execution.supporting_claim_ids == ["claim-annualized-revenue"]
+
+
 def test_reasoning_surfaces_score_band_and_justification_when_extraction_supplied_them():
     claims = deepcopy(_claims())
     claims[0]["normalized_value"]["score_band"] = "high"
@@ -189,7 +282,9 @@ def test_multi_claim_criterion_reasoning_cites_every_contributing_claim():
     market = next(item for item in result.criteria if item.criterion == "market")
     assert "Market growth is supported by two independent sources." in market.reasoning
     assert "A second, independent market-size estimate." in market.reasoning
-    assert "2 claims" in market.reasoning
+    assert "2 eligible policy anchors" in market.reasoning
+    assert "Conservative minimum" in market.reasoning
+    assert "Confidence-weighted average" not in market.reasoning
 
 
 def test_missing_evidence_is_unscored_not_converted_to_zero():
@@ -825,6 +920,22 @@ def test_freshness_and_source_quality_constrain_decisions(
         assert all(quality_flag in item.quality_flags for item in result.criteria)
     if expected_state is not RecommendationState.ADVANCE:
         assert result.recommendation.confidence < 0.8
+
+
+def test_reasoning_explains_when_source_quality_caps_a_policy_anchor():
+    claims = _claims()
+    for claim in claims:
+        claim["normalized_value"] = {"criterion_score": 8.0, "score_band": "high"}
+    links = [
+        _verified_link("claim-market", source_quality=0.5),
+        _verified_link("claim-execution", source_quality=0.5),
+    ]
+    snapshot, _ = snapshot_claims(claims, links, evaluation_at=EVALUATION_AT)
+
+    result = evaluate_snapshot(snapshot, _policy(), evaluation_at=EVALUATION_AT)
+
+    assert all(item.score == 7.19 for item in result.criteria)
+    assert all("Source-quality policy cap applied: 8.00 → 7.19." in item.reasoning for item in result.criteria)
 
 
 def test_snapshot_hash_captures_freshness_inputs_and_evaluation_timestamp():

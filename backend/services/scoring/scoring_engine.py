@@ -134,16 +134,28 @@ class DeterministicScoringEngine:
                     return {
                         "label": benchmark["label"],
                         "thresholds": benchmark["thresholds"],
+                        "component_adjustments": benchmark.get("component_adjustments", {}),
                     }
         return {
             "label": self.normalization_runtime[
                 "default_tam_benchmark_label"
             ],
             "thresholds": self.normalization_runtime["tam_thresholds"],
+            "component_adjustments": {},
         }
 
+    @staticmethod
+    def _apply_component_adjustment(component: Dict[str, Any], adjustment: float) -> Dict[str, Any]:
+        if not adjustment or component.get("value") is None and component.get("label") is None:
+            return component
+        updated = dict(component)
+        updated["score"] = round(max(0.0, min(10.0, float(component.get("score", DEFAULT_SCORE)) + adjustment)), 2)
+        updated["sector_benchmark_adjustment"] = adjustment
+        return updated
+
     def _normalize_market(
-        self, signals: Dict[str, Dict[str, Any]], tam_thresholds: Dict[str, Any] | None = None
+        self, signals: Dict[str, Dict[str, Any]], tam_thresholds: Dict[str, Any] | None = None,
+        component_adjustments: Dict[str, float] | None = None,
     ) -> Dict[str, Dict[str, Any]]:
         return {
             "tam": self._normalized_signal(
@@ -157,7 +169,10 @@ class DeterministicScoringEngine:
             ),
             "urgency": self._normalized_signal(signals.get("urgency", {}), lambda v: normalize_urgency(v)),
             "timing": self._normalized_signal(signals.get("timing", {}), lambda v: normalize_timing(v)),
-            "competition": self._normalized_signal(signals.get("competition", {}), lambda v: normalize_competition(v)),
+            "competition": self._apply_component_adjustment(
+                self._normalized_signal(signals.get("competition", {}), lambda v: normalize_competition(v)),
+                float((component_adjustments or {}).get("market.competition", 0.0)),
+            ),
         }
 
     def _normalize_execution(self, signals: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -184,9 +199,12 @@ class DeterministicScoringEngine:
             "retention": self._normalized_signal_with_value_fallback(signals.get("retention", {}), normalize_retention),
         }
 
-    def _normalize_technical(self, signals: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    def _normalize_technical(self, signals: Dict[str, Dict[str, Any]], component_adjustments: Dict[str, float] | None = None) -> Dict[str, Dict[str, Any]]:
         return {
-            "complexity": self._normalized_signal(signals.get("complexity", {}), normalize_complexity),
+            "complexity": self._apply_component_adjustment(
+                self._normalized_signal(signals.get("complexity", {}), normalize_complexity),
+                float((component_adjustments or {}).get("technical.complexity", 0.0)),
+            ),
             "engineering_quality": self._normalized_signal(
                 signals.get("engineering_quality", {}),
                 normalize_engineering_quality,
@@ -645,10 +663,14 @@ class DeterministicScoringEngine:
         tam_benchmark = self._resolve_tam_benchmark(scout_output.get("sector"))
         stage_cohort = resolve_stage_cohort(scout_output.get("funding_stage"))
         normalized = {
-            "market": self._normalize_market(extracted.get("market", {}), tam_benchmark["thresholds"]),
+            "market": self._normalize_market(
+                extracted.get("market", {}), tam_benchmark["thresholds"], tam_benchmark.get("component_adjustments")
+            ),
             "execution": self._normalize_execution(extracted.get("execution", {})),
             "product": self._normalize_product(extracted.get("product", {})),
-            "technical": self._normalize_technical(extracted.get("technical", {})),
+            "technical": self._normalize_technical(
+                extracted.get("technical", {}), tam_benchmark.get("component_adjustments")
+            ),
             "defensibility": self._normalize_defensibility(extracted.get("defensibility", {})),
         }
         aggregated = aggregate_all_dimensions(normalized, self.weights)
@@ -678,6 +700,7 @@ class DeterministicScoringEngine:
             "stage_cohort": stage_cohort["cohort"],
             "stage_cohort_label": stage_cohort["label"],
             "sector_tam_benchmark": tam_benchmark["label"],
+            "score_bands": self.normalization_runtime["score_bands"],
         }
         # Stamp the qualitative flag (P3.4) so the memo can distinguish a qualitative 8
         # (judgment, no objective anchor) from an evidence-backed 8. Classification is the

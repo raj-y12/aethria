@@ -137,8 +137,7 @@ export function getDealAttentionReason(startup: Startup, now = Date.now()): stri
     const age = getDealAgeDays(startup, now);
     return age != null ? `Waiting ${age} days` : 'Waiting';
   }
-  const score = startup.review?.overall_score ?? startup.review?.aggregate_score;
-  if (typeof score === 'number') return `Reviewed at ${score.toFixed(1)}`;
+  if (startup.review) return 'Review complete — evidence evaluation pending';
   return 'New — awaiting review';
 }
 

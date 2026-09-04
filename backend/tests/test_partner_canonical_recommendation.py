@@ -42,6 +42,31 @@ def test_canonical_advance_overrides_a_low_score_that_would_otherwise_pass():
     assert out["recommendation"] == "INVEST"
 
 
+def test_canonical_decision_does_not_reaverage_criteria_or_reviewer_scores():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    review = _base_review(market_score=1, product_score=1, technical_score=1, execution_score=1)
+    criteria = [
+        {"criterion": "market", "score": 8, "evidence_sufficiency": "sufficient"},
+        {"criterion": "product", "score": 3, "evidence_sufficiency": "sufficient"},
+        {"criterion": "technical", "score": 8, "evidence_sufficiency": "sufficient"},
+        {"criterion": "execution", "score": 3, "evidence_sufficiency": "sufficient"},
+    ]
+
+    out = engine.decide(
+        _base_scout(),
+        review,
+        canonical_recommendation="advance",
+        canonical_criteria=criteria,
+        canonical_confidence=0.9,
+    )
+
+    assert out["recommendation"] == "INVEST"
+    assert out["company_quality"] is None
+    assert "secondary score threshold" in out["decision_rationale"]
+    assert "1.0/10" not in out["decision_rationale"]
+    assert "3.0/10" not in out["decision_rationale"]
+
+
 def test_canonical_pass_overrides_a_high_score_that_would_otherwise_invest():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review(market_score=9, product_score=9, technical_score=9, execution_score=9)
@@ -51,20 +76,17 @@ def test_canonical_pass_overrides_a_high_score_that_would_otherwise_invest():
     assert out["recommendation"] == "PASS"
 
 
-def test_canonical_insufficient_evidence_does_not_force_the_ladder_either_way():
-    """insufficient_evidence has no INVEST/PASS/MONITOR equivalent — the engine's
-    own evidence-coverage branch owns that distinction, so this must fall back
-    to the score-based ladder rather than being coerced onto it."""
+def test_missing_canonical_recommendation_is_the_same_fail_closed_monitor():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review(market_score=9, product_score=9, technical_score=9, execution_score=9)
 
     with_canonical = engine.decide(_base_scout(), review, canonical_recommendation="insufficient_evidence")
     without_canonical = engine.decide(_base_scout(), review, canonical_recommendation=None)
 
-    assert with_canonical["recommendation"] == without_canonical["recommendation"]
+    assert with_canonical["recommendation"] == without_canonical["recommendation"] == "MONITOR"
 
 
-def test_no_canonical_recommendation_falls_back_to_the_verdict_ladder():
+def test_no_canonical_recommendation_never_falls_back_to_the_verdict_ladder():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review(
         verdict="STRONG", market_score=9, product_score=9, technical_score=9, execution_score=9
@@ -73,7 +95,7 @@ def test_no_canonical_recommendation_falls_back_to_the_verdict_ladder():
     with_none = engine.decide(_base_scout(), review, canonical_recommendation=None)
     without_param = engine.decide(_base_scout(), review)
 
-    assert with_none["recommendation"] == without_param["recommendation"] == "INVEST"
+    assert with_none["recommendation"] == without_param["recommendation"] == "MONITOR"
 
 
 def test_a_critical_risk_still_forces_pass_even_when_canonical_says_advance():
@@ -90,11 +112,9 @@ def test_a_critical_risk_still_forces_pass_even_when_canonical_says_advance():
     assert out["recommendation"] == "PASS"
 
 
-def test_canonical_override_also_reaches_the_grey_zone_llm_escalation_path():
-    """The LLM-escalation trigger sites (_decide_with_llm) build their own
-    final_recommendation from score_recommendation/branch_recommendation and
-    don't route through _emit_deterministic — they need the same override
-    applied at their own call sites (sub-project 1, Task 5)."""
+def test_canonical_recommendation_never_enters_the_legacy_grey_zone_ladder():
+    """A canonical evaluation is already the evidence-policy outcome; Partner
+    may add named safety gates but must not ask an LLM or rerun score bands."""
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     review = _base_review(
         market_score=7, product_score=7, technical_score=6, execution_score=6,
@@ -116,5 +136,7 @@ def test_canonical_override_also_reaches_the_grey_zone_llm_escalation_path():
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review, canonical_recommendation="advance")
 
-    assert llm_kwargs.get("final_recommendation") == "INVEST"
+    assert not llm_kwargs
     assert out["recommendation"] == "INVEST"
+    assert out["company_quality"] is None
+    assert "secondary score threshold" in out["decision_rationale"]

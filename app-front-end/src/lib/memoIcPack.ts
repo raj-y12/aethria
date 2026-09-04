@@ -7,26 +7,12 @@ import { buildMemoTags } from './memoTags';
 import { getNextStepText, judgmentToParagraphs, parseNextStepItems } from './memoText';
 import {
   DECISION_LABELS,
-  QUALITY_LABELS,
-  getReviewerQualityBand,
-  getScoreBand,
-  SCORE_DIMENSIONS,
 } from '../design-system/semantics';
 
-/**
- * Scores are stored as raw reviewer means (e.g. 5.403333) and were interpolated
- * straight into the pack, so an IC document showed "Product 5.403333/10". One
- * decimal place matches the partner rationale printed a page later, so the same
- * number now reads the same way wherever it appears.
- */
 function normalizeSourceUrl(value: string | undefined): string {
   if (!value) return '';
   const match = value.match(/https?:\/\/[^\s)\]]+/i);
   return (match ? match[0] : value).trim().replace(/\/+$/, '').toLowerCase();
-}
-
-function formatScore(score: number): string {
-  return score.toFixed(1);
 }
 
 const PDF_MARGIN = 18;
@@ -41,21 +27,12 @@ type RGB = [number, number, number];
 const INK: RGB = [13, 27, 53];
 const MUTED: RGB = [110, 116, 130];
 const RULE: RGB = [212, 215, 222];
-const TRACK: RGB = [232, 234, 239];
-
-// Score-band ramp, keyed by getScoreBand().label.
-const BAND_COLOR: Record<string, RGB> = {
-  Weak: [178, 58, 47],
-  Concerning: [183, 121, 31],
-  Promising: [47, 96, 140],
-  Strong: [46, 110, 78],
-};
 
 function decisionColor(rec?: string | null): RGB {
   const r = (rec ?? '').toUpperCase();
-  if (r.includes('INVEST') || r.includes('YES')) return BAND_COLOR.Strong;
-  if (r.includes('MONITOR') || r.includes('MAYBE')) return BAND_COLOR.Concerning;
-  if (r.includes('PASS') || r.includes('NO')) return BAND_COLOR.Weak;
+  if (r.includes('INVEST') || r.includes('YES')) return [46, 110, 78];
+  if (r.includes('MONITOR') || r.includes('MAYBE')) return [183, 121, 31];
+  if (r.includes('PASS') || r.includes('NO')) return [178, 58, 47];
   return MUTED;
 }
 
@@ -93,11 +70,8 @@ function buildJudgmentLines(startup: Startup): string[] {
   if (!startup.partner) return [];
   const p = startup.partner;
   const decisionLabel = DECISION_LABELS[p.recommendation] ?? p.recommendation;
-  const band = getReviewerQualityBand(startup.review);
-  const dossier =
-    band != null ? ` Dossier read: ${band} (${QUALITY_LABELS[band] ?? band}).` : '';
   const rationale = (p.decision_rationale ?? '').trim();
-  const head = `${decisionLabel}.${dossier}`.replace(/\.\s*\./g, '.').trim();
+  const head = `${decisionLabel}.`;
   const combined = rationale ? `${head} ${rationale}` : head;
   return judgmentToParagraphs(combined);
 }
@@ -125,7 +99,7 @@ export function getPipelineReplaySteps(startup: Startup): PipelineReplayStep[] {
       atDisplay: fmtDate(startup.timestamps?.reviewed_at),
       detail: startup.review
         ? [
-            `Verdict ${startup.review.consensus_verdict ?? startup.review.verdict ?? '—'}`,
+            'Qualitative research complete',
             startup.review.reviews?.[0]?.prompt_version
               ? `Prompt ${shortPrompt(startup.review.reviews[0].prompt_version)}`
               : '',
@@ -198,29 +172,6 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     });
   }
 
-  if (startup.review) {
-    const primary = SCORE_DIMENSIONS.slice(0, 2);
-    const scoreLines = primary
-      .map(({ id, name }) => {
-        const score = startup.review?.[id as keyof typeof startup.review];
-        if (score == null || typeof score !== 'number') return null;
-        const band = getScoreBand(score);
-        return `${name}: ${formatScore(score)}/10 (${band.label})`;
-      })
-      .filter(Boolean) as string[];
-    const supporting = SCORE_DIMENSIONS.slice(2);
-    const scoreLines2 = supporting
-      .map(({ id, name }) => {
-        const score = startup.review?.[id as keyof typeof startup.review];
-        if (score == null || typeof score !== 'number') return null;
-        const band = getScoreBand(score);
-        return `${name}: ${formatScore(score)}/10 (${band.label})`;
-      })
-      .filter(Boolean) as string[];
-    const allScores = [...scoreLines, ...scoreLines2];
-    if (allScores.length) sections.push({ title: 'Dimension scores', lines: allScores });
-  }
-
   // Firmographics read out of retrieved evidence. An IC pack that says
   // "missing traction data" while the record holds employee counts and a
   // revenue band is the failure this section exists to make visible.
@@ -261,11 +212,7 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
 
   const dissent: string[] = [];
   if (startup.review?.reviewer_disagreement) {
-    dissent.push('Multiple reviewers reported disagreement; treat verdicts with extra scrutiny.');
-  }
-  if (startup.review?.reviews && startup.review.reviews.length > 1) {
-    const verdicts = startup.review.reviews.map((r) => r.verdict).filter(Boolean);
-    if (verdicts.length) dissent.push(`Per-reviewer verdicts: ${verdicts.join(', ')}`);
+    dissent.push('Multiple reviewers surfaced differing qualitative concerns; inspect the cited research.');
   }
   if (startup.review?.assumption_feedback?.length) {
     dissent.push(
@@ -294,7 +241,6 @@ export function buildIcPackSections(startup: Startup): IcSection[] {
     const rec: string[] = [
       `Recommendation: ${DECISION_LABELS[p.recommendation] ?? p.recommendation} (${p.recommendation})`,
     ];
-    if (startup.review?.verdict) rec.push(`Reviewer quality band: ${startup.review.verdict}`);
     if (p.confidence != null) rec.push(`Partner confidence: ${Math.round(p.confidence * 100)}%`);
     if (p.human_review_required) rec.push('Flag: Human review was required before resolution.');
     if (p.decision_rationale?.trim()) rec.push(`Rationale: ${p.decision_rationale.trim()}`);
@@ -489,40 +435,7 @@ function drawBodyLine(doc: jsPDF, line: string, y: number): number {
   return y;
 }
 
-/** Score dimensions rendered as labelled rows with a proportional band bar. */
-function drawScoreBars(doc: jsPDF, startup: Startup, y: number): number {
-  const barX = PDF_MARGIN + 42;
-  const barW = contentWidth(doc) - 42 - 30;
-  for (const { id, name } of SCORE_DIMENSIONS) {
-    const score = startup.review?.[id as keyof typeof startup.review];
-    if (typeof score !== 'number') continue;
-    const band = getScoreBand(score);
-    const color = BAND_COLOR[band.label] ?? MUTED;
-    y = ensureSpace(doc, y, 8);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(PDF_FONT_SIZE_BODY);
-    setColor(doc, INK);
-    doc.text(name, PDF_MARGIN, y);
-
-    doc.setFillColor(TRACK[0], TRACK[1], TRACK[2]);
-    doc.roundedRect(barX, y - 3, barW, 2.4, 1.2, 1.2, 'F');
-    doc.setFillColor(color[0], color[1], color[2]);
-    doc.roundedRect(barX, y - 3, Math.max(2.4, (barW * score) / 10), 2.4, 1.2, 1.2, 'F');
-
-    doc.setFont('helvetica', 'bold');
-    setColor(doc, color);
-    doc.text(`${formatScore(score)}/10`, barX + barW + 4, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(PDF_FONT_SIZE_SMALL);
-    setColor(doc, MUTED);
-    doc.text(band.label, PDF_MARGIN, y + 3.4);
-    y += 8;
-  }
-  return y + 2;
-}
-
-/** Cover verdict strip: decision + confidence + reviewer band, accented. */
+/** Cover verdict strip: canonical Partner decision and confidence. */
 function drawVerdictStrip(doc: jsPDF, startup: Startup, y: number): number {
   const p = startup.partner;
   if (!p) return y;
@@ -547,8 +460,6 @@ function drawVerdictStrip(doc: jsPDF, startup: Startup, y: number): number {
   setColor(doc, MUTED);
   const meta: string[] = [];
   if (p.confidence != null) meta.push(`Partner confidence ${Math.round(p.confidence * 100)}%`);
-  const band = getReviewerQualityBand(startup.review);
-  if (band != null) meta.push(`Dossier ${QUALITY_LABELS[band] ?? band}`);
   if (p.human_review_required) meta.push('Human review required');
   if (meta.length) doc.text(meta.join('   ·   '), tx, y + 11);
   return y + h + 6;
@@ -608,11 +519,7 @@ export async function buildMemoPDF(startup: Startup): Promise<jsPDF> {
 
   for (const sec of buildIcPackSections(startup)) {
     y = drawHeading(doc, sec.title, y);
-    if (sec.title === 'Dimension scores') {
-      y = drawScoreBars(doc, startup, y);
-    } else {
-      for (const line of sec.lines) y = drawBodyLine(doc, line, y);
-    }
+    for (const line of sec.lines) y = drawBodyLine(doc, line, y);
     y += 4; // section gap
   }
 

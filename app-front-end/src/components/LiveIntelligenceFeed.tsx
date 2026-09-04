@@ -4,7 +4,6 @@ import { tokens } from '../design-system/tokens';
 import { transitionOrReduced } from '../design-system/motion';
 import { usePrefersReducedMotion } from '../hooks';
 import type { Startup, SignalItem, MetaCycleReport } from '../types/startup';
-import { formatReviewOverallStructuredScore } from '../lib/reviewScoring';
 import SignalEventRow from './SignalEventRow';
 import EmptyState from './EmptyState';
 import { UI_JUDGEMENTS_SUBTITLE } from '../design-system/ui-text';
@@ -73,12 +72,11 @@ export default function LiveIntelligenceFeed({ startups, signals, metaReports }:
       }
       if (s.timestamps?.reviewed_at) {
         const d = s.timestamps.reviewed_at;
-        const overall = formatReviewOverallStructuredScore(s.review);
         out.push({
           id: `${s.id}-review`,
           iso: d,
           timestamp: feedStamp(d),
-          message: `${s.scout.name} · Score ${overall}/10`,
+          message: `${s.scout.name} · Reviewer synthesis complete`,
           kind: 'reviewed',
         });
       }

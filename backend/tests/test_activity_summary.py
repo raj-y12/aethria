@@ -70,7 +70,7 @@ def test_backend_to_frontend_surfaces_queue_awareness():
     assert out["is_new_to_user"] is True
     assert out["changed_since_last_visit"] is True
     assert out["queue_reason"] == "New discovery awaiting review."
-    assert out["priority_reason"] == "Priority 70 · New signal · Fintech"
+    assert out["priority_reason"] == "Priority pending · New discovery awaiting review · Fintech"
 
 
 @pytest.mark.asyncio

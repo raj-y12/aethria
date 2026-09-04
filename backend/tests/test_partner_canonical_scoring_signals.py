@@ -64,7 +64,9 @@ def test_canonical_insufficient_evidence_triggers_the_fail_closed_gate():
     review = _base_review()  # all 4 dims scored in the legacy structured output
     criteria = _full_criteria(market=_criterion("market", score=None, evidence_sufficiency="insufficient"))
 
-    out = engine.decide(_base_scout(), review, canonical_criteria=criteria)
+    out = engine.decide(
+        _base_scout(), review, canonical_recommendation="insufficient_evidence", canonical_criteria=criteria
+    )
 
     assert out["human_review_required"] is True
     assert any("market" in risk for risk in out["risks"])
@@ -80,7 +82,28 @@ def test_fully_scored_canonical_criteria_does_not_trigger_the_gate():
     assert not any("Insufficient evidence coverage" in risk for risk in out["risks"])
 
 
-def test_no_canonical_criteria_falls_back_to_legacy_structured_scoring_gate():
+def test_canonical_recommendation_never_prints_or_reuses_reviewer_scores():
+    engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
+    review = _base_review(
+        market_score=1, product_score=1, technical_score=1, execution_score=1,
+    )
+    criteria = _full_criteria(
+        market=_criterion("market", score=8),
+        product=_criterion("product", score=5),
+        technical=_criterion("technical", score=3),
+        execution=_criterion("execution", score=8),
+    )
+
+    out = engine.decide(
+        _base_scout(), review, canonical_recommendation="advance", canonical_criteria=criteria
+    )
+
+    assert out["recommendation"] == "INVEST"
+    assert "secondary score threshold" in out["decision_rationale"]
+    assert "Market 1.0/10" not in out["decision_rationale"]
+
+
+def test_no_canonical_criteria_never_falls_back_to_legacy_structured_scoring():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     review = _base_review(structured_scoring={
         "market": {"score": 7, "unscored": False},
@@ -91,15 +114,13 @@ def test_no_canonical_criteria_falls_back_to_legacy_structured_scoring_gate():
 
     out = engine.decide(_base_scout(), review)
 
-    assert out["human_review_required"] is True
-    assert any("product" in risk for risk in out["risks"])
+    assert out["recommendation"] == "MONITOR"
+    assert "canonical evaluation is blocked" in out["decision_rationale"].lower()
 
 
 # --- Grey-zone escalation trigger ------------------------------------------
 
-def test_low_canonical_confidence_activates_grey_zone_even_with_a_clear_score():
-    """avg_score sits well outside the legacy score-band grey zone, but a low
-    canonical recommendation confidence should still escalate."""
+def test_low_canonical_confidence_does_not_reenter_the_legacy_grey_zone_ladder():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     review = _base_review(
         market_score=9, product_score=9, technical_score=9, execution_score=9,
@@ -123,11 +144,10 @@ def test_low_canonical_confidence_activates_grey_zone_even_with_a_clear_score():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     engine.decide(
-        _base_scout(), review, canonical_criteria=criteria, canonical_confidence=0.2,
+        _base_scout(), review, canonical_recommendation="advance", canonical_criteria=criteria, canonical_confidence=0.2,
     )
 
-    assert llm_kwargs, "expected the grey-zone trigger to escalate to the LLM path"
-    assert "canonical confidence" in llm_kwargs.get("trigger_reason", "")
+    assert not llm_kwargs
 
 
 def test_high_canonical_confidence_does_not_force_grey_zone():
@@ -165,7 +185,7 @@ def test_high_canonical_confidence_does_not_force_grey_zone():
 
 # --- Disagreement trigger ----------------------------------------------------
 
-def test_contradicting_canonical_evidence_is_treated_as_disagreement():
+def test_contradicting_canonical_evidence_requires_human_review_without_llm_rescoring():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     review = _base_review(
         market_score=7, product_score=7, technical_score=6, execution_score=6,
@@ -185,14 +205,16 @@ def test_contradicting_canonical_evidence_is_treated_as_disagreement():
         )
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
-    engine.decide(
-        _base_scout(), review, canonical_criteria=criteria, canonical_confidence=0.9,
+    result = engine.decide(
+        _base_scout(), review, canonical_recommendation="advance", canonical_criteria=criteria, canonical_confidence=0.9,
     )
 
-    assert llm_kwargs.get("trigger_reason") == "Reviewer disagreement detected"
+    assert not llm_kwargs
+    assert result["human_review_required"] is True
+    assert "contradicting_market" in result["decision_drivers"]
 
 
-def test_no_canonical_criteria_falls_back_to_legacy_reviewer_disagreement_flag():
+def test_no_canonical_criteria_never_uses_reviewer_disagreement_as_a_score_trigger():
     engine = PartnerDecisionEngine(use_llm_fallback=True, api_key=None)
     review = _base_review(
         # Avg = 9.0 — clear of the legacy grey-zone band (6.5-7.5) and the
@@ -214,6 +236,7 @@ def test_no_canonical_criteria_falls_back_to_legacy_reviewer_disagreement_flag()
         )
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
-    engine.decide(_base_scout(), review)
+    result = engine.decide(_base_scout(), review)
 
-    assert llm_kwargs.get("trigger_reason") == "Reviewer disagreement detected"
+    assert not llm_kwargs
+    assert result["recommendation"] == "MONITOR"

@@ -12,12 +12,14 @@ import re
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_RUBRIC = _REPO_ROOT / "resources" / "config" / "evaluation_rubric" / "v1.json"
+_ACTIVE = _REPO_ROOT / "resources" / "config" / "active.json"
 _SEMANTICS = _REPO_ROOT / "app-front-end" / "src" / "design-system" / "semantics.ts"
 
 
 def _rubric_bands():
-    data = json.loads(_RUBRIC.read_text())
+    active = json.loads(_ACTIVE.read_text())
+    rubric = _REPO_ROOT / "resources" / "config" / "evaluation_rubric" / f"{active['evaluation_rubric']}.json"
+    data = json.loads(rubric.read_text())
     return [(tuple(b["range"]), b["label"]) for b in data["score_bands"]]
 
 
@@ -41,8 +43,8 @@ def test_frontend_score_bands_match_rubric_B1():
     assert frontend == rubric, (
         "Frontend SCORE_BANDS drifted from the canonical rubric (audit B1).\n"
         f"  rubric:   {rubric}\n  frontend: {frontend}\n"
-        "Re-align app-front-end/src/design-system/semantics.ts with "
-        "resources/config/evaluation_rubric/v1.json."
+        "Re-align app-front-end/src/design-system/semantics.ts with the active "
+        "resources/config/evaluation_rubric policy."
     )
 
 

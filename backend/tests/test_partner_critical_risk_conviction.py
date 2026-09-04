@@ -49,4 +49,4 @@ def test_critical_risk_pass_conviction_comes_from_versioned_rules_not_a_literal(
     out = engine.decide(_scout(), _thin_review_with_critical_risk())
 
     assert out["recommendation"] == "PASS"
-    assert out["conviction_level"] == 3
+    assert out["conviction_level"] == 5

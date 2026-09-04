@@ -131,18 +131,18 @@ def test_incomplete_reviewer_coverage_remains_non_decisive_through_partner(
     assert decision["recommendation"] == "MONITOR"
     assert decision["decision"] == "MAYBE"
     assert decision["human_review_required"] is True
-    assert decision["confidence"] < 0.5
-    assert any("evidence" in risk.lower() for risk in decision["risks"])
+    assert decision["confidence"] <= 0.5
+    assert "canonical evaluation is blocked" in decision["decision_rationale"].lower()
 
 
-def test_complete_grounded_reviewer_coverage_can_reach_invest(monkeypatch):
+def test_complete_reviewer_coverage_cannot_reach_invest_without_canonical_evaluation(monkeypatch):
     review = _aggregate_traces(
         {"market", "product", "technical", "execution", "defensibility"}
     )
 
-    assert review["overall_score"] == 9
-    assert review["confidence_adjusted_score"] == 9
-    assert review["derived_verdict"] == "STRONG"
+    assert review["overall_score"] is None
+    assert review["confidence_adjusted_score"] is None
+    assert review["derived_verdict"] is None
     decision = _partner(monkeypatch).decide(_scout(), review)
 
-    assert decision["recommendation"] == "INVEST"
+    assert decision["recommendation"] == "MONITOR"

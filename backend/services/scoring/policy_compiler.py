@@ -18,6 +18,7 @@ from config.scoring_config import (
     EVIDENCE_GATE,
     OVERALL_DIMENSION_WEIGHTS,
     OVERALL_SCORE_DIMENSIONS,
+    RUNTIME_SCORE_BANDS,
     SECTOR_TAM_THRESHOLDS,
     THRESHOLDS,
 )
@@ -112,6 +113,7 @@ class RuntimeCalibration(BaseModel):
     mode: Literal["enforced", "shadow"]
     discount: RuntimeEvidenceDiscount
     evidence_gate: RuntimeEvidenceGate
+    stability_variance: float = Field(ge=0)
 
 
 class RuntimeEvidenceGrounding(BaseModel):
@@ -155,6 +157,7 @@ class RuntimeSectorTamBenchmark(BaseModel):
     keywords: List[str] = Field(min_length=1)
     label: str = Field(min_length=1)
     thresholds: RuntimeTamThresholds
+    component_adjustments: Dict[str, float] = Field(default_factory=dict)
 
 
 class RuntimeNormalization(BaseModel):
@@ -165,6 +168,7 @@ class RuntimeNormalization(BaseModel):
     tam_thresholds: RuntimeTamThresholds
     growth_thresholds: RuntimeGrowthThresholds
     sector_tam_benchmarks: Dict[str, RuntimeSectorTamBenchmark]
+    score_bands: List[Dict[str, Any]] = Field(min_length=1)
 
 
 class ScoringRuntimeContract(BaseModel):
@@ -248,6 +252,7 @@ def _default_scoring_runtime(
             "mode": "enforced",
             "discount": deepcopy(EVIDENCE_DISCOUNT),
             "evidence_gate": deepcopy(EVIDENCE_GATE),
+            "stability_variance": 1.0,
         },
         "evidence_grounding": {
             "enabled": True,
@@ -268,6 +273,7 @@ def _default_scoring_runtime(
             "tam_thresholds": deepcopy(THRESHOLDS["tam_usd"]),
             "growth_thresholds": deepcopy(THRESHOLDS["growth_pct"]),
             "sector_tam_benchmarks": deepcopy(SECTOR_TAM_THRESHOLDS),
+            "score_bands": deepcopy(RUNTIME_SCORE_BANDS),
         },
     }
 
@@ -349,6 +355,21 @@ def _validate_scoring_runtime_shape(runtime: Dict[str, Any]) -> None:
         ):
             raise ValueError(
                 f"sector TAM benchmark {name!r} thresholds must be strictly descending"
+            )
+        adjustments = benchmark.get("component_adjustments", {})
+        allowed_adjustments = {"market.competition", "technical.complexity"}
+        if set(adjustments) - allowed_adjustments:
+            raise ValueError(
+                f"sector TAM benchmark {name!r} contains unsupported component adjustments"
+            )
+        if any(
+            isinstance(value, bool)
+            or not math.isfinite(float(value))
+            or not -1.0 <= float(value) <= 1.0
+            for value in adjustments.values()
+        ):
+            raise ValueError(
+                f"sector TAM benchmark {name!r} component adjustments must be finite and within +/-1"
             )
 
 

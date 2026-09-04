@@ -53,6 +53,12 @@ def test_compiled_policy_contains_complete_hash_bound_scoring_runtime():
     assert runtime["normalization"]["tam_thresholds"]
     assert runtime["normalization"]["growth_thresholds"]
     assert runtime["normalization"]["sector_tam_benchmarks"]
+    assert runtime["normalization"]["score_bands"] == [
+        {"min": 1, "max": 3, "label": "Weak", "meaning": "High risk, failing, or structurally broken."},
+        {"min": 4, "max": 5, "label": "Concerning", "meaning": "Unproven, material execution or validation gaps."},
+        {"min": 6, "max": 7, "label": "Promising", "meaning": "Reasonable thesis, requires validation."},
+        {"min": 8, "max": 10, "label": "Strong", "meaning": "Investment-grade, clear upside with managed risk."},
+    ]
     assert policy["scoring_runtime_hash"]
 
 

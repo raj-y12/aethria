@@ -7,11 +7,6 @@ from typing import Any, TypedDict, Literal, Dict, List
 
 class ReviewerOutput(TypedDict, total=False):
     """Strict schema for Reviewer evaluations (legacy - use ReviewInfo from models.py)."""
-    market_score: int  # 1-10
-    product_score: int  # 1-10
-    technical_score: int  # 1-10
-    execution_score: int  # 1-10
-    defensibility_score: int  # 1-10
     overall_summary: str
     key_risks: list[str]
     verdict: Literal["STRONG", "MEDIUM", "WEAK"]
@@ -24,8 +19,6 @@ class ReviewerOutput(TypedDict, total=False):
     business_model_analysis: list[str]  # Monetization, pricing, growth plan, unit economics
     investment_thesis: list[str]  # Bullet points why to invest + core assumptions
     risk_mitigation: list[str]  # Actionable strategies per diligence_red_flags
-    score_reasoning: Dict[str, str]  # Optional: per-dimension concise reasoning, e.g. {"market_score": "...", "product_score": "..."}
-    score_source: str
     improvement_to_9: list[str]
     market_reasoning: list[str]
     market_weaknesses: list[str]
@@ -48,8 +41,6 @@ class ReviewerOutput(TypedDict, total=False):
     thesis_deviation_points: list[str]
     thesis_alignment_confidence: float
     fund_thesis_alignment_score: float  # optional at runtime; validated when present
-    structured_signals: Dict[str, dict]
-    structured_scoring: Dict[str, dict]
     # Investment read (reviewer_rules v2+). Narrative only: never an input to scores
     # or verdict. Each is omitted (empty) when the evidence bar is not met.
     founder_fluency: List[Dict[str, Any]]  # [{founder, prior_domain, fluent_in[], unlocks[], evidence}]
@@ -168,10 +159,6 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
     Raises ValueError if validation fails.
     """
     required_fields = {
-        "market_score": int,
-        "product_score": int,
-        "technical_score": int,
-        "execution_score": int,
         "overall_summary": str,
         "key_risks": list,
         "verdict": str,
@@ -187,17 +174,16 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
                 f"got {type(data[field]).__name__}"
             )
     
-    # Validate scores are 1-10
-    score_fields = ["market_score", "product_score", "technical_score", "execution_score"]
-    for field in score_fields:
-        if not (1 <= data[field] <= 10):
-            raise ValueError(f"{field} must be between 1 and 10, got {data[field]}")
-    
-    # Optional defensibility_score: if present, must be 1-10
-    if "defensibility_score" in data and data["defensibility_score"] is not None:
-        d = data["defensibility_score"]
-        if not isinstance(d, int) or not (1 <= d <= 10):
-            raise ValueError(f"defensibility_score must be an int between 1 and 10, got {d}")
+    # Numeric reviewer assessments and their trace payloads are retired.  Drop
+    # them even if a model or an old prompt emits them; canonical evaluation is
+    # the sole score-producing system.
+    for field in (
+        "market_score", "product_score", "technical_score", "execution_score",
+        "defensibility_score", "overall_score", "confidence_adjusted_score",
+        "score_reasoning", "score_source", "structured_signals",
+        "structured_scoring", "score_breakdown", "derived_verdict",
+    ):
+        data.pop(field, None)
     
     # Normalize common LLM verdict aliases before strict validation.
     # This prevents otherwise valid reviews from failing on label drift.
@@ -255,26 +241,6 @@ def validate_reviewer_output(data: dict) -> ReviewerOutput:
             for item in val:
                 if not isinstance(item, str):
                     raise ValueError(f"All items in {field} must be strings")
-
-    # Optional score_reasoning: if present, must be dict of str -> str
-    if "score_reasoning" in data and data["score_reasoning"] is not None:
-        sr = data["score_reasoning"]
-        if not isinstance(sr, dict):
-            raise ValueError("score_reasoning must be a dict")
-        for k, v in sr.items():
-            if not isinstance(k, str) or not isinstance(v, str):
-                raise ValueError("score_reasoning keys and values must be strings")
-
-    if "score_source" in data and data["score_source"] is not None:
-        if not isinstance(data["score_source"], str):
-            raise ValueError("score_source must be a string")
-        data["score_source"] = data["score_source"].strip()
-    if "structured_signals" in data and data["structured_signals"] is not None:
-        if not isinstance(data["structured_signals"], dict):
-            raise ValueError("structured_signals must be an object")
-    if "structured_scoring" in data and data["structured_scoring"] is not None:
-        if not isinstance(data["structured_scoring"], dict):
-            raise ValueError("structured_scoring must be an object")
 
     for dim in ("market", "product", "technical", "execution", "defensibility"):
         _validate_string_list(f"{dim}_reasoning", min_items=2, max_items=4)

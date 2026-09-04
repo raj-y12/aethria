@@ -59,38 +59,9 @@ describe('getTriageGateStatus', () => {
     expect(getTriageGateStatus(startup)).toEqual({ gated: false });
   });
 
-  it('does not gate a reviewed-and-decided startup', () => {
-    const startup = baseStartup({
-      review: { market_score: 8, product_score: 8, technical_score: 8, execution_score: 8 },
-      partner: { recommendation: 'INVEST' } as Startup['partner'],
-    });
-    expect(getTriageGateStatus(startup)).toEqual({ gated: false });
-  });
-
-  it('gates a reviewed-but-undecided startup below the decision threshold', () => {
+  it('does not derive a Partner gate from reviewer scores', () => {
     const startup = baseStartup({
       review: { market_score: 4, product_score: 4, technical_score: 4, execution_score: 4 },
-      partner: null,
-    });
-    expect(getTriageGateStatus(startup)).toEqual({
-      gated: true,
-      reason: 'not_decided',
-      overallScore: 4,
-      threshold: 0.55,
-    });
-  });
-
-  it('does not gate a reviewed-but-undecided startup at or above the decision threshold', () => {
-    const startup = baseStartup({
-      review: { market_score: 6, product_score: 6, technical_score: 6, execution_score: 6 },
-      partner: null,
-    });
-    expect(getTriageGateStatus(startup)).toEqual({ gated: false });
-  });
-
-  it('does not gate when the overall score is unparseable (ambiguous with an in-flight decision)', () => {
-    const startup = baseStartup({
-      review: { market_score: 4, product_score: 4, technical_score: undefined, execution_score: 4 },
       partner: null,
     });
     expect(getTriageGateStatus(startup)).toEqual({ gated: false });

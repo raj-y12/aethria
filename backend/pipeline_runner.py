@@ -356,6 +356,26 @@ def _build_pipeline_engines(
         canonical_startups=(startup_snapshot.rows if startup_snapshot is not None else None),
         legacy_startup_aliases=startup_aliases,
     )
+
+    async def load_canonical_evaluation(startup_id: str) -> Optional[Dict[str, Any]]:
+        """Return the one current canonical evaluation projected to a startup.
+
+        This adapter is deliberately narrow: the Partner layer receives no
+        repository and cannot discover a second score source for itself.
+        """
+        if postgres_pool is None:
+            return None
+        opportunity = await IdentityRepository(postgres_pool).get_opportunity_by_legacy_projection(
+            user_id=user_id,
+            legacy_startup_id=startup_id,
+        )
+        if opportunity is None:
+            return None
+        return await EvaluationRepository(postgres_pool).get_current(
+            user_id=user_id,
+            opportunity_id=opportunity.opportunity_id,
+        )
+
     partner_engine = PartnerEngine(
         storage=storage,
         interval_seconds=30,
@@ -371,6 +391,7 @@ def _build_pipeline_engines(
         include_deal_context_digest=include_deal_context_digest,
         settings=settings,
         startup_repository=startup_repository,
+        canonical_evaluation_loader=load_canonical_evaluation,
     )
     engines = _PipelineEngines(
         scout_engine=scout_engine,
@@ -742,6 +763,57 @@ async def _admit_named_lookup_before_review(
     return admission
 
 
+async def _evaluate_admitted_periodic_discoveries(
+    *,
+    user_id: str,
+    admissions: list[Any],
+    evaluation_prerequisites: EvaluationPrerequisites,
+    postgres_pool: Any,
+) -> int:
+    """Create one canonical evaluation per newly admitted opportunity.
+
+    Scout personas may produce several observations for the same company. Their
+    claims are all persisted during admission, then this function evaluates the
+    shared immutable evidence set once.  Reviewer output is intentionally not an
+    input: it follows the canonical evaluation as research context only.
+    """
+    if postgres_pool is None:
+        return 0
+    evaluated: set[str] = set()
+    repository = EvaluationRepository(postgres_pool)
+    for admission in admissions:
+        if getattr(admission, "blocks_evaluation", False):
+            continue
+        opportunity_id = str(getattr(admission, "opportunity_id", "") or "").strip()
+        if not opportunity_id or opportunity_id in evaluated:
+            continue
+        try:
+            await repository.evaluate(
+                user_id=user_id,
+                opportunity_id=opportunity_id,
+                actor_id=user_id,
+                trigger_type="periodic_discovery",
+                policy=evaluation_prerequisites.policy,
+                thesis_version_id=evaluation_prerequisites.thesis_version_id,
+            )
+        except EvaluationLifecycleError as exc:
+            logger.info(
+                "[%s] Periodic canonical evaluation skipped opportunity_id=%s: %s",
+                user_id[:12], opportunity_id, exc,
+            )
+            continue
+        except Exception:
+            # The Partner loader will fail closed for this opportunity. Do not
+            # turn a one-company evaluation problem into a whole-cycle failure.
+            logger.exception(
+                "[%s] Periodic canonical evaluation failed opportunity_id=%s",
+                user_id[:12], opportunity_id,
+            )
+            continue
+        evaluated.add(opportunity_id)
+    return len(evaluated)
+
+
 async def _mark_lookup_pipeline_failed(
     storage: Any,
     startup_id: Optional[str],
@@ -1082,6 +1154,34 @@ async def _run_one_pipeline_cycle_inner_impl(
         # on-demand lookup and resolution-status guards live in storage.
         await ensure_owned()
         await _prune_unreferenced_startups(storage, user_id, startup_repository)
+
+        # A periodic discovery may be visible before its identity has been
+        # resolved, but it may not become a scored deal on that basis.  Admit
+        # reference-surviving discoveries and create their canonical evaluation
+        # before Reviewer/Partner.  Ambiguous identities are quarantined by the
+        # admission helper; the Partner stage below then has one authoritative
+        # evaluation source instead of a reviewer-average fallback.
+        if discoveries and postgres_pool is not None:
+            await ensure_owned()
+            admissions = await _admit_autonomous_discoveries(
+                user_id=user_id,
+                discoveries=discoveries,
+                storage=storage,
+                identity_repository=identity_repository,
+                discoveries_are_persisted=True,
+                startup_repository=startup_repository,
+                evidence_repository=EvidenceRepository(postgres_pool),
+            )
+            canonical_evaluations = await _evaluate_admitted_periodic_discoveries(
+                user_id=user_id,
+                admissions=admissions,
+                evaluation_prerequisites=evaluation_prerequisites,
+                postgres_pool=postgres_pool,
+            )
+            stage_diagnostics["canonical_evaluation"] = {
+                "admissions": len(admissions),
+                "evaluations_created": canonical_evaluations,
+            }
 
         _activity_reviewed_count = 0
         _activity_decided_count = 0
@@ -1478,23 +1578,41 @@ def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
     return text
 
 
-def _review_policy_is_current(
+def _qualitative_review_is_current(
     review_info: Any,
     prerequisites: EvaluationPrerequisites,
+    reviewer_engine: ReviewerEngine,
 ) -> bool:
-    """Return whether a saved review was produced by the currently certified policy."""
-    trace = getattr(review_info, "structured_scoring", None)
-    if not isinstance(trace, dict) or not trace:
+    """Return whether a saved qualitative review matches the active review contract.
+
+    Reviewer traces are deliberately score-free.  Freshness is therefore bound
+    to the active thesis and the actual DefaultReviewer prompt, never to the
+    retired structured-scoring policy trace.
+    """
+    if review_info is None:
         return False
-    policy = prerequisites.compiled_scoring_policy
-    expected_version = str(policy.get("policy_version_id") or "").strip()
-    expected_hash = str(policy.get("policy_hash") or "").strip()
+    prompt = str(
+        getattr(getattr(reviewer_engine, "reviewer", None), "SYSTEM_PROMPT", "")
+    ).strip()
+    if not prompt:
+        return False
+    expected_version = str(prerequisites.thesis_version_id or "").strip()
     return bool(
         expected_version
-        and expected_hash
-        and str(trace.get("policy_version_id") or "").strip() == expected_version
-        and str(trace.get("policy_hash") or "").strip() == expected_hash
+        and str(getattr(review_info, "fund_thesis_version_id", "") or "").strip()
+        == expected_version
+        and str(getattr(review_info, "prompt_version", "") or "").strip()
+        == hash_prompt(prompt)
     )
+
+
+def _missing_typed_fact_dimensions(policy: Any, current_claim_types: set[str]) -> set[str]:
+    """Dimensions whose rubric-owned factual claim has not been extracted yet."""
+    return {
+        rule.dimension
+        for rule in getattr(policy, "fact_rules", ())
+        if rule.claim_type not in current_claim_types
+    }
 
 
 async def _run_on_demand_lookup_inner(
@@ -1834,19 +1952,26 @@ async def _run_on_demand_lookup_inner(
                     # criterion — then a bounded, inline retrieval pass against it.
                     # Best-effort: a failure here must not fail the dispatch.
                     try:
-                        current_claim_types = await EvidenceRepository(postgres_pool).list_current_claim_types(
+                        evidence_repository = EvidenceRepository(postgres_pool)
+                        current_claim_types = await evidence_repository.list_current_claim_types(
                             user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
                             min_confidence=evaluation_prerequisites.policy.decision_safety.claim_confidence.minimum_eligible,
                         )
                         missing_evidence, search_questions = compute_missing_evidence(
                             evaluation_prerequisites.policy, current_claim_types,
                         )
-                        if missing_evidence:
-                            plan = await EvidenceRepository(postgres_pool).create_plan(
+                        missing_fact_dimensions = _missing_typed_fact_dimensions(
+                            evaluation_prerequisites.policy, current_claim_types,
+                        )
+                        extraction_dimensions = sorted(
+                            set(missing_evidence) | missing_fact_dimensions
+                        )
+                        if extraction_dimensions:
+                            plan = await evidence_repository.create_plan(
                                 user_id=user_id,
                                 opportunity_id=canonical_admission.opportunity_id,
                                 trigger_type="dispatch",
-                                missing_evidence=missing_evidence,
+                                missing_evidence=extraction_dimensions,
                                 search_questions=search_questions,
                             )
                             retrieval_result = await execute_evidence_plan(
@@ -1854,7 +1979,7 @@ async def _run_on_demand_lookup_inner(
                                 company_id=canonical_admission.company_id,
                                 opportunity_id=canonical_admission.opportunity_id,
                                 plan=plan,
-                                evidence_repository=EvidenceRepository(postgres_pool),
+                                evidence_repository=evidence_repository,
                                 company_name=company,
                                 company_website=website or handoff_startup.scout_info.lookup_website,
                             )
@@ -1863,6 +1988,16 @@ async def _run_on_demand_lookup_inner(
                             # find. Re-evaluating with nothing new would just
                             # add latency for an identical result.
                             verified_items = retrieval_result.get("verified_items") or []
+                            if not verified_items and missing_fact_dimensions:
+                                ledger = await evidence_repository.get_ledger(
+                                    user_id=user_id,
+                                    opportunity_id=canonical_admission.opportunity_id,
+                                )
+                                verified_items = [
+                                    item for item in ledger["evidence_items"]
+                                    if item.get("verification_state") == "verified"
+                                    and item.get("display_excerpt")
+                                ]
                             if verified_items:
                                 from core.policy_resolver import get_evaluation_rubric
 
@@ -1870,11 +2005,11 @@ async def _run_on_demand_lookup_inner(
                                     user_id=user_id,
                                     company_id=canonical_admission.company_id,
                                     opportunity_id=canonical_admission.opportunity_id,
-                                    missing_evidence=missing_evidence,
+                                    missing_evidence=extraction_dimensions,
                                     evidence_items=verified_items,
                                     rubric=get_evaluation_rubric(),
                                     policy=evaluation_prerequisites.policy,
-                                    evidence_repository=EvidenceRepository(postgres_pool),
+                                    evidence_repository=evidence_repository,
                                     api_key=api_key,
                                     model=reviewer_engine.model,
                                 )
@@ -1915,9 +2050,10 @@ async def _run_on_demand_lookup_inner(
             not replace_startup_id
             and handoff_startup is not None
             and evaluation_prerequisites is not None
-            and _review_policy_is_current(
+            and _qualitative_review_is_current(
                 getattr(handoff_startup, "review_info", None),
                 evaluation_prerequisites,
+                reviewer_engine,
             )
         )
         if review_is_current:
@@ -2100,12 +2236,23 @@ async def _run_on_demand_lookup_inner(
                     status="ready",
                 )
             _notify_startups_changed(user_id, "lookup_partner")
+        # A completed Partner decision is durable. Everything below is
+        # observability or caller notification, and must never be reported as a
+        # Partner scoring failure.
+        current_stage = "completion"
         evaluation_path = "rerun" if replace_startup_id else "manual_lookup"
-        _observe_decision_ready_usage(
-            engines.cost_controller,
-            before=lookup_usage_before,
-            cohort="manual_lookup",
-        )
+        try:
+            _observe_decision_ready_usage(
+                engines.cost_controller,
+                before=lookup_usage_before,
+                cohort="manual_lookup",
+            )
+        except Exception as exc:  # Observability cannot invalidate a decision.
+            logger.exception(
+                "[%s] On-demand lookup usage telemetry failed after decision: %s",
+                user_id[:12],
+                exc,
+            )
         metrics.inc_evaluation_manifest(path=evaluation_path, outcome="success")
         await emit("completed", "succeeded", startup_id=startup_id)
         logger.info(

@@ -20,8 +20,6 @@ from reviewer.schema import ReviewerOutput, normalize_investment_read, validate_
 from utils.prompt_version import hash_prompt
 from utils.traction_extraction import render_traction_facts
 from utils.recency import reviewer_recency_directive
-from utils.scoring import DEFAULT_SCORE_SOURCE
-from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
 from regulatory_context import apply_regulatory_grounding_guard
 from founder_context import apply_founder_grounding_guard, resolved_founder_names
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
@@ -343,6 +341,8 @@ def _evidence_anchors_block() -> str:
     for comp_key, anchors in COMPONENT_EVIDENCE_ANCHORS.items():
         rendered = "; ".join(f"{label}={cond}" for label, cond in anchors)
         lines.append(f"- {comp_key}: {rendered}")
+        examples = "; ".join(f"{label} ← {cond}" for label, cond in anchors)
+        lines.append(f"  {comp_key} examples: {examples}")
     lines.append(
         "VALUE SIGNALS (give a number, not a label): "
         + ", ".join(VALUE_COMPONENTS)
@@ -405,7 +405,6 @@ def _build_system_prompt(
             label = rf.get("label", rf.get("id", ""))
             red_flags_block += f"- {label}\n"
 
-    dimensions_block = _build_dimensions_block(rubric)
     investment_read_block = (
         _build_investment_read_block(reviewer_rules) if include_investment_read else ""
     )
@@ -420,21 +419,21 @@ You are:
 - Tasked with filtering noise early
 - Skeptical of missing data
 
-SCORE BANDS (apply uniformly): 1–3 Weak; 4–5 Concerning; 6–7 Promising; 8–10 Strong.
-Rule of thumb: 5 = neutral/unproven; 6–7 = promising but incomplete; 8+ = fundable if pricing & ownership make sense.
-{dimensions_block}
-VERDICT (derived from scores, not subjective):
-- STRONG: avg ≥ 8.0, no dimension < 7, zero critical red flags
-- MEDIUM: avg ≥ 6.0, no dimension < 5 (max one exception), execution risk acceptable but unresolved
-- WEAK: avg < 6.0 OR multiple dimensions < 5 OR critical red flag present
+RESEARCH STANCE:
+- Your verdict is a qualitative research stance only: STRONG, MEDIUM, or WEAK.
+  It is not an investment recommendation and must never be derived from an
+  average, a score band, or a numeric threshold.
+- A separate canonical evaluator assigns policy anchors from cited evidence.
+  Do not emit numeric scores, score rationale, structured scoring payloads, or
+  an implied numerical rank.
 
-NARRATIVE AND SCORING:
-- overall_summary must be a concise narrative synthesis for the investment committee. Do NOT list or repeat numeric scores in overall_summary (scores are captured in the scores table and score_reasoning). Write 2-4 sentences summarizing strengths, concerns, and fit; no "X/10" or score phrases in this field.
-- Extract structured_signals as strict JSON evidence with confidences; deterministic scoring runs downstream and sets final scores.
-{_deterministic_scoring_contract_block()}
-{_evidence_anchors_block()}
+NARRATIVE:
+- overall_summary must be a concise narrative synthesis for the investment
+  committee. Write 2-4 sentences on evidence, concerns, and thesis fit. Do not
+  use "X/10", score labels, score bands, or claims that a factor is weighted.
 - Use bullet points for positives and risks where appropriate. Provide 2-5 bullets per analysis list when content allows.
-- Never emit placeholder strings like [MISSING]. When information is absent, leave list fields empty and rely on confidence + structured_signals null values.
+- Never emit placeholder strings like [MISSING]. When information is absent,
+  leave the relevant list empty and name the evidence gap when material.
 - Do NOT invent data; only summarize what the Scout memo states and what optional supplemental web snippets in the user message support (when present).
 
 HYPOTHESIS-DRIVEN EVALUATION:
@@ -996,21 +995,67 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
   "assumption_feedback": ["critical unknowns and assumption challenges"]
 }'''
 
+            # Reviewer is a qualitative research stage. Canonical evaluation
+            # extracts claims from verified evidence and is solely responsible
+            # for every numeric assessment. Keep the requested payload small so
+            # the model cannot imply a competing scorecard.
+            json_schema = '''{
+  "overall_summary": "concise evidence-grounded synthesis",
+  "key_risks": ["specific unresolved risk or evidence gap"],
+  "verdict": "STRONG" | "MEDIUM" | "WEAK", // qualitative research stance, not an investment decision
+  "diligence_red_flags": ["policy labels only"],
+  "assumption_feedback": ["critical unknown or challenged assumption"],
+  "team_analysis": ["optional evidence-grounded team observation"],
+  "competition_analysis": ["optional evidence-grounded competitive observation"],
+  "business_model_analysis": ["optional evidence-grounded business-model observation"],
+  "investment_thesis": ["optional thesis fit or deviation"],
+  "risk_mitigation": ["optional next diligence action"],
+  "market_reasoning": ["optional market evidence or uncertainty"],
+  "market_weaknesses": ["optional market evidence gap"],
+  "market_confidence": "low" | "medium" | "high",
+  "product_reasoning": ["optional product evidence or uncertainty"],
+  "product_weaknesses": ["optional product evidence gap"],
+  "product_confidence": "low" | "medium" | "high",
+  "technical_reasoning": ["optional technical evidence or uncertainty"],
+  "technical_weaknesses": ["optional technical evidence gap"],
+  "technical_confidence": "low" | "medium" | "high",
+  "execution_reasoning": ["optional execution evidence or uncertainty"],
+  "execution_weaknesses": ["optional execution evidence gap"],
+  "execution_confidence": "low" | "medium" | "high",
+  "defensibility_reasoning": ["optional defensibility evidence or uncertainty"],
+  "defensibility_weaknesses": ["optional defensibility evidence gap"],
+  "defensibility_confidence": "low" | "medium" | "high",
+  "improvement_to_9": ["specific evidence or milestone that would change the research view"],
+  "thesis_alignment_score": number, // 0.0-1.0 research fit signal; never a decision threshold
+  "thesis_matches_fund": boolean,
+  "thesis_fit_points": ["concise fit evidence"],
+  "thesis_deviation_points": ["concise deviation evidence"],
+  "thesis_alignment_confidence": number // 0.0-1.0 confidence in this qualitative fit signal
+}'''
+            if not is_primary_persona:
+                json_schema = '''{
+  "overall_summary": "one concise persona-specific evidence read",
+  "key_risks": ["persona-specific risk or evidence gap"],
+  "verdict": "STRONG" | "MEDIUM" | "WEAK",
+  "diligence_red_flags": ["policy labels only"],
+  "assumption_feedback": ["critical unknown or challenged assumption"]
+}'''
+
             persona_detail_directive = (
                 "Populate team_analysis, competition_analysis, business_model_analysis, "
                 "investment_thesis, and risk_mitigation when you can; use empty lists when info is absent. "
                 "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
-                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation."
+                "Include improvement_to_9 as concrete diligence milestones."
                 if is_primary_persona
                 else (
                     "For this non-primary persona, do not generate the long qualitative sections or per-dimension prose. "
-                    "Keep the persona-specific judgment in structured_signals, key_risks, diligence_red_flags, "
+                    "Keep the persona-specific judgment in key_risks, diligence_red_flags, "
                     "assumption_feedback, and verdict."
                 )
             )
             dimension_detail_directive = (
                 "For each dimension, include 2-4 reasoning bullets, 1-3 weaknesses bullets, and confidence as one of low/medium/high. "
-                "Include improvement_to_9 as actionable bullets and set score_source to reflect multi-reviewer aggregation."
+                "Include improvement_to_9 as concrete diligence milestones."
                 if is_primary_persona
                 else ""
             )
@@ -1036,21 +1081,12 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 else ""
             )
 
-            if omit_llm_scores:
-                score_directive = (
-                    "CRITICAL: do NOT output any numeric *_score fields or score_reasoning — "
-                    "those are derived deterministically downstream from structured_signals. "
-                    "Your sole scoring responsibility is to extract COMPLETE structured_signals with confidence values. "
-                )
-                score_reasoning_directive = ""
-            else:
-                score_directive = (
-                    "CRITICAL: treat all numeric score fields as provisional placeholders only. "
-                    "Do not invent final scoring. Your primary responsibility is to extract structured_signals with confidence values. "
-                )
-                score_reasoning_directive = (
-                    "Optionally include score_reasoning with one short sentence per dimension (e.g. market_score, product_score, technical_score, execution_score, defensibility_score) for the memo scores table.\n\n"
-                )
+            score_directive = (
+                "CRITICAL: do NOT output numeric *_score fields, score_reasoning, "
+                "structured_signals, or structured_scoring. Those do not constitute "
+                "canonical evidence. State only what the supplied sources support, "
+                "what remains uncertain, and the next evidence needed. "
+            )
 
             user_content = (
                 reviewer_recency_directive()
@@ -1059,13 +1095,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                 "Review Scout hypotheses when provided: evaluate assumptions and flag critical unknowns in assumption_feedback. "
                 f"{grounding_clause}{regulatory_clause} "
                 f"{score_directive}"
-                "structured_signals must be COMPLETE: include all 5 dimensions and all 25 components (no empty objects). "
-                "For each component provide either label or value, plus reasoning and evidence grounded in the provided startup text. "
-                "If evidence is unavailable, set value to null with confidence <= 0.2 and explain what is missing in reasoning. "
                 "In overall_summary, write a concise narrative synthesis only; do not list or repeat numeric scores. "
                 "Emphasize team execution; if team/founder data is missing, say so plainly. "
                 f"{persona_detail_directive} "
-                f"{score_reasoning_directive}"
                 f"{dimension_detail_directive}\n\n"
                 f"Output ONLY valid JSON matching this exact schema:\n\n{json_schema}\n\n"
                 "If founding team, revenue, competitors, or valuation data is missing, add the exact red-flag labels to diligence_red_flags. "
@@ -1150,24 +1182,8 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
                         data[field] = apply_founder_grounding_guard(data[field], founder_context)
             self._last_prompt_chars = len(user_content)
             
-            # Default optional fields
-            if "structured_signals" not in data or not isinstance(data.get("structured_signals"), dict):
-                data["structured_signals"] = {}
-            data["structured_signals"] = clamp_structured_signals_evidence(
-                self.scout_output,
-                data["structured_signals"],
-                grounding_contract=self._structured_signal_grounding,
-            )
-            data = _normalize_structured_signals_contract(data)
-            # When scores were intentionally omitted from the prompt, inject neutral
-            # placeholders so validate_reviewer_output passes. The engine overwrites
-            # these with deterministic scores from structured_signals immediately after.
-            if omit_llm_scores:
-                for sf in ("market_score", "product_score", "technical_score", "execution_score"):
-                    if not isinstance(data.get(sf), int):
-                        data[sf] = 5
-            if "defensibility_score" not in data:
-                data["defensibility_score"] = None
+            # Default optional qualitative fields. Numeric reviewer scores and
+            # structured scoring traces are intentionally not reconstructed.
             if "diligence_red_flags" not in data:
                 data["diligence_red_flags"] = []
             if "assumption_feedback" not in data or not isinstance(data.get("assumption_feedback"), list):
@@ -1186,10 +1202,6 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             else:
                 for field in ("founder_fluency", "capability_slope", "reframe"):
                     data.pop(field, None)
-            if "score_reasoning" not in data or not isinstance(data.get("score_reasoning"), dict):
-                data["score_reasoning"] = {}
-            if "score_source" not in data or not isinstance(data.get("score_source"), str):
-                data["score_source"] = DEFAULT_SCORE_SOURCE
             if "improvement_to_9" not in data or not isinstance(data.get("improvement_to_9"), list):
                 data["improvement_to_9"] = []
             for dim in ("market", "product", "technical", "execution", "defensibility"):
@@ -1247,7 +1259,9 @@ Scout Confidence: {scout_output.get('confidence', 0.0):.2f}
             # persona's constructed system prompt.
             data["prompt_version"] = hash_prompt(self.SYSTEM_PROMPT)
             
-            return data
+            # _call_llm_sync is also used by preview paths. Sanitize here, not
+            # only in review(), so no caller can observe a raw reviewer score.
+            return validate_reviewer_output(data)
             
         except json.JSONDecodeError as e:
             self.logger.error(f"Failed to parse JSON from LLM: {e}")

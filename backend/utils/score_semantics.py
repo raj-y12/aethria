@@ -1,5 +1,6 @@
 """
-Canonical 1–10 score band semantics aligned with evaluation_rubric v1.1 and app-front-end semantics.
+Canonical 1–10 score band semantics aligned with the active evaluation rubric
+and app-front-end semantics.
 
 Use for: memo prose, API additive rubric fields, any surface that must match Weak/Concerning/Promising/Strong.
 

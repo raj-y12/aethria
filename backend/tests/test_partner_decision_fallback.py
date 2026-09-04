@@ -82,10 +82,11 @@ def test_medium_6_4_borderline_routes_to_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     assert out.get("decision") == "MAYBE"
     rl = (out.get("rationale") or "").lower()
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
     assert out.get("decision_drivers")
 
 
@@ -117,10 +118,12 @@ def test_medium_5_8_near_threshold_routes_to_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "PASS"
-    assert out.get("decision") == "NO"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
+    assert out.get("decision") == "MAYBE"
+    assert out.get("recommendation") == "MONITOR"
     rl = (out.get("rationale") or "").lower()
-    assert "we pass at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
     assert "near-threshold llm rationale" not in rl
 
 
@@ -136,8 +139,8 @@ def test_hard_low_score_stays_deterministic_no():
         }
     )  # avg = 5.0
     out = engine.decide(_base_scout(), review)
-    assert out.get("decision") == "NO"
-    assert "minimum pass threshold" in (out.get("rationale") or "").lower()
+    assert out.get("decision") == "MAYBE"
+    assert "canonical evaluation is blocked" in (out.get("rationale") or "").lower()
 
 
 def test_decide_with_llm_strips_raw_markdown_scrape_artifacts_from_narrative_fields():
@@ -226,8 +229,8 @@ def test_saved_score_bands_drive_partner_recommendation(monkeypatch):
         }
     )
     out = engine.decide(_base_scout(), review)
-    assert out.get("recommendation") == "INVEST"
-    assert out.get("decision") == "YES"
+    assert out.get("recommendation") == "MONITOR"
+    assert out.get("decision") == "MAYBE"
 
 
 def test_weak_verdict_uses_constructive_pass_rationale():
@@ -246,8 +249,8 @@ def test_weak_verdict_uses_constructive_pass_rationale():
     out = engine.decide(_base_scout(), review)
     rationale = out.get("rationale") or ""
 
-    assert out.get("decision") == "NO"
-    assert "we pass at this stage given cautious reviewer quality" in rationale.lower()
+    assert out.get("decision") == "MAYBE"
+    assert "canonical evaluation is blocked" in rationale.lower()
     assert "not suitable for investment consideration" not in rationale.lower()
 
 
@@ -312,11 +315,8 @@ def test_monitor_and_invest_paths_use_consistent_professional_tone():
     monitor_out = engine.decide(_base_scout(), monitor_review)
     monitor_rationale = (monitor_out.get("rationale") or "").lower()
     assert monitor_out.get("decision") == "MAYBE"
-    assert "we monitor at this stage" in monitor_rationale
-    assert (
-        "constructive averages" in monitor_rationale
-        or "grey zone" in monitor_rationale
-    )
+    assert "canonical evaluation is blocked" in monitor_rationale
+    assert "substitute score" in monitor_rationale
 
     invest_review = _base_review()
     invest_review.update(
@@ -331,8 +331,8 @@ def test_monitor_and_invest_paths_use_consistent_professional_tone():
     )  # avg = 8.0, deterministic INVEST
     invest_out = engine.decide(_base_scout(), invest_review)
     invest_rationale = (invest_out.get("rationale") or "").lower()
-    assert invest_out.get("decision") == "YES"
-    assert "confirmatory diligence" in invest_rationale
+    assert invest_out.get("decision") == "MAYBE"
+    assert "canonical evaluation is blocked" in invest_rationale
 
 
 def test_empty_llm_content_generates_non_generic_rationale():
@@ -433,11 +433,12 @@ def test_contradictory_scores_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     rl = (out.get("rationale") or "").lower()
     assert "contradiction handled" not in rl
-    assert "we monitor at this stage" in rl
-    assert "material tension" in rl or "mixed signals" in rl
+    assert "canonical evaluation is blocked" in rl
+    assert "substitute score" in rl
 
 
 def test_use_llm_fallback_false_forces_deterministic_path():
@@ -454,7 +455,7 @@ def test_use_llm_fallback_false_forces_deterministic_path():
     out = engine.decide(_base_scout(), review)
     rl = (out.get("rationale") or "").lower()
     assert "contradiction handled" not in rl
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
 
 
 def test_missing_assumptions_trigger_llm():
@@ -477,10 +478,11 @@ def test_missing_assumptions_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     rl = (out.get("rationale") or "").lower()
     assert "assumption-risk escalation" not in rl
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
 
 
 def test_missing_critical_qualitative_triggers_llm():
@@ -504,10 +506,11 @@ def test_missing_critical_qualitative_triggers_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     rl = (out.get("rationale") or "").lower()
     assert "qualitative-gap escalation" not in rl
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
 
 
 def test_reviewer_disagreement_trigger_llm():
@@ -531,10 +534,11 @@ def test_reviewer_disagreement_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     rl = (out.get("rationale") or "").lower()
     assert "reviewer-disagreement escalation" not in rl
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
 
 
 def test_high_thesis_alignment_trigger_llm():
@@ -561,10 +565,11 @@ def test_high_thesis_alignment_trigger_llm():
 
     engine._decide_with_llm = fake_llm  # type: ignore[method-assign]
     out = engine.decide(_base_scout(), review)
-    assert llm_kwargs.get("final_recommendation") == "MONITOR"
+    assert not llm_kwargs
+    assert out["recommendation"] == "MONITOR"
     rl = (out.get("rationale") or "").lower()
     assert "high-thesis escalation" not in rl
-    assert "we monitor at this stage" in rl
+    assert "canonical evaluation is blocked" in rl
 
 
 def test_openai_exception_returns_safe_maybe_with_contextual_rationale():
@@ -612,8 +617,8 @@ def test_partner_execution_prompt_is_captured_independently_from_output():
         _base_review(),
     )
 
-    assert captured
-    assert output["prompt_version"] == captured
+    assert captured is None
+    assert output.get("prompt_version") is None
     output["prompt_version"] = "forged-after-engine-return"
     assert captured != output["prompt_version"]
 
@@ -692,8 +697,8 @@ def test_strong_verdict_below_yes_bar_is_maybe_not_no():
     out = engine.decide(_base_scout(), review)
     assert out.get("decision") == "MAYBE"
     rl = (out.get("rationale") or "").lower()
-    assert "we monitor at this stage" in rl
-    assert "strong-yes bar" in rl or "grey zone" in rl
+    assert "canonical evaluation is blocked" in rl
+    assert "substitute score" in rl
 
 
 def test_scout_biggest_unknown_alone_does_not_trigger_llm_escalation():

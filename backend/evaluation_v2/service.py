@@ -289,7 +289,11 @@ def _score(claim: Dict[str, Any]) -> float | None:
         return None
 
 
-def _claim_score_note(claim: Dict[str, Any], value: float) -> str:
+def _claim_score_note(
+    claim: Dict[str, Any],
+    value: float,
+    eligibility: ScoreEligibility | None = None,
+) -> str:
     """One claim's contribution: evidence, confidence, and -- when extraction
     supplied it -- which rubric band it met and why the score isn't higher/lower.
 
@@ -308,6 +312,19 @@ def _claim_score_note(claim: Dict[str, Any], value: float) -> str:
     note += ")"
     if justification:
         note += f" — {justification}"
+    original = _score(claim)
+    if (
+        eligibility is not None
+        and original is not None
+        and value < original
+    ):
+        cap_reasons = set(eligibility.reason_codes)
+        if "source_quality_below_full" in cap_reasons:
+            note += f" Source-quality policy cap applied: {original:.2f} → {value:.2f}."
+        elif "evidence_stale" in cap_reasons:
+            note += f" Freshness policy cap applied: {original:.2f} → {value:.2f}."
+        else:
+            note += f" Evidence policy cap applied: {original:.2f} → {value:.2f}."
     return note
 
 
@@ -319,10 +336,16 @@ def _criterion_reasoning(scored: list[tuple[Dict[str, Any], float, ScoreEligibil
     regardless of company or claim.
     """
     if len(scored) == 1:
-        claim, value, _ = scored[0]
-        return f"Scored from one claim: {_claim_score_note(claim, value)}"
-    notes = [_claim_score_note(claim, value) for claim, value, _ in scored]
-    return f"Confidence-weighted average of {len(scored)} claims: " + "; ".join(notes)
+        claim, value, eligibility = scored[0]
+        return f"Scored from one claim: {_claim_score_note(claim, value, eligibility)}"
+    notes = [
+        _claim_score_note(claim, value, eligibility)
+        for claim, value, eligibility in scored
+    ]
+    return (
+        f"Conservative minimum of {len(scored)} eligible policy anchors: "
+        + "; ".join(notes)
+    )
 
 
 def decisive_policy_outcome(
@@ -429,6 +452,20 @@ def evaluate_snapshot(
             for claim, score, eligibility in scored
             if score is not None
         ]
+        fact_claim_types = {
+            fact_rule.claim_type
+            for fact_rule in policy.fact_rules
+            if fact_rule.dimension == rule.criterion
+        }
+        fact_scored = [
+            item for item in scored if item[0]["claim_type"] in fact_claim_types
+        ]
+        if fact_scored:
+            # A typed fact's published band is the score authority for its
+            # dimension. Historical generic claims remain in the snapshot for
+            # contradiction and provenance checks, but cannot reintroduce a
+            # retired model-selected decimal such as traction=6.0.
+            scored = fact_scored
         contradicted = [
             claim["claim_id"]
             for claim in criterion_claims
@@ -451,24 +488,13 @@ def evaluate_snapshot(
                 )
             )
             continue
-        # M5: confidence_at_snapshot is the model's own self-reported number --
-        # weighting the criterion average by it alone let one overconfident
-        # claim dominate even when its evidence was weak/stale (eligibility.
-        # confidence_cap, a deterministic signal independent of the model,
-        # already caps the *composed* confidence below but wasn't applied to
-        # *weighting*). Same fix shape as C4: cross-check the self-reported
-        # number against the independent cap before trusting it.
-        weight_sum = sum(
+        effective_confidences = [
             min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
             for claim, _, eligibility in scored
-        )
-        if weight_sum == 0:
-            # confidence_cap is a policy-configured value (0 <= cap < 1) --
-            # unlike confidence_at_snapshot, nothing prevents a future
-            # partner_rules version from setting one to exactly 0, which
-            # would zero every scored claim's weight here. Fail closed the
-            # same way "no eligible scored claim" above does, rather than
-            # letting the division below raise and crash the evaluation.
+        ]
+        if not any(effective_confidences):
+            # A configured zero confidence cap means the evidence is explicitly
+            # unusable for a decision, even though a numeric anchor exists.
             missing.append(rule.criterion)
             if rule.required:
                 required_missing.append(rule.criterion)
@@ -484,10 +510,12 @@ def evaluate_snapshot(
                 )
             )
             continue
-        score = sum(
-            value * min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
-            for claim, value, eligibility in scored
-        ) / weight_sum
+        # Claim confidence gates eligibility and communicates uncertainty; it
+        # cannot interpolate a score between rubric anchors. A weighted average
+        # made the model's confidence a hidden numeric decision input (e.g. a
+        # 3 and 8 becoming 6.4). Conservative aggregation preserves the lowest
+        # eligible policy-owned anchor until the adverse fact is disproven.
+        score = min(value for _, value, _ in scored)
         confidence = min(
             1.0,
             sum(claim["confidence_at_snapshot"] for claim, _, _ in scored)
@@ -512,6 +540,16 @@ def evaluate_snapshot(
                     set(eligibility_flags)
                     | ({"contradiction_present"} if contradicted else set())
                 ),
+                deterministic_adjustments={
+                    "aggregation": (
+                        "typed_fact_claim_precedence"
+                        if fact_scored
+                        else "lowest_eligible_claim_score"
+                    ),
+                    "eligible_anchor_scores": sorted(
+                        {value for _, value, _ in scored}
+                    ),
+                },
             )
         )
 

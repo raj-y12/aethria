@@ -503,6 +503,13 @@ class AethriaView(BaseModel):
 
 class ReviewInfo(BaseModel):
     """Reviewer evaluation information."""
+    # Non-numeric provenance required to bind governed persistence. These fields
+    # identify the policy used by the run; they are not a reviewer score trace.
+    policy_version_id: Optional[str] = None
+    policy_hash: Optional[str] = None
+    rubric_version: Optional[str] = None
+    scoring_runtime_version: Optional[str] = None
+    scoring_runtime_hash: Optional[str] = None
     market_score: Optional[float] = Field(default=None, ge=0, le=10)
     product_score: Optional[float] = Field(default=None, ge=0, le=10)
     technical_score: Optional[float] = Field(default=None, ge=0, le=10)

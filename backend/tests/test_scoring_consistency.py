@@ -161,6 +161,42 @@ def test_attach_notes_single_pass_no_score_mutation():
     assert "receives a" not in exec_dim["headline"].lower() or True  # generic headline ok
 
 
+def test_presentation_uses_policy_score_bands_and_exposes_evidence_trace():
+    raw = {
+        "overall_score": 7.0,
+        "overall_confidence": 0.8,
+        "policy_version_id": "policy-test",
+        "normalization": {"score_bands": [
+            {"min": 1, "max": 3, "label": "Weak", "meaning": "Low"},
+            {"min": 4, "max": 5, "label": "Concerning", "meaning": "Gap"},
+            {"min": 6, "max": 7, "label": "Promising", "meaning": "Validate"},
+            {"min": 8, "max": 10, "label": "Strong", "meaning": "Good"},
+        ]},
+        "market": {
+            "score": 7.0,
+            "confidence": 0.8,
+            "components": {
+                "tam": {
+                    "score": 7.0,
+                    "confidence": 0.8,
+                    "label": "large",
+                    "value": 1000000000,
+                    "evidence": "Independent market estimate.",
+                    "rule": "Sector benchmark.",
+                    "reasoning": "Supported by evidence.",
+                }
+            },
+        },
+    }
+
+    presentation = serialize_scoring_presentation(raw)
+
+    assert presentation["overall_band"] == "Promising"
+    component = presentation["dimensions"][0]["components"][0]
+    assert component["evidence"] == "Independent market estimate."
+    assert component["rule"] == "Sector benchmark."
+
+
 def test_materially_inconsistent_still_renders_with_soft_note():
     audit = audit_dimension(
         "execution",

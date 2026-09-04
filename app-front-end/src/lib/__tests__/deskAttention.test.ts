@@ -63,7 +63,7 @@ describe('getDealAttentionReason', () => {
   it.each([
     [escalated, 'Escalated — awaiting your ruling'],
     [stale, 'Waiting 10 days'],
-    [reviewed, 'Reviewed at 6.2'],
+    [reviewed, 'Review complete — evidence evaluation pending'],
     [fresh, 'New — awaiting review'],
   ])('%#', (s, reason) => {
     expect(getDealAttentionReason(s, NOW)).toBe(reason);

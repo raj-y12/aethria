@@ -105,15 +105,16 @@ def _validate_startup_dependency_identity(
             "review thesis identity does not match the construction identity"
         )
     scoring = review.structured_scoring
-    if not isinstance(scoring, dict):
-        raise ValueError("review policy identity is required for governed persistence")
+    # Qualitative reviewers no longer persist a numeric structured trace. Their
+    # policy/runtime identity is carried as separate provenance fields instead.
+    identity_source = scoring if isinstance(scoring, dict) else review.model_dump(mode="python")
     expected_policy = {
         "policy_version_id": dependency.policy_version_id,
         "policy_hash": dependency.policy_hash,
         "rubric_version": dependency.rubric_version,
     }
     for key, expected in expected_policy.items():
-        if _required_text(scoring.get(key), field=f"review {key}") != expected:
+        if _required_text(identity_source.get(key), field=f"review {key}") != expected:
             raise ValueError(
                 f"review policy identity {key} does not match construction identity"
             )
@@ -122,7 +123,7 @@ def _validate_startup_dependency_identity(
         "scoring_runtime_hash": dependency.scoring_runtime_hash,
     }
     for key, expected in expected_runtime.items():
-        if _required_text(scoring.get(key), field=f"review {key}") != expected:
+        if _required_text(identity_source.get(key), field=f"review {key}") != expected:
             raise ValueError(
                 f"review runtime identity {key} does not match construction identity"
             )

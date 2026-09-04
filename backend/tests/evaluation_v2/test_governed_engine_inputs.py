@@ -89,7 +89,7 @@ class _ReviewerPersona:
         pass
 
 
-def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeypatch):
+def test_governed_reviewer_does_not_construct_a_secondary_scorer(monkeypatch):
     import reviewer.engine as reviewer_module
 
     prerequisites = _prerequisites()
@@ -114,10 +114,8 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
 
     assert reviewer.active_thesis == prerequisites.thesis_context
     assert reviewer.active_thesis is not prerequisites.thesis_context
-    assert reviewer.structured_scoring_engine.policy == prerequisites.compiled_scoring_policy
-    assert reviewer.structured_scoring_engine.policy is not prerequisites.compiled_scoring_policy
-    assert reviewer.structured_scoring_engine.dimension_weights["market"] == 70.0
-    assert reviewer.structured_scoring_engine.dimension_weights["execution"] == 30.0
+    assert reviewer.use_structured_scoring is False
+    assert reviewer.structured_scoring_engine is None
     assert reviewer.use_resource_fund_thesis_fallback is False
     assert all(
         persona._use_resource_fund_thesis_fallback is False
@@ -129,7 +127,7 @@ def test_governed_reviewer_consumes_exact_compiled_policy_without_reload(monkeyp
     )
 
 
-def test_governed_reviewer_ignores_disabled_structured_scoring_environment(monkeypatch):
+def test_governed_reviewer_omits_model_score_fields_regardless_of_environment(monkeypatch):
     import reviewer.engine as reviewer_module
 
     prerequisites = _prerequisites()
@@ -145,10 +143,10 @@ def test_governed_reviewer_ignores_disabled_structured_scoring_environment(monke
         evaluation_prerequisites=prerequisites,
     )
 
-    assert reviewer.use_structured_scoring is True
-    assert reviewer.structured_scoring_engine is not None
+    assert reviewer.use_structured_scoring is False
+    assert reviewer.structured_scoring_engine is None
     assert all(
-        persona._structured_scoring_enabled is True
+        persona._structured_scoring_enabled is False
         for persona in (
             reviewer.reviewer,
             reviewer.skeptical_reviewer,
@@ -157,13 +155,12 @@ def test_governed_reviewer_ignores_disabled_structured_scoring_environment(monke
     )
 
 
-def test_governed_reviewer_fails_closed_when_scorer_is_unavailable():
+def test_governed_reviewer_has_no_secondary_scorer_to_fail_over_to():
     reviewer = ReviewerEngine.__new__(ReviewerEngine)
     reviewer.evaluation_prerequisites = _prerequisites()
     reviewer.structured_scoring_engine = None
 
-    with pytest.raises(RuntimeError, match="governed structured scoring"):
-        reviewer._apply_structured_scoring({}, {"market_score": 9})
+    assert reviewer.structured_scoring_engine is None
 
 
 def test_governed_partner_consumes_exact_rules_and_fund_config_without_reload(monkeypatch):
@@ -342,6 +339,29 @@ def _decision_scout() -> dict:
     }
 
 
+def test_partner_without_canonical_evaluation_never_decides_from_reviewer_scores():
+    from partner.decision import PartnerDecisionEngine
+
+    decision = PartnerDecisionEngine(
+        use_llm_fallback=False,
+        tenant_user_id="user-a",
+    ).decide(
+        _decision_scout(),
+        {
+            "market_score": 10,
+            "product_score": 10,
+            "technical_score": 10,
+            "execution_score": 10,
+            "overall_summary": "Legacy reviewer scorecard says this is strong.",
+            "key_risks": [],
+            "verdict": "STRONG",
+        },
+    )
+
+    assert decision["recommendation"] == "MONITOR"
+    assert "canonical evaluation is blocked" in decision["decision_rationale"].lower()
+
+
 class _PersistingReviewerPersona:
     grounding_contracts: list[dict | None] = []
 
@@ -459,46 +479,28 @@ async def _run_persisted_governed_review(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("traces", "expected"),
+    "traces",
     [
-        ([_persona_trace(9), _persona_trace(9), _persona_trace(9)], "INVEST"),
-        ([_persona_trace(9), _persona_trace(5), _persona_trace(5)], "PASS"),
-        (
-            [
-                _persona_trace(9),
-                _persona_trace(9, missing_dimension="defensibility"),
-                _persona_trace(9),
-            ],
-            "MONITOR",
-        ),
+        [_persona_trace(9), _persona_trace(9), _persona_trace(9)],
+        [_persona_trace(9), _persona_trace(5), _persona_trace(5)],
+        [_persona_trace(9), _persona_trace(9, missing_dimension="defensibility"), _persona_trace(9)],
     ],
-    ids=["identical", "nine-five-five", "missing-dimension"],
+    ids=["identical", "disagreement", "missing-dimension"],
 )
-async def test_governed_reviewer_to_partner_uses_persisted_exact_consensus(
-    tmp_path, monkeypatch, traces, expected
-):
+async def test_governed_reviewer_persists_qualitative_research_only(tmp_path, monkeypatch, traces):
     saved, reloaded, prerequisites = await _run_persisted_governed_review(
         tmp_path, monkeypatch, traces
     )
 
     assert saved is True
     assert reloaded is not None and reloaded.review_info is not None
-    trace = reloaded.review_info.structured_scoring
-    assert trace["user_id"] == "user-a"
-    assert trace["trace_kind"] == "resolved_consensus"
-    assert len(trace["input_traces"]) == 3
-    decision = _governed_partner().decide(
-        _decision_scout(), reloaded.review_info.model_dump(mode="json")
-    )
-    assert decision["recommendation"] == expected, decision
+    assert reloaded.review_info.structured_scoring is None
+    assert reloaded.review_info.overall_score is None
+    assert reloaded.review_info.market_score is None
     expected_grounding = prerequisites.compiled_scoring_policy["scoring_runtime"][
         "evidence_grounding"
     ]
-    assert _PersistingReviewerPersona.grounding_contracts[-3:] == [
-        expected_grounding,
-        expected_grounding,
-        expected_grounding,
-    ]
+    assert _PersistingReviewerPersona.grounding_contracts[-3:] == [expected_grounding] * 3
 
 
 @pytest.mark.asyncio
@@ -544,7 +546,7 @@ async def test_embedding_backed_active_thesis_without_alignment_blocks_otherwise
 
 
 @pytest.mark.asyncio
-async def test_governed_persisted_trace_overrides_adversarial_post_resolution_mutation(
+async def test_governed_reviewer_drops_adversarial_numeric_mutation(
     tmp_path, monkeypatch
 ):
     saved, reloaded, _ = await _run_persisted_governed_review(
@@ -555,17 +557,13 @@ async def test_governed_persisted_trace_overrides_adversarial_post_resolution_mu
     )
 
     assert saved is True
-    assert reloaded.review_info.market_score == 5
-    assert reloaded.review_info.overall_score == 5
-    assert reloaded.review_info.structured_scoring["market"]["score"] == 5
-    decision = _governed_partner().decide(
-        _decision_scout(), reloaded.review_info.model_dump(mode="json")
-    )
-    assert decision["recommendation"] == "PASS"
+    assert reloaded.review_info.market_score is None
+    assert reloaded.review_info.overall_score is None
+    assert reloaded.review_info.structured_scoring is None
 
 
 @pytest.mark.asyncio
-async def test_governed_reviewer_does_not_persist_mixed_policy_personas(
+async def test_governed_reviewer_does_not_consume_mixed_policy_score_traces(
     tmp_path, monkeypatch
 ):
     stale = _persona_trace(9, policy_version_id="stale-policy")
@@ -575,9 +573,9 @@ async def test_governed_reviewer_does_not_persist_mixed_policy_personas(
         [_persona_trace(9), stale, _persona_trace(9)],
     )
 
-    assert saved is False
-    assert reloaded is not None
-    assert reloaded.review_info is None
+    assert saved is True
+    assert reloaded is not None and reloaded.review_info is not None
+    assert reloaded.review_info.structured_scoring is None
 
 
 @pytest.mark.parametrize(
@@ -604,12 +602,13 @@ async def test_governed_reviewer_does_not_persist_mixed_policy_personas(
         "incomplete",
     ],
 )
-def test_governed_partner_rejects_non_exact_structured_trace(trace):
+def test_governed_partner_ignores_every_reviewer_structured_trace(trace):
     review = _governed_review(9)
     review["structured_scoring"] = trace
 
-    with pytest.raises(RuntimeError, match="structured scoring trace"):
-        _governed_partner().decide(_decision_scout(), review)
+    decision = _governed_partner().decide(_decision_scout(), review)
+    assert decision["recommendation"] == "MONITOR"
+    assert "canonical evaluation is blocked" in decision["decision_rationale"].lower()
 
 
 @pytest.mark.parametrize("user_id", [None, "user-b"])
@@ -624,50 +623,27 @@ def test_governed_trace_rejects_missing_or_cross_tenant_identity(user_id):
         validate_governed_scoring_trace(trace, _prerequisites())
 
 
-def test_governed_partner_accepts_complete_exact_structured_trace():
+def test_governed_partner_does_not_decide_from_a_complete_reviewer_trace():
     decision = _governed_partner().decide(_decision_scout(), _governed_review(9))
 
-    assert decision["recommendation"] == "INVEST"
+    assert decision["recommendation"] == "MONITOR"
 
 
-def test_governed_consensus_trace_is_authoritative_after_persona_resolution():
+def test_reviewer_consensus_trace_is_discarded_at_the_persistence_boundary():
     review = _governed_review_from_persona_traces(
         [_persona_trace(9), _persona_trace(5), _persona_trace(5)]
     )
 
-    # Conservative resolution is 55% of the mean plus 45% of the minimum.
-    expected = pytest.approx(5.7333333333)
-    assert review["market_score"] == expected
-    assert review["overall_score"] == expected
-    assert review["structured_scoring"]["market"]["score"] == expected
-    assert review["structured_scoring"]["overall_score"] == expected
-    assert review["structured_scoring"]["trace_kind"] == "resolved_consensus"
-    assert len(review["structured_scoring"]["input_traces"]) == 3
-    assert review["structured_scoring"]["resolution_strategy"] == {
-        "version": "reviewer-consensus-v1",
-        "material_spread": 2.0,
-        "conservative_min_weight": 0.45,
-        "missingness": "union",
-    }
-    resolution = review["structured_scoring"]["market"]["components"][
-        "persona_resolution"
-    ]
-    assert resolution == {
-        "strategy": "conservative_mean_floor",
-        "scores": [9.0, 5.0, 5.0],
-        "spread": 4.0,
-    }
-    assert {
-        item["trace"]["policy_version_id"]
-        for item in review["structured_scoring"]["input_traces"]
-    } == {"policy-live"}
+    assert review["market_score"] is None
+    assert review["overall_score"] is None
+    assert review["structured_scoring"] is None
 
     serialized = json.loads(json.dumps(review))
     decision = _governed_partner().decide(_decision_scout(), serialized)
-    assert decision["recommendation"] == "PASS"
+    assert decision["recommendation"] == "MONITOR"
 
 
-def test_governed_consensus_unions_missingness_across_personas_and_partner_holds():
+def test_reviewer_consensus_missingness_is_not_promoted_to_an_assessment():
     review = _governed_review_from_persona_traces(
         [
             _persona_trace(9),
@@ -676,12 +652,7 @@ def test_governed_consensus_unions_missingness_across_personas_and_partner_holds
         ]
     )
 
-    detail = review["structured_scoring"]["defensibility"]
-    assert detail["score"] is None
-    assert detail["unscored"] is True
-    assert detail["missing_reasons"] == [
-        "SkepticalReviewer:no_grounded_components"
-    ]
+    assert review["structured_scoring"] is None
     assert review["defensibility_score"] is None
 
     decision = _governed_partner().decide(_decision_scout(), review)
@@ -751,6 +722,39 @@ def test_governed_single_review_and_adapter_never_synthesize_neutral_scores():
     assert adapted.execution_score is None
 
 
+def test_reviewer_adapter_discards_numeric_assessment_fields():
+    adapted = reviewer_output_to_review_info(
+        {
+            "overall_summary": "Strong research, but separate canonical evidence is required.",
+            "key_risks": [],
+            "verdict": "MEDIUM",
+            "market_score": 9,
+            "product_score": 8,
+            "technical_score": 7,
+            "execution_score": 6,
+            "defensibility_score": 5,
+            "overall_score": 7.0,
+            "overall_label": "STRONG",
+            "derived_verdict": "STRONG",
+            "score_reasoning": {"market": "Legacy score"},
+            "structured_scoring": {"overall_score": 7.0},
+            "structured_signals": {"market": {"tam": {"value": "$1B"}}},
+        }
+    )
+
+    assert adapted.market_score is None
+    assert adapted.product_score is None
+    assert adapted.technical_score is None
+    assert adapted.execution_score is None
+    assert adapted.defensibility_score is None
+    assert adapted.overall_score is None
+    assert adapted.overall_label is None
+    assert adapted.derived_verdict is None
+    assert adapted.score_reasoning is None
+    assert adapted.structured_scoring is None
+    assert adapted.structured_signals is None
+
+
 def test_governed_consensus_preserves_dynamic_missing_reason_provenance():
     prerequisites = _prerequisites()
     prerequisites.compiled_scoring_policy["dimensions"]["impact"] = {
@@ -788,12 +792,11 @@ def test_governed_consensus_preserves_dynamic_missing_reason_provenance():
     ]
 
 
-def test_governed_partner_rejects_unresolved_persona_trace_even_when_identity_matches():
+def test_governed_partner_ignores_an_unresolved_persona_trace_even_when_identity_matches():
     review = _governed_review(9)
     review["structured_scoring"] = _persona_trace(9)
 
-    with pytest.raises(RuntimeError, match="resolved consensus"):
-        _governed_partner().decide(_decision_scout(), review)
+    assert _governed_partner().decide(_decision_scout(), review)["recommendation"] == "MONITOR"
 
 
 def test_governed_trace_requires_every_compiled_dimension_including_defensibility():
@@ -813,6 +816,15 @@ def test_governed_trace_accepts_explicit_unscored_dimension_without_numeric_defa
     assert validated["defensibility"]["missing_reasons"] == [
         "no_grounded_components"
     ]
+
+
+def test_governed_trace_accepts_score_band_metadata():
+    trace = _persona_trace(7)
+    trace["score_bands"] = [{"min": 1, "max": 3, "label": "Weak"}]
+
+    validated = validate_governed_scoring_trace(trace, _prerequisites())
+
+    assert validated["score_bands"] == trace["score_bands"]
 
 
 @pytest.mark.parametrize(
@@ -867,26 +879,19 @@ def test_governed_trace_rejects_unknown_dimension_and_supports_future_compiled_d
 
 
 @pytest.mark.parametrize(
-    ("score", "expected"),
+    "score",
     [
-        (5.99, "PASS"),
-        (6.0, "MONITOR"),
-        (6.01, "MONITOR"),
-        (7.99, "MONITOR"),
-        (8.0, "INVEST"),
-        (8.01, "INVEST"),
+        5.99, 6.0, 6.01, 7.99, 8.0, 8.01,
     ],
 )
-def test_governed_reviewer_persistence_partner_handoff_preserves_boundary_precision(
-    score, expected
-):
+def test_governed_partner_does_not_use_reviewer_boundary_scores(score):
     review = _governed_review(score)
 
-    assert review["market_score"] == score
-    assert review["reviews"][0]["market_score"] == score
-    assert review["structured_scoring"]["market"]["score"] == score
+    assert review["market_score"] is None
+    assert review["reviews"][0]["market_score"] is None
+    assert review["structured_scoring"] is None
     decision = _governed_partner().decide(_decision_scout(), review)
-    assert decision["recommendation"] == expected
+    assert decision["recommendation"] == "MONITOR"
 
 
 def test_governed_partner_uses_versioned_policy_boundaries_over_display_bands():

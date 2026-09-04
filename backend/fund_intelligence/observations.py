@@ -13,13 +13,20 @@ from utils.partner_codes import ruling_aligns_with_recommendation
 
 
 MIN_SAMPLE_SIZE = 3
-# These bands are copied from the canonical score_bands in resources/config/evaluation_rubric/v1.json.
+# These bands are copied from the active canonical score_bands policy.
 _SCORE_BANDS = {
     "weak": (1, 3), "concerning": (4, 5),
     "promising": (6, 7), "strong": (8, 10),
 }
-_SCORE_BAND_SOURCE = "resources/config/evaluation_rubric/v1.json"
 MAX_INTERACTION_CRITERIA = 8
+
+
+def _score_band_source() -> str:
+    """Name the same rubric version that runtime policy resolution selected."""
+    from core.policy_resolver import get_active_meta_snapshot
+
+    version = str(get_active_meta_snapshot()["evaluation_rubric"])
+    return f"resources/config/evaluation_rubric/{version}.json"
 
 
 def _text(value: Any) -> str:
@@ -203,7 +210,7 @@ def _interaction(
         "involved_factors": sorted(involved_factors or []),
         "direction": direction,
         "value_ranges": value_ranges or {},
-        "score_band_source": _SCORE_BAND_SOURCE,
+        "score_band_source": _score_band_source(),
         "segment_scope": "cross_segment" if segment == {"scope": "fund"} else "segment_specific",
     })
     return item

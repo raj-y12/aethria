@@ -10,22 +10,21 @@ export interface PositionRow {
   score: number | null;
 }
 
-/* Positions are authoritative for what we hold. Sector, stage, and score are
- * display-only enrichment from the legacy startup row we already have loaded;
- * when the bridge is missing we render an em dash rather than guessing. */
+/* Positions are authoritative for what we hold. Sector and stage are
+ * display-only enrichment from the legacy startup row; score stays unavailable
+ * until this table is backed by canonical evaluation projection. */
 export function buildPositionRows(positions: PortfolioPosition[], startups: Startup[]): PositionRow[] {
   const byId = new Map(startups.map((s) => [s.id, s]));
   return positions.map((position) => {
     const startupId = position.legacy_startup_id ?? null;
     const legacy = startupId ? byId.get(startupId) : undefined;
-    const score = legacy?.review?.overall_score;
     return {
       position,
       name: position.canonical_name || legacy?.scout?.name || position.canonical_domain || 'Unknown',
       startupId,
       sector: legacy?.scout?.sector || null,
       stage: legacy?.scout?.funding_stage || null,
-      score: score == null ? null : Number(score),
+      score: null,
     };
   });
 }

@@ -38,6 +38,30 @@ class CriterionRule(BaseModel):
     required: bool = True
 
 
+class FactBand(BaseModel):
+    """A policy-owned lower bound and its fixed rubric anchor."""
+
+    minimum: float
+    score: float = Field(ge=0, le=10)
+    label: str = Field(min_length=1, max_length=100)
+
+
+class FactRule(BaseModel):
+    """A typed fact whose score is derived from published policy, not an LLM."""
+
+    claim_type: str = Field(min_length=1, max_length=100)
+    dimension: str = Field(min_length=1, max_length=100)
+    unit: Literal["usd", "percentage"]
+    bands: List[FactBand] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_descending_bands(self) -> "FactRule":
+        minima = [band.minimum for band in self.bands]
+        if minima != sorted(minima, reverse=True) or len(set(minima)) != len(minima):
+            raise ValueError("fact rule band minimums must be unique and descending")
+        return self
+
+
 class EvidenceEligibilityPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -121,6 +145,7 @@ class EvaluationPolicy(BaseModel):
     minimum_scored_weight: float = Field(gt=0, le=1)
     decision_safety: DecisionSafetyPolicy
     hard_exclusion_claim_types: List[str] = Field(min_length=1)
+    fact_rules: List[FactRule] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_threshold_order(self) -> "EvaluationPolicy":

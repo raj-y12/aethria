@@ -100,6 +100,21 @@ def test_compiled_published_policy_maps_to_evidence_evaluation_contract():
     assert {"market", "market_quality", "tam", "urgency"}.issubset(market.claim_types)
 
 
+def test_versioned_rubric_registers_typed_fact_claims_for_their_dimension():
+    rubric_path = Path(__file__).resolve().parents[3] / "resources/config/evaluation_rubric/v3.json"
+    policy = evaluation_policy_from_compiled(
+        _compiled_policy(),
+        partner_rules=_partner_rules(),
+        rubric=json.loads(rubric_path.read_text()),
+    )
+
+    fact_rules = {rule.claim_type: rule for rule in policy.fact_rules}
+    assert fact_rules["annualized_revenue_usd"].unit == "usd"
+    assert fact_rules["customer_retention_pct"].unit == "percentage"
+    execution = next(item for item in policy.criteria if item.criterion == "execution")
+    assert "annualized_revenue_usd" in execution.claim_types
+
+
 def test_compiled_policy_carries_versioned_decision_safety_contract():
     policy = evaluation_policy_from_compiled(
         _compiled_policy(),

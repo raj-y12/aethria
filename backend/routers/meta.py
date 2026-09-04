@@ -33,7 +33,6 @@ from meta.evaluator import run_prompt_evaluation
 from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
 from reviewer.engine import ReviewerEngine
-from partner.engine import PartnerEngine
 from fund_thesis import (
     FundThesisIncompleteError,
     bootstrap_default_thesis_with_repository,
@@ -525,11 +524,9 @@ _TRIAGE_OVERRIDE_HOUR_POLICY = RateLimitPolicy("triage_override_hour", limit=100
 @router.post("/api/startups/{startup_id}/triage-override")
 async def post_startup_triage_override(request: Request, startup_id: str, body: TriageOverrideBody):
     """
-    Manual "review it anyway" / "decide it anyway" action for a periodic-pipeline
-    startup that the triage funnel gates (confidence_threshold / decision_threshold)
-    left unreviewed or reviewed-but-undecided. Bypasses only that one gate -- the
-    reviewers_enabled/partners_enabled agent-enabled gate is bypassed too, since this
-    is an explicit human-triggered action, not an autonomous cycle.
+    Manual review action for a periodic-pipeline startup that the confidence gate
+    left unreviewed. A Partner decision is never an override of evidence: it needs a
+    current canonical evaluation produced by the evaluation workflow.
     """
     startup_id = validate_route_id(startup_id, field_name="startup_id")
     if body.stage not in ("review", "decide"):
@@ -580,16 +577,12 @@ async def post_startup_triage_override(request: Request, startup_id: str, body: 
         else:
             if startup.review_info is None:
                 raise HTTPException(status_code=409, detail="Startup has not been reviewed yet")
-            partner_engine = PartnerEngine(
-                storage=storage,
-                tenant_user_id=uid,
-                fund_thesis=thesis_ctx,
-                startup_repository=startup_repository,
-            )
-            done = await partner_engine.run_startup(
-                startup_id,
-                bypass_agent_enabled_gate=True,
-                startup=startup,
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A Partner decision requires a current canonical evaluation. "
+                    "Run an evidence evaluation for this opportunity before deciding."
+                ),
             )
     except FundThesisIncompleteError as e:
         raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")

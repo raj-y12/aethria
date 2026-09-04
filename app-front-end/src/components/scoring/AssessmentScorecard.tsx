@@ -5,8 +5,11 @@ import type {
   ScoringPresentation,
   StructuredScoring,
 } from '../../types/startup';
+import type { CriterionAssessment, RecommendationState } from '../../api/evaluations';
+import type { MemoClaimProvenance } from '../../lib/memoDecisionBrief';
 import { getScoreBand } from '../../design-system/semantics';
 import { tokens } from '../../design-system/tokens';
+import { safeHref } from '../../lib/memoReferenceHref';
 import { getEvidenceConfidenceLabel, isLowEvidence } from './ConfidenceIndicator';
 import {
   buildComponentDrivers,
@@ -35,10 +38,16 @@ interface AssessmentScorecardProps {
   reviewerConsensus: ScorecardReviewerConsensus;
   renderNumbers?: (value: unknown) => ReactNode;
   reduceMotion?: boolean;
+  /** Canonical score provenance, supplied only when the scorecard is backed by
+   * an immutable evaluation. This is deliberately separate from legacy review
+   * components so the UI never invents a ledger for historical scores. */
+  canonicalCriteria?: CriterionAssessment[];
+  canonicalClaims?: MemoClaimProvenance[];
+  canonicalRecommendationState?: RecommendationState | null;
+  canonicalRubricVersion?: string | null;
 }
 
 const METHOD_COPY = [
-  'Each dimension is scored 1–10 from extracted evidence — bands: 1–3 Weak · 4–5 Concerning · 6–7 Promising · 8–10 Strong.',
   'Overall = mean of Market, Product, Technical, Execution. Defensibility is a separate moat signal and is not averaged in.',
   'A dimension with no supporting evidence reads “Not scored” and is excluded from the overall. Evidence labels (Limited → Extensive) describe how well-supported a score is, separately from the score.',
 ];
@@ -60,6 +69,10 @@ export default function AssessmentScorecard({
   reviewerConsensus,
   renderNumbers = identity,
   reduceMotion = false,
+  canonicalCriteria = [],
+  canonicalClaims = [],
+  canonicalRecommendationState = null,
+  canonicalRubricVersion = null,
 }: AssessmentScorecardProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const idPrefix = useId();
@@ -71,10 +84,24 @@ export default function AssessmentScorecard({
       return next;
     });
 
-  const overallScore = presentation?.overall_score ?? scoring.overall_score;
-  const overallBand = presentation?.overall_band ?? getScoreBand(scoring.overall_score).label;
+  const insufficientEvidence = canonicalRecommendationState === 'insufficient_evidence';
+  const overallScore = insufficientEvidence ? null : (presentation?.overall_score ?? scoring.overall_score);
+  const overallBand = insufficientEvidence
+    ? 'Decision blocked by evidence'
+    : (presentation?.overall_band ?? getScoreBand(scoring.overall_score, presentation?.score_bands ?? undefined).label);
   const evidenceLabel =
     presentation?.confidence_label ?? getEvidenceConfidenceLabel(scoring.overall_confidence);
+  const bandCopy = (presentation?.score_bands ?? [])
+    .map((band) => `${band.min}–${band.max} ${band.label}`)
+    .join(' · ');
+  const methodCopy = [
+    `Each dimension is scored 1–10 from extracted evidence${bandCopy ? ` — bands: ${bandCopy}.` : '.'}`,
+    ...METHOD_COPY,
+    presentation?.policy_version_id ? `Policy: ${presentation.policy_version_id}.` : null,
+    canonicalRubricVersion ? `Rubric: ${canonicalRubricVersion}; anchors low 3, mid 5, high 8.` : null,
+    presentation?.stage_cohort_label ? `Stage cohort: ${presentation.stage_cohort_label}.` : null,
+    presentation?.sector_tam_benchmark ? `Market TAM benchmark: ${presentation.sector_tam_benchmark}.` : null,
+  ].filter((line): line is string => Boolean(line));
 
   // Driver-score dispersion (audit): the overall is a mean, so a flat 7 and a lopsided
   // [9,9,3,9] share a headline. Surface the spread so a reader sees the profile is uneven.
@@ -92,10 +119,21 @@ export default function AssessmentScorecard({
   const driverDims = dimensions.filter((d) => d.key !== 'defensibility');
   const moatDims = dimensions.filter((d) => d.key === 'defensibility');
 
+  const scoreBasis = driverDims
+    .map((dim) => {
+      const source = presentation?.dimensions?.find((item) => item.id === dim.key);
+      const dimension = scoring[dim.key];
+      const score = source?.score ?? (dimension.unscored ? null : dimension.score);
+      return score == null ? null : `${dim.label} ${score.toFixed(1)}`;
+    })
+    .filter((value): value is string => Boolean(value));
+
   const renderRow = (dim: ScorecardDimensionDef) => {
     const dimension = scoring[dim.key];
     if (!dimension) return null;
     const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
+    const canonicalCriterion = canonicalCriteria.find((criterion) => criterion.criterion === dim.key);
+    const criterionClaims = canonicalClaims.filter((claim) => claim.criterion === dim.key);
     const unscored = !presDim && dimension.unscored === true;
     const scoreText = unscored
       ? 'Not scored'
@@ -126,8 +164,9 @@ export default function AssessmentScorecard({
     const reasoning = allDrivers.length === 0 ? cleanReasoningList(dimension.reasoning) : [];
     const weaknesses = cleanReasoningList(dimension.weaknesses);
     const isOpen = expanded.has(dim.key);
+    const hasCanonicalLedger = Boolean(canonicalCriterion);
     const hasDetail =
-      evidence.length > 0 || gaps.length > 0 || reasoning.length > 0 || weaknesses.length > 0 || lowConfidence || unscored || disputed;
+      evidence.length > 0 || gaps.length > 0 || reasoning.length > 0 || weaknesses.length > 0 || lowConfidence || unscored || disputed || hasCanonicalLedger;
 
     const renderDriver = (d: (typeof allDrivers)[number]) => (
       <li key={d.id} className="memoScoreDriverItem">
@@ -135,7 +174,14 @@ export default function AssessmentScorecard({
           <span className="memoScoreDriverName">{d.label}</span>
           {d.tag && <span className="memoScoreDriverTag">{d.tag}</span>}
         </span>
+        {d.score != null && (
+          <span className="memoScoreDriverText memoScoreDriverMeta">
+            {renderNumbers(`${d.score.toFixed(1)}/10 · ${d.qualitative ? 'qualitative judgment' : `${Math.round((d.confidence ?? 0) * 100)}% confidence`}`)}
+          </span>
+        )}
         {d.text && <span className="memoScoreDriverText">{renderNumbers(d.text)}</span>}
+        {d.evidence && <span className="memoScoreDriverText">{renderNumbers(`Evidence: ${d.evidence}`)}</span>}
+        {d.rule && <span className="memoScoreDriverText">{renderNumbers(`Rule: ${d.rule}`)}</span>}
       </li>
     );
 
@@ -184,6 +230,41 @@ export default function AssessmentScorecard({
               style={{ overflow: 'hidden' }}
             >
               <div id={detailId} role="region" aria-label={`${dim.label} detail`} className="memoScoreDetail">
+                {canonicalCriterion && (
+                  <div className="memoScoreLedger" aria-label={`${dim.label} score ledger`}>
+                    <p className="memoScoreGroupLabel">Score ledger</p>
+                    {canonicalCriterion.score == null ? (
+                      <p className="memoScoreEvidenceNote">Not scored: {canonicalCriterion.missing_evidence.join('; ') || 'no eligible cited claim.'}</p>
+                    ) : (
+                      <p className="memoScoreEvidenceNote">
+                        Formula: lowest eligible policy anchor
+                        {Array.isArray(canonicalCriterion.deterministic_adjustments?.eligible_anchor_scores)
+                          ? ` (${canonicalCriterion.deterministic_adjustments.eligible_anchor_scores.join(', ')})`
+                          : ''}
+                        {`. Result: ${canonicalCriterion.score.toFixed(1)}/10.`}
+                      </p>
+                    )}
+                    {criterionClaims.length > 0 && (
+                      <ul className="memoScoreReasonList">
+                        {criterionClaims.map((claim) => (
+                          <li key={`${claim.claimId}-${claim.relationship}`} className="memoScoreReason">
+                            <span>{renderNumbers(`${claim.relationship === 'supports' ? 'Supports' : 'Contradicts'}: ${claim.claim}`)}</span>
+                            {claim.sources.length > 0 && (
+                              <span className="memoScoreDriverText memoScoreDriverMeta">
+                                Sources: {claim.sources.map((source, index) => (
+                                  <span key={source.artifactId}>
+                                    {index > 0 ? ' · ' : ''}
+                                    {source.href ? <a href={safeHref(source.href)} target="_blank" rel="noreferrer">{source.title}</a> : source.title}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 {evidence.length > 0 && (
                   <div>
                     {gaps.length > 0 && <p className="memoScoreGroupLabel">Evidence</p>}
@@ -243,8 +324,14 @@ export default function AssessmentScorecard({
       {/* Headline — overall score reads as a figure, band + evidence as a quiet tag. */}
       <div className="memoScoreHead">
         <p className="memoScoreHeadline">
-          <span className="memoScoreHeadlineValue">{renderNumbers(overallScore.toFixed(1))}</span>
-          <span className="memoScoreHeadlineMax">/ 10</span>
+          {overallScore == null ? (
+            <span className="memoScoreHeadlineValue">Not scored</span>
+          ) : (
+            <>
+              <span className="memoScoreHeadlineValue">{renderNumbers(overallScore.toFixed(1))}</span>
+              <span className="memoScoreHeadlineMax">/ 10</span>
+            </>
+          )}
           <span className="memoScoreHeadlineTag">
             {[overallBand, evidenceLabel ? `${evidenceLabel} evidence` : null].filter(Boolean).join('  ·  ')}
           </span>
@@ -257,7 +344,7 @@ export default function AssessmentScorecard({
           content={
             <div className="space-y-1.5">
               <p className="type-label-section">How this was scored</p>
-              {METHOD_COPY.map((line, i) => (
+              {methodCopy.map((line, i) => (
                 <p key={i} className="type-note leading-relaxed text-oxford/[0.72]">{renderNumbers(line)}</p>
               ))}
             </div>
@@ -266,6 +353,14 @@ export default function AssessmentScorecard({
           How scored
         </Popover>
       </div>
+      <p className="memoScoreBasis">
+        <strong>Score basis:</strong>{' '}
+        {insufficientEvidence
+          ? 'No headline score is shown because required evidence is missing or contradictory.'
+          : scoreBasis.length > 0
+          ? `${scoreBasis.join(' + ')}; overall is the mean of these scored dimensions. Unscored dimensions are excluded.`
+          : 'No driver has enough supporting evidence to contribute to the overall score.'}
+      </p>
       {dispersionLine && <p className="memoScoreSub">{renderNumbers(dispersionLine)}</p>}
 
       {/* Driver dimensions — these four make up the overall. Click a row to expand. */}

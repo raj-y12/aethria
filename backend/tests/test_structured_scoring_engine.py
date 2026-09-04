@@ -38,6 +38,7 @@ def test_scoring_output_shape_snapshot():
         "stage_cohort",
         "stage_cohort_label",
         "sector_tam_benchmark",
+        "score_bands",
         "calibration",
     }
     if result["market"]["unscored"]:
@@ -51,6 +52,7 @@ def test_scoring_output_shape_snapshot():
     assert "value_prop" in result["product"]["components"]
     assert "complexity" in result["technical"]["components"]
     assert "brand" in result["defensibility"]["components"]
+    assert result["score_bands"][0]["label"] == "Weak"
 
 
 def test_published_runtime_makes_scoring_environment_independent(monkeypatch):

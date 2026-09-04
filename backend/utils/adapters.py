@@ -10,7 +10,6 @@ from utils.timeutil import utcnow
 
 from uuid import uuid4
 from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials, AethriaView
-from utils.scoring import enrich_scores
 from utils.traction_extraction import extract_traction_facts
 
 
@@ -133,17 +132,24 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
     reviewed = _parse_timestamp(reviewer_output.get("reviewed_at"))
     if reviewed is None:
         reviewed = utcnow()
-    enriched = enrich_scores(reviewer_output)
+    # Reviewer output is qualitative research.  Never derive or persist a
+    # numerical assessment from it: canonical evaluation owns that contract.
+    enriched = reviewer_output
     return ReviewInfo(
-        market_score=enriched.get("market_score"),
-        product_score=enriched.get("product_score"),
-        technical_score=enriched.get("technical_score"),
-        execution_score=enriched.get("execution_score"),
-        defensibility_score=enriched.get("defensibility_score"),
+        policy_version_id=enriched.get("policy_version_id"),
+        policy_hash=enriched.get("policy_hash"),
+        rubric_version=enriched.get("rubric_version"),
+        scoring_runtime_version=enriched.get("scoring_runtime_version"),
+        scoring_runtime_hash=enriched.get("scoring_runtime_hash"),
+        market_score=None,
+        product_score=None,
+        technical_score=None,
+        execution_score=None,
+        defensibility_score=None,
         overall_summary=enriched.get("overall_summary", ""),
         key_risks=enriched.get("key_risks", []),
         verdict=enriched.get("verdict", "MEDIUM"),
-        derived_verdict=enriched.get("derived_verdict"),
+        derived_verdict=None,
         diligence_red_flags=enriched.get("diligence_red_flags", []),
         assumption_feedback=enriched.get("assumption_feedback") or [],
         reviewer_agent_id=enriched.get("reviewer_agent_id"),
@@ -157,8 +163,8 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         capability_slope=enriched.get("capability_slope") or None,
         reframe=enriched.get("reframe") or None,
         evidence_coverage=enriched.get("evidence_coverage"),
-        score_reasoning=enriched.get("score_reasoning") or None,
-        score_source=enriched.get("score_source"),
+        score_reasoning=None,
+        score_source=None,
         improvement_to_9=enriched.get("improvement_to_9") or None,
         market_reasoning=enriched.get("market_reasoning") or None,
         market_weaknesses=enriched.get("market_weaknesses") or None,
@@ -175,13 +181,13 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         defensibility_reasoning=enriched.get("defensibility_reasoning") or None,
         defensibility_weaknesses=enriched.get("defensibility_weaknesses") or None,
         defensibility_confidence=enriched.get("defensibility_confidence"),
-        overall_score=enriched.get("overall_score"),
-        overall_label=enriched.get("overall_label"),
-        market_score_label=enriched.get("market_score_label"),
-        product_score_label=enriched.get("product_score_label"),
-        technical_score_label=enriched.get("technical_score_label"),
-        execution_score_label=enriched.get("execution_score_label"),
-        defensibility_score_label=enriched.get("defensibility_score_label"),
+        overall_score=None,
+        overall_label=None,
+        market_score_label=None,
+        product_score_label=None,
+        technical_score_label=None,
+        execution_score_label=None,
+        defensibility_score_label=None,
         prompt_version=enriched.get("prompt_version"),
         fund_thesis_version_id=enriched.get("fund_thesis_version_id"),
         thesis_alignment_score=enriched.get("thesis_alignment_score"),
@@ -191,9 +197,12 @@ def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInf
         thesis_deviation_points=enriched.get("thesis_deviation_points") or None,
         thesis_alignment_confidence=enriched.get("thesis_alignment_confidence"),
         fund_thesis_alignment_score=enriched.get("fund_thesis_alignment_score"),
-        confidence_adjusted_score=enriched.get("confidence_adjusted_score"),
-        structured_scoring=enriched.get("structured_scoring"),
-        structured_signals=enriched.get("structured_signals"),
+        confidence_adjusted_score=None,
+        structured_scoring=None,
+        # A reviewer signal matrix was part of the retired secondary scoring
+        # path. Do not allow an old payload to re-enter persistence through an
+        # adapter call; canonical evidence claims own structured assessment.
+        structured_signals=None,
         resolution_notes=enriched.get("resolution_notes") or None,
         disagreement_summary=enriched.get("disagreement_summary"),
         aethria_view=_coerce_aethria_view(enriched.get("aethria_view")),

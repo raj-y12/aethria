@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from core.policy_resolver import get_active_meta_snapshot
 from fund_intelligence.observations import build_observations
 
 
@@ -48,7 +49,10 @@ def test_criterion_tradeoff_retains_contradictory_cases_and_uses_canonical_bands
     assert observation["direction"] == "strong technical / weak execution"
     assert observation["supporting_case_ids"] == ["support-1", "support-2", "support-3"]
     assert observation["contradictory_case_ids"] == ["contradiction"]
-    assert observation["score_band_source"] == "resources/config/evaluation_rubric/v1.json"
+    assert observation["score_band_source"] == (
+        "resources/config/evaluation_rubric/"
+        f"{get_active_meta_snapshot()['evaluation_rubric']}.json"
+    )
     assert observation["value_ranges"] == {"technical": "strong", "execution": "weak"}
 
 

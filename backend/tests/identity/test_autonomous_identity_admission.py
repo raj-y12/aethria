@@ -77,6 +77,48 @@ def test_same_name_with_different_domains_remains_distinguishable():
     assert first.observed_domain != second.observed_domain
 
 
+@pytest.mark.asyncio
+async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch):
+    """Several Scout observations must not create competing evaluations."""
+    calls = []
+
+    class EvaluationRepository:
+        def __init__(self, pool):
+            assert pool is pool_marker
+
+        async def evaluate(self, **kwargs):
+            calls.append(kwargs)
+            return {}
+
+    class Prerequisites:
+        policy = object()
+        thesis_version_id = "thesis-v1"
+
+    pool_marker = object()
+    monkeypatch.setattr(pipeline_runner, "EvaluationRepository", EvaluationRepository)
+
+    count = await pipeline_runner._evaluate_admitted_periodic_discoveries(
+        user_id="fund-a",
+        admissions=[
+            SimpleNamespace(opportunity_id="opportunity-1", blocks_evaluation=False),
+            SimpleNamespace(opportunity_id="opportunity-1", blocks_evaluation=False),
+            SimpleNamespace(opportunity_id="opportunity-2", blocks_evaluation=True),
+        ],
+        evaluation_prerequisites=Prerequisites(),
+        postgres_pool=pool_marker,
+    )
+
+    assert count == 1
+    assert calls == [{
+        "user_id": "fund-a",
+        "opportunity_id": "opportunity-1",
+        "actor_id": "fund-a",
+        "trigger_type": "periodic_discovery",
+        "policy": Prerequisites.policy,
+        "thesis_version_id": "thesis-v1",
+    }]
+
+
 class _Storage:
     def __init__(self, surviving):
         self.surviving = set(surviving)

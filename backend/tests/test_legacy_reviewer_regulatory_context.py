@@ -231,7 +231,8 @@ def test_non_default_personas_use_compact_contract_but_keep_divergence_fields():
     assert "business_model_analysis" not in completions.prompt
     assert "investment_thesis" not in completions.prompt
     assert "risk_mitigation" not in completions.prompt
-    assert "COMPLETE structured_signals" in completions.prompt
+    assert "do NOT output numeric *_score" in completions.prompt
+    assert "structured_signals" not in result
     assert result["prompt_version"]
 
 

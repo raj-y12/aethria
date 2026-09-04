@@ -37,11 +37,11 @@ def test_pass_opening_not_monitor():
     out = eng.decide(
         _scout(),
         _review(market_score=5, product_score=5, technical_score=5, execution_score=5),
+        canonical_recommendation="pass",
     )
     assert out.get("recommendation") == "PASS"
     rl = (out.get("rationale") or "").lower()
-    assert "we pass at this stage" in rl
-    assert "we monitor at this stage" not in rl
+    assert "canonical evaluation recommends pass" in rl
 
 
 def test_monitor_opening_not_pass():
@@ -49,11 +49,11 @@ def test_monitor_opening_not_pass():
     out = eng.decide(
         _scout(),
         _review(market_score=7, product_score=7, technical_score=7, execution_score=7),
+        canonical_recommendation="monitor",
     )
     assert out.get("recommendation") == "MONITOR"
     rl = (out.get("rationale") or "").lower()
-    assert "we monitor at this stage" in rl
-    assert "we pass at this stage" not in rl
+    assert "canonical evaluation recommends monitor" in rl
 
 
 def test_invest_opening_not_pass():
@@ -67,11 +67,11 @@ def test_invest_opening_not_pass():
             technical_score=8,
             execution_score=8,
         ),
+        canonical_recommendation="advance",
     )
     assert out.get("recommendation") == "INVEST"
     rl = (out.get("rationale") or "").lower()
-    assert "confirmatory diligence" in rl
-    assert "we pass at this stage" not in rl
+    assert "canonical evaluation recommends advance" in rl
 
 
 def test_decision_drivers_nonempty_when_weak_verdict():
@@ -85,8 +85,9 @@ def test_decision_drivers_nonempty_when_weak_verdict():
             technical_score=4,
             execution_score=4,
         ),
+        canonical_recommendation="pass",
     )
     assert out.get("recommendation") == "PASS"
     drivers = out.get("decision_drivers") or []
     assert isinstance(drivers, list)
-    assert drivers and drivers[0] == "weak_verdict"
+    assert drivers and drivers[0] == "canonical_pass"

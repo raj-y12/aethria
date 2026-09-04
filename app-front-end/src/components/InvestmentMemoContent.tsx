@@ -3,7 +3,6 @@ import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
 import type { ScoringDimensionKey, SignalItem, Startup } from '../types/startup';
-import { normalizeStructuredScoring } from '../lib/reviewScoring';
 import { canonicalCriteriaToStructuredScoring } from '../lib/canonicalScoring';
 import { getPipelineReplaySteps } from '../lib/memoIcPack';
 import { UI_DETAIL_EMPTY_HINT } from '../design-system/ui-text';
@@ -60,7 +59,6 @@ import {
   collapseWhitespace,
   clipText,
   leadSentences,
-  reviewerMeanScore,
   buildInvestmentCase,
   cleanFactValue,
   buildSnapshotRows,
@@ -323,9 +321,8 @@ function InvestmentMemoContent(
       }),
     [displayStartup, companyResolution],
   );
-  // Canonical evaluate_snapshot() criteria are the score authority when present;
-  // legacy reviewer structured_scoring is the fallback for opportunities without
-  // one yet (see docs/archive/plans/2026-08-17-reviewer-scoring-collapse.md).
+  // Canonical evaluation criteria are the sole score authority. Reviewer output
+  // remains qualitative diligence context and never becomes a fallback scorecard.
   const canonicalStructuredScoring = useMemo(
     () => canonicalCriteriaToStructuredScoring(canonicalEvaluation),
     [canonicalEvaluation]
@@ -358,17 +355,9 @@ function InvestmentMemoContent(
     () => (displayStartup ? findPrecedentCandidates(displayStartup, peerStartups) : []),
     [displayStartup, peerStartups]
   );
-  const structuredScoring = useMemo(
-    () => canonicalStructuredScoring ?? normalizeStructuredScoring(displayStartup?.review ?? null),
-    [canonicalStructuredScoring, displayStartup?.review]
-  );
+  const structuredScoring = canonicalStructuredScoring;
 
-  // scoring_presentation is a legacy narrative layer built from reviewer's own
-  // dimension values — only valid alongside the legacy scoring, never canonical's.
-  const scoringPresentation = useMemo(
-    () => (canonicalStructuredScoring ? null : (displayStartup?.review?.scoring_presentation ?? null)),
-    [canonicalStructuredScoring, displayStartup?.review]
-  );
+  const scoringPresentation = null;
   const thesisSection = useMemo(() => {
     const review = displayStartup?.review;
     if (!review) {
@@ -457,18 +446,13 @@ function InvestmentMemoContent(
       .map((rv) => ({
         key: rv.reviewer_type,
         name: REVIEWER_LABELS[rv.reviewer_type] ?? rv.reviewer_type,
-        score: reviewerMeanScore(rv),
-        verdict: rv.verdict,
+        score: null as number | null,
+        verdict: undefined,
         // Lead sentence only — the reviewer's full read lives in Reviewer detail. Keeps the
         // consensus panel compact instead of stacking a full paragraph per reviewer.
         take: leadSentences(rv.overall_summary, 140),
-        // A low score on thin data is a measurement, not a verdict. Without this
-        // the panel showed a bare "2.0" beside an upbeat sentence and the two read
-        // as a contradiction. Despite its backend name, evidence_coverage is the
-        // fraction of rubric sub-criteria that had ANY extractable signal (not
-        // missing_data_applied) -- it says nothing about whether that signal was
-        // independently verified. Labelled "data coverage" below, not "evidenced",
-        // so it never reads as a verification claim.
+        // Reviewer coverage remains qualitative diligence context; reviewer
+        // numbers are never rendered or blended into canonical scoring.
         coverage: typeof rv.evidence_coverage === 'number' ? rv.evidence_coverage : null,
       }))
       .filter((row) => row.score != null || row.take);
@@ -482,14 +466,10 @@ function InvestmentMemoContent(
     const spread = min != null && max != null ? max - min : null;
     const split =
       displayStartup?.review?.reviewer_disagreement === true || (spread != null && spread >= 2);
-    const verdict =
-      displayStartup?.review?.consensus_verdict ?? displayStartup?.review?.derived_verdict ?? null;
-    return { min, max, spread, split, verdict };
+    return { min, max, spread, split, verdict: null };
   }, [
     reviewerConsensusRows,
     displayStartup?.review?.reviewer_disagreement,
-    displayStartup?.review?.consensus_verdict,
-    displayStartup?.review?.derived_verdict,
   ]);
   // The house upward reveal (see Reveal.tsx), fired as each document section scrolls
   // into view. Shared by every numbered section so the motion stays uniform.
@@ -729,7 +709,7 @@ function InvestmentMemoContent(
                 { label: 'Business Model', items: bizItems },
               ].filter((section) => section.items.length > 0);
               const hasScorecard = showScores && !!structuredScoring;
-              const hasPanel = reviewerConsensusRows.length > 0;
+              const hasPanel = Boolean(canonicalStructuredScoring) && reviewerConsensusRows.length > 0;
               const hasDeepDive = assessmentReadouts.length > 0;
               if (!hasScorecard && !hasPanel && !hasDeepDive) {
                 return null;
@@ -747,6 +727,10 @@ function InvestmentMemoContent(
                         reviewerConsensus={reviewerConsensus}
                         renderNumbers={renderWithMonoNumbers}
                         reduceMotion={reduceMotion}
+                        canonicalCriteria={canonicalEvaluation?.criteria}
+                        canonicalClaims={mastheadBrief.claims}
+                        canonicalRecommendationState={canonicalEvaluation?.recommendation?.recommended_state}
+                        canonicalRubricVersion={canonicalEvaluation?.evaluation.rubric_version}
                       />
                     </div>
                   ) : hasPanel ? (

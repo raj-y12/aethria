@@ -56,24 +56,13 @@ describe('getVisibleRecommendation', () => {
 });
 
 describe('getQueueConvictionPct / formatQueueConviction', () => {
-  it('scales a 0-10 overall score to 0-100', () => {
-    expect(getQueueConvictionPct(ctx({ startup: startup({ review: { overall_score: 7 }, scout: {} }), configuredScore: 0 }))).toBe(70);
+  it('does not turn legacy reviewer, configured, or Scout values into conviction', () => {
+    expect(getQueueConvictionPct(ctx({ startup: startup({ review: { overall_score: 7 }, scout: {} }), configuredScore: 0 }))).toBeNull();
+    expect(getQueueConvictionPct(ctx({ startup: startup({ scout: {} }), configuredScore: 60 }))).toBeNull();
+    expect(getQueueConvictionPct(ctx({ startup: startup({ scout: { confidence: 0.4 } }), configuredScore: 0 }))).toBeNull();
   });
 
-  it('passes through an already-0-100 score', () => {
-    expect(getQueueConvictionPct(ctx({ startup: startup({ review: { overall_score: 85 }, scout: {} }), configuredScore: 0 }))).toBe(85);
-  });
-
-  it('falls back to configuredScore, then scout confidence, then null', () => {
-    expect(getQueueConvictionPct(ctx({ startup: startup({ scout: {} }), configuredScore: 60 }))).toBe(60);
-    expect(
-      getQueueConvictionPct(ctx({ startup: startup({ scout: { confidence: 0.4 } }), configuredScore: 0 })),
-    ).toBe(40);
-    expect(getQueueConvictionPct(ctx({ startup: startup({ scout: {} }), configuredScore: 0 }))).toBeNull();
-  });
-
-  it('formats as x.x/10, or em-dash when unknown', () => {
-    expect(formatQueueConviction(ctx({ startup: startup({ review: { overall_score: 7 }, scout: {} }), configuredScore: 0 }))).toBe('7.0/10');
+  it('formats unavailable conviction as an em dash', () => {
     expect(formatQueueConviction(ctx({ startup: startup({ scout: {} }), configuredScore: 0 }))).toBe('—');
   });
 });

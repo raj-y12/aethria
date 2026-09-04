@@ -550,6 +550,17 @@ def _partner_for_stage(entries, *, cost_controller=None, outcome=(True, None)):
     engine.settings = {"agent_config": {"partners_enabled": True}, "cost_budget": {"enabled": False}}
     engine._get_undecided_entries = lambda *, limit=None: list(entries)[:limit]
 
+    async def load_canonical(_startup_id):
+        return {
+            "recommendation": {"recommended_state": "monitor", "confidence": 0.8},
+            "criteria": [
+                {"criterion": dimension, "score": 8.0, "evidence_sufficiency": "sufficient"}
+                for dimension in ("market", "product", "technical", "execution")
+            ],
+        }
+
+    engine.canonical_evaluation_loader = load_canonical
+
     async def decide(*_args, **_kwargs):
         if isinstance(outcome, Exception):
             raise outcome
@@ -568,9 +579,8 @@ def _partner_entry(startup_id="startup-1"):
     return {
         "id": startup_id,
         "scout": {"name": "Typed Stage Co", "primary_thesis": ""},
-        # Scores clear the decision_threshold gate (default 0.55) so these
-        # cases exercise budget/persistence/exception accounting, not the
-        # unrelated score-threshold gate.
+        # Reviewer scores are deliberately irrelevant here: the fixture's
+        # canonical loader authorizes the decision path under test.
         "review": {
             "market_score": 8,
             "product_score": 8,

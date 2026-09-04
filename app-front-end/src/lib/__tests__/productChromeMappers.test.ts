@@ -62,10 +62,8 @@ function evaluationRecord(criteria: CriterionAssessment[]): EvaluationRecord {
 }
 
 describe('buildLookupSnapshotProps', () => {
-  it('falls back to legacy reviewer scores when no canonical evaluation exists', () => {
-    const props = buildLookupSnapshotProps(startup(), undefined, undefined, null);
-    const product = props!.dimensions.find((d) => d.key === 'product');
-    expect(product?.score).toBe(6);
+  it('does not render a score snapshot without a canonical evaluation', () => {
+    expect(buildLookupSnapshotProps(startup(), undefined, undefined, null)).toBeNull();
   });
 
   it('shows a dimension as unscored (null) when canonical evidence is insufficient, even though legacy has a number', () => {

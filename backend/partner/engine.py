@@ -7,7 +7,7 @@ import copy
 import json
 import logging
 import os
-from typing import List, Optional, Dict, Any, Tuple
+from typing import Awaitable, Callable, List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from utils.timeutil import utcnow
 
@@ -23,7 +23,6 @@ from compatibility_projection import project_scout_for_runtime
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from models import EvaluationManifestIdentity
 from pipeline_execution import StageExecutionResult
-from utils.scoring import compute_overall_score
 
 
 logger = logging.getLogger(__name__)
@@ -58,6 +57,9 @@ class PartnerEngine:
         include_deal_context_digest: Optional[bool] = None,
         settings: Optional[Dict[str, Any]] = None,
         startup_repository: Any = None,
+        canonical_evaluation_loader: Optional[
+            Callable[[str], Awaitable[Optional[Dict[str, Any]]]]
+        ] = None,
     ):
         """
         Initialize the Partner engine.
@@ -71,6 +73,10 @@ class PartnerEngine:
         self.tenant_user_id = require_user_id(inferred, context="PartnerEngine")
         self.storage = storage
         self.startup_repository = startup_repository
+        # Periodic governed decisions receive their evidence-backed evaluation
+        # through this explicit tenant-scoped boundary.  Do not let a Reviewer
+        # score become an implicit fallback when it is absent.
+        self.canonical_evaluation_loader = canonical_evaluation_loader
         self.interval_seconds = interval_seconds
         self.agent_id = agent_id
         self.cost_controller = cost_controller
@@ -188,11 +194,13 @@ class PartnerEngine:
             "id": startup.startup_id,
             "scout": scout_runtime,
             "review": {
-                "market_score": review_info.market_score,
-                "product_score": review_info.product_score,
-                "technical_score": review_info.technical_score,
-                "execution_score": review_info.execution_score,
-                "defensibility_score": getattr(review_info, "defensibility_score", None),
+                # Reviewer scores are retired data.  Do not forward even
+                # historical values into Partner's handoff payload.
+                "market_score": None,
+                "product_score": None,
+                "technical_score": None,
+                "execution_score": None,
+                "defensibility_score": None,
                 "overall_summary": review_info.overall_summary,
                 "key_risks": review_info.key_risks,
                 "verdict": review_info.verdict,
@@ -202,21 +210,19 @@ class PartnerEngine:
                 "business_model_analysis": getattr(review_info, "business_model_analysis", None) or [],
                 "investment_thesis": getattr(review_info, "investment_thesis", None) or [],
                 "risk_mitigation": getattr(review_info, "risk_mitigation", None) or [],
-                "score_reasoning": getattr(review_info, "score_reasoning", None) or {},
+                "score_reasoning": {},
                 "reviewer_disagreement": getattr(review_info, "reviewer_disagreement", False),
-                "score_variance": getattr(review_info, "score_variance", None),
-                "derived_verdict": getattr(review_info, "derived_verdict", None),
+                "score_variance": None,
+                "derived_verdict": None,
                 "thesis_alignment_score": getattr(review_info, "thesis_alignment_score", None),
                 "thesis_alignment_state": getattr(review_info, "thesis_alignment_state", None),
                 "thesis_matches_fund": getattr(review_info, "thesis_matches_fund", None),
                 "thesis_fit_points": getattr(review_info, "thesis_fit_points", None) or [],
                 "thesis_deviation_points": getattr(review_info, "thesis_deviation_points", None) or [],
                 "thesis_alignment_confidence": getattr(review_info, "thesis_alignment_confidence", None),
-                "confidence_adjusted_score": getattr(
-                    review_info, "confidence_adjusted_score", None
-                ),
-                "structured_scoring": getattr(review_info, "structured_scoring", None),
-                "structured_signals": getattr(review_info, "structured_signals", None),
+                "confidence_adjusted_score": None,
+                "structured_scoring": None,
+                "structured_signals": None,
                 "resolution_notes": getattr(review_info, "resolution_notes", None),
                 "disagreement_summary": getattr(review_info, "disagreement_summary", None),
                 "contradiction_guard": getattr(review_info, "contradiction_guard", None),
@@ -536,26 +542,9 @@ class PartnerEngine:
         
         self.logger.info(f"Found {len(undecided)} entries awaiting partner decision")
 
-        # Triage funnel gate 2 (product direction, 2026-08-18): reviewed
-        # companies scoring under 55% overall don't get an automatic
-        # decision -- they stay "reviewed, not decided" until a human
-        # requests one explicitly via run_startup (which has no such gate).
-        # Uses the same compute_overall_score() the reviewer/memo layers
-        # already treat as the primary score (avg of market/product/
-        # technical/execution) rather than inventing a new one. Missing
-        # core-dimension data -> None -> fails closed (not decided), per
-        # invariant #5 -- never a plausible guess on incomplete data.
-        try:
-            decision_threshold = max(0.0, min(1.0, float(
-                (self.settings.get("agent_config") or {}).get("decision_threshold", 0.55)
-            )))
-        except (TypeError, ValueError):
-            decision_threshold = 0.55
-
         decided_count = 0
         failed_count = 0
         blocked_count = 0
-        skipped_below_threshold = 0
         self.last_cycle_escalations = 0
 
         # Process each entry
@@ -563,10 +552,33 @@ class PartnerEngine:
             entry_id = entry["id"]
             scout_output = entry["scout"]
             review_output = entry["review"]
-
-            overall_score = compute_overall_score(review_output)
-            if overall_score is None or (overall_score / 10.0) < decision_threshold:
-                skipped_below_threshold += 1
+            canonical_evaluation: Optional[Dict[str, Any]] = None
+            canonical_evaluation_loader = getattr(
+                self, "canonical_evaluation_loader", None
+            )
+            if canonical_evaluation_loader is None:
+                self.logger.warning(
+                    "Partner blocked startup_id=%s: canonical evaluation loader unavailable",
+                    entry_id,
+                )
+                blocked_count += 1
+                continue
+            try:
+                canonical_evaluation = await canonical_evaluation_loader(entry_id)
+            except Exception as exc:
+                self.logger.warning(
+                    "Partner blocked startup_id=%s: canonical evaluation load failed: %s",
+                    entry_id,
+                    exc,
+                )
+                blocked_count += 1
+                continue
+            if not isinstance(canonical_evaluation, dict):
+                self.logger.info(
+                    "Partner blocked startup_id=%s: canonical evaluation unavailable",
+                    entry_id,
+                )
+                blocked_count += 1
                 continue
 
             try:
@@ -592,6 +604,21 @@ class PartnerEngine:
                     scout_output,
                     review_output,
                     pipeline_run_id,
+                    canonical_recommendation=(
+                        (canonical_evaluation.get("recommendation") or {}).get("recommended_state")
+                        if canonical_evaluation is not None
+                        else None
+                    ),
+                    canonical_criteria=(
+                        canonical_evaluation.get("criteria")
+                        if canonical_evaluation is not None
+                        else None
+                    ),
+                    canonical_confidence=(
+                        (canonical_evaluation.get("recommendation") or {}).get("confidence")
+                        if canonical_evaluation is not None
+                        else None
+                    ),
                 )
 
                 if success and decision:
@@ -630,9 +657,11 @@ class PartnerEngine:
                 continue
         
         self.logger.info(
-            f"Decision cycle complete: {decided_count}/{len(undecided)} decisions successful "
-            f"({skipped_below_threshold} below decision_threshold={decision_threshold:.2f}, "
-            "reviewed but not decided)"
+            "Decision cycle complete: %s/%s decisions successful (%s blocked by "
+            "missing or unavailable canonical evaluation)",
+            decided_count,
+            len(undecided),
+            blocked_count,
         )
 
         # "attempted" means "considered this cycle", matching reviewer/engine.py's
@@ -654,55 +683,46 @@ class PartnerEngine:
                 succeeded=decided_count,
                 failed=failed_count,
                 blocked=blocked_count,
-                skipped=skipped_below_threshold,
+                skipped=0,
             )
         if blocked_count:
             if decided_count:
                 return StageExecutionResult.failed_result(
                     stage="partner",
-                    code="partner_partial_budget_block",
+                    code="partner_partial_canonical_evaluation_block",
                     detail=(
                         f"Partner completed {decided_count} of {attempted_count} "
-                        "attempted candidates before the budget blocked remaining work."
+                        "attempted candidates; remaining candidates have no current "
+                        "canonical evaluation."
                     ),
                     recovery_action=(
-                        "Increase the Partner budget or wait for the budget window "
-                        "to reset, then retry the blocked candidates."
+                        "Evaluate the blocked candidates against the active policy, "
+                        "then retry."
                     ),
                     attempted=attempted_count,
                     succeeded=decided_count,
                     failed=0,
                     blocked=blocked_count,
-                    skipped=skipped_below_threshold,
+                    skipped=0,
                 )
             return StageExecutionResult.blocked_result(
                 stage="partner",
-                code="partner_budget_blocked",
-                detail="Partner budget denied all eligible work in this cycle.",
+                code="partner_canonical_evaluation_blocked",
+                detail="Partner could not decide because no eligible candidate has a current canonical evaluation.",
                 recovery_action=(
-                    "Increase the Partner budget or wait for the budget window "
-                    "to reset, then retry."
+                    "Evaluate the blocked candidates against the active policy, then retry."
                 ),
                 attempted=attempted_count,
                 blocked=blocked_count,
-                skipped=skipped_below_threshold,
+                skipped=0,
             )
         if decided_count == 0:
-            # Every candidate this cycle was below decision_threshold --
-            # "completed" requires succeeded > 0, and this isn't a failure
-            # or a budget block, it's the triage gate correctly doing its
-            # job. Matches the "no eligible work" skipped_result pattern
-            # already used above for the empty-undecided-list case.
             return StageExecutionResult.skipped_result(
                 stage="partner",
-                code="partner_all_below_decision_threshold",
-                detail=(
-                    f"All {attempted_count} reviewed candidate(s) scored below "
-                    f"decision_threshold={decision_threshold:.2f}; none decided "
-                    "automatically this cycle."
-                ),
+                code="partner_no_decisions",
+                detail="Partner did not produce a decision for any eligible candidate.",
                 attempted=attempted_count,
-                skipped=skipped_below_threshold,
+                skipped=0,
             )
         return StageExecutionResult.completed(
             stage="partner",
@@ -710,7 +730,7 @@ class PartnerEngine:
             detail=f"Partner completed {decided_count} eligible candidate(s).",
             attempted=attempted_count,
             succeeded=decided_count,
-            skipped=skipped_below_threshold,
+            skipped=0,
         )
 
     async def run_startup(
@@ -732,8 +752,8 @@ class PartnerEngine:
         bypass_agent_enabled_gate: when True, run even if partners are disabled in settings
         (used for occasional on-demand company lookup only).
         canonical_recommendation: the canonical evaluator's recommendation state for
-        this opportunity, when already computed (on-demand lookup only for now — the
-        periodic pipeline cycle isn't bridged to canonical evaluation yet).
+        this opportunity. A Partner decision requires a canonical evaluation;
+        Reviewer scores are research context, never a decision fallback.
         canonical_criteria: the canonical evaluation's per-criterion assessments, when
         already computed — supersedes Reviewer's own structured_scoring for the
         evidence-coverage gate and disagreement detection.
@@ -754,6 +774,12 @@ class PartnerEngine:
         entry = self._entry_from_startup(startup)
         if entry is None:
             self.logger.info("Startup is not ready for partner decision: %s", startup_id)
+            return False
+        if not isinstance(canonical_criteria, list):
+            self.logger.warning(
+                "Partner blocked startup_id=%s: canonical evaluation unavailable",
+                startup_id,
+            )
             return False
         try:
             success, decision = await self._decide_and_save(

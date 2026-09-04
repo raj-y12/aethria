@@ -29,6 +29,7 @@ _TRACE_METADATA_FIELDS = frozenset(
         "stage_cohort",
         "stage_cohort_label",
         "sector_tam_benchmark",
+        "score_bands",
         "calibration",
         "scoring_runtime_version",
         "scoring_runtime_hash",

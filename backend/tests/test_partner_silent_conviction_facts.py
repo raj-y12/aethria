@@ -25,35 +25,33 @@ def _review(**overrides):
     return review
 
 
-def test_red_flag_keyword_is_named_not_just_a_silent_conviction_penalty():
+def test_reviewer_red_flag_does_not_override_a_canonical_recommendation():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     # A real red_flag_keyword (resources/config/partner_rules) — this predicate
     # previously only flipped human_review_required, with no visible reason.
     review = _review(key_risks=["Founder background check is missing."])
 
-    out = engine.decide(_scout(), review)
+    out = engine.decide(_scout(), review, canonical_recommendation="advance")
 
-    assert "red_flag_language_in_key_risks" in out["decision_drivers"]
+    assert out["decision_drivers"] == ["canonical_advance"]
 
 
-def test_large_pre_seed_portfolio_penalty_is_named_not_silent():
+def test_portfolio_size_does_not_apply_a_hidden_adjustment_to_canonical_recommendation():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     engine.portfolio_store = _FakePortfolioStore(total=25, sector_counts={})
 
-    out = engine.decide(_scout(funding_stage="Pre-Seed"), _review())
+    out = engine.decide(_scout(funding_stage="Pre-Seed"), _review(), canonical_recommendation="advance")
 
-    assert "large_portfolio_pre_seed_caution" in out["decision_drivers"]
+    assert out["decision_drivers"] == ["canonical_advance"]
 
 
-def test_sector_concentration_penalty_is_named_not_only_prose():
+def test_sector_concentration_does_not_apply_a_hidden_adjustment_to_canonical_recommendation():
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     engine.portfolio_store = _FakePortfolioStore(total=5, sector_counts={"B2B SaaS": 3})
 
-    out = engine.decide(_scout(), _review())
+    out = engine.decide(_scout(), _review(), canonical_recommendation="advance")
 
-    assert "portfolio_sector_concentration" in out["decision_drivers"]
-    # The existing prose sentence still fires too — this is additive, not a replacement.
-    assert "sizing discipline" in out["decision_rationale"]
+    assert out["decision_drivers"] == ["canonical_advance"]
 
 
 class _FakePortfolioStore:

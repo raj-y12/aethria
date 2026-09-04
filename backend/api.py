@@ -287,7 +287,6 @@ async def _save_settings_for_pool(settings: dict, user_id: str, pool: Any) -> No
     if inspect.isawaitable(result):
         await result
 from services.scoring.policy_compiler import PolicyValidationError, compile_policy_from_fund_config
-from services.scoring.presentation_layer import serialize_scoring_presentation
 from portfolio.store import PortfolioStore
 from portfolio.rejection import RejectionAnalyzer
 from portfolio.cost_control import CostController
@@ -352,8 +351,6 @@ from fund_thesis_repository import FundThesisRepository
 from models import FundConfig, FundMemory, Startup, UserPreferences
 from conviction_state import build_conviction_patch
 from core import policy_resolver
-from utils.scoring import compute_overall_score, enrich_scores, score_to_label
-from utils.score_semantics import rubric_band_for_numeric
 from utils.partner_codes import (
     LEGACY_TO_RECOMMENDATION,
     legacy_ruling_from_institutional,
@@ -1706,21 +1703,11 @@ def _default_queue_reason(raw: Dict[str, Any]) -> str:
 
 def _default_priority_reason(raw: Dict[str, Any]) -> str:
     scout = raw.get("scout_info") if isinstance(raw.get("scout_info"), dict) else {}
-    review = raw.get("review_info") if isinstance(raw.get("review_info"), dict) else {}
     sector = (scout.get("sector") or "").split("/")[0].strip()
-    score = review.get("overall_score") or review.get("aggregate_score")
-    if not isinstance(score, (int, float)):
-        nums = [
-            review.get("market_score"),
-            review.get("product_score"),
-            review.get("technical_score"),
-            review.get("execution_score"),
-        ]
-        vals = [float(v) for v in nums if isinstance(v, (int, float))]
-        score = (sum(vals) / len(vals) * 10) if vals else None
-    elif score <= 10:
-        score = score * 10
-    parts = [f"Priority {round(float(score))}" if isinstance(score, (int, float)) else "Priority pending"]
+    # Reviewer scores are qualitative diligence artifacts. A list projection
+    # cannot claim an evidence-backed priority until it carries a canonical
+    # evaluation, so do not reconstruct a numeric score from legacy fields.
+    parts = ["Priority pending"]
     reason = _default_queue_reason(raw).rstrip(".")
     if reason:
         parts.append(reason)
@@ -1782,52 +1769,8 @@ def _partner_dict_for_frontend(partner: dict) -> dict:
 
 
 def _enrich_review_for_api_payload(review: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Pipeline writes enriched review payloads via adapters and reviewer engine.
-    Set SKIP_READ_ENRICH_SCORES=1 to skip redundant enrich_scores() on GET when rows
-    already carry overall_score and at least one overall label/band field.
-    """
-    if os.getenv("SKIP_READ_ENRICH_SCORES", "").strip().lower() in ("1", "true", "yes"):
-        if review.get("overall_score") is not None and (
-            review.get("overall_label") is not None or review.get("overall_rubric_band") is not None
-        ):
-            return dict(review)
-    return enrich_scores(review)
-
-
-def _mirror_structured_scoring_aliases(review: Dict[str, Any]) -> None:
-    """Ensure scoring / structured_scoring / score_breakdown reference the same object when any is set."""
-    sc = review.get("structured_scoring") or review.get("scoring") or review.get("score_breakdown")
-    if sc is None:
-        return
-    review["structured_scoring"] = sc
-    review["scoring"] = sc
-    review["score_breakdown"] = sc
-
-
-def _build_scoring_presentation(
-    structured_scoring: Dict[str, Any] | None,
-    *,
-    scout: Dict[str, Any] | None = None,
-    review: Dict[str, Any] | None = None,
-) -> Dict[str, Any] | None:
-    """Build the investor-facing presentation DTO from raw scoring data."""
-    if not structured_scoring or not isinstance(structured_scoring, dict):
-        return None
-    if "overall_score" not in structured_scoring:
-        return None
-    try:
-        ctx: Dict[str, Any] = {}
-        if scout:
-            ctx["scout"] = scout
-        if review:
-            ctx["reviewer_output"] = review
-        return serialize_scoring_presentation(
-            structured_scoring,
-            startup_context=ctx or None,
-        )
-    except Exception:
-        return None
+    """Return qualitative Reviewer research without deriving a score on read."""
+    return dict(review)
 
 
 def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> dict:
@@ -1902,7 +1845,9 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
         "is_new_to_user": raw.get("acknowledged_at") is None and not _startup_has_human_ruling(raw),
         "changed_since_last_visit": _is_after(raw.get("updated_at"), last_seen_at),
         "queue_reason": raw.get("queue_reason") or _default_queue_reason(raw),
-        "priority_reason": raw.get("priority_reason") or _default_priority_reason(raw),
+        # Stored priority text may predate canonical evaluation and contain a
+        # reviewer-derived number. Rebuild the presentation without trusting it.
+        "priority_reason": _default_priority_reason(raw),
     }
 
     if review:
@@ -1919,29 +1864,32 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             _polished_aethria if _polished_aethria is not None else _raw_aethria
         )
         out["review"] = {
-            "market_score": review_enriched.get("market_score"),
-            "product_score": review_enriched.get("product_score"),
-            "technical_score": review_enriched.get("technical_score"),
-            "execution_score": review_enriched.get("execution_score"),
-            "defensibility_score": review_enriched.get("defensibility_score"),
-            "market_score_label": review_enriched.get("market_score_label"),
-            "product_score_label": review_enriched.get("product_score_label"),
-            "technical_score_label": review_enriched.get("technical_score_label"),
-            "execution_score_label": review_enriched.get("execution_score_label"),
-            "defensibility_score_label": review_enriched.get("defensibility_score_label"),
-            "overall_score": review_enriched.get("overall_score"),
-            "overall_label": review_enriched.get("overall_label"),
-            "overall_rubric_band": review_enriched.get("overall_rubric_band"),
-            "market_rubric_band": review_enriched.get("market_rubric_band"),
-            "product_rubric_band": review_enriched.get("product_rubric_band"),
-            "technical_rubric_band": review_enriched.get("technical_rubric_band"),
-            "execution_rubric_band": review_enriched.get("execution_rubric_band"),
-            "defensibility_rubric_band": review_enriched.get("defensibility_rubric_band"),
+            # Compatibility fields remain present but raw reviewer values never
+            # cross the API boundary as an assessment. Canonical evaluation is
+            # the sole score source exposed to an operator.
+            "market_score": None,
+            "product_score": None,
+            "technical_score": None,
+            "execution_score": None,
+            "defensibility_score": None,
+            "market_score_label": None,
+            "product_score_label": None,
+            "technical_score_label": None,
+            "execution_score_label": None,
+            "defensibility_score_label": None,
+            "overall_score": None,
+            "overall_label": None,
+            "overall_rubric_band": None,
+            "market_rubric_band": None,
+            "product_rubric_band": None,
+            "technical_rubric_band": None,
+            "execution_rubric_band": None,
+            "defensibility_rubric_band": None,
             "overall_summary": review_enriched.get("overall_summary"),
             "key_risks": review_enriched.get("key_risks") or [],
             "verdict": review_enriched.get("verdict"),
-            "derived_verdict": review_enriched.get("derived_verdict"),
-            "score_reasoning": review_enriched.get("score_reasoning") or None,
+            "derived_verdict": None,
+            "score_reasoning": None,
             "score_source": review_enriched.get("score_source"),
             "improvement_to_9": review_enriched.get("improvement_to_9") or [],
             "market_reasoning": review_enriched.get("market_reasoning") or [],
@@ -1972,7 +1920,7 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "evidence_coverage": review_enriched.get("evidence_coverage"),
             "consensus_verdict": review_enriched.get("consensus_verdict"),
             "reviewer_disagreement": review_enriched.get("reviewer_disagreement"),
-            "score_variance": review_enriched.get("score_variance"),
+            "score_variance": None,
             "fund_thesis_version_id": review_enriched.get("fund_thesis_version_id"),
             "thesis_alignment_score": review_enriched.get("thesis_alignment_score"),
             "thesis_matches_fund": review_enriched.get("thesis_matches_fund"),
@@ -1980,20 +1928,28 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
             "thesis_deviation_points": review_enriched.get("thesis_deviation_points") or None,
             "thesis_alignment_confidence": review_enriched.get("thesis_alignment_confidence"),
             "fund_thesis_alignment_score": review_enriched.get("fund_thesis_alignment_score"),
-            "confidence_adjusted_score": review_enriched.get("confidence_adjusted_score"),
-            "structured_scoring": review_enriched.get("structured_scoring"),
-            "scoring_presentation": _build_scoring_presentation(
-                review_enriched.get("structured_scoring"),
-                scout=scout,
-                review=review_enriched,
-            ),
-            "structured_signals": review_enriched.get("structured_signals"),
+            "confidence_adjusted_score": None,
+            "structured_scoring": None,
+            "scoring_presentation": None,
+            "structured_signals": None,
             "resolution_notes": review_enriched.get("resolution_notes"),
             "disagreement_summary": review_enriched.get("disagreement_summary"),
             "aethria_view": _aethria_for_fe,
-            "reviews": review_enriched.get("reviews") or None,
+            "reviews": [
+                {
+                    **item,
+                    "market_score": None,
+                    "product_score": None,
+                    "technical_score": None,
+                    "execution_score": None,
+                    "defensibility_score": None,
+                    "score_reasoning": None,
+                    "structured_scoring": None,
+                }
+                for item in (review_enriched.get("reviews") or [])
+                if isinstance(item, dict)
+            ] or None,
         }
-        _mirror_structured_scoring_aliases(out["review"])
     else:
         out["review"] = None
 
@@ -2067,25 +2023,16 @@ def _list_projection_to_frontend(
         "is_new_to_user": row.get("acknowledged_at") is None and not has_human_ruling,
         "changed_since_last_visit": _is_after(row.get("updated_at"), last_seen_at),
         "queue_reason": row.get("queue_reason") or "",
-        "priority_reason": row.get("priority_reason") or "",
+        # Rebuild this field below; stored values may contain retired reviewer
+        # score text from before canonical evaluation became authoritative.
+        "priority_reason": "",
     }
-    if row.get("list_verdict") or row.get("list_score") is not None or row.get("short_summary"):
-        score = row.get("list_score")
-        try:
-            agg = float(score) if score is not None else None
-        except (TypeError, ValueError):
-            agg = None
+    if row.get("list_verdict") or row.get("short_summary"):
         out["review"] = {
             "verdict": row.get("list_verdict"),
             "consensus_verdict": row.get("list_consensus_verdict") or row.get("list_verdict"),
             "overall_summary": row.get("short_summary") or "",
             "reviewer_disagreement": bool(row.get("list_reviewer_disagreement")),
-            "aggregate_score": agg,
-            "overall_score": agg,
-            "overall_label": score_to_label(agg) if isinstance(agg, (int, float)) else None,
-            "overall_rubric_band": rubric_band_for_numeric(float(agg))
-            if isinstance(agg, (int, float))
-            else None,
         }
     else:
         out["review"] = None
@@ -2137,22 +2084,11 @@ def _thin_list_from_full_frontend(obj: Dict[str, Any]) -> Dict[str, Any]:
     rev = obj.get("review") or {}
     thin_rev: Optional[Dict[str, Any]] = None
     if rev:
-        overall = rev.get("overall_score")
-        if not isinstance(overall, (int, float)):
-            overall = compute_overall_score(rev)
         thin_rev = {
             "verdict": rev.get("verdict"),
             "consensus_verdict": rev.get("consensus_verdict") or rev.get("verdict"),
             "overall_summary": (rev.get("overall_summary") or "")[:400],
             "reviewer_disagreement": rev.get("reviewer_disagreement"),
-            "aggregate_score": overall,
-            "overall_score": overall,
-            "overall_label": score_to_label(float(overall)) if isinstance(overall, (int, float)) else None,
-            "overall_rubric_band": rev.get("overall_rubric_band")
-            if rev.get("overall_rubric_band") is not None
-            else (
-                rubric_band_for_numeric(float(overall)) if isinstance(overall, (int, float)) else None
-            ),
         }
     part = obj.get("partner") or {}
     thin_part: Optional[Dict[str, Any]] = None

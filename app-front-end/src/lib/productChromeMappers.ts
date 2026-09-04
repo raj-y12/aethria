@@ -1,9 +1,7 @@
 import type { LookupResultSnapshotProps } from '@aethria/product-chrome';
 import type { EvaluationRecord } from '../api/evaluations';
-import { getReviewerQualityBand } from '../design-system/semantics';
 import type { Startup } from '../types/startup';
 import { canonicalCriteriaToStructuredScoring } from './canonicalScoring';
-import { normalizeStructuredScoring } from './reviewScoring';
 import { badgeTextColorForBackground, DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
 
 const DIMENSION_KEYS = ['market', 'execution', 'product', 'technical', 'defensibility'] as const;
@@ -58,21 +56,16 @@ export function buildLookupSnapshotProps(
   const review = startup.review;
   if (!review) return null;
 
-  // Regression: this snapshot used to read only the legacy reviewer's
-  // persona scores, unconditionally -- so a dimension the canonical
-  // evaluation correctly left unscored (insufficient evidence) still showed
-  // a number here, while the full memo (which reads canonical) correctly
-  // showed "Not scored". Canonical evidence-gated scoring takes priority
-  // when a canonical evaluation exists, same as AssessmentScorecard.
+  // Canonical evidence evaluation is the sole score source. A lookup result
+  // without it stays pending rather than presenting reviewer numerics.
   const canonicalScoring = canonicalCriteriaToStructuredScoring(evaluation);
-  const scoring = canonicalScoring ?? normalizeStructuredScoring(review);
-  const band = getReviewerQualityBand(review);
-  if (!band && !scoring) return null;
+  const scoring = canonicalScoring;
+  if (!scoring) return null;
 
   // Lead with the partner recommendation (INVEST / MONITOR / PASS) — the decision,
   // not the reviewer quality band (STRONG/MEDIUM/WEAK). Fall back to band, then status.
   const recommendation = startup.partner?.recommendation;
-  const verdict = recommendation ? `${recommendation}.` : band ? `${band}.` : 'REVIEWING.';
+  const verdict = recommendation ? `${recommendation}.` : 'REVIEWING.';
 
   // Filled chip, matching DecisionBadge: configured colour is the fill,
   // with a computed contrasting ink for readability.
@@ -99,14 +92,6 @@ export function buildLookupSnapshotProps(
     startup.scout.one_line?.trim() ||
     'Analyst review in progress.';
 
-  const flatScores: Record<(typeof DIMENSION_KEYS)[number], number | undefined> = {
-    market: review.market_score,
-    execution: review.execution_score,
-    product: review.product_score,
-    technical: review.technical_score,
-    defensibility: review.defensibility_score,
-  };
-
   const dimensions = DIMENSION_KEYS.map((key) => {
     const dim = scoring?.[key];
     // Canonical's unscored dimensions carry score: 0 (a real number, not
@@ -115,11 +100,7 @@ export function buildLookupSnapshotProps(
     const score =
       typeof dim?.score === 'number' && !dim.unscored
         ? dim.score
-        : canonicalScoring
-          ? null
-          : typeof flatScores[key] === 'number'
-            ? flatScores[key]!
-            : null;
+        : null;
     return {
       key,
       label: DIMENSION_LABELS[key],

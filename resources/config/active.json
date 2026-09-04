@@ -1,7 +1,7 @@
 {
   "partner_rules": "v4",
   "reviewer_rules": "v2",
-  "evaluation_rubric": "v1",
+  "evaluation_rubric": "v3",
   "identity_disambiguation_rules": "v1",
   "triage_rules": "v1",
   "fund_thesis": "v1",

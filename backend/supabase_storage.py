@@ -159,25 +159,10 @@ _MEMO_PARTIAL_SELECT = (
 
 
 def _score_from_review(review_info: Any) -> Optional[int]:
-    if not review_info:
-        return None
-    if hasattr(review_info, "overall_score") and getattr(review_info, "overall_score") is not None:
-        try:
-            return max(0, min(100, round(float(getattr(review_info, "overall_score")) * 10)))
-        except (TypeError, ValueError):
-            return None
-    scores: List[float] = []
-    for attr in ("market_score", "product_score", "technical_score", "execution_score"):
-        val = getattr(review_info, attr, None)
-        if val is None:
-            continue
-        try:
-            scores.append(float(val))
-        except (TypeError, ValueError):
-            continue
-    if not scores:
-        return None
-    return max(0, min(100, round((sum(scores) / len(scores)) * 10)))
+    # ponytail: queue priority must not reconstruct canonical assessment from
+    # a legacy Reviewer row. The canonical evaluation projection owns it.
+    del review_info
+    return None
 
 
 def _queue_reasons_for_startup(startup: Startup) -> Tuple[str, str]:

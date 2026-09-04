@@ -633,9 +633,10 @@ export function useDispatchLookup({
     setBusy(true);
     setFailure(null);
     setDispatching(true);
-    setMessage('Retry accepted. Waiting for execution to resume...');
+    setMessage('Requesting a retry…');
     try {
       const job = await retryJob(jobId);
+      setMessage('Retry accepted. Waiting for execution to resume...');
       setPendingLookup((current) => current?.jobId === jobId
         ? { ...current, durableStatus: job.status }
         : current);

@@ -148,7 +148,11 @@ def test_legacy_reviewer_prompt_keeps_scout_context_and_founder_packet():
         def create(self, *, messages, **kwargs):
             self.prompt = messages[-1]["content"]
             return {
-                "choices": [{"message": {"content": json.dumps({"verdict": "MEDIUM"})}}],
+                "choices": [{"message": {"content": json.dumps({
+                    "overall_summary": "Founder evidence is available for diligence.",
+                    "key_risks": [],
+                    "verdict": "MEDIUM",
+                })}}],
                 "usage": None,
             }
 

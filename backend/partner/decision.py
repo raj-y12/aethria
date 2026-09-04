@@ -447,20 +447,111 @@ class PartnerDecisionEngine:
         mapping = {"advance": "INVEST", "monitor": "MONITOR", "pass": "PASS"}
         return mapping.get((canonical_recommendation or "").strip().lower())
 
-    def _canonical_override_or(
+    def _decide_from_canonical_evaluation(
         self,
-        fallback: str,
         *,
-        canonical_recommendation: Optional[str],
-        has_critical_risk: bool,
-    ) -> str:
-        """Shared override point for every deterministic and LLM-escalated branch:
-        canonical wins when available, never over a fail-closed critical-risk PASS."""
-        if canonical_recommendation is not None and not has_critical_risk:
-            mapped = self._recommendation_from_canonical_state(canonical_recommendation)
-            if mapped is not None:
-                return mapped
-        return fallback
+        scout_output: Dict[str, Any],
+        review_output: Dict[str, Any],
+        canonical_recommendation: str,
+        canonical_criteria: Optional[Dict[str, Dict[str, Any]]],
+        canonical_confidence: Optional[float],
+        rules: PartnerRules,
+    ) -> Dict[str, Any]:
+        """Project an immutable evaluation into a Partner decision.
+
+        This is deliberately separate from the legacy score ladder below. Once
+        an evaluator state exists, Partner may apply named safety and mandate
+        gates, but it must not average criteria or re-run score thresholds.
+        """
+        state = canonical_recommendation.strip().lower()
+        mapped = self._recommendation_from_canonical_state(state)
+        criteria = canonical_criteria or {}
+        missing = sorted(
+            key
+            for key, item in criteria.items()
+            if item.get("evidence_sufficiency") == "insufficient"
+            or item.get("score") is None
+        )
+        contradicted = sorted(
+            key for key, item in criteria.items() if item.get("contradicting_claim_ids")
+        )
+        key_risks = list(review_output.get("key_risks") or [])
+        critical_risk = self._has_critical_risk(key_risks, rules)
+        assumption_risks = self._compute_assumption_risks(
+            scout_output, review_output, list(review_output.get("assumption_feedback") or [])
+        )
+        narrative = self._build_narrative_from_inputs(scout_output, review_output)
+
+        if critical_risk:
+            recommendation = "PASS"
+            rationale = (
+                "Canonical evaluation is overridden by the named critical-risk "
+                "gate; an operator must verify the blocker."
+            )
+            next_action = rules.next_actions.critical_risks
+        elif state == "insufficient_evidence" or missing:
+            recommendation = "MONITOR"
+            missing_text = ", ".join(missing) if missing else "required criteria"
+            rationale = (
+                "Canonical evaluation is blocked by insufficient evidence for "
+                f"{missing_text}; Partner did not calculate a substitute score."
+            )
+            next_action = rules.next_actions.human_review_monitor
+        else:
+            recommendation = mapped or "MONITOR"
+            rationale = (
+                f"Canonical evaluation recommends {state or 'monitor'}; Partner "
+                "applied no secondary score threshold."
+            )
+            next_action = self._next_action_for_llm_decision(
+                recommendation, rules.next_actions
+            )
+
+        conviction = _confidence_float_to_conviction_level(canonical_confidence)
+        result = self._create_decision(
+            recommendation=recommendation,
+            conviction=conviction,
+            decision_rationale=rationale,
+            next_action=next_action,
+            human_review_required=bool(
+                critical_risk
+                or state == "insufficient_evidence"
+                or missing
+                or contradicted
+                or recommendation == "INVEST"
+            ),
+            thesis=narrative[0],
+            why_this_matters=narrative[1],
+            snapshot=narrative[2],
+            market_insight=narrative[3],
+            product_edge=narrative[4],
+            traction_signals=narrative[5],
+            risks=_merge_risks(
+                assumption_risks,
+                (["Critical diligence risk requires verification."] if critical_risk else [])
+                + ([f"Insufficient evidence: {item}" for item in missing])
+                + ([f"Contradicting evidence: {item}" for item in contradicted]),
+            ),
+        )
+        result["decision_drivers"] = [
+            f"canonical_{state or 'monitor'}",
+            *("critical_risk" for _ in [0] if critical_risk),
+            *(f"missing_{item}" for item in missing),
+            *(f"contradicting_{item}" for item in contradicted),
+        ]
+        result = self._apply_final_recommendation_fields(
+            result, recommendation, assumption_risks, next_action=next_action
+        )
+        result = self._apply_handoff_quality_fields(
+            result, self._handoff_quality_from_review(review_output)
+        )
+        result = self._finalize_thesis_and_mandate_gate(
+            result, review_output, scout_output, 0.0, 0
+        )
+        # There is no Partner-owned company-quality average in this path.
+        result["company_quality"] = None
+        result["canonical_recommendation"] = state
+        return result
 
     def _canonical_recommendation(self, avg_score: float) -> str:
         """Score-threshold fallback, used only when no canonical recommendation
@@ -877,16 +968,20 @@ class PartnerDecisionEngine:
             human_review_required, assumption_risks.
         """
         self._execution_prompt_version.set(None)
-        if self.evaluation_prerequisites is not None:
-            validate_governed_scoring_trace(
-                review_output.get("structured_scoring"),
-                self.evaluation_prerequisites,
-                require_resolved=True,
-            )
         rules = self._get_rules()
         verdict_rules = rules.verdict_rules
         score_thresholds = rules.score_thresholds
         next_actions = rules.next_actions
+
+        if canonical_recommendation is None:
+            return self._decide_from_canonical_evaluation(
+                scout_output=scout_output,
+                review_output=review_output,
+                canonical_recommendation="insufficient_evidence",
+                canonical_criteria=None,
+                canonical_confidence=None,
+                rules=rules,
+            )
 
         canonical_criteria_by_key: Optional[Dict[str, Dict[str, Any]]] = (
             {
@@ -897,6 +992,29 @@ class PartnerDecisionEngine:
             if canonical_criteria
             else None
         )
+
+        if canonical_recommendation is not None:
+            return self._decide_from_canonical_evaluation(
+                scout_output=scout_output,
+                review_output=review_output,
+                canonical_recommendation=canonical_recommendation,
+                canonical_criteria=canonical_criteria_by_key,
+                canonical_confidence=canonical_confidence,
+                rules=rules,
+            )
+
+        # Reviewer numbers are historical, qualitative handoff metadata once a
+        # canonical evaluation exists. Replace them before any rationale or LLM
+        # path reads the review payload so no old model-produced decimal can be
+        # presented as the basis for a governed decision.
+        if canonical_criteria_by_key is not None:
+            review_output = dict(review_output)
+            for dimension in ("market", "product", "technical", "execution"):
+                scored, score = self._dimension_scored(
+                    dimension, review_output, canonical_criteria_by_key
+                )
+                if scored and score is not None:
+                    review_output[f"{dimension}_score"] = score
 
         portfolio_context = self._get_portfolio_context() if self.portfolio_store else {}
         thesis_block = ""
@@ -1240,15 +1358,6 @@ class PartnerDecisionEngine:
             *,
             next_action: Optional[str] = None,
         ) -> Dict[str, Any]:
-            # Canonical takes precedence over every deterministic verdict branch
-            # (STRONG/MEDIUM/WEAK, v3's score ladder) — but never over a critical-
-            # risk PASS, which is this engine's own fail-closed gate and must not
-            # be second-guessed by a less-informed canonical opinion.
-            recommendation = self._canonical_override_or(
-                recommendation,
-                canonical_recommendation=canonical_recommendation,
-                has_critical_risk=has_critical_risk,
-            )
             effective_human_review = bool(human_rev or has_red_flags)
             if historical_v3:
                 # Preserve v3's recommendation-derived action mapping. The one
@@ -1329,11 +1438,7 @@ class PartnerDecisionEngine:
             )
             if self.use_llm_fallback and low_score_edge_case:
                 trigger_reason = "MEDIUM verdict slightly below pass threshold"
-                llm_final_recommendation = self._canonical_override_or(
-                    score_recommendation,
-                    canonical_recommendation=canonical_recommendation,
-                    has_critical_risk=has_critical_risk,
-                )
+                llm_final_recommendation = score_recommendation
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -1428,11 +1533,7 @@ class PartnerDecisionEngine:
                 trigger_reason = "High thesis alignment with solid average — extended partner review"
             use_llm = self.use_llm_fallback and bool(trigger_reason)
             if use_llm:
-                llm_final_recommendation = self._canonical_override_or(
-                    branch_recommendation,
-                    canonical_recommendation=canonical_recommendation,
-                    has_critical_risk=has_critical_risk,
-                )
+                llm_final_recommendation = branch_recommendation
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,
@@ -1516,11 +1617,7 @@ class PartnerDecisionEngine:
                     if grey_zone_active
                     else "MEDIUM verdict with borderline average score"
                 )
-                llm_final_recommendation = self._canonical_override_or(
-                    branch_recommendation,
-                    canonical_recommendation=canonical_recommendation,
-                    has_critical_risk=has_critical_risk,
-                )
+                llm_final_recommendation = branch_recommendation
                 result = self._decide_with_llm(
                     scout_output,
                     review_output,

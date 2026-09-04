@@ -29,7 +29,7 @@ describe('buildPositionRows', () => {
     expect(row.name).toBe('Acme');
     expect(row.sector).toBe('Fintech');
     expect(row.stage).toBe('Seed');
-    expect(row.score).toBe(7.4);
+    expect(row.score).toBeNull();
   });
 
   it('leaves enrichment null when there is no legacy bridge, without inventing values', () => {

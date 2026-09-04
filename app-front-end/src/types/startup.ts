@@ -169,11 +169,11 @@ export interface SingleReview {
   reviewer_type: 'DefaultReviewer' | 'SkepticalReviewer' | 'OpportunistReviewer';
   /** Fraction of rubric criteria that carried complete evidence (0-1). Undefined = unknown, not zero. */
   evidence_coverage?: number;
-  market_score: number;
-  product_score: number;
-  technical_score: number;
-  execution_score: number;
-  defensibility_score: number;
+  market_score: number | null;
+  product_score: number | null;
+  technical_score: number | null;
+  execution_score: number | null;
+  defensibility_score: number | null;
   verdict: 'STRONG' | 'MEDIUM' | 'WEAK';
   overall_summary: string;
   key_risks: string[];
@@ -289,6 +289,7 @@ export interface StructuredScoring {
   stage_cohort_label?: string | null;
   /** Sector-relative TAM benchmark the Market score was graded on (P6.3). */
   sector_tam_benchmark?: string | null;
+  score_bands?: ScoreBand[] | null;
 }
 
 export interface PresentationComponent {
@@ -298,6 +299,16 @@ export interface PresentationComponent {
   band: string;
   has_evidence: boolean;
   interpretation: string;
+  evidence?: string | null;
+  rule?: string | null;
+  qualitative?: boolean;
+}
+
+export interface ScoreBand {
+  min: number;
+  max: number;
+  label: string;
+  meaning: string;
 }
 
 export interface PresentationMissingEvidence {
@@ -348,6 +359,12 @@ export interface ScoringPresentation {
   confidence_label: string;
   confidence_tooltip: string;
   dimensions: PresentationDimension[];
+  score_bands?: ScoreBand[] | null;
+  policy_version_id?: string | null;
+  policy_hash?: string | null;
+  stage_cohort?: string | null;
+  stage_cohort_label?: string | null;
+  sector_tam_benchmark?: string | null;
   consistency_audit?: ScoringConsistencyAudit;
 }
 

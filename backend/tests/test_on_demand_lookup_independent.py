@@ -9,6 +9,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
 )
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
+from utils.prompt_version import hash_prompt
 from pipeline_execution import (
     MetaCycleResult,
     PipelineExecutionResult,
@@ -16,6 +17,21 @@ from pipeline_execution import (
     ScoutCycleResult,
     StageExecutionResult,
 )
+
+
+def test_missing_typed_fact_dimensions_are_reextracted_even_when_generic_claims_exist():
+    import pipeline_runner
+
+    policy = SimpleNamespace(
+        fact_rules=[
+            SimpleNamespace(dimension="execution", claim_type="annualized_revenue_usd"),
+            SimpleNamespace(dimension="product", claim_type="customer_retention_pct"),
+        ]
+    )
+
+    assert pipeline_runner._missing_typed_fact_dimensions(
+        policy, {"traction", "growth_velocity", "customer_retention_pct"}
+    ) == {"execution"}
 
 
 class _FakeScoutEngine:
@@ -47,6 +63,7 @@ class _FakeReviewerEngine:
             "use_resource_fund_thesis_fallback",
             "missing",
         )
+        self.reviewer = SimpleNamespace(SYSTEM_PROMPT="qualitative reviewer prompt")
 
     async def run_startup(self, *args, **kwargs):
         type(self).calls += 1
@@ -630,10 +647,9 @@ async def test_retry_reuses_current_review_and_resumes_at_partner(monkeypatch):
     startup = SimpleNamespace(
         startup_id="startup-1",
         review_info=SimpleNamespace(
-            structured_scoring={
-                "policy_version_id": "policy-live",
-                "policy_hash": "hash-live",
-            }
+            fund_thesis_version_id="thesis-v1",
+            prompt_version=hash_prompt("qualitative reviewer prompt"),
+            structured_scoring={"policy_version_id": "policy-old"},
         ),
     )
     storage = SimpleNamespace(
@@ -663,10 +679,9 @@ async def test_retry_reruns_stale_review_before_partner(monkeypatch):
     startup = SimpleNamespace(
         startup_id="startup-1",
         review_info=SimpleNamespace(
-            structured_scoring={
-                "policy_version_id": "policy-old",
-                "policy_hash": "hash-old",
-            }
+            fund_thesis_version_id="thesis-old",
+            prompt_version=hash_prompt("obsolete reviewer prompt"),
+            structured_scoring={"policy_version_id": "policy-live"},
         ),
     )
     storage = SimpleNamespace(
@@ -836,3 +851,22 @@ async def test_lookup_emits_durable_stage_checkpoints_without_handoff_sleeps(mon
         "policy_version_id": "policy-live",
         "policy_hash": "hash-live",
     }
+
+
+@pytest.mark.asyncio
+async def test_lookup_completion_is_not_failed_by_usage_telemetry(monkeypatch):
+    _wire_common_engines(monkeypatch)
+    monkeypatch.setattr("pipeline_runner.get_active_thesis", lambda *a, **k: _FakeThesis())
+
+    def telemetry_failure(*args, **kwargs):
+        raise RuntimeError("metrics backend unavailable")
+
+    monkeypatch.setattr("pipeline_runner._observe_decision_ready_usage", telemetry_failure)
+
+    result = await run_on_demand_lookup(
+        "user_123",
+        "Acme",
+        lookup_id="lookup-telemetry-1",
+    )
+
+    assert result.state is PipelineExecutionState.COMPLETED

@@ -13,7 +13,6 @@
  */
 import type { Startup } from '../types/startup';
 import type { QueueAnnotationVariant } from '../design-system/verdictBadgeTokens';
-import { normalizeConfidence } from '../components/scoring/ConfidenceIndicator';
 import { extractAdverseRegister, type AdverseRegisterItem } from './adverseRegister';
 import { getDealAgeDays, isDealDecided, type RulingDecision } from './dealState';
 import { computeConfiguredScore, isStartupStaleByConfig, type FundConfiguration } from './fundConfiguration';
@@ -71,24 +70,11 @@ export function startupNeedsRuling(startup: Startup): boolean {
   return !isDealDecided(startup) && Boolean(startup.review || startup.partner?.recommendation);
 }
 
-/** Conviction % for queue display — list-safe fallback chain. */
+/** Queue score display is intentionally unavailable without a canonical
+ * evaluation projection. Legacy reviewer scores and configured-score fallbacks
+ * must not be presented as decision conviction. */
 export function getQueueConvictionPct(ctx: QueueRowContext): number | null {
-  const { startup, configuredScore } = ctx;
-  // Conviction == the canonical overall SCORE (quality), consistent with the memo.
-  // It is deliberately NOT partner.confidence: confidence (how sure the decision is)
-  // is a separate axis and was previously conflated under the same "conviction" label
-  // (audit B3). Returned on a 0–100 internal scale (score×10) for the tier thresholds;
-  // display formats it back to x/10.
-  const agg = startup.review?.overall_score ?? startup.review?.aggregate_score;
-  if (typeof agg === 'number' && Number.isFinite(agg)) {
-    return Math.round(agg <= 10 ? agg * 10 : agg);
-  }
-
-  if (Number.isFinite(configuredScore) && configuredScore > 0) return configuredScore;
-
-  const scoutConf = normalizeConfidence(startup.scout.confidence);
-  if (scoutConf != null) return Math.round(scoutConf * 100);
-
+  void ctx;
   return null;
 }
 

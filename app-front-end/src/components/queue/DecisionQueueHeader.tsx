@@ -15,7 +15,7 @@ export type OutcomeFilter = 'YES' | 'NO' | 'MAYBE' | 'DECIDED';
 
 export type FlagFilter = 'ADVERSE';
 
-export type ReviewFilter = 'STRONG' | 'MEDIUM' | 'WEAK' | 'UNREVIEWED';
+export type ReviewFilter = 'REVIEWED' | 'UNREVIEWED';
 
 export type SortFilter = 'QUEUE_PRIORITY' | 'NEWEST' | 'OLDEST' | 'UNRESOLVED_OLDEST';
 
@@ -48,9 +48,7 @@ const FLAG_FILTER_CHIPS: { key: FlagFilter; label: string }[] = [
 ];
 
 const REVIEW_FILTER_CHIPS: { key: ReviewFilter; label: string }[] = [
-  { key: 'STRONG', label: 'STRONG' },
-  { key: 'MEDIUM', label: 'MEDIUM' },
-  { key: 'WEAK', label: 'WEAK' },
+  { key: 'REVIEWED', label: 'REVIEWED' },
   { key: 'UNREVIEWED', label: 'UNREVIEWED' },
 ];
 

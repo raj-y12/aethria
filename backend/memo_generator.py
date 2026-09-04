@@ -2,9 +2,9 @@
 Investment Memo Generator.
 
 Transforms nested Startup Pydantic models into professional Markdown Investment Memos.
-Includes all Reviewer output fields (scores, verdict, overall_summary, key_risks, diligence_red_flags,
+Includes qualitative Reviewer output (overall_summary, key_risks, diligence_red_flags,
 assumption_feedback, team_analysis, competition_analysis, business_model_analysis, investment_thesis,
-risk_mitigation, score_reasoning). Surfaces Partner next_action, rationale, MAYBE + human_review_required.
+risk_mitigation). Canonical evaluation owns every displayed assessment score.
 """
 import json
 import logging
@@ -17,8 +17,6 @@ from utils.timeutil import utcnow
 
 from models import Startup
 from utils.recency import memo_recency_note
-from utils.scoring import compute_overall_score, score_to_label
-from utils.score_semantics import rubric_band_for_numeric, rubric_score_bands_markdown_footnote
 from utils.traction_extraction import render_traction_facts
 
 _logger_memo = logging.getLogger("memo_generation")
@@ -38,36 +36,6 @@ def _rss_mb() -> float:
         return round((rss / (1024 * 1024)) if rss > 10_000_000 else (rss / 1024), 1)
     except Exception:
         return -1.0
-
-# Dimension labels for scores table (ReviewInfo field -> display name)
-SCORE_DIMENSIONS = [
-    ("market_score", "Market"),
-    ("product_score", "Product"),
-    ("technical_score", "Technical"),
-    ("execution_score", "Execution"),
-    ("defensibility_score", "Defensibility"),
-]
-
-
-def _criterion_reasoning_for_dimension(structured_scoring: Dict[str, Any], dimension: str) -> Optional[str]:
-    details = structured_scoring.get(dimension) if isinstance(structured_scoring, dict) else None
-    if not isinstance(details, dict):
-        return None
-    criteria = details.get("criteria")
-    if not isinstance(criteria, dict) or not criteria:
-        return None
-    parts = []
-    for criterion in criteria.values():
-        if not isinstance(criterion, dict):
-            continue
-        name = str(criterion.get("name") or "Criterion").strip()
-        status = str(criterion.get("evidence_status") or "unknown").strip()
-        reason = str(criterion.get("reasoning") or "").strip()
-        missing = " Missing evidence applied." if criterion.get("missing_data_applied") else ""
-        if reason:
-            parts.append(f"{name} ({status}): {reason}{missing}")
-    return " ".join(parts) or None
-
 
 def _append_investment_read_section(lines: list, startup: Startup, for_display: bool) -> None:
     """Render the investment read (reviewer_rules v2+) as the memo's lead.
@@ -386,55 +354,11 @@ class MemoGenerator:
                 lines.append("- Not provided")
             lines.append("")
 
-        # Reviewer Analysis (scores table + summary + key risks; full version adds red flags / assumption feedback)
+        # Reviewer research is qualitative. Canonical evaluation renders the
+        # assessment ledger elsewhere; never reconstruct it from reviewer fields.
         if startup.review_info:
             ri = startup.review_info
-            lines.append("## Reviewer Analysis")
-            lines.append("")
-            score_reasoning = getattr(ri, "score_reasoning", None) or {}
-            structured_scoring = getattr(ri, "structured_scoring", None) or {}
-            lines.append("### Scores")
-            lines.append("")
-            policy_version = structured_scoring.get("policy_version_id") if isinstance(structured_scoring, dict) else None
-            if policy_version:
-                lines.append(f"**Policy version:** `{policy_version}`")
-                lines.append("")
-            lines.append(rubric_score_bands_markdown_footnote())
-            lines.append("")
-            lines.append("| Dimension | Score | Band | Reasoning |")
-            lines.append("|-----------|-------|------|-----------|")
-            for dim_key, dim_label in SCORE_DIMENSIONS:
-                score_val = getattr(ri, dim_key, None)
-                # Stored scores are raw reviewer means (e.g. 5.403333). This was
-                # the one score in the memo printed unformatted, so the table
-                # read "5.403333/10" directly above a summary line that used
-                # one decimal — the same document disagreeing with itself.
-                score_str = f"{float(score_val):.1f}/10" if score_val is not None else "—"
-                band = (
-                    rubric_band_for_numeric(float(score_val))
-                    if score_val is not None
-                    else None
-                ) or "—"
-                dim_id = dim_key.replace("_score", "")
-                policy_reasoning = _criterion_reasoning_for_dimension(structured_scoring, dim_id)
-                reasoning = policy_reasoning or ((score_reasoning.get(dim_key) or "—").strip() if isinstance(score_reasoning, dict) else "—")
-                if not reasoning:
-                    reasoning = "—"
-                reasoning_esc = reasoning.replace("|", "\\|")
-                lines.append(f"| {dim_label} | {score_str} | {band} | {reasoning_esc} |")
-            avg_score = compute_overall_score(ri.model_dump()) or 0.0
-            avg_label = score_to_label(avg_score)
-            lines.append("")
-            lines.append(f"**Overall score (4 dimensions):** {avg_score:.1f} — {avg_label}")
-            lines.append(
-                f"Market ({ri.market_score:.1f}), Product ({ri.product_score:.1f}), "
-                f"Technical ({ri.technical_score:.1f}), Execution ({ri.execution_score:.1f})"
-            )
-            def_val = ri.defensibility_score
-            if def_val is not None:
-                lines.append(f"Defensibility: {def_val:.1f} — {score_to_label(float(def_val))}")
-            lines.append("")
-            lines.append(f"**Quality assessment:** {ri.verdict}")
+            lines.append("## Reviewer Research")
             lines.append("")
             lines.append("### Overall Summary")
             lines.append("")
@@ -525,9 +449,6 @@ class MemoGenerator:
             if startup.partner_info:
                 lines.append("## Decision")
                 lines.append("")
-                if startup.review_info:
-                    lines.append(f"**Quality assessment:** {startup.review_info.verdict}")
-                    lines.append("")
                 decision_label = startup.partner_info.recommendation
                 if startup.partner_info.human_review_required:
                     decision_label += " *(human review required)*"
@@ -609,10 +530,7 @@ class MemoGenerator:
         lines.append("")
         lines.append(f"**Sector:** {startup.scout_info.sector}")
         if startup.review_info:
-            avg_score = compute_overall_score(startup.review_info.model_dump()) or 0.0
-            lines.append(
-                f"**Review Score:** {avg_score:.1f} — {score_to_label(avg_score)} ({startup.review_info.verdict})"
-            )
+            lines.append("**Research:** Complete — canonical evidence assessment pending or available in the deal memo.")
         if startup.partner_info:
             lines.append(
                 f"**Decision:** {startup.partner_info.recommendation} "

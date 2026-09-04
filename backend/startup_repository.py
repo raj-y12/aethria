@@ -47,16 +47,9 @@ def _queue_reasons_for_startup(startup: Startup) -> tuple[str, str]:
     """Build queue display fields without depending on legacy storage code."""
     sector = (startup.scout_info.sector or "").split("/")[0].strip()
     review = startup.review_info
-    scores = []
-    for attr in ("market_score", "product_score", "technical_score", "execution_score"):
-        value = getattr(review, attr, None) if review is not None else None
-        if value is not None:
-            try:
-                scores.append(float(value))
-            except (TypeError, ValueError):
-                pass
-    score = max(0, min(100, round((sum(scores) / len(scores)) * 10))) if scores else None
-    priority_parts = [f"Priority {score}" if score is not None else "Priority pending"]
+    # ponytail: legacy Reviewer scores are not queue conviction; keep priority
+    # pending until a canonical evaluation projection is available.
+    priority_parts = ["Priority pending"]
     human_resolution = startup.human_resolution if isinstance(startup.human_resolution, dict) else None
     if human_resolution and human_resolution.get("resolved_at"):
         decision = str(human_resolution.get("decision") or "recorded").upper()

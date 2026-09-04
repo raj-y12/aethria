@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Dict
+from typing import Any, Dict
 
 
 DEFAULT_SCORE = 5.0
@@ -156,6 +156,13 @@ THRESHOLDS = {
     },
     "growth_pct": {"hyper": 40.0, "strong": 25.0, "healthy": 12.0, "slow": 5.0},
 }
+
+RUNTIME_SCORE_BANDS = [
+    {"min": 1, "max": 3, "label": "Weak", "meaning": "High risk, failing, or structurally broken."},
+    {"min": 4, "max": 5, "label": "Concerning", "meaning": "Unproven, material execution or validation gaps."},
+    {"min": 6, "max": 7, "label": "Promising", "meaning": "Reasonable thesis, requires validation."},
+    {"min": 8, "max": 10, "label": "Strong", "meaning": "Investment-grade, clear upside with managed risk."},
+]
 
 # ── Sector-relative TAM benchmarks (P6.3) ─────────────────────────────────────────
 #

@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict
 
 import env_config
 
-from core.policy_resolver import get_partner_rules
+from core.policy_resolver import get_evaluation_rubric, get_partner_rules
 from evaluation_v2.models import EvaluationPolicy
 from evaluation_v2.partner_rules import PartnerRules, parse_partner_rules
 from models import EvaluationDependencyIdentity
@@ -390,7 +390,11 @@ async def load_evaluation_prerequisites(
 
     try:
         rules = parse_partner_rules(await resolve_rules())
-        policy = evaluation_policy_from_compiled(compiled, partner_rules=rules)
+        policy = evaluation_policy_from_compiled(
+            compiled,
+            partner_rules=rules,
+            rubric=get_evaluation_rubric(),
+        )
     except Exception as exc:
         raise EvaluationPrerequisiteError(
             code="prerequisite_unavailable",

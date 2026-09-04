@@ -184,11 +184,15 @@ def _evidence_confidence(confidence: float | None) -> Dict[str, str]:
     return EVIDENCE_CONFIDENCE_LABELS["limited"]
 
 
-def _score_band(score: float) -> str:
+def _score_band(score: float, bands: List[Dict[str, Any]] | None = None) -> str:
     rounded = max(1, min(10, round(score)))
-    for (lo, hi), label in SCORE_BAND_LABELS.items():
-        if lo <= rounded <= hi:
-            return label
+    for band in bands or []:
+        if float(band.get("min", 0)) <= rounded <= float(band.get("max", 0)):
+            return str(band.get("label") or "")
+    if bands is None:
+        for (lo, hi), label in SCORE_BAND_LABELS.items():
+            if lo <= rounded <= hi:
+                return label
     return "Promising, Incomplete"
 
 
@@ -207,12 +211,12 @@ def _component_has_evidence(comp: Dict[str, Any]) -> bool:
 
 
 def _build_component_presentation(
-    name: str, comp: Dict[str, Any], dimension_key: str
+    name: str, comp: Dict[str, Any], dimension_key: str, bands: List[Dict[str, Any]] | None = None
 ) -> Dict[str, Any]:
     label = COMPONENT_LABELS.get(name, name.replace("_", " ").title())
     score = max(0.0, min(10.0, float(comp.get("score", 5.0))))
     has_evidence = _component_has_evidence(comp)
-    band = _score_band(score)
+    band = _score_band(score, bands)
     reasoning = _sanitize_text(comp.get("reasoning"))
     evidence_text = _sanitize_text(comp.get("evidence"))
 
@@ -233,6 +237,9 @@ def _build_component_presentation(
         "band": band,
         "has_evidence": has_evidence,
         "interpretation": interpretation,
+        "evidence": evidence_text,
+        "rule": _sanitize_text(comp.get("rule")),
+        "qualitative": comp.get("qualitative") is True,
     }
 
 
@@ -508,6 +515,9 @@ def serialize_scoring_presentation(
     overall_confidence = raw_scoring.get("overall_confidence")
     if overall_confidence is not None:
         overall_confidence = float(overall_confidence)
+    bands = raw_scoring.get("score_bands") or (raw_scoring.get("normalization") or {}).get("score_bands")
+    if not isinstance(bands, list) or not bands:
+        bands = None
 
     dimensions_output: List[Dict[str, Any]] = []
     dimension_keys = ("market", "product", "technical", "execution", "defensibility")
@@ -529,7 +539,7 @@ def serialize_scoring_presentation(
             if not isinstance(comp_data, dict):
                 continue
             components_presentation.append(
-                _build_component_presentation(comp_name, comp_data, dim_key)
+                _build_component_presentation(comp_name, comp_data, dim_key, bands)
             )
 
         components_presentation.sort(key=lambda c: (-1 if c["has_evidence"] else 1, -c["score"]))
@@ -583,7 +593,7 @@ def serialize_scoring_presentation(
             "id": dim_key,
             "label": dim_label,
             "score": None if dim_score is None else round(dim_score, 1),
-            "band": "Not scored" if dim_score is None else _score_band(dim_score),
+            "band": "Not scored" if dim_score is None else _score_band(dim_score, bands),
             "headline": headline,
             "score_interpretation": score_interpretation,
             "analyst_summary": analyst_summary,
@@ -600,12 +610,18 @@ def serialize_scoring_presentation(
 
     presentation = {
         "overall_score": None if overall_score is None else round(overall_score, 1),
-        "overall_band": (
-            "Not scored" if overall_score is None else _score_band(overall_score)
+            "overall_band": (
+            "Not scored" if overall_score is None else _score_band(overall_score, bands)
         ),
         "confidence_label": overall_conf_info["label"],
         "confidence_tooltip": overall_conf_info["tooltip"],
         "dimensions": dimensions_output,
+        "score_bands": bands,
+        "policy_version_id": raw_scoring.get("policy_version_id"),
+        "policy_hash": raw_scoring.get("policy_hash"),
+        "stage_cohort": raw_scoring.get("stage_cohort"),
+        "stage_cohort_label": raw_scoring.get("stage_cohort_label"),
+        "sector_tam_benchmark": raw_scoring.get("sector_tam_benchmark"),
     }
 
     scout_ctx = None

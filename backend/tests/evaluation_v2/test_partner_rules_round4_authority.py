@@ -141,7 +141,7 @@ def _governed_review(
     ("score", "expected"),
     [(5.99, "PASS"), (6.0, "MONITOR"), (7.99, "MONITOR"), (8.0, "INVEST")],
 )
-def test_full_governed_decide_uses_one_active_rules_threshold_authority(
+def test_full_governed_decide_requires_canonical_evaluation_not_reviewer_thresholds(
     score: float, expected: str
 ) -> None:
     prerequisites = _governed_prerequisites()
@@ -156,21 +156,18 @@ def test_full_governed_decide_uses_one_active_rules_threshold_authority(
     )
 
     assert engine._canonical_recommendation(score) == expected
-    assert decision["recommendation"] == expected
+    assert decision["recommendation"] == "MONITOR"
+    assert "canonical evaluation is blocked" in decision["decision_rationale"].lower()
 
 
 @pytest.mark.parametrize(
-    ("verdict", "score", "expected"),
+    ("verdict", "score"),
     [
-        ("WEAK", 5.99, {"recommendation": "PASS", "decision": "NO"}),
-        ("WEAK", 6.0, {"recommendation": "MONITOR", "decision": "MAYBE"}),
-        ("WEAK", 7.2, {"recommendation": "MONITOR", "decision": "MAYBE"}),
-        ("WEAK", 8.0, {"recommendation": "INVEST", "decision": "YES"}),
-        ("MEDIUM", 8.0, {"recommendation": "INVEST", "decision": "YES"}),
+        ("WEAK", 5.99), ("WEAK", 6.0), ("WEAK", 7.2), ("WEAK", 8.0), ("MEDIUM", 8.0),
     ],
 )
-def test_historical_v3_replays_score_authoritative_behavior(
-    verdict: str, score: float, expected: dict[str, str]
+def test_historical_v3_cannot_replay_a_reviewer_score_authoritative_decision(
+    verdict: str, score: float
 ) -> None:
     engine = PartnerDecisionEngine(use_llm_fallback=False, api_key=None)
     engine._rules = parse_partner_rules(_rules("3"))
@@ -179,7 +176,5 @@ def test_historical_v3_replays_score_authoritative_behavior(
 
     decision = engine.decide(_scout(), _legacy_review(verdict=verdict, score=score))
 
-    assert {
-        "recommendation": decision["recommendation"],
-        "decision": decision["decision"],
-    } == expected
+    assert decision["recommendation"] == "MONITOR"
+    assert decision["decision"] == "MAYBE"

@@ -113,6 +113,12 @@ class ReviewerEngine:
             inferred = (getattr(storage, "_user_id", None) or "").strip()
         self.tenant_user_id = require_user_id(inferred, context="ReviewerEngine")
         self.evaluation_prerequisites = evaluation_prerequisites
+        runtime_calibration = (
+            evaluation_prerequisites.compiled_scoring_policy.get("scoring_runtime", {}).get("calibration", {})
+            if evaluation_prerequisites is not None
+            else {}
+        )
+        self.score_stability_variance = runtime_calibration.get("stability_variance")
         self.settings = settings if isinstance(settings, dict) else DEFAULT_SETTINGS
         self.regulatory_context_loader = regulatory_context_loader
         self.canonical_context_loader = canonical_context_loader
@@ -148,17 +154,17 @@ class ReviewerEngine:
         # Ramp-up: when unreviewed backlog is high, process more per cycle
         self.ramp_threshold = int(os.getenv("REVIEWER_RAMP_THRESHOLD", "5"))
         self.ramp_batch_max = int(os.getenv("REVIEWER_RAMP_BATCH_MAX", "5"))
-        self.use_structured_scoring = evaluation_prerequisites is not None or (
-            os.getenv("USE_STRUCTURED_SCORING", "true").lower()
-            in ("1", "true", "yes")
-        )
-        self.structured_scoring_engine = self._build_scoring_engine() if self.use_structured_scoring else None
+        # Reviewer is qualitative research. Canonical evidence evaluation owns
+        # numeric assessment; do not manufacture a scorecard and redact it later.
+        self.use_structured_scoring = False
+        self.structured_scoring_engine = None
         structured_signal_grounding = None
         if evaluation_prerequisites is not None:
+            # Evidence-grounding is a qualitative extraction guard, not a
+            # reviewer scoring contract.
             structured_signal_grounding = evaluation_prerequisites.compiled_scoring_policy[
                 "scoring_runtime"
             ]["evidence_grounding"]
-        
         # Initialize Reviewers (default + persona reviewers)
         tid = self.tenant_user_id
         self.reviewer = DefaultReviewer(
@@ -166,7 +172,7 @@ class ReviewerEngine:
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
-            structured_scoring_enabled=self.use_structured_scoring,
+            structured_scoring_enabled=False,
             structured_signal_grounding=structured_signal_grounding,
         )
         self.skeptical_reviewer = SkepticalReviewer(
@@ -174,7 +180,7 @@ class ReviewerEngine:
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
-            structured_scoring_enabled=self.use_structured_scoring,
+            structured_scoring_enabled=False,
             structured_signal_grounding=structured_signal_grounding,
         )
         self.opportunist_reviewer = OpportunistReviewer(
@@ -182,7 +188,7 @@ class ReviewerEngine:
             model=model,
             tenant_user_id=tid,
             use_resource_fund_thesis_fallback=self.use_resource_fund_thesis_fallback,
-            structured_scoring_enabled=self.use_structured_scoring,
+            structured_scoring_enabled=False,
             structured_signal_grounding=structured_signal_grounding,
         )
         
@@ -348,7 +354,7 @@ class ReviewerEngine:
             return_exceptions=True,
         )
     
-    def _compute_consensus(self, results: list) -> dict:
+    def _compute_consensus(self, results: list, stability_variance: Optional[float] = None) -> dict:
         """
         Compute consensus verdict, disagreement flag, and score variance from multiple reviewer results.
         """
@@ -360,6 +366,8 @@ class ReviewerEngine:
 
         score_fields = ["market_score", "product_score", "technical_score", "execution_score"]
         score_variance = {}
+        score_stability = {}
+        stability_limit = stability_variance
         for field in score_fields:
             values = [
                 float(value)
@@ -371,11 +379,20 @@ class ReviewerEngine:
                 mean = sum(values) / len(values)
                 variance = sum((v - mean) ** 2 for v in values) / len(values)
                 score_variance[field] = round(variance, 2)
+                if stability_limit is not None:
+                    score_stability[field] = (
+                        "unstable" if variance >= float(stability_limit) else "stable"
+                    )
+
+        reviewer_disagreement = reviewer_disagreement or any(
+            status == "unstable" for status in score_stability.values()
+        )
 
         return {
             "consensus_verdict": consensus_verdict,
             "reviewer_disagreement": reviewer_disagreement,
             "score_variance": score_variance,
+            "score_stability": score_stability,
         }
 
     @staticmethod
@@ -448,10 +465,9 @@ class ReviewerEngine:
             out["reviewer_type"] = persona
             if self.use_structured_scoring:
                 out = self._apply_structured_scoring(scout_output, out)
-                if self.evaluation_prerequisites is not None:
+                if getattr(self, "evaluation_prerequisites", None) is not None:
                     self._blend_numeric_scores_into_primary(out, [out])
-            self._derive_verdict_from_scores(out)
-            return out
+            return self._redact_reviewer_score_projection(out)
         finally:
             rev.set_prompt(prev_prompt)
 
@@ -614,38 +630,25 @@ class ReviewerEngine:
     def _build_single_reviews(successful_results: List[Dict[str, Any]]) -> List[Any]:
         """Build per-persona SingleReview snapshots for storage.
 
-        Only the primary persona's snapshot retains the heavy structured_signals /
-        raw structured_scoring blob. The authoritative top-level resolved trace embeds
-        every persona input with provenance; the snapshots do not need duplicate blobs.
-
-        Primary = DefaultReviewer when present, else the first successful result
-        (mirrors _pick_primary_structured_signals and the primary review_output).
+        Persona snapshots are qualitative research. Numeric score projections and
+        reviewer scoring traces are stripped here as a second persistence boundary;
+        canonical evaluation is the only assessment artifact.
         """
         from models import SingleReview
 
         _valid_reviewer_types = ("DefaultReviewer", "SkepticalReviewer", "OpportunistReviewer")
-        has_default = any(r.get("reviewer_type") == "DefaultReviewer" for r in successful_results)
-        primary_type = "DefaultReviewer" if has_default else (
-            successful_results[0].get("reviewer_type") if successful_results else None
-        )
-
         single_reviews: List[Any] = []
-        primary_kept = False
         for r in successful_results:
             reviewer_label = r.get("reviewer_type", "DefaultReviewer")
             if reviewer_label not in _valid_reviewer_types:
                 reviewer_label = "DefaultReviewer"
-            # Keep structured payloads only on the first snapshot matching the primary.
-            keep_structured = (not primary_kept) and (r.get("reviewer_type") == primary_type)
-            if keep_structured:
-                primary_kept = True
             single_reviews.append(SingleReview(
                 reviewer_type=reviewer_label,
-                market_score=r.get("market_score"),
-                product_score=r.get("product_score"),
-                technical_score=r.get("technical_score"),
-                execution_score=r.get("execution_score"),
-                defensibility_score=r.get("defensibility_score"),
+                market_score=None,
+                product_score=None,
+                technical_score=None,
+                execution_score=None,
+                defensibility_score=None,
                 overall_summary=r.get("overall_summary", ""),
                 key_risks=r.get("key_risks", []),
                 verdict=r.get("verdict", "MEDIUM"),
@@ -656,7 +659,7 @@ class ReviewerEngine:
                 business_model_analysis=r.get("business_model_analysis") or None,
                 investment_thesis=r.get("investment_thesis") or None,
                 risk_mitigation=r.get("risk_mitigation") or None,
-                score_reasoning=r.get("score_reasoning") or None,
+                score_reasoning=None,
                 score_source=r.get("score_source"),
                 improvement_to_9=r.get("improvement_to_9") or None,
                 market_reasoning=r.get("market_reasoning") or None,
@@ -676,12 +679,8 @@ class ReviewerEngine:
                 defensibility_confidence=r.get("defensibility_confidence"),
                 prompt_version=r.get("prompt_version"),
                 evidence_coverage=r.get("evidence_coverage"),
-                structured_scoring=r.get("structured_scoring") if keep_structured else None,
-                structured_signals=(
-                    dict(r["structured_signals"])
-                    if keep_structured and isinstance(r.get("structured_signals"), dict)
-                    else None
-                ),
+                structured_scoring=None,
+                structured_signals=None,
             ))
         return single_reviews
 
@@ -698,6 +697,40 @@ class ReviewerEngine:
             recorder(startup_id, trace)
         except Exception as exc:  # pragma: no cover - defensive
             self.logger.debug("scoring trail persist failed for %s: %s", startup_id, exc)
+
+    def _redact_reviewer_score_projection(self, review_output: Dict[str, Any]) -> Dict[str, Any]:
+        """Publish Reviewer research without a competing numeric scorecard."""
+        redacted = dict(review_output)
+        for key in (
+            "market_score", "product_score", "technical_score",
+            "execution_score", "defensibility_score", "overall_score",
+            "confidence_adjusted_score", "structured_scoring",
+            "structured_signals", "score_reasoning", "score_variance", "derived_verdict",
+        ):
+            redacted.pop(key, None)
+        redacted["score_source"] = "Qualitative reviewer research; canonical evaluation required"
+        return redacted
+
+    def _stamp_policy_identity(self, review_output: Dict[str, Any]) -> Dict[str, Any]:
+        """Carry governed dependency identity without carrying numeric scoring."""
+        prerequisites = getattr(self, "evaluation_prerequisites", None)
+        if prerequisites is None:
+            return review_output
+        stamped = dict(review_output)
+        stamped.update(
+            {
+                "policy_version_id": prerequisites.policy.policy_version_id,
+                "policy_hash": prerequisites.policy.policy_hash,
+                "rubric_version": prerequisites.policy.rubric_version,
+                "scoring_runtime_version": prerequisites.compiled_scoring_policy[
+                    "scoring_runtime"
+                ]["semantic_version"],
+                "scoring_runtime_hash": prerequisites.compiled_scoring_policy[
+                    "scoring_runtime_hash"
+                ],
+            }
+        )
+        return stamped
 
     def _apply_structured_scoring(self, scout_output: dict, reviewer_output: dict) -> dict:
         """Replace LLM-assigned numeric scores with deterministic weighted scores."""
@@ -1164,22 +1197,27 @@ class ReviewerEngine:
                 else:
                     review_output = dict(successful_results[0])
 
-                self._blend_numeric_scores_into_primary(review_output, successful_results)
+                if self.use_structured_scoring:
+                    self._blend_numeric_scores_into_primary(review_output, successful_results)
                 # apply_resolution_to_primary's dimension-score mutation only survives when
                 # there's no active thesis (_refresh_derived_after_dimension_changes falls back
                 # to _recompute_derived_from_primary, which reads rather than overwrites); the
                 # governed path immediately overwrites it via _project_governed_trace. Its return
                 # values are not stored on review_output -- resolution_notes/disagreement_summary
                 # had zero frontend consumers (typed on startup.ts, never read).
-                resolution_notes, disagreement_summary = apply_resolution_to_primary(
-                    review_output, successful_results
-                )
-                self._refresh_derived_after_dimension_changes(review_output, successful_results)
+                if self.use_structured_scoring:
+                    resolution_notes, disagreement_summary = apply_resolution_to_primary(
+                        review_output, successful_results
+                    )
+                    self._refresh_derived_after_dimension_changes(review_output, successful_results)
+                else:
+                    resolution_notes, disagreement_summary = [], None
                 sig_primary = self._pick_primary_structured_signals(successful_results)
                 if sig_primary is not None:
                     review_output["structured_signals"] = sig_primary
 
-                self._derive_verdict_from_scores(review_output)
+                if self.use_structured_scoring:
+                    self._derive_verdict_from_scores(review_output)
                 self.logger.info(
                     "reviewer_engine verdict=%s derived_verdict=%s",
                     review_output.get("verdict"),
@@ -1196,6 +1234,15 @@ class ReviewerEngine:
                 )
                 self._finalize_thesis_alignment_state(review_output)
 
+                # Persist only qualitative Reviewer research in every path.
+                review_output = self._redact_reviewer_score_projection(
+                    self._stamp_policy_identity(review_output)
+                )
+                successful_results = [
+                    self._redact_reviewer_score_projection(result)
+                    for result in successful_results
+                ]
+
                 # Record token usage if cost controller exists (sum all persona calls)
                 if self.cost_controller:
                     total_tok = (
@@ -1208,7 +1255,9 @@ class ReviewerEngine:
                     )
                 
                 # Compute consensus across all successful results
-                consensus = self._compute_consensus(successful_results)
+                consensus = self._compute_consensus(
+                    successful_results, getattr(self, "score_stability_variance", None)
+                )
                 review_output["aethria_view"] = build_aethria_view(
                     review_output=review_output,
                     scout_output=scout_output,
@@ -1279,12 +1328,9 @@ class ReviewerEngine:
                 if success:
                     reviewed_count += 1
                     verdict = review_output.get("verdict", "UNKNOWN")
-                    avg_score = compute_overall_score(review_output) or 0.0
-                    
                     self.logger.info(
                         f"Reviewed entry {entry_id}: {verdict} "
-                        f"(avg score: {avg_score:.1f}/10, "
-                        f"consensus: {consensus['consensus_verdict']}, "
+                        f"(consensus: {consensus['consensus_verdict']}, "
                         f"disagreement: {consensus['reviewer_disagreement']})"
                     )
                     
@@ -1469,16 +1515,20 @@ class ReviewerEngine:
                 review_output = dict(default_results[0])
             else:
                 review_output = dict(successful_results[0])
-            self._blend_numeric_scores_into_primary(review_output, successful_results)
-            resolution_notes, disagreement_summary = apply_resolution_to_primary(
-                review_output, successful_results
-            )
-            self._refresh_derived_after_dimension_changes(review_output, successful_results)
+            if self.use_structured_scoring:
+                self._blend_numeric_scores_into_primary(review_output, successful_results)
+                resolution_notes, disagreement_summary = apply_resolution_to_primary(
+                    review_output, successful_results
+                )
+                self._refresh_derived_after_dimension_changes(review_output, successful_results)
+            else:
+                resolution_notes, disagreement_summary = [], None
             sig_primary = self._pick_primary_structured_signals(successful_results)
             if sig_primary is not None:
                 review_output["structured_signals"] = sig_primary
 
-            self._derive_verdict_from_scores(review_output)
+            if self.use_structured_scoring:
+                self._derive_verdict_from_scores(review_output)
             self.logger.info(
                 "reviewer_engine verdict=%s derived_verdict=%s",
                 review_output.get("verdict"),
@@ -1491,7 +1541,16 @@ class ReviewerEngine:
                 review_output, scout_output, startup_id
             )
             self._finalize_thesis_alignment_state(review_output)
-            consensus = self._compute_consensus(successful_results)
+            review_output = self._redact_reviewer_score_projection(
+                self._stamp_policy_identity(review_output)
+            )
+            successful_results = [
+                self._redact_reviewer_score_projection(result)
+                for result in successful_results
+            ]
+            consensus = self._compute_consensus(
+                successful_results, getattr(self, "score_stability_variance", None)
+            )
             review_output["aethria_view"] = build_aethria_view(
                 review_output=review_output,
                 scout_output=scout_output,

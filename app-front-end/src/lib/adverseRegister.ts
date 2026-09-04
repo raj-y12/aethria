@@ -1,5 +1,4 @@
 import type { Startup } from '../types/startup';
-import { normalizeStructuredScoring } from './reviewScoring';
 
 export type AdverseSeverity = 'high' | 'medium' | 'low';
 export type AdverseBasis = 'evidence-backed' | 'inferred';
@@ -134,24 +133,6 @@ export function extractAdverseRegister(startup: Startup | null | undefined): Adv
 
   for (const review of startup.review?.reviews ?? []) {
     addTextItems(items, review.key_risks, `${review.reviewer_type.replace('Reviewer', '')} review`, 'medium');
-  }
-
-  const scoring = normalizeStructuredScoring(startup.review ?? null);
-  if (scoring) {
-    for (const [dimension, detail] of Object.entries(scoring)) {
-      if (dimension === 'overall_score') continue;
-      if (!detail || typeof detail !== 'object' || !('score' in detail)) continue;
-      const score = Number((detail as { score?: number }).score);
-      if (!Number.isFinite(score) || score > 3) continue;
-      uniquePush(items, {
-        id: `score:${dimension}`,
-        severity: 'high',
-        title: `${dimension.charAt(0).toUpperCase()}${dimension.slice(1)} score below bar`,
-        whyItMatters: `Reviewer scoring places ${dimension} at ${score}/10, below the threshold for conviction without further diligence.`,
-        basis: 'evidence-backed',
-        source: 'Score breakdown',
-      });
-    }
   }
 
   return items.sort((a, b) => {

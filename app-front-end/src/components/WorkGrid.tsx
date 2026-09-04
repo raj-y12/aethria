@@ -3,7 +3,6 @@ import type { ReactElement, ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 import { LayoutGroup, motion, type Variants } from 'framer-motion';
 import type { Startup } from '../types/startup';
-import { getReviewerQualityBand } from '../design-system/semantics';
 import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
 import EmptyState from './EmptyState';
@@ -110,7 +109,7 @@ function buildDocketRow(
   return {
     startup,
     sourceBadge: getSourceBadge(startup),
-    reviewBand: getReviewerQualityBand(startup.review),
+    hasReview: startup.review != null,
     decisionVariant: getDecisionBadgeVariant(startup),
     queueContext,
     attentionDriver,
@@ -149,7 +148,8 @@ function rowMatchesReviewFilters(row: DocketRowModel, filters: Set<ReviewFilter>
   if (filters.size === 0) return true;
   for (const f of filters) {
     if (f === 'UNREVIEWED' && row.startup.review == null) return true;
-    if (f !== 'UNREVIEWED' && row.reviewBand === f) return true;
+    if (f === 'REVIEWED' && row.hasReview) return true;
+    if (f === 'UNREVIEWED' && !row.hasReview) return true;
   }
   return false;
 }

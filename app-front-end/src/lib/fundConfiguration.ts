@@ -634,30 +634,12 @@ export function bandForScore(score: number, bands: ScoreBand[]): ScoreBand {
 }
 
 export function computeConfiguredScore(startup: Startup, config: FundConfiguration): number {
-  const review = startup.review;
-  const scores: Record<ScoringDimensionKey, number | null> = {
-    market: review?.market_score ?? review?.structured_scoring?.market?.score ?? null,
-    product: review?.product_score ?? review?.structured_scoring?.product?.score ?? null,
-    technical: review?.technical_score ?? review?.structured_scoring?.technical?.score ?? null,
-    execution: review?.execution_score ?? review?.structured_scoring?.execution?.score ?? null,
-    defensibility: review?.defensibility_score ?? review?.structured_scoring?.defensibility?.score ?? null,
-    traction: deriveTractionScore(startup),
-    timing: deriveTimingScore(startup),
-    fundFit: deriveFundFitScore(startup),
-  };
-  const available = config.scoringWeights.filter(
-    (weight) =>
-      scores[weight.key] != null
-      && Number.isFinite(scores[weight.key])
-      && Number.isFinite(weight.weight),
-  );
-  const fallback = Math.round((startup.scout.confidence ?? 0.5) * 100);
-  if (!available.length) return fallback;
-  const weighted = available.reduce((sum, weight) => sum + ((scores[weight.key] ?? 0) * 10 * weight.weight), 0);
-  const totalWeight = available.reduce((sum, weight) => sum + weight.weight, 0);
-  if (!(totalWeight > 0)) return fallback;
-  const result = Math.round(weighted / totalWeight);
-  return Number.isFinite(result) ? result : fallback;
+  // ponytail: the list DTO does not carry an immutable canonical evaluation.
+  // Returning a reviewer-derived or Scout-confidence substitute would create a
+  // second score system. Callers already treat non-finite values as unavailable.
+  void startup;
+  void config;
+  return Number.NaN;
 }
 
 export function isStartupStaleByConfig(startup: Startup, config: FundConfiguration, now = Date.now()): boolean {
@@ -889,32 +871,4 @@ function normalizeConfidence(value: unknown): number | null {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
   return Math.max(0, Math.min(1, numeric));
-}
-
-function deriveTractionScore(startup: Startup): number | null {
-  const text = [
-    startup.partner?.traction_signals,
-    startup.scout.primary_thesis,
-    startup.review?.business_model_analysis?.join(' '),
-  ].filter(Boolean).join(' ').toLowerCase();
-  if (!text.trim()) return null;
-  if (/(revenue|arr|retention|paid|enterprise|pilot|customer|usage|growth)/.test(text)) return 7;
-  if (/(waitlist|beta|prototype|early)/.test(text)) return 5;
-  return 4;
-}
-
-function deriveTimingScore(startup: Startup): number | null {
-  const whyNow = startup.scout.why_now?.trim();
-  if (!whyNow) return null;
-  return whyNow.length > 180 ? 7 : 5;
-}
-
-function deriveFundFitScore(startup: Startup): number | null {
-  const score = startup.review?.thesis_alignment_score ?? startup.review?.fund_thesis_alignment_score;
-  if (typeof score === 'number' && Number.isFinite(score)) {
-    return score <= 1 ? Math.round(score * 10) : Math.min(10, score);
-  }
-  if (startup.review?.thesis_matches_fund === true) return 8;
-  if (startup.review?.thesis_matches_fund === false) return 3;
-  return null;
 }
