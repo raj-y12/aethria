@@ -91,6 +91,8 @@ export function useMemoDecisionBrief(startupId: string): UseMemoDecisionBriefRes
           ? 'The evidence ledger could not be loaded.'
           : rulings.isError
             ? 'The ruling history could not be loaded.'
+            : evaluation.data.dependencies && evaluation.data.dependencies.state !== 'current'
+              ? evaluation.data.dependencies.message
             : brief.coverage === 'missing'
               ? 'The canonical evaluation is blocked by missing evidence.'
               : brief.coverage === 'contradictory'

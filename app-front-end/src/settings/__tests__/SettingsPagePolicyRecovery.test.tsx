@@ -141,6 +141,16 @@ async function failAfterSettingsPatch(initial: Settings, deployed: Settings) {
 }
 
 describe('SettingsPage durable policy publish recovery', () => {
+  it('explains Partner judgment without exposing retired automatic decision sliders', async () => {
+    const settings = createSettings();
+    mocks.fetchSettings.mockResolvedValue(settings);
+    renderPage(settings);
+    expect(await screen.findByRole('heading', { name: 'Investment decisions' })).toBeInTheDocument();
+    expect(screen.getByText(/Partner weighs the completed review/)).toBeInTheDocument();
+    expect(screen.queryByText('Review threshold')).not.toBeInTheDocument();
+    expect(screen.queryByText('Decision thresholds')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     mocks.navigate.mockReset();
     mocks.fetchSettings.mockReset();

@@ -4,8 +4,9 @@ pipeline against opportunities dispatched before that pipeline existed.
 Reuses exactly the functions a live dispatch calls inline (pipeline_runner.py) --
 no new production code path, just the existing one run against opportunities that
 never went through it. Each opportunity gets a real, bounded (max 3 queries)
-retrieval pass plus one extraction LLM call per still-missing dimension, so this
-costs real API spend -- run with --limit first.
+retrieval pass, retains factual source statements without extraction model calls,
+then runs the shared Reviewer/validation/Partner analysis. Retrieval and analysis
+cost real API spend -- run with --limit first.
 """
 
 from __future__ import annotations
@@ -21,13 +22,12 @@ import asyncpg
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import env_config
-from core.policy_resolver import get_evaluation_rubric
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
-from evaluation_v2.repository import EvaluationRepository
-from evidence.extraction import extract_claims_from_evidence
+from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
+from evidence.factual import retain_verified_source_statements
 from evidence.planning import compute_missing_evidence
 from evidence.repository import EvidenceRepository
 from evidence.retrieval import execute_evidence_plan
@@ -83,17 +83,12 @@ async def _backfill_opportunity(
     if not verified_items:
         return {"opportunity_id": str(opportunity_id), "skipped": "no_verified_evidence", **retrieval_result}
 
-    extraction_result = await extract_claims_from_evidence(
+    extraction_result = await retain_verified_source_statements(
         user_id=user_id,
         company_id=company_id,
         opportunity_id=opportunity_id,
-        missing_evidence=missing_evidence,
-        evidence_items=verified_items,
-        rubric=get_evaluation_rubric(),
-        policy=evaluation_prerequisites.policy,
+        evidence_item_ids=[str(item["evidence_item_id"]) for item in verified_items],
         evidence_repository=evidence_repository,
-        api_key=api_key,
-        model=env_config.reviewer_model(),
     )
     if not extraction_result.get("claims_created"):
         return {

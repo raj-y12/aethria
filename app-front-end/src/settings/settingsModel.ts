@@ -41,7 +41,7 @@ export const SETTINGS_GROUPS = [
 export const SETTINGS_SECTIONS = [
   { id: 'thesis', label: 'Mandate', short: 'Thesis', group: 'thesis' },
   { id: 'version', label: 'Version context', short: 'Version', group: 'thesis' },
-  { id: 'thresholds', label: 'Decision thresholds', short: 'Thresholds', group: 'policy' },
+  { id: 'thresholds', label: 'Investment decisions', short: 'Decisions', group: 'policy' },
   { id: 'sensitivity', label: 'Escalation sensitivity', short: 'Sensitivity', group: 'policy' },
   { id: 'weights', label: 'Scoring weights', short: 'Weights', group: 'policy' },
   { id: 'memo', label: 'Memo output', short: 'Memo', group: 'policy' },

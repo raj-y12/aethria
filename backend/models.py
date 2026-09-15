@@ -395,9 +395,11 @@ class ScoutInfo(BaseModel):
     why_now: str
     scout_type: Literal["market_driven", "builder_technical", "pain_point", "contrarian"]
     confidence_score: float = Field(ge=0.0, le=1.0)
-    # Hypothesis framing from Scout stage.
+    # Historical Scout v1 hypothesis fields; current Scout never writes them.
     primary_thesis: Optional[str] = None
     key_assumptions: Optional[List[str]] = None
+    unknowns: List[str] = Field(default_factory=list)
+    contradictions: List[str] = Field(default_factory=list)
     biggest_unknown: Optional[str] = None
     funding_stage: Optional[Literal["Pre-Seed", "Seed", "Series A", "Series B", "Series C", "Series C+", "Unknown"]] = None
     location: Optional[str] = None  # HQ or primary operating city, e.g. "Paris, FR"
@@ -517,7 +519,7 @@ class ReviewInfo(BaseModel):
     defensibility_score: Optional[float] = Field(default=None, ge=0, le=10)  # Calculated by reviewer
     overall_summary: str
     key_risks: List[str]
-    verdict: Literal["STRONG", "MEDIUM", "WEAK"]
+    verdict: Optional[Literal["STRONG", "MEDIUM", "WEAK"]] = None
     diligence_red_flags: List[str] = Field(default_factory=list)  # Missing data flags
     assumption_feedback: List[str] = Field(default_factory=list)  # Comments on Scout assumptions; critical unknowns
     reviewer_agent_id: Optional[str] = None
@@ -602,6 +604,28 @@ class PartnerSnapshot(BaseModel):
     key_signal: Optional[str] = None
 
 
+class PartnerProvenance(BaseModel):
+    """Engine-owned audit metadata; absent on uninstrumented historical decisions."""
+    original_recommendation_origin: Literal["CANONICAL_EVALUATION", "PARTNER_ANALYSIS", "UNKNOWN_LEGACY"]
+    recommendation_origin: Literal["PARTNER_CANONICAL_MAPPING", "DETERMINISTIC_PARTNER", "PARTNER_ANALYSIS", "UNKNOWN_LEGACY"]
+    canonical_recommendation: Optional[str] = None
+    mapped_recommendation: Optional[str] = None
+    decision_recommendation: Optional[str] = None
+    partner_recommendation: Optional[str] = None
+    policy_changed_recommendation: Optional[bool] = None
+    guard_changed_recommendation: Optional[bool] = None
+    validation_changed_recommendation: Optional[bool] = None
+    evaluation_run_id: Optional[str] = None
+    evidence_snapshot_hash: Optional[str] = None
+    policy_version: Optional[str] = None
+    source_evaluation_pipeline_run_id: Optional[str] = None
+    canonical_scores: Dict[str, Optional[float]] = Field(default_factory=dict)
+    canonical_confidence: Optional[float] = None
+    partner_rules_version: Optional[str] = None
+    partner_model: Optional[str] = None
+    human_review_required: Optional[bool] = None
+
+
 class PartnerInfo(BaseModel):
     """Partner decision information — strict JSON output schema."""
     thesis: str
@@ -632,6 +656,7 @@ class PartnerInfo(BaseModel):
     mandate_override_required: Optional[bool] = None # strong company held off-thesis, needs IC exception
     # Derived guard for any Partner narrative corrected against canonical evidence.
     contradiction_guard: Optional[Dict[str, Any]] = None
+    provenance: Optional[PartnerProvenance] = None
 
 
 class Financials(BaseModel):

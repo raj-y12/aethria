@@ -1,14 +1,12 @@
 """
-Strict output schema for all Scouts.
-All Scouts must emit JSON matching this structure exactly.
-Hypothesis-oriented: primary_thesis, key_assumptions, biggest_unknown support
-evolution, reviewers, and partners.
+Current factual Scout v2 output, with historical v1 validation retained.
+New discoveries omit investment hypotheses and preserve factual limitations.
 References must prove the company exists (URLs, news, Crunchbase, etc.);
 generic placeholders like "General domain knowledge" are rejected.
 Also, we reject obvious mega-cap incumbents (Google, Microsoft, Amazon, etc.)
 as Scout outputs; Scouts should surface VC-scale startups instead.
 """
-from typing import TypedDict, List
+from typing import TypedDict, List, NotRequired
 from uuid import uuid4
 import json
 import re
@@ -21,7 +19,7 @@ from utils.reference_validation import (
 
 
 class ScoutOutput(TypedDict):
-    """Strict schema for Scout discoveries. `name` is always a real company; thesis fields frame the investment hypothesis about that company. References are mandatory."""
+    """Company facts and references. Optional hypothesis fields are historical only."""
     id: str
     scout_type: str
     name: str
@@ -32,8 +30,11 @@ class ScoutOutput(TypedDict):
     target_users: str
     why_now: str
     confidence: float
-    primary_thesis: str
-    key_assumptions: List[str]
+    version: NotRequired[str]
+    primary_thesis: NotRequired[str]  # Historical v1 only.
+    key_assumptions: NotRequired[List[str]]  # Historical v1 only.
+    unknowns: NotRequired[List[str]]
+    contradictions: NotRequired[List[str]]
     biggest_unknown: str
     references: List[str]
     founder_names: List[str]
@@ -60,6 +61,11 @@ def validate_scout_output(data: dict) -> ScoutOutput:
         "biggest_unknown": str,
         "references": list,
     }
+    factual = data.get("version") == "2"
+    if factual:
+        required_fields.pop("primary_thesis")
+        required_fields.pop("key_assumptions")
+        required_fields.update(unknowns=list, contradictions=list)
     
     # Check all required fields exist
     for field, field_type in required_fields.items():
@@ -92,14 +98,18 @@ def validate_scout_output(data: dict) -> ScoutOutput:
         raise ValueError("confidence must be between 0.0 and 1.0")
     
     # key_assumptions: list of strings, length 2-4
-    assumptions = data["key_assumptions"]
-    if not (2 <= len(assumptions) <= 4):
+    assumptions = data.get("key_assumptions", [])
+    if not factual and not (2 <= len(assumptions) <= 4):
         raise ValueError("key_assumptions must have between 2 and 4 items")
     for i, a in enumerate(assumptions):
         if not isinstance(a, str):
             raise ValueError(
                 f"key_assumptions[{i}] must be a string, got {type(a).__name__}"
             )
+    if factual:
+        for field in ("unknowns", "contradictions"):
+            if any(not isinstance(item, str) or not item.strip() for item in data[field]):
+                raise ValueError(f"{field} must contain non-empty strings")
     
     # references: mandatory, 1-8 non-empty strings; at least one must be a real source
     refs = data["references"]
@@ -134,6 +144,18 @@ def validate_scout_output(data: dict) -> ScoutOutput:
         raise ValueError("founder_names must contain non-empty strings")
 
     return ScoutOutput(**data)
+
+
+def factual_scout_payload(data: dict) -> ScoutOutput:
+    """Current output boundary; never reinterpret old opinions as factual claims."""
+    out = dict(data)
+    for field in ("primary_thesis", "key_assumptions", "investment_thesis", "recommendation",
+                  "score", "conviction", "founder_quality", "market_quality", "moat_judgment"):
+        out.pop(field, None)
+    out["version"] = "2"
+    out.setdefault("unknowns", [])
+    out.setdefault("contradictions", [])
+    return validate_scout_output(out)
 
 
 def generate_id() -> str:

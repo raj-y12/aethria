@@ -369,11 +369,11 @@ export interface ScoringPresentation {
 }
 
 export interface Review {
-  market_score?: number;
-  product_score?: number;
-  technical_score?: number;
-  execution_score?: number;
-  defensibility_score?: number;
+  market_score?: number | null;
+  product_score?: number | null;
+  technical_score?: number | null;
+  execution_score?: number | null;
+  defensibility_score?: number | null;
   overall_summary?: string;
   key_risks?: string[];
   verdict?: string;
@@ -473,7 +473,25 @@ export interface PartnerSnapshot {
   key_signal?: string | null;
 }
 
+export interface PartnerProvenance {
+  original_recommendation_origin: 'CANONICAL_EVALUATION' | 'PARTNER_ANALYSIS' | 'UNKNOWN_LEGACY';
+  recommendation_origin: 'PARTNER_CANONICAL_MAPPING' | 'DETERMINISTIC_PARTNER' | 'PARTNER_ANALYSIS' | 'UNKNOWN_LEGACY';
+  canonical_recommendation?: string | null;
+  mapped_recommendation?: string | null;
+  decision_recommendation?: string | null;
+  partner_recommendation?: string | null;
+  policy_changed_recommendation?: boolean | null;
+  guard_changed_recommendation?: boolean | null;
+  validation_changed_recommendation?: boolean | null;
+  canonical_scores?: Record<string, number | null>;
+  canonical_confidence?: number | null;
+  partner_rules_version?: string | null;
+  partner_model?: string | null;
+  human_review_required?: boolean | null;
+}
+
 export interface Partner {
+  provenance?: PartnerProvenance | null;
   recommendation: 'INVEST' | 'PASS' | 'MONITOR';
   confidence?: number;            // 0.0–1.0
   thesis?: string;
@@ -548,6 +566,23 @@ export interface Financials {
 
 export interface Startup {
   id: string;
+  /** Internal audit values, separate from analyst-facing scores. */
+  projection_provenance?: {
+    projection_origin: 'COMPATIBILITY_PROJECTION';
+    legacy_score_origin: 'UNKNOWN_LEGACY';
+    recorded_score_source: string | null;
+    legacy_scores: Partial<Record<'market_score' | 'product_score' | 'technical_score' | 'execution_score' | 'defensibility_score' | 'overall_score' | 'confidence_adjusted_score', number | null>>;
+    canonical_evaluation_id: string | null;
+    partner_recommendation: string | null;
+    partner_provenance: Record<string, unknown> | null;
+    human_override: Record<string, unknown> | null;
+  };
+  /** Client audit metadata; never used to choose a score or recommendation. */
+  frontend_projection?: {
+    source: 'CANONICAL_DECISION_VIEW';
+    original_recommended_state: string | null;
+    recommendation_mapping: string;
+  };
   /** Canonical opportunity identity when this row is a compatibility projection. */
   canonical_opportunity_id?: string;
   scout: Scout;

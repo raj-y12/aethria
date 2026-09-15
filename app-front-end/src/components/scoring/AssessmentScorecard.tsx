@@ -72,7 +72,6 @@ export default function AssessmentScorecard({
   canonicalCriteria = [],
   canonicalClaims = [],
   canonicalRecommendationState = null,
-  canonicalRubricVersion = null,
 }: AssessmentScorecardProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const idPrefix = useId();
@@ -89,16 +88,16 @@ export default function AssessmentScorecard({
   const overallBand = insufficientEvidence
     ? 'Decision blocked by evidence'
     : (presentation?.overall_band ?? getScoreBand(scoring.overall_score, presentation?.score_bands ?? undefined).label);
-  const evidenceLabel =
-    presentation?.confidence_label ?? getEvidenceConfidenceLabel(scoring.overall_confidence);
+  const evidenceLabel = insufficientEvidence ? 'Incomplete evidence'
+    : presentation?.confidence_label ?? getEvidenceConfidenceLabel(scoring.overall_confidence);
   const bandCopy = (presentation?.score_bands ?? [])
     .map((band) => `${band.min}–${band.max} ${band.label}`)
     .join(' · ');
   const methodCopy = [
-    `Each dimension is scored 1–10 from extracted evidence${bandCopy ? ` — bands: ${bandCopy}.` : '.'}`,
+    canonicalCriteria.some((criterion) => criterion.deterministic_adjustments?.assessment_validation)
+      ? 'Reviewer proposes each dimension score with an investment rationale. Evidence validation may cap it or leave it unscored when support is insufficient. Partner makes the recommendation from the completed review.'
+      : `Historical evidence-based scoring: each dimension is scored 1–10 from extracted evidence${bandCopy ? ` — bands: ${bandCopy}.` : '.'}`,
     ...METHOD_COPY,
-    presentation?.policy_version_id ? `Policy: ${presentation.policy_version_id}.` : null,
-    canonicalRubricVersion ? `Rubric: ${canonicalRubricVersion}; anchors low 3, mid 5, high 8.` : null,
     presentation?.stage_cohort_label ? `Stage cohort: ${presentation.stage_cohort_label}.` : null,
     presentation?.sector_tam_benchmark ? `Market TAM benchmark: ${presentation.sector_tam_benchmark}.` : null,
   ].filter((line): line is string => Boolean(line));
@@ -133,6 +132,8 @@ export default function AssessmentScorecard({
     if (!dimension) return null;
     const presDim = presentation?.dimensions?.find((d) => d.id === dim.key);
     const canonicalCriterion = canonicalCriteria.find((criterion) => criterion.criterion === dim.key);
+    const validation = canonicalCriterion?.deterministic_adjustments?.assessment_validation;
+    const priorReview = canonicalCriterion?.deterministic_adjustments?.change_from_prior_review;
     const criterionClaims = canonicalClaims.filter((claim) => claim.criterion === dim.key);
     const unscored = !presDim && dimension.unscored === true;
     const scoreText = unscored
@@ -233,7 +234,25 @@ export default function AssessmentScorecard({
                 {canonicalCriterion && (
                   <div className="memoScoreLedger" aria-label={`${dim.label} score ledger`}>
                     <p className="memoScoreGroupLabel">Score ledger</p>
-                    {canonicalCriterion.score == null ? (
+                    {validation ? (
+                      <>
+                        <p className="memoScoreEvidenceNote">
+                          {`Reviewer assessment: ${validation.proposed_score == null ? 'not scored' : `${validation.proposed_score.toFixed(1)}/10`}. Validated: ${canonicalCriterion.score == null ? 'not scored' : `${canonicalCriterion.score.toFixed(1)}/10`}.`}
+                        </p>
+                        {validation.cap_reason && <p className="memoScoreEvidenceNote">{validation.cap_reason}</p>}
+                        {priorReview?.score_changed && (
+                          <p className="memoScoreEvidenceNote">
+                            {`Previous review: ${priorReview.previous_score == null ? 'not scored' : `${priorReview.previous_score.toFixed(1)}/10`}.`}
+                          </p>
+                        )}
+                        {priorReview?.reasoning_changed && priorReview.previous_reasoning && (
+                          <p className="memoScoreEvidenceNote">Previous reasoning: {priorReview.previous_reasoning}</p>
+                        )}
+                        {validation.contradiction_status === 'PRESENT' && (
+                          <p className="memoScoreEvidenceNote">Conflicting evidence requires diligence.</p>
+                        )}
+                      </>
+                    ) : canonicalCriterion.score == null ? (
                       <p className="memoScoreEvidenceNote">Not scored: {canonicalCriterion.missing_evidence.join('; ') || 'no eligible cited claim.'}</p>
                     ) : (
                       <p className="memoScoreEvidenceNote">

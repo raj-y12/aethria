@@ -163,12 +163,16 @@ async def test_target_postgres_skip_locked_claims_distinct_tenant_jobs():
     pool = await asyncpg.create_pool(dsn, min_size=1, max_size=4)
     repository = DurableJobRepository(pool)
     user_id = f"contract-{uuid4()}"
+    # Test SKIP LOCKED, not host/container clock synchronization. These jobs
+    # must already be due according to the clock used by claim_next's SQL.
+    due_at = await pool.fetchval("select clock_timestamp()")
     jobs = [
         AgentJob(
             user_id=user_id,
             job_type=JobType.PIPELINE_CYCLE,
             idempotency_key=f"contract:{index}:{uuid4()}",
             payload={"user_id": user_id, "manual_one_shot": True},
+            next_attempt_at=due_at,
         )
         for index in range(2)
     ]
@@ -186,12 +190,14 @@ async def test_target_postgres_skip_locked_claims_distinct_tenant_jobs():
         }
         tenant_depths = await repository.tenant_queue_depths(user_id=user_id)
         assert tenant_depths["pipeline_cycle:running"] == 2
-        async with pool.acquire() as connection:
-            await connection.execute(
-                "delete from public.domain_outbox where user_id=$1", user_id
-            )
-            await connection.execute(
-                "delete from public.agent_jobs where user_id=$1", user_id
-            )
     finally:
-        await pool.close()
+        try:
+            async with pool.acquire() as connection:
+                await connection.execute(
+                    "delete from public.domain_outbox where user_id=$1", user_id
+                )
+                await connection.execute(
+                    "delete from public.agent_jobs where user_id=$1", user_id
+                )
+        finally:
+            await pool.close()

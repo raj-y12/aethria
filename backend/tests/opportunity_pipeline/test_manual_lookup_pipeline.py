@@ -61,6 +61,8 @@ async def test_manual_lookup_ingests_evidence_then_evaluates():
     class Evaluation:
         async def evaluate(self, **kwargs):
             assert calls == ["evidence", "claim"]
+            assert kwargs["pipeline_binding"].user_id == "fund-a"
+            assert kwargs["pipeline_binding"].pipeline_entry_type == "opportunity_manual_lookup"
             calls.append("evaluation")
             return {"recommendation": {"state": "advance"}}
 
@@ -82,6 +84,15 @@ async def test_manual_lookup_ingests_evidence_then_evaluates():
     )
     assert result.code == "opportunity_evaluated"
     assert calls == ["evidence", "claim", "evaluation"]
+    assert result.pipeline_run_id
+    assert [(event["stage"], event["status"]) for event in result.pipeline_trace] == [
+        ("identity", "STARTED"), ("identity", "DONE"),
+        ("prerequisites", "STARTED"), ("prerequisites", "DONE"),
+        ("evidence", "STARTED"), ("evidence", "DONE"),
+        ("canonical_evaluation", "STARTED"), ("canonical_evaluation", "DONE"),
+        ("evidence_reviewer", "STARTED"), ("evidence_reviewer", "DONE"),
+        ("deterministic_partner", "STARTED"), ("deterministic_partner", "DONE"),
+    ]
 
 
 @pytest.mark.asyncio

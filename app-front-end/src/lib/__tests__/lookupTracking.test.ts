@@ -4,10 +4,35 @@ import {
   findTrackedLookupStartup,
   lookupChipStatus,
   rerunHasSettled,
+  lookupIsWorking,
+  invalidateLookupCompletionQueries,
 } from '../lookupTracking';
 import type { Startup } from '../../types/startup';
 
 const DISPATCHED_AT = '2026-07-29T12:00:00Z';
+
+it('does not count a completed unopened result as an active dispatch', () => {
+  expect(lookupIsWorking({ busy: false, cancelPending: false, pending: true,
+    autoOpened: false, decided: true })).toBe(false);
+  expect(lookupIsWorking({ busy: false, cancelPending: false, pending: true,
+    autoOpened: false, decided: false, durableStatus: 'succeeded' })).toBe(false);
+  expect(lookupIsWorking({ busy: false, cancelPending: false, pending: true,
+    autoOpened: false, decided: false, durableStatus: 'running' })).toBe(true);
+});
+
+it('invalidates the coherent canonical memo dependency set after completion', () => {
+  const queryKeys: unknown[][] = [];
+  invalidateLookupCompletionQueries({
+    invalidateQueries: ({ queryKey }) => queryKeys.push([...queryKey]),
+  }, 'startup-1', 'opportunity-1');
+  expect(queryKeys).toEqual([
+    ['startup', 'detail', 'startup-1'],
+    ['institutional', 'opportunity', 'legacy', 'startup-1'],
+    ['institutional', 'evidence', 'opportunity-1'],
+    ['institutional', 'evaluation', 'opportunity-1'],
+    ['institutional', 'rulings', 'opportunity-1'],
+  ]);
+});
 
 function makeStartup(overrides: Partial<Startup> = {}): Startup {
   return {

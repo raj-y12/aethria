@@ -310,7 +310,7 @@ class ScoutEngine:
                 else:
                     if self.deal_memory:
                         thesis = result.get("primary_thesis", "")
-                        if await self.deal_memory.is_duplicate_thesis(thesis):
+                        if thesis and await self.deal_memory.is_duplicate_thesis(thesis):
                             self.logger.info(
                                 f"[{scout.scout_type}] Skipping duplicate thesis: "
                                 f"{result['name']}"
@@ -326,18 +326,10 @@ class ScoutEngine:
 
                     result["pipeline_run_id"] = pipeline_run_id
 
-                    # Product decision, 2026-08-19: replace the model's
-                    # self-reported confidence entirely. It was requested as
-                    # a bare "number between 0 and 1" with no rubric, so two
-                    # identical companies could legitimately score
-                    # differently between calls -- there was nothing
-                    # grounding it. confidence_score now comes purely from
-                    # matching Scout's own structured fields (sector,
-                    # funding_stage, location) against the mandate's
-                    # structured categories -- deterministic, same inputs
-                    # always produce the same result. Scoped to periodic
-                    # discovery only: named on-demand lookups already bypass
-                    # this gate entirely (ignore_confidence_threshold=True).
+                    # Preserve the historical discovery-fit projection. This
+                    # number measures structured mandate-category matches, not
+                    # factual certainty or investment attractiveness. The live
+                    # Reviewer no longer uses it as an admission threshold.
                     parsed_json = (self.active_thesis or {}).get("parsed_json") or {}
                     fit = compute_structured_thesis_fit(result, parsed_json)
                     result["confidence"] = fit["matched_categories"] / fit["total_categories"]

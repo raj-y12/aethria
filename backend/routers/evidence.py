@@ -57,13 +57,23 @@ def _safe_ledger(ledger):
 
 
 @router.get("/api/opportunities/{opportunity_id}/evidence")
-async def get_evidence_ledger(request: Request, opportunity_id: str):
+async def get_evidence_ledger(request: Request, opportunity_id: str, view: Literal["full", "analyst"] = "full"):
     validate_route_id(opportunity_id, field_name="opportunity_id")
     user_id = require_authenticated_user(request)
     ledger = await _repository(request).get_ledger(
         user_id=user_id, opportunity_id=opportunity_id
     )
-    return _safe_ledger(ledger)
+    safe = _safe_ledger(ledger)
+    if view == "analyst":
+        fields = {
+            "artifacts": ("artifact_id", "artifact_type", "source_uri", "title", "trust_class", "access_class", "published_at", "effective_at", "retrieved_at"),
+            "evidence_items": ("evidence_item_id", "artifact_id", "item_type", "display_excerpt", "effective_at", "expires_at", "verification_state", "source_quality", "extraction_confidence"),
+            "claims": ("claim_id", "company_id", "claim_type", "display_text", "assertion_class", "confidence", "material", "status", "period"),
+            "claim_evidence_links": ("link_id", "claim_id", "evidence_item_id", "relationship", "support_strength", "rationale"),
+        }
+        return {kind: [{key: row[key] for key in keys if key in row} for row in safe.get(kind, [])]
+                for kind, keys in fields.items()}
+    return safe
 
 
 @router.post("/api/opportunities/{opportunity_id}/evidence-plans")

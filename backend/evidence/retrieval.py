@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import re
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -22,6 +23,7 @@ from evidence.models import (
 )
 from evidence.service import detect_prompt_injection
 from utils.retrieval_grounding import retrieve_source_pack_merged
+from utils.text_sanitize import strip_markdown_links
 
 # Fixed 2026-08-17 (audit CRITICAL-2): this used to be 3, silently capping
 # plan.search_questions[:3] -- but the plan has one search question *per
@@ -55,6 +57,23 @@ def _domain(url: Optional[str]) -> str:
 # call's own contribution so total worst-case volume across MAX_QUERIES
 # queries stays reasonable).
 _MAX_SOURCES_PER_QUERY = 4
+
+
+def analytical_excerpt(content: str, *, limit: int = 2000) -> str:
+    """Keep analytical signal when a scrape leads with boilerplate consent text."""
+    cleaned = strip_markdown_links(content)
+    if len(cleaned) <= limit:
+        return cleaned
+    marker = re.compile(r"trusted by|customers?|case stud(?:y|ies)|testimonial|logos?|used by", re.IGNORECASE)
+    windows = [cleaned[:420]]
+    for match in marker.finditer(cleaned):
+        windows.append(cleaned[max(0, match.start() - 100):match.end() + 320])
+    windows.append(cleaned[-420:])
+    result = "\n...\n".join(dict.fromkeys(windows))
+    if len(result) <= limit:
+        return result
+    tail = cleaned[-420:]
+    return result[:max(1, limit - len(tail) - 9)] + "\n...\n" + tail
 
 
 async def execute_evidence_plan(
@@ -108,6 +127,12 @@ async def execute_evidence_plan(
     for query, pack in zip(queries, packs):
         provider = str(pack.get("provider") or "") or provider
         sources = pack.get("sources") or []
+        if plan.trigger_type == "investment_analysis":
+            from investment_analysis.grounding import relevant_source
+            # Research for the live analytical core must establish company
+            # relevance before unrelated domains can count as corroboration.
+            sources = [source for source in sources if relevant_source(
+                source, company_name=company_name, company_website=company_website)]
         # Deterministic trust/verification (spec §9.6 is otherwise entirely
         # unbuilt -- nothing else in the codebase ever marks retrieved
         # evidence VERIFIED). Two auditable rules, no model judgment
@@ -182,7 +207,7 @@ async def execute_evidence_plan(
                         user_id=user_id,
                         item_type="retrieval_excerpt",
                         normalized_value={},
-                        display_excerpt=content[:2000],
+                        display_excerpt=analytical_excerpt(content),
                         source_locator=source.get("url"),
                         verification_state=verification_state,
                         source_quality=source_quality,

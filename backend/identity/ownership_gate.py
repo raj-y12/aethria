@@ -53,7 +53,7 @@ def detect_acquisition_signal(text: str) -> Optional[str]:
 
 
 def check_ownership_conflict(
-    scout_output: Dict[str, Any], review_output: Dict[str, Any]
+    scout_output: Dict[str, Any], review_output: Dict[str, Any], *, company_name: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """Return a block payload when acquisition language is present and no
     operator has independently verified the company as a new spinout;
@@ -61,6 +61,17 @@ def check_ownership_conflict(
     if any(bool(scout_output.get(key) or review_output.get(key)) for key in _SPINOUT_OVERRIDE_KEYS):
         return None
     text = _collect_text(scout_output, review_output)
+    if company_name:
+        # Canonical source excerpts include founders' employment histories and
+        # competitors. Acquisition language must name this company as its
+        # subject, not merely occur somewhere on the same retrieved page.
+        subject = r"\b" + re.escape(company_name.strip()) + r"\b"
+        subject += r"(?:\s+(?:Limited|Ltd\.?|Inc\.?|Medical|Corporation|Corp\.?))*"
+        prefix = subject + r"\s*(?:\([^)]{0,60}\)\s*)?(?:(?:was|has been|is|recently|reportedly)\s+)*"
+        patterns = [prefix + pattern.pattern for pattern in _ACQUISITION_PATTERNS]
+        patterns.append(r"\bacquisition\s+of\s+" + subject + r"\s+by\b")
+        text = "\n".join(match.group(0) for pattern in patterns
+                         for match in re.finditer(pattern, text, re.IGNORECASE))
     matched = detect_acquisition_signal(text)
     if matched is None:
         return None

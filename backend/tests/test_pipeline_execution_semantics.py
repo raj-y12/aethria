@@ -638,6 +638,7 @@ async def _run_periodic_with_stage_results(
     scout_result=None,
     portfolio_result=None,
     meta_result=None,
+    partners_enabled=True,
 ):
     import pipeline_runner
 
@@ -650,7 +651,7 @@ async def _run_periodic_with_stage_results(
             "agent_config": {
                 "scouts_enabled": scout_result is not None,
                 "reviewers_enabled": True,
-                "partners_enabled": True,
+                "partners_enabled": partners_enabled,
             }
         },
     )
@@ -673,6 +674,7 @@ async def _run_periodic_with_stage_results(
         last_cycle_stats = {}
 
         async def run_cycle(self, **_kwargs):
+            assert partners_enabled, "Shared analysis must not invoke a disabled Partner"
             return reviewer_result
 
         def close(self):
@@ -682,6 +684,7 @@ async def _run_periodic_with_stage_results(
         last_cycle_escalations = 0
 
         async def run_cycle(self, **_kwargs):
+            assert partners_enabled, "Disabled Partner must not execute"
             return partner_result
 
         def close(self):
@@ -760,6 +763,17 @@ def _stage_no_work(stage):
         code=f"{stage}_no_eligible_work",
         detail=f"No eligible {stage} work.",
     )
+
+
+@pytest.mark.asyncio
+async def test_shared_periodic_analysis_blocks_when_partner_disabled(monkeypatch):
+    result = await _run_periodic_with_stage_results(
+        monkeypatch, _stage_success("reviewer"), _stage_success("partner"),
+        partners_enabled=False,
+    )
+    assert result.state is PipelineExecutionState.BLOCKED
+    assert result.code == "analysis_partner_disabled"
+    assert result.metadata["stage_results"]["partner"]["code"] == "partner_disabled"
 
 
 @pytest.mark.asyncio

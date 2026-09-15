@@ -418,7 +418,7 @@ export default function DispatchCommandBar({
             <section aria-label="Active dispatches" className="border-y border-oxford/[0.1] py-phi-3">
               <div className="mb-phi-2 flex items-center justify-between gap-phi-3">
                 <p className="type-label-section">Active dispatches</p>
-                <p className="type-meta text-oxford/65">{chips.length}</p>
+                <p className="type-meta text-oxford/65">{chips.filter((chip) => chip.status !== 'decided').length} active</p>
               </div>
               <div className="flex gap-phi-2 overflow-x-auto pb-1" role="list">
                 {chips.map((c) => (

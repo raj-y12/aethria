@@ -59,7 +59,7 @@ def parse_lookup_input(lookup_input: str) -> Dict[str, Optional[str]]:
             host = host[4:] if host.startswith("www.") else host
             website = host or None
             # Strip the detected website token so company_name remains clean.
-            candidate_name = re.sub(re.escape(token), " ", raw, flags=re.IGNORECASE).strip(" ,|-")
+            candidate_name = re.sub(re.escape(token), " ", raw, flags=re.IGNORECASE).strip(" ,|-–—")
             candidate_name = normalize_lookup_company_phrase(candidate_name)
             if candidate_name and not is_lookup_command_only(candidate_name):
                 company_name = candidate_name

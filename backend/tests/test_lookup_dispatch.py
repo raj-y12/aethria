@@ -2,6 +2,23 @@ from api import _parse_lookup_input, _resolve_status_for
 from resolver.company_resolver import CompanyCandidate, CompanyResolution
 
 
+def test_unicode_separator_is_not_part_of_company_identity():
+    parsed = _parse_lookup_input("Assiduous — https://assiduous.ai")
+    assert parsed["company_name"] == "Assiduous"
+    assert parsed["website"] == "assiduous.ai"
+    assert parsed["lookup_query"] == "Assiduous — https://assiduous.ai"
+
+
+def test_unverified_hint_with_competing_domain_requires_confirmation(monkeypatch):
+    import resolver.company_resolver as cr
+    monkeypatch.setattr(cr, "retrieve_source_pack_merged", lambda **kw: {"sources": [
+        {"title": "Assiduous", "url": "https://assiduous.tech", "snippet": "Dublin company Assiduous."},
+    ]})
+    result = cr.resolve_company("Assiduous", user_id="user_a", website_hint="assiduous.ai")
+    assert _resolve_status_for(result, website_hint="assiduous.ai") == "ambiguous"
+    assert any(c.website == "https://assiduous.tech" for c in result.candidates)
+
+
 def test_parse_lookup_input_strips_common_command_prefix():
     parsed = _parse_lookup_input("find Perplexity AI")
 

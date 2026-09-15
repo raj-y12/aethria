@@ -120,3 +120,12 @@ def test_memo_omits_the_traction_line_when_nothing_was_found():
     startup.scout_info.traction_facts = None
 
     assert "Traction (from evidence)" not in MemoGenerator().generate_memo(startup)
+
+
+def test_display_memo_keeps_thesis_identifier_internal():
+    thesis = {"version_id": "internal-thesis-id", "version_number": 39}
+    generator = MemoGenerator()
+    display = generator.generate_memo(_decided_startup(), fund_thesis=thesis, for_display=True)
+    assert "internal-thesis-id" not in display
+    assert "version 39" in display
+    assert "internal-thesis-id" in generator.generate_memo(_decided_startup(), fund_thesis=thesis)

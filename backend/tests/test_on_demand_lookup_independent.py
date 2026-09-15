@@ -19,6 +19,22 @@ from pipeline_execution import (
 )
 
 
+@pytest.mark.asyncio
+async def test_current_startup_read_ignores_stale_in_memory_projection():
+    from tests.test_memo_generator_current_schema import _decided_startup
+    import pipeline_runner
+    from unittest.mock import AsyncMock
+
+    current = _decided_startup()
+    current.review_info.overall_summary = "New canonical review"
+    repository = SimpleNamespace(get_startup=AsyncMock(return_value=current.model_dump(mode="json")))
+    storage = SimpleNamespace(get_startup=lambda key: pytest.fail("Must not read the old snapshot"))
+    result = await pipeline_runner._read_current_startup(
+        user_id="fund-a", startup_id="startup-1", startup_repository=repository, storage=storage)
+    repository.get_startup.assert_awaited_once_with("fund-a", "startup-1")
+    assert result.review_info.overall_summary == "New canonical review"
+
+
 def test_missing_typed_fact_dimensions_are_reextracted_even_when_generic_claims_exist():
     import pipeline_runner
 
@@ -145,6 +161,14 @@ def _wire_common_engines(monkeypatch):
     monkeypatch.setattr("pipeline_runner.ScoutEngine", _FakeScoutEngine)
     monkeypatch.setattr("pipeline_runner.ReviewerEngine", _FakeReviewerEngine)
     monkeypatch.setattr("pipeline_runner.PartnerEngine", _FakePartnerEngine)
+    def projection_stage(**kwargs):
+        # Exercise the same orchestration assertions through the new shared-core
+        # callbacks; this suite deliberately stubs model/persistence work.
+        options = {**kwargs, "use_resource_fund_thesis_fallback": False}
+        if kwargs["stage"] == "reviewer":
+            return _FakeReviewerEngine(**options)
+        return _FakePartnerEngine(**{**options, "fund_thesis": kwargs.get("active_thesis")})
+    monkeypatch.setattr("pipeline_runner.CompletedAnalysisStage", projection_stage)
     monkeypatch.setattr("pipeline_runner.PortfolioStore", lambda *args, **kwargs: SimpleNamespace())
     prerequisites = _prerequisites()
 

@@ -8,10 +8,13 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import uuid4
 
+from evaluation_v2.provenance import PipelineBinding, evaluation_provenance
 from evaluation_v2.models import EvaluationPolicy
+from investment_analysis.models import AnalysisResult
 from evaluation_v2.evidence_projection import enriched_claim_evidence_sql
 from evaluation_v2.service import (
     evaluate_snapshot,
+    evaluate_claim_score_eligibility,
     explain_recommendation_change,
     materiality_digest,
     snapshot_claims,
@@ -77,8 +80,22 @@ class EvaluationRepository:
         model_manifest: Optional[Dict[str, Any]] = None,
         prompt_manifest: Optional[Dict[str, Any]] = None,
         judgment_audit: Optional[Dict[str, Any]] = None,
+        pipeline_binding: Optional[PipelineBinding] = None,
+        prepared_analysis: Optional[AnalysisResult] = None,
+        analysis_at: Optional[datetime] = None,
+        expected_evaluation_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         uid = require_user_id(user_id, context="EvaluationRepository.evaluate")
+        if pipeline_binding is not None and pipeline_binding.user_id != uid:
+            raise ValueError("pipeline binding tenant mismatch")
+        if prepared_analysis is not None:
+            if prepared_analysis.reviewer.lineage.user_id != uid or prepared_analysis.reviewer.lineage.opportunity_id != opportunity_id:
+                raise ValueError("prepared analysis tenant/opportunity mismatch")
+            if prepared_analysis.reviewer.policy_versions.policy_hash != policy.policy_hash:
+                raise ValueError("prepared analysis policy mismatch")
+            if analysis_at is None:
+                raise ValueError("prepared analysis requires its frozen evidence clock")
+            judgment_audit = {**(judgment_audit or {}), "investment_analysis": prepared_analysis.model_dump(mode="json")}
         await self._require_write_path(user_id=uid, operation="evaluation creation")
         async with self.pool.acquire() as conn:
             async with conn.transaction(isolation="repeatable_read"):
@@ -87,8 +104,15 @@ class EvaluationRepository:
                 previous = await conn.fetchrow(
                     """
                     select o.service_level, o.decision_state, o.legacy_startup_id,
-                           o.workflow_version, o.workflow_state, r.*
+                           o.workflow_version, o.workflow_state, o.company_id,
+                           o.current_evaluation_id,
+                           s.agent_trace as source_agent_trace,
+                           s.investment_memo_markdown as prior_memo,
+                           s.review_info as prior_review_info,
+                           s.partner_info as prior_partner_info, r.*
                     from public.opportunities o
+                    left join public.startups s
+                      on s.user_id = o.user_id and s.startup_id = o.legacy_startup_id::text
                     left join public.recommendations r
                       on r.user_id = o.user_id
                      and r.recommendation_id = o.current_recommendation_id
@@ -100,6 +124,12 @@ class EvaluationRepository:
                 )
                 if previous is None:
                     raise LookupError("Opportunity not found for tenant")
+                if prepared_analysis is not None:
+                    current_id = previous.get("current_evaluation_id")
+                    if (str(current_id) if current_id is not None else None) != expected_evaluation_id:
+                        raise EvaluationLifecycleError(
+                            "A newer evaluation completed during analysis; retry against the current review"
+                        )
                 if int(previous.get("service_level") or 0) <= 0:
                     raise EvaluationLifecycleError(
                         "Evaluation is paused for this opportunity"
@@ -151,15 +181,71 @@ class EvaluationRepository:
                         uid, opportunity_id,
                     )
                 ]
-                evaluation_at = self._clock()
+                evaluation_at = analysis_at or self._clock()
                 snapshot, digest = snapshot_claims(
                     claims, links, evaluation_at=evaluation_at
                 )
                 content_digest = materiality_digest(snapshot)
-                result = evaluate_snapshot(
-                    snapshot, policy, evaluation_at=evaluation_at
+                if prepared_analysis is not None:
+                    if digest != prepared_analysis.evaluation.snapshot_hash:
+                        raise EvaluationLifecycleError("Evidence changed during analysis; retry against the current snapshot")
+                    result = prepared_analysis.evaluation
+                    if previous.get("current_evaluation_id"):
+                        prior_criteria = await conn.fetch(
+                            "select criterion,score,reasoning from public.criterion_assessments where user_id=$1 and evaluation_id=$2",
+                            uid, str(previous["current_evaluation_id"]),
+                        )
+                        prior_by_dimension = {row["criterion"]: row for row in prior_criteria}
+                        for criterion in result.criteria:
+                            old = prior_by_dimension.get(criterion.criterion)
+                            if old is not None:
+                                criterion.deterministic_adjustments["change_from_prior_review"] = {
+                                    "previous_score": old["score"],
+                                    "previous_reasoning": old["reasoning"],
+                                    "score_changed": old["score"] != criterion.score,
+                                    "reasoning_changed": old["reasoning"] != criterion.reasoning,
+                                }
+                else:
+                    # Retained for historical replay and Phase 0 regression tests.
+                    # Live entry points use InvestmentAnalysisRepository.
+                    result = evaluate_snapshot(snapshot, policy, evaluation_at=evaluation_at)
+                # Lineage is separate from the frozen decision snapshot: adding
+                # observability must not alter snapshot hashes or score inputs.
+                source_trace = _json(previous.get("source_agent_trace"), {})
+                if prepared_analysis is not None and previous.get("legacy_startup_id"):
+                    # Cache invalidation must not erase the previous analyst view.
+                    # This immutable audit copy is tenant scoped with the run.
+                    judgment_audit["superseded_startup_projection"] = {
+                        "investment_memo_markdown": previous.get("prior_memo"),
+                        "review_info": _json(previous.get("prior_review_info"), None),
+                        "partner_info": _json(previous.get("prior_partner_info"), None),
+                        "agent_trace": source_trace,
+                    }
+                source_scout = source_trace.get("scout") or {}
+                recorded_binding = pipeline_binding or PipelineBinding(
+                    user_id=uid, pipeline_entry_type=trigger_type,
                 )
-                evaluation_id = str(uuid4())
+                recorded_binding = recorded_binding.model_copy(update={
+                    "pipeline_run_id": recorded_binding.pipeline_run_id or (prepared_analysis.reviewer.lineage.pipeline_run_id if prepared_analysis else None),
+                    "company_id": recorded_binding.company_id or (str(previous["company_id"]) if previous.get("company_id") else None),
+                    "scout_run_id": recorded_binding.scout_run_id or source_scout.get("scout_run_id"),
+                    "source_scout_pipeline_run_id": recorded_binding.source_scout_pipeline_run_id or source_scout.get("pipeline_run_id"),
+                })
+                recorded_model_manifest = dict(model_manifest or {})
+                recorded_model_manifest["pipeline_provenance"] = {
+                    "binding": recorded_binding.model_dump(mode="json"),
+                    "claim_validation": {
+                        str(claim["claim_id"]): evaluate_claim_score_eligibility(
+                            claim, policy=policy, evaluation_at=evaluation_at,
+                        ).model_dump(mode="json") for claim in snapshot
+                    },
+                    "evidence_links": [
+                        {key: str(link[key]) if link.get(key) is not None else None for key in (
+                            "claim_id", "evidence_item_id", "artifact_id", "source_uri", "source_observation_id", "relationship",
+                        )} for link in links
+                    ],
+                }
+                evaluation_id = prepared_analysis.reviewer.lineage.evaluation_run_id if prepared_analysis is not None else str(uuid4())
                 await conn.execute(
                     """
                     insert into public.evaluation_runs (
@@ -175,7 +261,7 @@ class EvaluationRepository:
                     digest, content_digest, json.dumps(snapshot), json.dumps(judgment_audit or {}), thesis_version_id,
                     policy.policy_version_id, policy.policy_hash, policy.rubric_version,
                     policy.partner_rules_version, policy.partner_rules_hash,
-                    json.dumps(model_manifest or {}), json.dumps(prompt_manifest or {}),
+                    json.dumps(recorded_model_manifest), json.dumps(prompt_manifest or {}),
                     previous_payload.get("evaluation_id") if previous_payload else None,
                 )
                 for criterion in result.criteria:
@@ -238,6 +324,17 @@ class EvaluationRepository:
                     opportunity_id, uid, evaluation_id, recommendation_id,
                     recommendation.attention_priority,
                 )
+                if prepared_analysis is not None and previous.get("legacy_startup_id"):
+                    from investment_analysis.projection import legacy_stage_projection
+                    review_projection, partner_projection, trace_projection = legacy_stage_projection(user_id=uid, analysis=prepared_analysis)
+                    await conn.execute(
+                        """update public.startups set review_info=$3::jsonb,partner_info=$4::jsonb,
+                           agent_trace=(coalesce(agent_trace,'{}'::jsonb) - 'evaluation_manifest') || $5::jsonb,
+                           investment_memo_markdown=null,updated_at=now()
+                           where user_id=$1 and startup_id=$2""",
+                        uid, str(previous["legacy_startup_id"]), json.dumps(review_projection),
+                        json.dumps(partner_projection), json.dumps(trace_projection),
+                    )
                 await self._outbox(
                     conn, user_id=uid, aggregate_id=evaluation_id,
                     event_type="evaluation.completed",
@@ -274,6 +371,19 @@ class EvaluationRepository:
                     "criteria": [item.model_dump(mode="json") for item in result.criteria],
                     "recommendation": recommendation.model_dump(mode="json"),
                     "policy": policy.model_dump(mode="json"),
+                    "provenance": evaluation_provenance(
+                        user_id=uid,
+                        evaluation={
+                            "user_id": uid, "evaluation_id": evaluation_id,
+                            "opportunity_id": opportunity_id, "evidence_snapshot_hash": digest,
+                            "claim_snapshot": snapshot, "model_manifest": recorded_model_manifest,
+                            "judgment_audit": judgment_audit or {},
+                            "thesis_version_id": thesis_version_id,
+                            **policy.model_dump(mode="json"),
+                        },
+                        criteria=[item.model_dump(mode="json") for item in result.criteria],
+                        recommendation=recommendation.model_dump(mode="json"),
+                    ),
                 }
 
     async def get_current(self, *, user_id: str, opportunity_id: str) -> Optional[Dict[str, Any]]:
@@ -335,6 +445,10 @@ class EvaluationRepository:
             "evaluation": evaluation_payload,
             "criteria": criteria_payload,
             "recommendation": recommendation_payload,
+            "provenance": evaluation_provenance(
+                user_id=uid, evaluation=evaluation_payload,
+                criteria=criteria_payload, recommendation=recommendation_payload,
+            ),
         }
 
     async def record_failed_refresh(

@@ -17,7 +17,7 @@ import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
 import { supersedeLookupRetryQueries } from '../lib/lookupRetrySupersession';
-import { findTrackedLookupStartup, lookupChipStatus, rerunHasSettled } from '../lib/lookupTracking';
+import { findTrackedLookupStartup, lookupChipStatus, rerunHasSettled, lookupIsWorking, invalidateLookupCompletionQueries } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -461,8 +461,8 @@ export function useDispatchLookup({
     : false;
   useEffect(() => {
     if (!lookupDecided || !pendingLookupMatch?.id) return;
-    void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', pendingLookupMatch.id] });
-  }, [lookupDecided, pendingLookupMatch?.id, queryClient]);
+    invalidateLookupCompletionQueries(queryClient, pendingLookupMatch.id, pendingLookupMatch.canonical_opportunity_id);
+  }, [lookupDecided, pendingLookupMatch?.id, pendingLookupMatch?.canonical_opportunity_id, queryClient]);
 
   useEffect(() => {
     if (!pendingLookup || pendingLookup.autoOpened || lookupDecided) return;
@@ -522,7 +522,9 @@ export function useDispatchLookup({
     // "Open memo" action (openLookupMemo) so the user advances deliberately.
   }, [lookupDecided, pendingLookup, pendingLookupMatch, rerunDecisionComplete]);
 
-  const lookupWorking = cancelPending || busy || (pendingLookup != null && !pendingLookup.autoOpened);
+  const lookupWorking = lookupIsWorking({ cancelPending, busy, pending: pendingLookup != null,
+    autoOpened: Boolean(pendingLookup?.autoOpened), decided: lookupDecided,
+    durableStatus: durableJobQuery.data?.status ?? pendingLookup?.durableStatus });
 
   const phaseLabel: LookupPhaseLabel = !lookupWorking
     ? null

@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://aethria/resources/schemas/scout_output_v2.json",
+  "title": "ScoutOutput",
+  "description": "Factual Scout discovery output. Legacy investment hypotheses are excluded.",
+  "type": "object",
+  "version": "2",
+  "required": [
+    "version",
+    "id",
+    "scout_type",
+    "name",
+    "one_line",
+    "sector",
+    "problem",
+    "solution",
+    "target_users",
+    "why_now",
+    "confidence",
+    "biggest_unknown",
+    "references",
+    "unknowns",
+    "contradictions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "2"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "scout_type": {
+      "type": "string",
+      "enum": [
+        "market_driven",
+        "builder_technical",
+        "pain_point",
+        "contrarian"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "one_line": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "sector": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "problem": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "solution": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "target_users": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "why_now": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "biggest_unknown": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "funding_stage": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "Pre-Seed",
+        "Seed",
+        "Series A",
+        "Series B",
+        "Series C+",
+        "Unknown",
+        null
+      ]
+    },
+    "est_tam": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "location": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 128,
+      "description": "HQ or primary operating city when known from sources, e.g. Paris, FR"
+    },
+    "founder_names": {
+      "type": "array",
+      "description": "Founder or co-founder names explicitly supported by retrieved sources.",
+      "items": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 160
+      },
+      "maxItems": 8
+    },
+    "references": {
+      "description": "Required. References that PROVE the company exists: company website URL, news article, Crunchbase, LinkedIn, press release. 'General domain knowledge' is rejected.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      },
+      "minItems": 1,
+      "maxItems": 8
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Factual limitations with source attribution where available; no investment judgment."
+    },
+    "contradictions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Factual limitations with source attribution where available; no investment judgment."
+    },
+    "financials": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "description": "Optional source-quoted figures, independently verified before persistence."
+    }
+  }
+}

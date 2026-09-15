@@ -22,13 +22,11 @@ import {
   type FundThesisSummary,
 } from '../api/fundThesis';
 import { useFundConfiguration, usePrefersReducedMotion } from '../hooks';
-import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import SettingsActionDialog from './SettingsActionDialog';
 import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
 import SettingsMobileNav from './SettingsMobileNav';
 import OperationsStrip from './OperationsStrip';
-import ThresholdControls from './ThresholdControls';
 import ExecutionReadinessPanel from '../components/institutional/ExecutionReadinessPanel';
 import { MetaCommandTab } from '../components/system/internals';
 import { validateDecisionThresholds } from '../lib/decisionThresholds';
@@ -660,9 +658,6 @@ export default function SettingsPage() {
   const updateMandate = <K extends keyof FundConfiguration['mandate']>(key: K, value: FundConfiguration['mandate'][K]) =>
     updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }));
 
-  const updateThreshold = <K extends keyof FundConfiguration['thresholds']>(key: K, value: FundConfiguration['thresholds'][K]) =>
-    updateDraft((current) => ({ ...current, thresholds: { ...current.thresholds, [key]: value } }));
-
   const updateRisk = <K extends keyof FundConfiguration['risk']>(key: K, value: FundConfiguration['risk'][K]) =>
     updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }));
 
@@ -967,11 +962,6 @@ export default function SettingsPage() {
               onSettingsChange={setSettings}
             />
           </div>
-          <ThresholdControls
-            settings={settings}
-            storageUnavailable={storageNotReady}
-            onSettingsChange={setSettings}
-          />
           {/* The room's own arrival is the page transition on the root; a second
               entrance here just re-faded content that had already arrived. */}
           <main
@@ -1060,13 +1050,14 @@ export default function SettingsPage() {
 
                   <RoomSection
                     id="thresholds"
-                    title="Decision thresholds"
+                    title="Investment decisions"
                   >
-                    <DecisionThresholdsPanel
-                      draft={draft}
-                      updateDraft={updateDraft}
-                      updateThreshold={updateThreshold}
-                    />
+                    <p className="type-body-sm py-phi-5 text-ink-muted">
+                      Reviewer proposes assessments and explains the evidence behind each score.
+                      Evidence checks constrain unsupported scores. Partner weighs the completed review,
+                      uncertainty, and your fund mandate to decide whether to advance, pass, monitor,
+                      or request more diligence. A score alone does not determine the recommendation.
+                    </p>
                   </RoomSection>
 
                   <RoomSection

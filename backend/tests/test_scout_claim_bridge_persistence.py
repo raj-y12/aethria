@@ -11,6 +11,10 @@ async def test_persists_source_grounded_scout_claims_and_evidence_items():
     claims = []
 
     class Evidence:
+        async def get_ledger(self, *, user_id, opportunity_id):
+            assert (user_id, opportunity_id) == ("fund-a", "opp-a")
+            return {"claims": [], "claim_evidence_links": []}
+
         async def ingest_artifact(self, artifact, *, items):
             artifacts.append((artifact, items))
             return SimpleNamespace(artifact_id=f"artifact-{len(artifacts)}"), [
@@ -58,6 +62,10 @@ async def test_persists_competition_claims_with_source_links():
     persisted = []
 
     class Evidence:
+        async def get_ledger(self, *, user_id, opportunity_id):
+            assert (user_id, opportunity_id) == ("fund-a", "opp-a")
+            return {"claims": [], "claim_evidence_links": []}
+
         async def ingest_artifact(self, artifact, *, items):
             return SimpleNamespace(artifact_id="artifact-competition"), [
                 SimpleNamespace(evidence_item_id="item-competition", display_excerpt=items[0].display_excerpt, source_locator=artifact.source_uri)

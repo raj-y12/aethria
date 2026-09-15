@@ -102,6 +102,12 @@ def snapshot_claims(
                                 link.get("artifact_effective_at")
                             ),
                             "retrieved_at": _iso_or_none(link.get("retrieved_at")),
+                            # Add actual source material when available. Historical
+                            # snapshots without these fields retain their exact
+                            # serialized shape and digest for replay.
+                            **{key: str(link[key]) if link[key] is not None else None
+                               for key in ("artifact_id", "source_uri", "display_excerpt")
+                               if key in link},
                         }
                         for link in claim_links
                     ],

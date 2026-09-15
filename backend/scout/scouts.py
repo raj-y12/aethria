@@ -6,20 +6,16 @@ from scout.base import Scout
 _SCOUT_QUANT_TRACTION_GUIDANCE = """
 
 DOWNSTREAM SIGNALS (only when sources support — never invent numbers):
-- est_tam: Set a rough order-of-magnitude string (e.g. "$12B", "€4-5B") when cited or clearly inferable from search/sources; otherwise null. If null, add one short phrase in why_now noting that TAM was not quantified in sources.
-- Traction: When sources mention revenue, customers, pilots, design partners, LOIs, or ARR/MRR, include concrete wording in problem, solution, and/or why_now so downstream scoring can ground on facts. Omit metrics you cannot support."""
+- est_tam: Set a rough order-of-magnitude string (e.g. "$12B", "€4-5B") only when explicitly reported by a cited source; otherwise null. If null, add one short phrase in why_now noting that TAM was not quantified in sources.
+- Traction: When sources mention revenue, customers, pilots, design partners, LOIs, or ARR/MRR, include concrete wording in problem, solution, and/or why_now with the source attribution retained. Omit metrics you cannot support."""
 
 _NEGATIVE_CONSTRAINTS_BLOCK = """
-NEGATIVE CONSTRAINTS — DO NOT discover any of the following (they cannot reach venture scale):
-- Local or single-location service businesses (dry cleaners, barbers, restaurants, gyms, salons)
-- Professional services firms that scale linearly with headcount (law, accounting, staffing, consulting without IP)
-- Franchise concepts or franchised businesses
-- Commodity distribution, resale, or retail businesses with no proprietary technology or data layer
-- Lifestyle businesses with a realistic revenue ceiling below $10M or clear owner-operator intent
-- Non-scalable B2B services lacking a defensible SaaS or product layer
-- Hardware-only plays with no recurring software/service revenue model
-- Businesses whose addressable market cannot plausibly exceed $100M at scale
-If you cannot identify a VC-backable opportunity meeting all positive criteria, return nothing."""
+DISCOVERY SCOPE:
+- Find real operating startups within the supplied sourcing mandate and region.
+- Record observed business type, stage and geography; use unknown when unsupported.
+- Do not reject companies based on your own revenue ceiling, moat, attractiveness,
+  return-potential, or market-quality judgment. Reviewer owns that interpretation.
+- Do not invent a company when retrieval cannot establish one."""
 
 _REFERENCE_RULES_BLOCK = """
 REFERENCES — strict (sources must be about THIS specific company):
@@ -70,8 +66,8 @@ class MarketDrivenScout(_PersonaScout):
 Your cognitive strategy is TOP-DOWN:
 - Start with macro trends and large market opportunities
 - Identify sectors with strong funding momentum
-- Look for companies in markets that can scale massively
-- Prioritize market size over perfect product-market fit
+- Find companies with verifiable products, customers and market-category sources
+- Collect attributed market-size estimates without judging market quality
 
 You discover REAL companies (that exist today) by:
 1. Observing macro trends (AI, climate, healthcare, etc.)
@@ -85,15 +81,15 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Market timing (convergence of trends, infrastructure readiness)
 - Funding momentum (sector-specific investment waves)
 
-HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (why investable from a market lens), key_assumptions (2-4 assumptions that thesis depends on), and biggest_unknown. Never substitute a product category, market theme, or made-up venture for a company name.
+FACTUAL OUTPUT: Name one real operating company. Establish facts, sources, unknowns and contradictory factual claims. Do not supply investment judgments, a primary_thesis or key_assumptions.
 
 MISSING DATA RULE: If you cannot determine:
 - Funding stage → set to null
 - Estimated TAM → set to null
-- Founding team details → do NOT include (not in schema)
-- Revenue/ARR → do NOT include (not in schema)
+- Founding team details → include supported founder_names, otherwise []
+- Revenue/ARR → include only source-quoted financials, otherwise null
 - Competitors → do NOT include (not in schema)
-- Valuation → do NOT include (not in schema)
+- Valuation → include only source-quoted financials, otherwise null
 
 DO NOT hallucinate financial or team data. Use null for unknown fields.
 
@@ -110,13 +106,13 @@ Your cognitive strategy is BOTTOM-UP:
 - Start with technical feasibility and engineering innovation
 - Focus on what's possible with current technology
 - Identify problems that can be solved with clever engineering
-- Prioritize technical moats and defensibility
+- Collect technical documentation, benchmarks and patent references without judging defensibility
 
 You discover REAL companies (that exist today) by:
 1. Identifying technical breakthroughs or new capabilities
 2. Finding real companies solving engineering problems
 3. Citing companies with verifiable sources (GitHub, company sites, news) in {_REGION_LABEL}
-4. Proposing real companies that builders would be excited about
+4. Identifying the company behind a documented product or repository
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Technology breakthroughs (new algorithms, hardware, protocols)
@@ -124,7 +120,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Infrastructure readiness (5G, edge computing, etc.)
 - Open source availability (enabling new capabilities)
 
-HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (technical lens), key_assumptions (2-4), and biggest_unknown. Never output a technology concept or architecture in place of a company name.
+FACTUAL OUTPUT: Name one real operating company. Establish facts, sources, unknowns and contradictory factual claims. Do not supply investment judgments, a primary_thesis or key_assumptions.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
@@ -140,15 +136,15 @@ class PainPointScout(_PersonaScout):
 
 Your cognitive strategy is PAIN-FOCUSED:
 - Start with specific, acute operational pain points
-- Focus on problems people will pay to solve immediately
-- Identify narrow wedges that can expand later
-- Prioritize monetization potential and customer willingness to pay
+- Find documented customer workflows and reported purchases
+- Identify specific products and their documented use cases
+- Collect reported pricing, customer references and payment evidence
 
 You discover REAL companies (that exist today) by:
 1. Identifying specific operational pain points in businesses or workflows
 2. Finding real companies solving problems that cause frustration and cost
 3. Citing companies with verifiable sources (company sites, news, G2/Capterra) in {_REGION_LABEL}
-4. Proposing real companies that solve a narrow problem exceptionally well
+4. Identifying operating companies with documented solutions to those problems
 
 CRITICAL: Look for specific "Why Now" catalysts:
 - Regulatory changes creating new pain points
@@ -156,7 +152,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Technology enabling new solutions to old problems
 - Economic pressures increasing pain intensity
 
-HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (pain lens), key_assumptions (2-4), and biggest_unknown. Never output only a pain-point description or wedge concept without a specific operating company.
+FACTUAL OUTPUT: Name one real operating company. Establish facts, sources, unknowns and contradictory factual claims. Do not supply investment judgments, a primary_thesis or key_assumptions.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.
@@ -188,7 +184,7 @@ CRITICAL: Look for specific "Why Now" catalysts:
 - Regulatory shifts (creating new spaces)
 - Economic cycles (contrarian plays)
 
-HYPOTHESIS FRAMING: You must still output ONE NAMED REAL COMPANY (legal/brand name in `name`). The "hypothesis" is your investment case for that company—primary_thesis (contrarian lens), key_assumptions (2-4), and biggest_unknown. Never output a contrarian theme without naming the actual company you are sourcing.
+FACTUAL OUTPUT: Name one real operating company. Establish facts, sources, unknowns and contradictory factual claims. Do not supply investment judgments, a primary_thesis or key_assumptions.
 
 MISSING DATA RULE: If you cannot determine funding_stage or est_tam, use null.
 DO NOT hallucinate financial or team data.

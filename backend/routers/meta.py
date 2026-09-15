@@ -539,54 +539,16 @@ async def post_startup_triage_override(request: Request, startup_id: str, body: 
     if limited is not None:
         return limited
 
-    startup_repository = _get_startup_repository(request)
-    storage = StartupReadStorageAdapter(None, await startup_repository.load_snapshot(uid))
-    startup = storage.get_startup(startup_id)
-    if startup is None:
-        raise HTTPException(status_code=404, detail="Startup not found")
+    identity = getattr(request.app.state, "identity_repository", None)
+    if identity is None:
+        raise HTTPException(status_code=503, detail="Canonical identity repository unavailable")
+    opportunity = await identity.get_opportunity_by_legacy_projection(
+        user_id=uid, legacy_startup_id=startup_id,
+    )
+    if opportunity is None:
+        raise HTTPException(status_code=409, detail="Resolve the startup's canonical identity before investment analysis.")
+    from routers.evaluations import evaluate_opportunity
 
-    intelligence = getattr(request.app.state, "fund_intelligence_repository", None)
-    thesis_repository = getattr(intelligence, "thesis_repository", None)
-    if thesis_repository is None:
-        raise HTTPException(status_code=503, detail="PostgreSQL thesis repository is unavailable")
-    thesis = await get_active_thesis_from_repository(thesis_repository, uid)
-    if thesis is None:
-        await bootstrap_default_thesis_with_repository(thesis_repository, uid)
-        thesis = await get_active_thesis_from_repository(thesis_repository, uid)
-    thesis_ctx = thesis.as_engine_context() if thesis else None
-
-    try:
-        if body.stage == "review":
-            api_key = os.getenv("OPENAI_API_KEY", "").strip()
-            if not api_key:
-                raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for review")
-            reviewer_engine = ReviewerEngine(
-                api_key=api_key,
-                storage=storage,
-                tenant_user_id=uid,
-                model=os.getenv("REVIEWER_MODEL", "gpt-5-nano"),
-                active_thesis=thesis_ctx,
-                startup_repository=startup_repository,
-            )
-            done = await reviewer_engine.run_startup(
-                startup_id,
-                ignore_confidence_threshold=True,
-                bypass_agent_enabled_gate=True,
-                startup=startup,
-            )
-        else:
-            if startup.review_info is None:
-                raise HTTPException(status_code=409, detail="Startup has not been reviewed yet")
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    "A Partner decision requires a current canonical evaluation. "
-                    "Run an evidence evaluation for this opportunity before deciding."
-                ),
-            )
-    except FundThesisIncompleteError as e:
-        raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
-
-    if not done:
-        raise HTTPException(status_code=422, detail=f"Could not complete {body.stage} for this startup")
+    await evaluate_opportunity(request, opportunity.opportunity_id,
+                               scope="partner" if body.stage == "decide" else "full")
     return {"success": True, "startup_id": startup_id, "stage": body.stage}

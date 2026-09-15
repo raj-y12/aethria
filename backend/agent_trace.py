@@ -10,6 +10,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
+from uuid import uuid4
 
 from utils.reference_verify import extract_http_urls
 
@@ -202,6 +203,9 @@ def build_scout_trace(
         }
     trace = {
         "stage": "scout",
+        "scout_run_id": str(uuid4()),
+        "scout_model": scout.get("model"),
+        "scout_prompt_version": scout.get("prompt_version"),
         "status": "completed",
         "pipeline_run_id": pipeline_run_id,
         "recorded_at": _now_iso(),
@@ -265,6 +269,13 @@ def build_review_trace(
         flags.append("thesis_mismatch")
         conflicts.append("Review indicates low fund thesis alignment.")
 
+    context_claim_ids: set[str] = set()
+    contexts = _as_dict(_as_dict(review.get("canonical_context_snapshot")).get("contexts"))
+    for packet in contexts.values():
+        context = _as_dict(packet)
+        for claim in _as_list(context.get("claims") or context.get("current_supported_claims")):
+            if _as_dict(claim).get("claim_id"):
+                context_claim_ids.add(str(claim["claim_id"]))
     confidence = _review_confidence(review, evidence)
     handoff = {
         "status": _status_from(flags),
@@ -276,6 +287,24 @@ def build_review_trace(
     }
     return {
         "stage": "reviewer",
+        "reviewer_run_id": str(uuid4()),
+        "canonical_context_claim_ids": sorted(context_claim_ids),
+        "reviewer_model": review.get("model"),
+        "reviewer_prompt_version": review.get("prompt_version"),
+        "reviewer_prompt_versions": [
+            item.get("prompt_version")
+            for item in _as_list(review.get("reviews")) if isinstance(item, dict)
+        ],
+        "score_origin": review.get("score_origin") or "UNKNOWN_LEGACY",
+        "legacy_scores": {
+            key: review.get(key) for key in (
+                "market_score", "product_score", "technical_score",
+                "execution_score", "defensibility_score", "confidence_adjusted_score",
+            )
+        },
+        "policy_version_id": review.get("policy_version_id"),
+        "policy_hash": review.get("policy_hash"),
+        "evaluation_rubric_version": review.get("rubric_version"),
         "status": "completed",
         "pipeline_run_id": pipeline_run_id,
         "recorded_at": _now_iso(),
@@ -328,6 +357,13 @@ def build_partner_trace(
     }
     return {
         "stage": "partner",
+        "partner_run_id": str(uuid4()),
+        "partner_prompt_version": partner.get("prompt_version"),
+        "provenance": partner.get("provenance"),
+        "recommendation_origin": (
+            _as_dict(partner.get("provenance")).get("recommendation_origin")
+            or "UNKNOWN_LEGACY"
+        ),
         "status": "completed",
         "pipeline_run_id": pipeline_run_id,
         "recorded_at": _now_iso(),

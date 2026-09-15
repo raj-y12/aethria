@@ -125,6 +125,87 @@ own fixed-window policy (`backend/security/rate_limiter.py`).
 | `GET`/`POST` | `/api/opportunities/{opportunity_id}/actions` | Workflow actions and drafts |
 | `POST` | `/api/actions/{workflow_action_id}/approve` | Approval record — does **not** itself perform an external write |
 
+### Internal provenance metadata
+
+Current shared-analysis evaluations also carry typed internal contracts under
+`evaluation.judgment_audit.investment_analysis`. Criterion
+`deterministic_adjustments.assessment_validation` distinguishes proposed and
+validated scores, cap reason, support and contradiction status. Score origins
+add `REVIEWER_ASSESSMENT` and `VALIDATED_REVIEWER_ASSESSMENT`; recommendation
+origin adds `PARTNER_ANALYSIS`. Historical records keep their original origins.
+Normal scorecards display investment explanations only.
+New immutable claim snapshots include optional linked `display_excerpt`,
+`source_uri` and `artifact_id` fields. Historical snapshots without those fields
+remain readable. The analysis audit records factual preparation and any bounded
+targeted research, including the initial review when new evidence caused a
+second Reviewer pass. Those source/run details remain internal; the analyst sees
+the final rationale, evidence limitations and unresolved diligence.
+
+Explicit evaluation refresh returns a named `{code, detail}` error for analysis
+dependency changes (409), unconfigured models, unavailable model budgets or
+failed factual preparation (`evidence_preparation_failed`, 503).
+`POST /api/opportunities/{opportunity_id}/evaluate?scope=partner` reuses a completed
+review only when its factual evidence and published review policy/thesis are
+unchanged. It revalidates freshness and calls Partner alone. Incompatible or
+missing prior reviews return 409 and require the default full refresh.
+The existing startup `triage-override` action converges on this same evaluator:
+`stage=review` refreshes the full analysis and `stage=decide` performs Partner-only
+refresh. Neither action invokes the retired Reviewer persona scoring engine.
+Scout projections add `unknowns` and `contradictions`; legacy hypothesis fields
+remain readable but are not populated by factual Scout v2.
+
+The current evaluation DTO has an additive `provenance` object (typed in
+`backend/evaluation_v2/provenance.py` and `app-front-end/src/api/evaluations.ts`).
+It binds the pipeline entry/run, source Scout run, company/opportunity,
+evaluation ID, immutable evidence snapshot hash, evidence artifact/item/claim
+links, rubric/policy/thesis versions and recommendation origin. Each criterion
+retains its canonical score, support/contradiction IDs, quality flags and exact
+recorded claim eligibility/caps. Missing historical metadata is null or an empty
+collection; it is never reconstructed from today's policy.
+
+Startup DTOs include additive `projection_provenance`: stored historical scores,
+their recorded source (or `UNKNOWN_LEGACY`), compatibility IDs, Partner provenance
+and human override. Normal `review.*_score` fields remain null. New stage trace
+entries carry distinct Scout/Reviewer/Partner invocation IDs. Partner metadata
+records the original canonical state, its mapping, policy/guard/validation changes
+and the exact evaluation ID/hash supplied to that invocation when available.
+The startup's `partner.provenance` is also preserved in the Partner DTO.
+For `recommendation_origin=PARTNER_ANALYSIS`, `canonical_recommendation` records
+the operational canonical action: `advance`, `pass`, `monitor`, or
+`insufficient_evidence` (displayed as **More diligence** for this origin).
+The legacy `partner.recommendation=MONITOR` compatibility value is unchanged;
+new displays must not mistake that projection for a Partner decision to monitor.
+Historical records lacking provenance retain their historical labels.
+Lookup resolution can return `ambiguous` even with a supplied website when
+retrieved evidence identifies competing domains and does not corroborate that
+website. The existing candidate picker must obtain a deliberate identity choice;
+canonical admission blocks disputed raw hints as `conflicting_domain_evidence`.
+Supplying a domain is not proof that sources about similarly named firms belong
+to that company.
+
+Both `GET /api/opportunities/{opportunity_id}/evaluation` and
+`GET /api/opportunities/{opportunity_id}/evidence` accept `view=analyst|full`.
+The default remains `full` for existing API clients. The production app requests
+`view=analyst`; development retains the full response for its provenance inspector.
+The analyst evaluation view includes run ID/status/date, criterion scores,
+reasoning, supporting/contradicting claim keys, limitations, validation/change
+explanations, recommendation rationale and dependency status. It omits the raw
+claim snapshot, model/prompt manifests, policy hashes and duplicated audit objects.
+Only score/recommendation origins remain in its provenance object. Audit-only
+evaluation fields are optional in the typed client. The analyst evidence view
+retains source descriptions/URLs, excerpts, claim explanations and the identifiers
+needed to join them; it omits execution plans, storage references, normalized raw
+payloads and other unconsumed fields. Restricted-source URL redaction applies to
+both views. Authentication and tenant scope are unchanged.
+
+`POST /api/opportunities/manual-lookup` additionally returns `pipeline_run_id`
+and an ordered `pipeline_trace` of the shared factual-evidence → Reviewer → validation → Partner path and compatibility projections.
+No new debug endpoint or access policy is introduced. Existing authenticated,
+tenant-scoped routes retain their guards. These fields are internal audit data;
+the normal analyst UI does not render raw identifiers. In development, expand
+**Development provenance** in a Flow memo to inspect them. See
+[the provenance operating guide](docs/operations/pipeline-provenance.md).
+
 ## Monitoring and refresh budgets
 
 | Method | Path | Notes |
@@ -239,3 +320,14 @@ All fund-thesis routes require Supabase and return `503` when it is unavailable.
 
 Admin routes are inert unless `ADMIN_DASHBOARD_ENABLED` and the admin secrets are
 configured.
+
+### Investment-review dependency validity
+
+`GET /api/opportunities/{opportunity_id}/evaluation` adds optional `dependencies`:
+`{state: "current" | "stale" | "unknown", reasons: string[], message: string}`.
+For new investment reviews, this read-only check compares material factual evidence,
+current evidence eligibility, thesis, policy and prompt versions. Stored historical
+scores and decisions are not rewritten. The memo displays the human-readable
+refresh message; reason codes remain API/audit metadata. Historical evaluations
+without the new contracts report unknown. Partner-only refresh rejects changed
+Reviewer dependencies; a full refresh safely reuses available factual evidence.

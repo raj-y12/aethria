@@ -21,6 +21,45 @@ _RULES_PATH = (
 )
 
 
+@pytest.mark.asyncio
+async def test_former_employer_acquisition_is_not_startup_ownership():
+    from tests.investment_analysis.test_authority import run_case
+
+    def former_employer(claims, links):
+        claims[0]["display_text"] = "Synthetic's COO previously worked at Novate Medical (acquired by BTG plc)."
+
+    result, _ = await run_case(action="ADVANCE", mutate=former_employer)
+    assert result.partner.operational_action == "ADVANCE"
+    assert not any("ownership" in item.lower() for item in result.partner.constraints)
+
+
+def test_v5_versions_new_authority_without_changing_evidence_safety_limits():
+    directory = _RULES_PATH.parent
+    old = json.loads((directory / "v4.json").read_text())
+    new = json.loads((directory / "v5.json").read_text())
+    assert new["version"] == "5.0"
+    assert "Partner chooses" in new["description"]
+    for key in old.keys() - {"version", "description"}:
+        assert new[key] == old[key], key
+
+
+@pytest.mark.asyncio
+async def test_live_partner_judgment_is_not_selected_by_legacy_score_thresholds():
+    from tests.investment_analysis.test_authority import run_case
+
+    passed, _ = await run_case(proposal=8, action="PASS")
+    advanced, _ = await run_case(proposal=8, action="ADVANCE")
+    assert [item.score for item in passed.evaluation.criteria] == [item.score for item in advanced.evaluation.criteria]
+    assert passed.partner.operational_action == "PASS"
+    assert advanced.partner.operational_action == "ADVANCE"
+    assert passed.partner.judgment.action == "PASS"
+
+    unsupported, _ = await run_case("B_strong_looking_unverified", proposal=8, action="ADVANCE")
+    assert unsupported.partner.judgment.action == "ADVANCE"
+    assert unsupported.partner.operational_action == "MORE_DILIGENCE"
+    assert unsupported.partner.constraints
+
+
 def _rules() -> dict[str, Any]:
     return json.loads(_RULES_PATH.read_text())
 
@@ -202,6 +241,37 @@ def test_compiled_policy_marks_each_configured_dimension_required_for_evaluation
         "execution",
     }
     assert all(criterion.required for criterion in policy.criteria)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("verified,expected", [(True, "PASS"), (False, "MORE_DILIGENCE")])
+async def test_live_partner_judgment_retained_when_explicit_fund_exclusion_constrains_action(verified, expected):
+    from investment_analysis.models import ReviewerDraft, PartnerDraft
+    from investment_analysis.service import analyze
+    from pipeline_contracts.models import Lineage, Identity
+    from tests.investment_analysis.test_mandate import sector_snapshot
+    from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
+    from tests.evaluation_v2.test_phase0_golden_pipeline import CLOCK
+
+    async def generate(stage, prompt, payload, schema):
+        if stage == "reviewer":
+            return ReviewerDraft(overall_assessment="Sector established; investment dimensions need diligence.")
+        return PartnerDraft(action="ADVANCE", rationale=["Test senior judgment before the mandate check."],
+                            confidence=0.8, investment_case="Test opportunity")
+
+    result = await analyze(
+        user_id="fund-a", lineage=Lineage(user_id="fund-a"), identity=Identity(name="Synthetic"),
+        snapshot=sector_snapshot(verified=verified), policy=_policy(), evaluation_at=CLOCK,
+        context={"fund_configuration": {"mandate": {"excludedSectorList": ["gambling"]}}},
+        generate=generate,
+    )
+    assert result.partner.judgment.action.value == "ADVANCE"
+    assert result.partner.operational_action.value == expected
+    assert result.partner.constraints
+    assert bool(result.evaluation.recommendation.mandate_conflicts) is verified
+    assert any("sector" in item for item in (
+        result.evaluation.recommendation.mandate_conflicts + result.evaluation.recommendation.missing_information
+    ))
 
 
 def test_partner_consumes_validated_rule_values_without_behavioral_defaults():

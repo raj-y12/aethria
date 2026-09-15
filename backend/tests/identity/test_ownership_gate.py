@@ -1,4 +1,16 @@
 from identity.ownership_gate import check_ownership_conflict, detect_acquisition_signal
+import pytest
+
+
+@pytest.mark.parametrize("text", [
+    "Acme was acquired by BigCo.",
+    "The acquisition of Acme by BigCo closed yesterday.",
+    "Acme Limited has been acquired by BigCo.",
+    "Acme is now a wholly-owned subsidiary of BigCo.",
+    "Acme was acquihired by BigCo.",
+])
+def test_named_subject_retains_actual_company_acquisition_blocks(text):
+    assert check_ownership_conflict({"one_line": text}, {}, company_name="Acme")
 
 
 def test_detects_common_acquisition_phrasings():

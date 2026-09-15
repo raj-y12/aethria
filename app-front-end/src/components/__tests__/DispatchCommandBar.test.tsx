@@ -97,6 +97,7 @@ describe('DispatchCommandBar active lookup', () => {
 
     expect(screen.getByRole('region', { name: 'Active dispatches' })).toBeInTheDocument();
     const queue = screen.getByRole('region', { name: 'Active dispatches' });
+    expect(within(queue).getByText('2 active')).toBeInTheDocument();
     expect(within(queue).getByText('Aethria')).toBeInTheDocument();
     expect(within(queue).getByText('Morrow')).toBeInTheDocument();
     expect(within(queue).getByText('Kite')).toBeInTheDocument();

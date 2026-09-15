@@ -4,6 +4,13 @@
   "updated": "2026-04-02",
   "resources": [
     {
+      "name": "scout_output_v2",
+      "version": "2",
+      "type": "schema",
+      "path": "contracts/schemas/scout_output_v2.json",
+      "description": "Factual company discovery with sources, unknowns and contradictions."
+    },
+    {
       "name": "scout_output_v1",
       "version": "1",
       "type": "schema",
@@ -61,7 +68,7 @@
     }
   ],
   "defaults": {
-    "schema": { "scout": "scout_output_v1", "reviewer": "reviewer_output_v1", "partner": "partner_vote_v1", "startup": "startup_summary_v1" },
+    "schema": { "scout": "scout_output_v2", "reviewer": "reviewer_output_v1", "partner": "partner_vote_v1", "startup": "startup_summary_v1" },
     "memo": "investment_memo_v1",
     "rubric": "evaluation_rubric_v1",
     "style": "analyst_style_v1"

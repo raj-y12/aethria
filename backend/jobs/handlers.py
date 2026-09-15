@@ -31,6 +31,7 @@ from monitoring.models import RefreshReason
 from monitoring.repository import MonitoringRepository
 from pipeline_runner import run_on_demand_lookup, run_one_pipeline_cycle
 from pipeline_execution import PipelineExecutionResult, PipelineExecutionState
+from pipeline_state import pipeline_stage_log
 from resolver.company_resolver import CompanyResolution, resolve_company
 from authority.repository import AuthorityBlocked
 
@@ -41,6 +42,12 @@ async def _raise_if_cancelled(repository: Any, job: AgentJob) -> None:
 
 async def _checkpoint(repository, job, stage, status, metadata):
     await _raise_if_cancelled(repository, job)
+    pipeline_stage_log(
+        job.pipeline_run_id, startup_id=str(metadata.get("startup_id") or ""),
+        user_id=job.user_id, stage=stage,
+        phase=("RETRIED" if status == "started" and job.attempts > 1 else
+               {"started": "STARTED", "succeeded": "DONE", "failed": "FAILED"}.get(status, status.upper())),
+    )
     await repository.write_checkpoint(
         user_id=job.user_id,
         job_id=job.job_id,

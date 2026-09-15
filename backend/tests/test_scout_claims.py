@@ -1,6 +1,54 @@
 from canonical_scout_claims import derive_scout_claims
 
 
+def test_source_snippets_do_not_make_scout_claims_externally_verified():
+    claims = derive_scout_claims({
+        "funding_stage": "Seed",
+        "traction_facts": {"revenue": "$4M ARR"},
+        "source_evidence": [{"url": "https://acme.example", "snippet": "Seed funding and $4M ARR."}],
+    })
+    assert claims
+    assert all(claim["assertion_class"] == "unverified" for claim in claims)
+
+
+async def test_persisted_scout_claims_and_evidence_remain_unverified():
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from canonical_scout_claims import persist_scout_claims
+
+    repository = SimpleNamespace(
+        get_ledger=AsyncMock(return_value={"claims": [], "claim_evidence_links": []}),
+        ingest_artifact=AsyncMock(return_value=(None, [SimpleNamespace(evidence_item_id="evidence-1")])),
+        create_claim=AsyncMock(),
+    )
+    result = await persist_scout_claims(
+        user_id="fund-a", company_id="company-a", opportunity_id="opportunity-a",
+        observation_id="observation-a", evidence_repository=repository,
+        scout_output={"funding_stage": "Seed", "source_evidence": [
+            {"url": "https://acme.example", "snippet": "Seed funding round."},
+        ]},
+    )
+    assert result["claims_created"] == 1
+    item = repository.ingest_artifact.call_args.kwargs["items"][0]
+    claim = repository.create_claim.call_args.args[0]
+    assert item.verification_state.value == claim.assertion_class.value == "unverified"
+    assert item.user_id == claim.user_id == "fund-a"
+    assert repository.create_claim.call_args.kwargs["links"][0].evidence_item_id == "evidence-1"
+    # A retry with the same source material must reuse the current claim.
+    repository.get_ledger.return_value = {
+        "claims": [{**claim.model_dump(mode="json"), "claim_id": "existing", "status": "current"}],
+        "claim_evidence_links": [{"claim_id": "existing", "evidence_item_id": "evidence-1", "relationship": "supports"}],
+    }
+    repeated = await persist_scout_claims(
+        user_id="fund-a", company_id="company-a", opportunity_id="opportunity-a",
+        observation_id="observation-b", evidence_repository=repository,
+        scout_output={"funding_stage": "Seed", "source_evidence": [
+            {"url": "https://acme.example", "snippet": "Seed funding round."}]},
+    )
+    assert repeated["claims_created"] == 0
+    repository.create_claim.assert_awaited_once()
+
+
 def test_derives_only_decision_bearing_claims_with_matching_source_evidence():
     claims = derive_scout_claims(
         {

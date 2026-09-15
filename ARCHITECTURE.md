@@ -76,20 +76,25 @@ See [ADR-0001](docs/adr/0001-explicit-tenancy.md).
 ### 3.1 Stage order
 
 ```
-ScoutEngine → ReviewerEngine → PartnerEngine → PortfolioEngine → MetaAgent
+Scout / identity / evidence → InvestmentAnalysisRepository → PortfolioEngine → MetaAgent
+                            Reviewer → validation → Partner
 ```
 
 Orchestrated by `run_one_pipeline_cycle(user_id)` in `backend/pipeline_runner.py`.
-Each stage is `async`, tenant-scoped, individually toggleable in user settings,
-and gated on the active fund thesis.
+Each stage is `async` and tenant-scoped. Periodic work is gated on the active fund
+thesis. The shared analysis invokes both Reviewer and Partner and therefore
+requires both toggles; Scout-only cycles retain factual discoveries. The runner's
+Reviewer/Partner callbacks project the completed shared analysis. Historical
+engine implementations remain for compatibility while migration is in progress
+([ADR-0016](docs/adr/0016-reviewer-assessment-and-partner-judgment.md)).
 
 | Stage | Module | Responsibility |
 |---|---|---|
 | **Scout** | `backend/scout/` | Discover *real* companies via the retrieval chain (Exa semantic search finds candidate companies, Firecrawl reads their pages) + OpenAI structuring. Four personas: `market_driven`, `builder_technical`, `pain_point`, `contrarian`. Persona selection is weighted by the MetaAgent; backpressure throttles discovery when the review backlog builds, and ramp waves accelerate it when the backlog drains. |
-| **Reviewer** | `backend/reviewer/` | Three personas — Default, Skeptical, Opportunist — score five dimensions (market, product, technical, execution, defensibility) 1–10 in parallel, then blend into a consensus with variance and confidence discounting. Gap retrieval fills missing evidence before scoring. The primary persona additionally produces the **investment read** — `founder_fluency`, `capability_slope`, `reframe` — which is narrative only and never touches a score (ADR-0012). |
-| **Partner** | `backend/partner/` | Produces INVEST / PASS / MONITOR. **Rule-based by default** against versioned thresholds; the LLM is only invoked for the edge-case triggers declared in the active partner-rules file. Escalates to human review when evidence is weak or reviewers disagree. |
+| **Reviewer** | `backend/investment_analysis/` | One evidence-first review produces cited reasoning units, proposed dimension scores with rationale, risks, unknowns and diligence priorities. Historical Scout score/opinion fields are excluded from its factual packet. Evidence validation retains, caps or withholds each proposed score. The old three-persona implementation remains historical compatibility code. |
+| **Partner** | `backend/investment_analysis/` | Reads completed review and validated assessments and chooses ADVANCE / PASS / MONITOR / MORE_DILIGENCE. Deterministic evidence constraints can change the operational action without erasing its original judgment. Legacy startup projections still map ADVANCE to INVEST and MORE_DILIGENCE to MONITOR; the full distinction is persisted in the evaluation audit. |
 | **Portfolio** | `backend/portfolio/` | Tracks accepted companies: execution checkpoints, external signals, feedback loops, and health checks, each on its own interval. Also owns rejection analysis and concentration clustering. |
-| **Meta** | `backend/meta/` | Self-optimisation. Analyses outcomes, then mutates scout prompts (`mutator.py`), reweights scout personas (`reweighter.py`), and calibrates reviewer thresholds (`calibrator.py`). Runs on its own interval (`META_AGENT_INTERVAL_SECONDS`, default daily) — it self-gates and returns early when the interval has not elapsed. |
+| **Meta** | `backend/meta/` | Self-optimisation. Analyses outcomes, then mutates scout prompts (`mutator.py`), reweights scout personas (`reweighter.py`), and proposes historical calibration updates (`calibrator.py`). Retired Reviewer threshold proposals do not gate the shared investment-analysis core. Runs on its own interval (`META_AGENT_INTERVAL_SECONDS`, default daily) — it self-gates and returns early when the interval has not elapsed. |
 
 ### 3.2 The fund thesis gate
 
@@ -121,13 +126,18 @@ can set `human_review_required`; warnings are persisted rather than dropped.
 
 ### 3.4 Decision policy is data
 
-Partner thresholds and LLM-escalation triggers live in
-`resources/config/partner_rules/v{1..4}.json`. `resources/config/active.json`
-selects the live version (`v4` at time of writing) and
+Historical Partner thresholds and LLM-escalation triggers live in
+`resources/config/partner_rules/v{1..5}.json`. `resources/config/active.json`
+selects the live version (`v5` at time of writing) and
 `backend/core/policy_resolver.py` resolves it at runtime. Reviewer rules, the
 evaluation rubric, and the default fund thesis are versioned the same way.
-Changing decision behaviour means publishing a new policy version, not editing
-Python. See [ADR-0002](docs/adr/0002-versioned-decision-policy.md).
+The shared investment-analysis core uses the published evidence constraints but
+does not use legacy numerical thresholds to choose recommendations. Reviewer
+proposes analytical scores; Partner decides from the completed review. Numeric
+evidence limits remain versioned policy data. See
+[ADR-0016](docs/adr/0016-reviewer-assessment-and-partner-judgment.md) for the
+authority change and [ADR-0002](docs/adr/0002-versioned-decision-policy.md) for
+policy versioning.
 
 The governed path goes further: `backend/services/scoring/` compiles a fund
 configuration into a policy, previews it, and publishes it as an immutable
@@ -220,7 +230,8 @@ mode rather than swapped in at once.
 |---|---|---|
 | Identity | `backend/identity/` | Source observations → normalisation → canonical `companies` / `opportunities`; ambiguous matches become `identity_cases` for human resolution rather than silent merges. |
 | Evidence | `backend/evidence/` | Artifacts, claims, claim↔evidence links, trust/verification classes, access classes for confidential material, operator corrections, and prompt-injection detection on ingested text. |
-| Evaluation | `backend/evaluation_v2/` | Immutable evaluations bound to a policy version and an evidence snapshot, with explicit prerequisites — a thesis-blind, incomplete, or contradictory evaluation fails closed to canonical `insufficient_evidence` before any machine recommendation. The recommendation is not a human ruling. |
+| Investment analysis | `backend/investment_analysis/` | Shared factual preparation, evidence-first Reviewer assessments, evidence/policy validation and a genuine Partner decision. Supports bounded targeted research and Partner-only refresh against unchanged review dependencies. |
+| Evaluation persistence | `backend/evaluation_v2/` | Immutable analysis, validated criteria, Partner recommendation and source snapshots. Its historical deterministic score/recommendation functions remain for replay; live entry points use the shared analysis repository. A machine recommendation is not a human ruling. |
 | Decisions | `backend/decisions/` | Authoritative human rulings, workflow actions, approvals, CRM export. An approval records intent; it does not itself perform an external write. |
 | Monitoring | `backend/monitoring/` | Service levels 0–5, refresh reservations with cost envelopes, material-change checks. |
 | Fund intelligence | `backend/fund_intelligence/` | Derives attributed policy proposals from outcomes; proposals are previewed, human-reviewed, and published as governed policy versions. |

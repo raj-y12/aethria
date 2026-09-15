@@ -20,3 +20,6 @@ data/*
 !data/settings.json
 *.json
 !package.json
+
+# Deterministic Phase 0 golden contract (test input, not generated output).
+!tests/evaluation_v2/phase0_golden_pipeline.json

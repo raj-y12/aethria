@@ -106,17 +106,33 @@ def source_mentions_company(
     anchor_host: Optional[str],
 ) -> bool:
     """True when a source's own text refers to this company or its domain."""
-    text = f"{source.get('title') or ''} {source.get('snippet') or ''} {source.get('url') or ''}".lower()
+    text = f"{source.get('title') or ''} {source.get('snippet') or ''}".lower()
+    host = registrable_domain(host_of(source.get("url")))
     if anchor_host:
-        anchor_slug = registrable_domain(anchor_host).split(".", 1)[0]
-        if anchor_host.lower() in text or (anchor_slug and anchor_slug in text):
+        anchor_domain = registrable_domain(anchor_host)
+        slug = anchor_domain.split(".", 1)[0]
+        if host != anchor_domain and host.split(".", 1)[0].startswith(slug):
+            return False
+        if re.search(r"(?<![\w.-])(?:www\.)?" + re.escape(anchor_host.lower()) + r"(?![\w.-])", text):
             return True
+    path = urlparse(str(source.get("url") or "")).path.strip("/").split("/")
+    if host in {"linkedin.com", "crunchbase.com", "dealroom.co"}:
+        if len(path) < 2 or path[0] not in {"company", "organization", "companies"}:
+            return False
+        compact = lambda value: re.sub(r"[^a-z0-9]", "", str(value).lower())
+        target = registrable_domain(anchor_host).split(".", 1)[0] if anchor_host else company_name
+        return compact(path[1]) == compact(target)
     tokens = company_tokens(company_name)
     if not tokens:
         # Without a usable name the only safe signal is the anchor domain, which
         # was already checked above.
         return False
-    return all(token in text for token in tokens)
+    # A company-directory title with an expanded organization name is a
+    # different identity, even though every query token appears in it.
+    name = re.escape(str(company_name or "").strip(" -–—").lower())
+    if re.search(r"\b" + name + r"\s+(?:solutions|infotech|distributor|home care|staffing|software services)\b", text):
+        return False
+    return bool(re.search(r"\b" + r"[\s-]+".join(re.escape(token) for token in tokens) + r"\b", text))
 
 
 def keep_source_for_anchor(

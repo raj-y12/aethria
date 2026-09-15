@@ -1,5 +1,19 @@
 import type { HumanRulingDecision } from '../api/decisions';
 import type { RecommendationState } from '../api/evaluations';
+import type { Partner } from '../types/startup';
+import { DECISION_LABELS } from '../design-system/semantics';
+
+export function partnerRecommendationLabel(partner?: Partner | null): string | null {
+  if (!partner) return null;
+  const canonical = partner.provenance?.canonical_recommendation;
+  if (['PARTNER_ANALYSIS', 'PARTNER_CANONICAL_MAPPING'].includes(partner.provenance?.recommendation_origin ?? '') && canonical) {
+    if (canonical === 'insufficient_evidence') return 'More diligence';
+    if (canonical === 'advance') return 'Advance';
+    if (canonical === 'pass') return 'Pass';
+    if (canonical === 'monitor') return 'Monitor';
+  }
+  return DECISION_LABELS[partner.recommendation] ?? partner.recommendation;
+}
 
 type RecommendationSemantics = {
   label: string;

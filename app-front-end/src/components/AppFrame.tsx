@@ -22,6 +22,7 @@ import AppSpine, {
   type SpineTelemetry,
 } from './AppSpine';
 import MobileHeader from './MobileHeader';
+import { partnerRecommendationLabel } from '../lib/recommendationSemantics';
 import AgentLogoutModal from './AgentLogoutModal';
 import DispatchCommandBar from './DispatchCommandBar';
 import LookupReadyNotice from './LookupReadyNotice';
@@ -567,6 +568,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
               <LookupReadyNotice
                 name={dispatch.lookupReady?.scout?.name ?? null}
                 recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
+                recommendationLabel={partnerRecommendationLabel(dispatch.lookupReady?.partner)}
                 onOpen={dispatch.openLookupMemo}
                 onDismiss={dispatch.dismissReady}
               />

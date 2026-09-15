@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from evidence.models import EvidenceItemRecord, EvidencePlanRecord, TrustClass, VerificationState
-from evidence.retrieval import MAX_QUERIES, execute_evidence_plan
+from evidence.retrieval import MAX_QUERIES, analytical_excerpt, execute_evidence_plan
 
 
 def _plan(**overrides):
@@ -27,6 +27,31 @@ def _plan(**overrides):
     )
     defaults.update(overrides)
     return EvidencePlanRecord(**defaults)
+
+
+def test_analytical_excerpt_preserves_signal_after_long_consent_boilerplate():
+    content = "Cookie settings and privacy choices. " * 100 + " Trusted by We Are Riley and Mango Media."
+    excerpt = analytical_excerpt(content)
+    assert len(excerpt) <= 2000
+    assert "Trusted by We Are Riley and Mango Media" in excerpt
+
+
+def test_analytical_excerpt_preserves_middle_customer_signal_and_reviewer_attribution():
+    content = "Cookie settings and privacy choices. " * 70
+    content += " Trusted by We Are Riley and Mango Media; customer logos are company-reported, not independently verified. "
+    content += " Footer privacy settings and consent management. " * 70
+    excerpt = analytical_excerpt(content)
+    assert "We Are Riley" in excerpt and "Mango Media" in excerpt
+    from investment_analysis.grounding import reviewer_evidence
+    packet, _, _ = reviewer_evidence([{
+        "claim_id": "customers", "claim_type": "customer_signal",
+        "display_text": excerpt, "evidence_relationships": [{
+            "evidence_item_id": "item", "artifact_id": "source", "source_uri": "https://glitchads.ai",
+            "display_excerpt": excerpt, "verification_state": "verified", "source_quality": 1.0,
+        }], "supporting_evidence_ids": ["item"],
+    }], company_name="Glitch Ads", company_website="glitchads.ai")
+    assert "company-reported" in packet[0]["statement"]
+    assert "independently verified" in packet[0]["statement"]
 
 
 class _FakeEvidenceRepository:

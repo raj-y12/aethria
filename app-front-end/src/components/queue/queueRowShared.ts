@@ -1,6 +1,7 @@
 import type { Startup } from '../../types/startup';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import type { QueueAttentionDriver, QueueRowContext } from '../../lib/queueAttentionDriver';
+import { partnerRecommendationLabel } from '../../lib/recommendationSemantics';
 
 export interface DocketRowModel {
   startup: Startup;
@@ -44,7 +45,7 @@ export function formatUnresolvedAgeDays(value: string): string {
 
 export function buildRowAriaLabel(model: DocketRowModel, isSelected: boolean): string {
   const { startup, attentionDriver, queueContext } = model;
-  const rec = queueContext.startup.partner?.recommendation ?? '';
+  const rec = partnerRecommendationLabel(queueContext.startup.partner);
   const score = queueContext.configuredScore;
   const parts = [
     startup.scout.name,

@@ -31,6 +31,9 @@ codebase, not when the record was written.
 | [0011](0011-decision-case-and-fund-intelligence-authority.md) | Historical Decision Cases and Fund Intelligence authority boundaries | Accepted |
 | [0012](0012-investment-read-is-narrative-not-score.md) | The investment read is narrative, and never a score input | Accepted |
 | [0013](0013-evidence-sufficiency-precedes-machine-recommendation.md) | Evidence sufficiency precedes machine recommendation | Accepted |
+| [0014](0014-observability-does-not-change-decision-authority.md) | Provenance observes existing decision authority; internal metadata stays out of analyst UX | Accepted |
+| [0015](0015-internal-contracts-with-lossless-legacy-adapters.md) | Internal target contracts with lossless legacy adapters | Accepted |
+| [0016](0016-reviewer-assessment-and-partner-judgment.md) | Shared Reviewer assessment, evidence validation and Partner judgment | Accepted; migration in progress |
 
 ## Writing a new one
 

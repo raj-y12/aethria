@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any, Dict, List, Optional
+from resolver.founder_resolver import is_non_person_label
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ def accepted_founder_names(resolution: Any) -> List[str]:
     for candidate in getattr(resolution, "founders", []) or []:
         name = str(getattr(candidate, "name", "") or "").strip()
         confidence = float(getattr(candidate, "confidence", 0.0) or 0.0)
-        if name and confidence >= floor and name not in names:
+        if name and not is_non_person_label(name) and confidence >= floor and name not in names:
             names.append(name)
     return names[: _max_names()]
 

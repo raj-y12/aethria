@@ -78,16 +78,20 @@ def test_same_name_with_different_domains_remains_distinguishable():
 
 
 @pytest.mark.asyncio
-async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch):
+@pytest.mark.parametrize("fails", [False, True])
+async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch, fails):
     """Several Scout observations must not create competing evaluations."""
     calls = []
 
     class EvaluationRepository:
-        def __init__(self, pool):
+        def __init__(self, pool, *, cost_controller=None):
             assert pool is pool_marker
+            assert cost_controller is None
 
         async def evaluate(self, **kwargs):
             calls.append(kwargs)
+            if fails:
+                raise RuntimeError("synthetic model failure")
             return {}
 
     class Prerequisites:
@@ -108,12 +112,14 @@ async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch):
         postgres_pool=pool_marker,
     )
 
-    assert count == 1
+    assert count == (0 if fails else 1)
+    from evaluation_v2.provenance import PipelineBinding
     assert calls == [{
         "user_id": "fund-a",
         "opportunity_id": "opportunity-1",
         "actor_id": "fund-a",
         "trigger_type": "periodic_discovery",
+        "pipeline_binding": PipelineBinding(user_id="fund-a", pipeline_entry_type="periodic_discovery"),
         "policy": Prerequisites.policy,
         "thesis_version_id": "thesis-v1",
     }]
@@ -148,6 +154,49 @@ class _Service:
     async def admit(self, observation):
         self.observations.append(observation)
         return next(self.admissions)
+
+
+@pytest.mark.asyncio
+async def test_identity_block_on_retry_preserves_existing_linked_startup():
+    storage = _Storage({"startup-1"})
+
+    class Repository:
+        async def get_opportunity_by_legacy_projection(self, *, user_id, legacy_startup_id):
+            assert user_id == "fund-a"
+            assert legacy_startup_id == "startup-1"
+            return SimpleNamespace(id="opportunity-1")
+
+    blocked = IdentityAdmission(
+        user_id="fund-a", observation_id="observation-2",
+        status=IdentityStatus.AMBIGUOUS, confidence=0,
+        blocks_evaluation=True, identity_case_id="case-1",
+    )
+    results = await pipeline_runner._admit_autonomous_discoveries(
+        user_id="fund-a", discoveries=[_discovery("startup-1")],
+        storage=storage, identity_repository=Repository(),
+        identity_service=_Service([blocked]),
+    )
+    assert results[0].blocks_evaluation
+    assert storage.removed == []
+    assert storage.get_startup("startup-1") is not None
+
+
+@pytest.mark.asyncio
+async def test_named_rereview_reuses_tenant_scoped_identity_link():
+    class Repository:
+        async def get_opportunity_by_legacy_projection(self, *, user_id, legacy_startup_id):
+            assert (user_id, legacy_startup_id) == ("fund-a", "startup-1")
+            return SimpleNamespace(company_id="company-1", opportunity_id="opportunity-1",
+                                   latest_observation_id="observation-1")
+
+    admission = await pipeline_runner._admit_named_lookup_before_review(
+        user_id="fund-a", startup_id="startup-1", scout_output=_discovery("startup-1"),
+        storage=_Storage({"startup-1"}), identity_repository=Repository(),
+        evidence_repository=None,
+    )
+    assert admission.opportunity_id == "opportunity-1"
+    assert admission.company_id == "company-1"
+    assert not admission.blocks_evaluation
 
 
 @pytest.mark.asyncio
@@ -281,6 +330,46 @@ async def test_unpersisted_second_persona_reuses_existing_legacy_row_instead_of_
     # Only the first persona's discovery created a legacy row -- the second
     # reused it instead of duplicating.
     assert len(storage.persisted) == 1
+
+
+@pytest.mark.asyncio
+async def test_persisted_duplicate_reuses_linked_legacy_row_and_removes_orphan():
+    """A fresh retry may persist a second startup before canonical admission.
+    If the opportunity already owns a different legacy row, reuse that row and
+    remove only the new orphan before projection linking.
+    """
+    discoveries = [
+        _discovery("startup-1", scout_type="market_driven"),
+        _discovery("startup-2", scout_type="market_driven"),
+    ]
+    service = _Service([
+        IdentityAdmission(user_id="fund-a", observation_id="observation-1", status=IdentityStatus.RESOLVED,
+                          company_id="company-1", opportunity_id="opportunity-1", confidence=1),
+        IdentityAdmission(user_id="fund-a", observation_id="observation-2", status=IdentityStatus.RESOLVED,
+                          company_id="company-1", opportunity_id="opportunity-1", confidence=1),
+    ])
+    storage = _Storage({"startup-1", "startup-2"})
+
+    class Repository:
+        def __init__(self):
+            self.linked = None
+
+        async def get_opportunity(self, *, user_id, opportunity_id):
+            return SimpleNamespace(legacy_startup_id=self.linked) if self.linked else None
+
+        async def link_legacy_projection(self, *, user_id, opportunity_id, legacy_startup_id):
+            self.linked = legacy_startup_id
+
+    repository = Repository()
+    results = await pipeline_runner._admit_autonomous_discoveries(
+        user_id="fund-a", discoveries=discoveries, storage=storage,
+        identity_repository=repository, identity_service=service,
+        discoveries_are_persisted=True,
+    )
+
+    assert len(results) == 2
+    assert storage.removed == ["startup-2"]
+    assert repository.linked == "startup-1"
 
 
 @pytest.mark.asyncio

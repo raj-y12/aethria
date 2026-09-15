@@ -9,6 +9,7 @@ interface LookupReadyNoticeProps {
   /** Company name when a background lookup has finished and is unopened. */
   name: string | null;
   recommendation?: 'INVEST' | 'PASS' | 'MONITOR' | null;
+  recommendationLabel?: string | null;
   onOpen: () => void;
   onDismiss: () => void;
 }
@@ -17,7 +18,7 @@ interface LookupReadyNoticeProps {
  * Inline completion handoff for a background Dispatch lookup.
  * It belongs to the workspace flow rather than floating above it like a toast.
  */
-export default function LookupReadyNotice({ name, recommendation, onOpen, onDismiss }: LookupReadyNoticeProps) {
+export default function LookupReadyNotice({ name, recommendation, recommendationLabel, onOpen, onDismiss }: LookupReadyNoticeProps) {
   const reduceMotion = usePrefersReducedMotion();
 
   return (
@@ -42,7 +43,7 @@ export default function LookupReadyNotice({ name, recommendation, onOpen, onDism
                 {name}
               </p>
             </div>
-            {recommendation ? <DecisionBadge variant={recommendation} /> : null}
+            {recommendation ? <DecisionBadge variant={recommendationLabel === 'More diligence' ? 'escalation' : recommendation} label={recommendationLabel?.toUpperCase()} /> : null}
             <button
               type="button"
               onClick={onOpen}

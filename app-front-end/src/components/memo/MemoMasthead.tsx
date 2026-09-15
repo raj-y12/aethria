@@ -28,7 +28,9 @@ interface MemoMastheadProps {
 function MemoVerdictBadge({ brief }: { brief: MemoDecisionBrief }) {
   if (brief.status === 'loading' || brief.status === 'unavailable') return null;
   const variant = memoVerdictVariant(brief);
-  const label = brief.status === 'blocked' || brief.status === 'recorded'
+  const label = brief.leanProvenance === 'partner-judgment' && brief.lean === 'more_diligence' && brief.status !== 'recorded'
+    ? 'Partner: More diligence'
+    : brief.status === 'blocked' || brief.status === 'recorded'
     ? MEMO_STATUS_LABELS[brief.status]
     : MEMO_LEAN_LABELS[brief.lean];
   const reason = brief.drivers[0];

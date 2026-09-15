@@ -8,7 +8,7 @@ import { type ReactNode } from 'react';
 import type { MemoPartialPayload } from '../../api/startups';
 import type { DecisionHistoryDecision, Review, SingleReview, Startup } from '../../types/startup';
 import { memoReferenceHref, memoReferenceLabel } from '../../lib/memoReferenceHref';
-import { DECISION_LABELS } from '../../design-system/semantics';
+import { partnerRecommendationLabel } from '../../lib/recommendationSemantics';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
 import { type PipelineReplayStep } from '../../lib/memoIcPack';
 import { type RulingDecision } from '../../lib/dealState';
@@ -177,9 +177,7 @@ export function renderWithMonoNumbers(value: unknown): ReactNode {
 }
 
 export function partnerDecisionHeadline(startup: Startup): string {
-  const rec = startup.partner?.recommendation;
-  if (rec == null) return '—';
-  return DECISION_LABELS[rec] ?? String(rec);
+  return partnerRecommendationLabel(startup.partner) ?? '—';
 }
 
 export function toJudgmentReasoning(startup: Startup): string[] {

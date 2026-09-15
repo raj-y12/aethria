@@ -50,3 +50,27 @@ def project_scout_for_runtime(
 
     projected["canonical_runtime_fields"] = fields
     return projected
+
+
+def legacy_projection_provenance(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Observe stored compatibility values before the analyst DTO redacts scores.
+
+    Caller already owns a tenant-scoped startup row. This pure projection never
+    resolves a foreign ID or upgrades a legacy score to canonical authority.
+    """
+    review = raw.get("review_info") or {}
+    partner = raw.get("partner_info") or {}
+    trace = raw.get("agent_trace") or {}
+    return {
+        "projection_origin": "COMPATIBILITY_PROJECTION",
+        "legacy_score_origin": "UNKNOWN_LEGACY",
+        "recorded_score_source": review.get("score_source"),
+        "legacy_scores": {key: review.get(key) for key in (
+            "market_score", "product_score", "technical_score", "execution_score",
+            "defensibility_score", "overall_score", "confidence_adjusted_score",
+        )},
+        "canonical_evaluation_id": review.get("canonical_evaluation_id") or partner.get("canonical_evaluation_id"),
+        "partner_recommendation": partner.get("recommendation"),
+        "partner_provenance": partner.get("provenance") or (trace.get("partner") or {}).get("provenance"),
+        "human_override": raw.get("human_resolution"),
+    }

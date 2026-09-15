@@ -6,7 +6,7 @@ from __future__ import annotations
 def enriched_claim_evidence_sql() -> str:
     """Return the single tenant-safe SQL projection for decision-bearing links."""
     return """
-        select l.*, ei.verification_state, ei.source_quality,
+        select l.*, ea.artifact_id, ea.source_uri, ea.source_observation_id, ei.display_excerpt, ei.verification_state, ei.source_quality,
                ei.effective_at as evidence_effective_at,
                ei.expires_at as evidence_expires_at,
                ea.trust_class, ea.untrusted_input,
@@ -20,6 +20,7 @@ def enriched_claim_evidence_sql() -> str:
           on ei.user_id=l.user_id and ei.evidence_item_id=l.evidence_item_id
         join public.evidence_artifacts ea
           on ea.user_id=ei.user_id and ea.artifact_id=ei.artifact_id
+          and ea.company_id=c.company_id and ea.opportunity_id=c.opportunity_id
         where l.user_id = $1 and c.opportunity_id = $2
         order by l.claim_id, l.evidence_item_id
     """

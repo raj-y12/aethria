@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import DecisionBadge from '../DecisionBadge';
 import EscalationQueueMarker from './EscalationQueueMarker';
 import type { DecisionBadgeVariant } from '../../lib/decisionBadgeVariant';
+import { partnerRecommendationLabel } from '../../lib/recommendationSemantics';
 import {
   attentionDriverBadgeLabel,
   getQueueConvictionPct,
@@ -65,6 +66,9 @@ export default function QueueVerdictLine({
   attentionDriver?: QueueAttentionDriver;
 }) {
   const recommendation = getVisibleRecommendation(ctx.startup);
+  const recommendationLabel = ctx.startup.human_resolution?.decision
+    ? recommendation : partnerRecommendationLabel(ctx.startup.partner);
+  const displayVariant = recommendationLabel === 'More diligence' ? 'escalation' : recommendation;
   const convictionPct = getQueueConvictionPct(ctx);
   const convictionLabel = convictionPct != null ? String(convictionPct) : null;
   const badgeVariant = queueDecisionBadgeVariant(decisionVariant, recommendation);
@@ -102,12 +106,13 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`Escalated${recommendation ? `, partner recommends ${recommendation.toLowerCase()}` : ''}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
+        aria-label={`Escalated${recommendationLabel ? `, partner recommends ${recommendationLabel.toLowerCase()}` : ''}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
       >
         <EscalationQueueMarker ctx={ctx} driver={attentionDriver} />
         {recommendation && (
           <DecisionBadge
-            variant={recommendation}
+            variant={displayVariant ?? recommendation}
+            label={recommendationLabel?.toUpperCase()}
             queue
             prominent={prominent}
           />
@@ -121,10 +126,11 @@ export default function QueueVerdictLine({
     return (
       <div
         className="inline-flex flex-wrap items-center justify-end gap-x-phi-2 gap-y-0"
-        aria-label={`${recommendation}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
+        aria-label={`${recommendationLabel}${convictionLabel != null ? `, ${convictionLabel} conviction` : ''}`}
       >
         <DecisionBadge
-          variant={recommendation}
+          variant={displayVariant ?? recommendation}
+          label={recommendationLabel?.toUpperCase()}
           queue
           prominent={prominent}
         />

@@ -39,7 +39,11 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
-from evaluation_v2.repository import EvaluationLifecycleError, EvaluationRepository
+from evaluation_v2.repository import EvaluationLifecycleError
+from investment_analysis.model_gateway import AnalysisBlocked
+from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
+from investment_analysis.stages import CompletedAnalysisStage
+from evaluation_v2.provenance import PipelineBinding
 from evaluation.manifest import (
     build_model_identity,
     capture_evaluation_manifest_identity,
@@ -56,14 +60,11 @@ from pipeline_execution import (
 )
 from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from utils.settings_loader import load_settings
-from pipeline_state import upsert_pipeline_state
+from pipeline_state import upsert_pipeline_state, pipeline_stage_log
 from scout.engine import ScoutEngine
 from reviewer.engine import ReviewerEngine
 from people.repository import PeopleRepository
 from evidence.repository import EvidenceRepository
-from evidence.planning import compute_missing_evidence
-from evidence.retrieval import execute_evidence_plan
-from evidence.extraction import extract_claims_from_evidence
 from identity.repository import IdentityConflictError, IdentityRepository
 from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
@@ -331,24 +332,6 @@ def _build_pipeline_engines(
         if postgres_pool is not None
         else None
     )
-    reviewer_engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=60,
-        model=reviewer_model,
-        batch_size=reviewer_batch_size,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        tenant_user_id=user_id,
-        active_thesis=copy.deepcopy(thesis_ctx),
-        use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
-        evaluation_prerequisites=evaluation_prerequisites,
-        regulatory_context_loader=regulatory_context_loader,
-        canonical_context_loader=canonical_context_loader,
-        founder_persister=founder_persister,
-        settings=settings,
-        startup_repository=startup_repository,
-    )
     portfolio_dir = os.getenv("PORTFOLIO_DIR", "data/portfolio")
     portfolio_store = PortfolioStore(
         data_dir=portfolio_dir,
@@ -356,6 +339,8 @@ def _build_pipeline_engines(
         canonical_startups=(startup_snapshot.rows if startup_snapshot is not None else None),
         legacy_startup_aliases=startup_aliases,
     )
+
+    failed_analysis_opportunities: set[str] = set()
 
     async def load_canonical_evaluation(startup_id: str) -> Optional[Dict[str, Any]]:
         """Return the one current canonical evaluation projected to a startup.
@@ -371,27 +356,44 @@ def _build_pipeline_engines(
         )
         if opportunity is None:
             return None
+        if str(opportunity.opportunity_id) in failed_analysis_opportunities:
+            raise AnalysisBlocked("analysis_failed_this_cycle", "This opportunity's analysis failed earlier in this cycle; retry in a new run.")
         return await EvaluationRepository(postgres_pool).get_current(
             user_id=user_id,
             opportunity_id=opportunity.opportunity_id,
         )
 
-    partner_engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=30,
-        use_llm_fallback=use_llm_fallback,
-        cost_controller=cost_controller,
-        deal_memory=deal_memory,
-        portfolio_store=portfolio_store,
-        tenant_user_id=user_id,
-        fund_thesis=copy.deepcopy(thesis_ctx),
-        use_resource_fund_thesis_fallback=use_resource_fund_thesis_fallback,
-        evaluation_prerequisites=evaluation_prerequisites,
-        model=partner_model,
-        include_deal_context_digest=include_deal_context_digest,
-        settings=settings,
-        startup_repository=startup_repository,
-        canonical_evaluation_loader=load_canonical_evaluation,
+    async def refresh_analysis(startup_id: str, pipeline_run_id: Optional[str]):
+        if postgres_pool is None or evaluation_prerequisites is None:
+            raise RuntimeError("canonical_analysis_unavailable")
+        opportunity = await IdentityRepository(postgres_pool).get_opportunity_by_legacy_projection(
+            user_id=user_id, legacy_startup_id=startup_id,
+        )
+        if opportunity is None:
+            raise RuntimeError("canonical_identity_required")
+        current = await startup_repository.get_startup(user_id, startup_id) if startup_repository is not None else await asyncio.to_thread(storage.get_startup, startup_id)
+        trace = ((current.get("agent_trace") if isinstance(current, dict) else getattr(current, "agent_trace", None))
+                 if current is not None else None) or {}
+        scout_trace = trace.get("scout") or {}
+        return await EvaluationRepository(postgres_pool, cost_controller=cost_controller).evaluate(
+            user_id=user_id, opportunity_id=opportunity.opportunity_id, actor_id=user_id,
+            trigger_type="analysis_refresh", policy=evaluation_prerequisites.policy,
+            thesis_version_id=evaluation_prerequisites.thesis_version_id,
+            pipeline_binding=PipelineBinding(user_id=user_id, pipeline_run_id=pipeline_run_id,
+                                             pipeline_entry_type="analysis_refresh",
+                                             scout_run_id=scout_trace.get("scout_run_id"),
+                                             source_scout_pipeline_run_id=scout_trace.get("pipeline_run_id")),
+        )
+
+    reviewer_engine = CompletedAnalysisStage(
+        stage="reviewer", user_id=user_id, storage=storage, load=load_canonical_evaluation,
+        refresh=refresh_analysis, model=reviewer_model, settings=settings, batch_size=reviewer_batch_size, active_thesis=thesis_ctx,
+    )
+    reviewer_engine.founder_persister = founder_persister
+    reviewer_engine.failed_analysis_opportunities = failed_analysis_opportunities
+    partner_engine = CompletedAnalysisStage(
+        stage="partner", user_id=user_id, storage=storage, load=load_canonical_evaluation,
+        refresh=refresh_analysis, model=partner_model, settings=settings, active_thesis=thesis_ctx,
     )
     engines = _PipelineEngines(
         scout_engine=scout_engine,
@@ -642,6 +644,20 @@ async def _admit_autonomous_discoveries(
                     admission.identity_case_id,
                 )
                 continue
+            # A retry may raise a new identity question for an already-linked
+            # company. Block this run without deleting its historical analyst
+            # view or the compatibility row referenced by the opportunity.
+            lookup = getattr(identity_repository, "get_opportunity_by_legacy_projection", None)
+            linked = (
+                await lookup(user_id=user_id, legacy_startup_id=startup_id)
+                if callable(lookup) else None
+            )
+            if linked is not None:
+                logger.warning(
+                    "[%s] Identity review blocked retry; preserving linked startup_id=%s case_id=%s",
+                    user_id[:12], startup_id, admission.identity_case_id,
+                )
+                continue
             if startup_repository is not None:
                 await startup_repository.remove_startup(user_id, startup_id)
             else:
@@ -658,31 +674,47 @@ async def _admit_autonomous_discoveries(
                 admission.identity_case_id,
             )
             continue
-        if not discoveries_are_persisted:
-            # Fixed 2026-08-18 (audit CRITICAL-F2): this used to call
-            # storage.add_discovery unconditionally, even when the canonical
-            # admission resolved to an opportunity that ALREADY has a legacy
-            # startups row linked (e.g. a second persona rediscovering the
-            # same company within the same cycle -- proven by
-            # test_two_personas_same_domain_keep_two_observations_one_opportunity).
-            # link_legacy_projection's "already linked to a different id"
-            # guard then raised an uncaught IdentityConflictError, crashing
-            # the whole pipeline cycle (Reviewer/Partner/Portfolio/Meta never
-            # ran) and leaving the never-linked new row permanently orphaned.
-            # Reuse the existing legacy row instead of creating a duplicate.
-            existing_opportunity = await identity_repository.get_opportunity(
+        # A canonical opportunity owns at most one legacy startups row. This
+        # applies to both unpersisted autonomous discoveries and persisted
+        # manual-lookup retries. Reuse the linked row; if a retry already
+        # created a duplicate, remove that orphan before projection linking.
+        get_opportunity = getattr(identity_repository, "get_opportunity", None)
+        existing_opportunity = (
+            await get_opportunity(
                 user_id=user_id, opportunity_id=admission.opportunity_id
             )
-            if existing_opportunity is not None and existing_opportunity.legacy_startup_id:
-                startup_id = str(existing_opportunity.legacy_startup_id)
-            else:
-                persisted_id = await asyncio.to_thread(
-                    storage.add_discovery,
-                    discovery,
-                    pipeline_run_id=discovery.get("pipeline_run_id"),
+            if callable(get_opportunity)
+            else None
+        )
+        existing_legacy_id = (
+            str(existing_opportunity.legacy_startup_id).strip()
+            if existing_opportunity is not None and existing_opportunity.legacy_startup_id
+            else ""
+        )
+        if existing_legacy_id:
+            if discoveries_are_persisted and existing_legacy_id != startup_id:
+                remover = (
+                    startup_repository.remove_startup
+                    if startup_repository is not None
+                    else getattr(storage, "remove_startup", None)
                 )
-                startup_id = str(persisted_id or startup_id)
-            discovery["persisted_startup_id"] = startup_id
+                if not callable(remover):
+                    raise RuntimeError(
+                        "Duplicate persisted discovery cannot be removed before projection linking"
+                    )
+                if startup_repository is not None:
+                    await remover(user_id, startup_id)
+                else:
+                    await asyncio.to_thread(remover, startup_id)
+            startup_id = existing_legacy_id
+        elif not discoveries_are_persisted:
+            persisted_id = await asyncio.to_thread(
+                storage.add_discovery,
+                discovery,
+                pipeline_run_id=discovery.get("pipeline_run_id"),
+            )
+            startup_id = str(persisted_id or startup_id)
+        discovery["persisted_startup_id"] = startup_id
         try:
             await link_admission_projection(
                 identity_repository,
@@ -723,6 +755,17 @@ async def _admit_autonomous_discoveries(
     return admissions
 
 
+async def _read_current_startup(*, user_id, startup_id, startup_repository, storage):
+    """Read persisted stage results, not the snapshot loaded before analysis."""
+    uid = require_user_id(user_id, context="current_startup_projection")
+    if startup_repository is not None:
+        from models import Startup
+
+        raw = await startup_repository.get_startup(uid, startup_id)
+        return Startup.model_validate(raw) if raw else None
+    return await asyncio.to_thread(storage.get_startup, startup_id)
+
+
 async def _admit_named_lookup_before_review(
     *,
     user_id: str,
@@ -735,6 +778,30 @@ async def _admit_named_lookup_before_review(
     founder_persister: Optional[Callable[..., Any]] = None,
 ) -> Optional[Any]:
     """Converge a persisted named lookup onto canonical authority before review."""
+    user_id = require_user_id(user_id, context="named_lookup_identity")
+    lookup = getattr(identity_repository, "get_opportunity_by_legacy_projection", None)
+    existing = await lookup(user_id=user_id, legacy_startup_id=startup_id) if callable(lookup) else None
+    if existing is not None:
+        # Re-review retains the established identity, as the durable handler
+        # does. A reduced compatibility Scout payload is not a new identity
+        # observation and must not invalidate the original verified link.
+        from identity.models import IdentityAdmission, IdentityStatus
+
+        admission = IdentityAdmission(
+            user_id=user_id, observation_id=existing.latest_observation_id,
+            status=IdentityStatus.RESOLVED, company_id=existing.company_id,
+            opportunity_id=existing.opportunity_id, confidence=1,
+        )
+        if evidence_repository is not None:
+            from canonical_scout_claims import persist_scout_claims
+
+            await persist_scout_claims(
+                user_id=user_id, company_id=existing.company_id,
+                opportunity_id=existing.opportunity_id,
+                observation_id=existing.latest_observation_id,
+                scout_output=scout_output, evidence_repository=evidence_repository,
+            )
+        return admission
     admissions = await _admit_autonomous_discoveries(
         user_id=user_id,
         discoveries=[scout_output],
@@ -769,40 +836,56 @@ async def _evaluate_admitted_periodic_discoveries(
     admissions: list[Any],
     evaluation_prerequisites: EvaluationPrerequisites,
     postgres_pool: Any,
+    pipeline_run_id: Optional[str] = None,
+    cost_controller: Any = None,
+    failed_opportunities: Optional[set[str]] = None,
+    scout_run_ids_by_opportunity: Optional[dict[str, str]] = None,
 ) -> int:
-    """Create one canonical evaluation per newly admitted opportunity.
+    """Create one completed investment analysis per newly admitted opportunity.
 
     Scout personas may produce several observations for the same company. Their
     claims are all persisted during admission, then this function evaluates the
-    shared immutable evidence set once.  Reviewer output is intentionally not an
-    input: it follows the canonical evaluation as research context only.
+    shared immutable evidence set once through Reviewer, validation and Partner.
+    Failed opportunities are not retried by another persona or stage this cycle.
     """
     if postgres_pool is None:
         return 0
     evaluated: set[str] = set()
-    repository = EvaluationRepository(postgres_pool)
+    attempted: set[str] = set()
+    repository = EvaluationRepository(postgres_pool, cost_controller=cost_controller)
     for admission in admissions:
         if getattr(admission, "blocks_evaluation", False):
             continue
         opportunity_id = str(getattr(admission, "opportunity_id", "") or "").strip()
-        if not opportunity_id or opportunity_id in evaluated:
+        if not opportunity_id or opportunity_id in attempted:
             continue
+        attempted.add(opportunity_id)
         try:
             await repository.evaluate(
                 user_id=user_id,
                 opportunity_id=opportunity_id,
                 actor_id=user_id,
                 trigger_type="periodic_discovery",
+                pipeline_binding=PipelineBinding(
+                    user_id=user_id, pipeline_run_id=pipeline_run_id,
+                    pipeline_entry_type="periodic_discovery",
+                    company_id=getattr(admission, "company_id", None),
+                    scout_run_id=(scout_run_ids_by_opportunity or {}).get(opportunity_id),
+                ),
                 policy=evaluation_prerequisites.policy,
                 thesis_version_id=evaluation_prerequisites.thesis_version_id,
             )
         except EvaluationLifecycleError as exc:
+            if failed_opportunities is not None:
+                failed_opportunities.add(opportunity_id)
             logger.info(
                 "[%s] Periodic canonical evaluation skipped opportunity_id=%s: %s",
                 user_id[:12], opportunity_id, exc,
             )
             continue
         except Exception:
+            if failed_opportunities is not None:
+                failed_opportunities.add(opportunity_id)
             # The Partner loader will fail closed for this opportunity. Do not
             # turn a one-company evaluation problem into a whole-cycle failure.
             logger.exception(
@@ -1114,6 +1197,7 @@ async def _run_one_pipeline_cycle_inner_impl(
             # On-demand lookup's own admission path (_admit_named_lookup_before_review)
             # is untouched -- this only removes identity gating from the
             # autonomous/periodic discovery path.
+            pipeline_stage_log(pipeline_run_id, startup_id="", user_id=user_id, stage="scout", phase="STARTED")
             scout_result = await scout_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
                 persist_discoveries=True,
@@ -1157,10 +1241,10 @@ async def _run_one_pipeline_cycle_inner_impl(
 
         # A periodic discovery may be visible before its identity has been
         # resolved, but it may not become a scored deal on that basis.  Admit
-        # reference-surviving discoveries and create their canonical evaluation
-        # before Reviewer/Partner.  Ambiguous identities are quarantined by the
-        # admission helper; the Partner stage below then has one authoritative
-        # evaluation source instead of a reviewer-average fallback.
+        # reference-surviving discoveries before invoking the shared analysis.
+        # Ambiguous identities are quarantined by the admission helper.
+        # The shared core calls both Reviewer and Partner, so both stage toggles
+        # must permit it. Scout-only cycles still persist factual discoveries.
         if discoveries and postgres_pool is not None:
             await ensure_owned()
             admissions = await _admit_autonomous_discoveries(
@@ -1172,12 +1256,37 @@ async def _run_one_pipeline_cycle_inner_impl(
                 startup_repository=startup_repository,
                 evidence_repository=EvidenceRepository(postgres_pool),
             )
-            canonical_evaluations = await _evaluate_admitted_periodic_discoveries(
-                user_id=user_id,
-                admissions=admissions,
-                evaluation_prerequisites=evaluation_prerequisites,
-                postgres_pool=postgres_pool,
-            )
+            canonical_evaluations = 0
+            if reviewers_enabled and partners_enabled:
+                scout_run_ids: dict[str, str] = {}
+                for discovery in discoveries:
+                    startup_id = str(discovery.get("persisted_startup_id") or discovery.get("id") or "").strip()
+                    if not startup_id:
+                        continue
+                    current = (await startup_repository.get_startup(user_id, startup_id)
+                               if startup_repository is not None
+                               else await asyncio.to_thread(storage.get_startup, startup_id))
+                    trace = ((current.get("agent_trace") if isinstance(current, dict) else getattr(current, "agent_trace", None))
+                             if current is not None else None) or {}
+                    scout_trace = trace.get("scout") or {}
+                    scout_run_id = str(scout_trace.get("scout_run_id") or "").strip()
+                    if not scout_run_id:
+                        continue
+                    for admission in admissions:
+                        same_opportunity = str(getattr(admission, "opportunity_id", "")) == str(discovery.get("opportunity_id", ""))
+                        same_company = str(getattr(admission, "company_id", "")) == str(discovery.get("company_id", ""))
+                        if same_opportunity or same_company:
+                            scout_run_ids[str(admission.opportunity_id)] = scout_run_id
+                canonical_evaluations = await _evaluate_admitted_periodic_discoveries(
+                    pipeline_run_id=pipeline_run_id,
+                    cost_controller=engines.cost_controller,
+                    failed_opportunities=getattr(reviewer_engine, "failed_analysis_opportunities", None),
+                    user_id=user_id,
+                    admissions=admissions,
+                    scout_run_ids_by_opportunity=scout_run_ids,
+                    evaluation_prerequisites=evaluation_prerequisites,
+                    postgres_pool=postgres_pool,
+                )
             stage_diagnostics["canonical_evaluation"] = {
                 "admissions": len(admissions),
                 "evaluations_created": canonical_evaluations,
@@ -1186,9 +1295,17 @@ async def _run_one_pipeline_cycle_inner_impl(
         _activity_reviewed_count = 0
         _activity_decided_count = 0
         _activity_escalations_count = 0
-        if reviewers_enabled and identity_repository is not None:
+        if reviewers_enabled and not partners_enabled:
+            stage_results["reviewer"] = StageExecutionResult.blocked_result(
+                stage="reviewer", code="analysis_partner_disabled",
+                detail="The shared investment analysis requires Partner to be enabled.",
+                recovery_action="Enable Partner to complete the investment analysis.",
+                attempted=1, blocked=1,
+            )
+            logger.info("[%s] Shared analysis blocked: analysis_partner_disabled", user_id[:12])
+        elif reviewers_enabled and identity_repository is not None:
             current_stage = "reviewer"
-            agents_executed += 3
+            agents_executed += 1
             unreviewed_before = await asyncio.to_thread(_safe_stage_count, storage, "count_unreviewed", user_id)
             if (unreviewed_before or 0) > 0:
                 _visible_info(
@@ -1197,6 +1314,7 @@ async def _run_one_pipeline_cycle_inner_impl(
                     unreviewed_before,
                 )
             await ensure_owned()
+            pipeline_stage_log(pipeline_run_id, startup_id="", user_id=user_id, stage="reviewer", phase="STARTED")
             reviewer_result = await reviewer_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
             )
@@ -1247,6 +1365,7 @@ async def _run_one_pipeline_cycle_inner_impl(
                     undecided_before,
                 )
             await ensure_owned()
+            pipeline_stage_log(pipeline_run_id, startup_id="", user_id=user_id, stage="partner", phase="STARTED")
             partner_result = await partner_engine.run_cycle(
                 pipeline_run_id=pipeline_run_id,
             )
@@ -1379,7 +1498,11 @@ async def _run_one_pipeline_cycle_inner_impl(
             _activity_escalations_count,
             agents_executed,
         )
+        for stage, stage_result in stage_results.items():
+            pipeline_stage_log(pipeline_run_id, startup_id="", user_id=user_id, stage=stage,
+                               phase={"completed": "DONE", "failed": "FAILED", "blocked": "BLOCKED", "skipped": "SKIPPED"}.get(stage_result.state.value, "DONE"))
         result_metadata = {
+            "pipeline_run_id": pipeline_run_id,
             "startups_found": _activity_startups_found,
             "reviewed": _activity_reviewed_count,
             "decided": _activity_decided_count,
@@ -1648,7 +1771,14 @@ async def _run_on_demand_lookup_inner(
     )
     lid = (lookup_id or "").strip() or None
 
+    lookup_run_id = pipeline_run_id
+
     async def emit(stage: str, status: str, **metadata: Any) -> None:
+        pipeline_stage_log(
+            lookup_run_id, startup_id=str(metadata.get("startup_id") or ""),
+            user_id=user_id, stage=stage,
+            phase={"succeeded": "DONE", "started": "STARTED", "failed": "FAILED", "blocked": "BLOCKED", "skipped": "SKIPPED", "retried": "RETRIED"}.get(status, "DONE"),
+        )
         if checkpoint is not None:
             await checkpoint(stage, status, metadata)
 
@@ -1794,6 +1924,7 @@ async def _run_on_demand_lookup_inner(
                 detail="The lookup was cancelled before Scout started.",
             )
         if replace_startup_id:
+            pipeline_stage_log(lookup_run_id, startup_id=replace_startup_id, user_id=user_id, stage="scout_reused", phase="SKIPPED")
             # Post-hoc re-review: the company is already resolved and scouted — do NOT
             # re-discover. Keep the existing profile/resolution/sources, fetch any links
             # the operator named, stamp the context on the row, and re-run only
@@ -1826,6 +1957,7 @@ async def _run_on_demand_lookup_inner(
                     recovery_action="Run a fresh lookup or restore the original startup record.",
                 )
         else:
+            pipeline_stage_log(lookup_run_id, startup_id="", user_id=user_id, stage="scout", phase="STARTED")
             scout_stage_started = time.perf_counter()
             await ensure_owned()
             startup_id = await scout_engine.run_named_lookup(
@@ -1882,10 +2014,12 @@ async def _run_on_demand_lookup_inner(
                 detail="The lookup was cancelled after Scout completed.",
                 startup_id=startup_id,
             )
+        canonical_evaluation: Optional[Dict[str, Any]] = None
         canonical_recommendation_state: Optional[str] = None
         canonical_criteria: Optional[List[Dict[str, Any]]] = None
         canonical_confidence: Optional[float] = None
         if postgres_pool is not None and handoff_startup is not None:
+            source_scout_trace = (getattr(handoff_startup, "agent_trace", None) or {}).get("scout") or {}
             canonical_scout_output = handoff_startup.scout_info.model_dump(mode="json")
             canonical_scout_output["id"] = startup_id
             canonical_scout_output["persisted_startup_id"] = startup_id
@@ -1927,123 +2061,58 @@ async def _run_on_demand_lookup_inner(
                 startup_id,
                 canonical_admission.opportunity_id,
             )
-            # Canonical claims are already persisted by admission above — evaluate
-            # now, before Reviewer/Partner run, so Partner can defer to the
-            # canonical recommendation instead of computing its own from
-            # avg_score (see docs/archive/plans/2026-08-16-partner-behind-evaluator.md).
-            # Best-effort: a failure here must not fail an otherwise-healthy lookup.
+            # The shared repository owns factual preparation and the complete
+            # Reviewer → validation → Partner sequence for every entry route.
+            # The callbacks below only project the completed analysis.
             if evaluation_prerequisites is not None:
                 try:
-                    canonical_evaluation = await EvaluationRepository(postgres_pool).evaluate(
+                    pipeline_stage_log(lookup_run_id, startup_id=startup_id, user_id=user_id, stage="canonical_evaluation", phase="STARTED")
+                    canonical_evaluation = await EvaluationRepository(postgres_pool, cost_controller=engines.cost_controller).evaluate(
                         user_id=user_id,
                         opportunity_id=canonical_admission.opportunity_id,
                         actor_id=user_id,
                         trigger_type="dispatch",
+                        pipeline_binding=PipelineBinding(
+                            user_id=user_id, pipeline_run_id=lookup_run_id,
+                            pipeline_entry_type="rerun" if replace_startup_id else "manual_lookup",
+                            company_id=canonical_admission.company_id,
+                            scout_run_id=source_scout_trace.get("scout_run_id"),
+                            source_scout_pipeline_run_id=source_scout_trace.get("pipeline_run_id"),
+                        ),
                         policy=evaluation_prerequisites.policy,
                         thesis_version_id=evaluation_prerequisites.thesis_version_id,
                     )
+                    await emit("canonical_evaluation", "succeeded", startup_id=startup_id,
+                               evaluation_run_id=canonical_evaluation.get("evaluation_id"),
+                               evidence_snapshot_hash=canonical_evaluation.get("evidence_snapshot_hash"))
                     canonical_recommendation_payload = canonical_evaluation.get("recommendation") or {}
                     canonical_recommendation_state = canonical_recommendation_payload.get("state")
                     canonical_confidence = canonical_recommendation_payload.get("confidence")
                     canonical_criteria = canonical_evaluation.get("criteria")
-                    # Sub-project 4, Phase A+B (spec §9.3-9.4): a fine-grained gap
-                    # the coarse per-criterion missing_evidence above can't express
-                    # — which specific claim types would satisfy each still-missing
-                    # criterion — then a bounded, inline retrieval pass against it.
-                    # Best-effort: a failure here must not fail the dispatch.
-                    try:
-                        evidence_repository = EvidenceRepository(postgres_pool)
-                        current_claim_types = await evidence_repository.list_current_claim_types(
-                            user_id=user_id, opportunity_id=canonical_admission.opportunity_id,
-                            min_confidence=evaluation_prerequisites.policy.decision_safety.claim_confidence.minimum_eligible,
-                        )
-                        missing_evidence, search_questions = compute_missing_evidence(
-                            evaluation_prerequisites.policy, current_claim_types,
-                        )
-                        missing_fact_dimensions = _missing_typed_fact_dimensions(
-                            evaluation_prerequisites.policy, current_claim_types,
-                        )
-                        extraction_dimensions = sorted(
-                            set(missing_evidence) | missing_fact_dimensions
-                        )
-                        if extraction_dimensions:
-                            plan = await evidence_repository.create_plan(
-                                user_id=user_id,
-                                opportunity_id=canonical_admission.opportunity_id,
-                                trigger_type="dispatch",
-                                missing_evidence=extraction_dimensions,
-                                search_questions=search_questions,
-                            )
-                            retrieval_result = await execute_evidence_plan(
-                                user_id=user_id,
-                                company_id=canonical_admission.company_id,
-                                opportunity_id=canonical_admission.opportunity_id,
-                                plan=plan,
-                                evidence_repository=evidence_repository,
-                                company_name=company,
-                                company_website=website or handoff_startup.scout_info.lookup_website,
-                            )
-                            # Sub-project 4, Phase C (spec §9.5): only now is
-                            # there something new for a second evaluate() to
-                            # find. Re-evaluating with nothing new would just
-                            # add latency for an identical result.
-                            verified_items = retrieval_result.get("verified_items") or []
-                            if not verified_items and missing_fact_dimensions:
-                                ledger = await evidence_repository.get_ledger(
-                                    user_id=user_id,
-                                    opportunity_id=canonical_admission.opportunity_id,
-                                )
-                                verified_items = [
-                                    item for item in ledger["evidence_items"]
-                                    if item.get("verification_state") == "verified"
-                                    and item.get("display_excerpt")
-                                ]
-                            if verified_items:
-                                from core.policy_resolver import get_evaluation_rubric
-
-                                extraction_result = await extract_claims_from_evidence(
-                                    user_id=user_id,
-                                    company_id=canonical_admission.company_id,
-                                    opportunity_id=canonical_admission.opportunity_id,
-                                    missing_evidence=extraction_dimensions,
-                                    evidence_items=verified_items,
-                                    rubric=get_evaluation_rubric(),
-                                    policy=evaluation_prerequisites.policy,
-                                    evidence_repository=evidence_repository,
-                                    api_key=api_key,
-                                    model=reviewer_engine.model,
-                                )
-                                if extraction_result.get("claims_created"):
-                                    canonical_evaluation = await EvaluationRepository(postgres_pool).evaluate(
-                                        user_id=user_id,
-                                        opportunity_id=canonical_admission.opportunity_id,
-                                        actor_id=user_id,
-                                        trigger_type="dispatch_post_extraction",
-                                        policy=evaluation_prerequisites.policy,
-                                        thesis_version_id=evaluation_prerequisites.thesis_version_id,
-                                    )
-                                    canonical_recommendation_payload = canonical_evaluation.get("recommendation") or {}
-                                    canonical_recommendation_state = canonical_recommendation_payload.get("state")
-                                    canonical_confidence = canonical_recommendation_payload.get("confidence")
-                                    canonical_criteria = canonical_evaluation.get("criteria")
-                    except Exception:
-                        logger.exception(
-                            "[%s] Evidence-plan computation failed opportunity_id=%s",
-                            user_id[:12],
-                            canonical_admission.opportunity_id,
-                        )
-                except EvaluationLifecycleError as exc:
-                    logger.info(
-                        "[%s] Canonical evaluation skipped opportunity_id=%s: %s",
-                        user_id[:12],
-                        canonical_admission.opportunity_id,
-                        exc,
+                except (AnalysisBlocked, EvaluationLifecycleError) as exc:
+                    code = exc.code if isinstance(exc, AnalysisBlocked) else "analysis_dependencies_changed"
+                    pipeline_stage_log(lookup_run_id, startup_id=startup_id, user_id=user_id,
+                                       stage="canonical_evaluation", phase="BLOCKED")
+                    await emit("canonical_evaluation", "blocked", startup_id=startup_id, code=code)
+                    return PipelineExecutionResult.blocked(
+                        code=code, detail=str(exc), startup_id=startup_id,
+                        projection_id=canonical_admission.opportunity_id,
+                        recovery_action="Resolve the analysis dependency or budget block, then retry.",
                     )
                 except Exception:
                     logger.exception(
                         "[%s] Canonical evaluation failed opportunity_id=%s",
                         user_id[:12],
                         canonical_admission.opportunity_id,
+                    )
+                    pipeline_stage_log(lookup_run_id, startup_id=startup_id, user_id=user_id,
+                                       stage="canonical_evaluation", phase="FAILED")
+                    await emit("canonical_evaluation", "failed", startup_id=startup_id,
+                               code="investment_analysis_failed")
+                    return PipelineExecutionResult.stage_failure(
+                        stage="investment_analysis", code="investment_analysis_failed",
+                        detail="The investment analysis did not complete; the previous review remains historical.",
+                        startup_id=startup_id, recovery_action="Inspect analysis logs, then retry the lookup.",
                     )
         current_stage = "reviewer"
         review_is_current = bool(
@@ -2113,12 +2182,15 @@ async def _run_on_demand_lookup_inner(
             # object built before that persistence and no longer reflects it.
             # Reload so Partner reads the same review it will read back later,
             # instead of the stale pre-Reviewer snapshot.
-            get_startup = getattr(storage, "get_startup", None)
-            if callable(get_startup):
-                reloaded_startup = await asyncio.to_thread(get_startup, startup_id)
+            if startup_repository is not None or callable(getattr(storage, "get_startup", None)):
+                reloaded_startup = await _read_current_startup(
+                    user_id=user_id, startup_id=startup_id,
+                    startup_repository=startup_repository, storage=storage,
+                )
                 if reloaded_startup is not None:
                     handoff_startup = reloaded_startup
         current_stage = "partner"
+        pipeline_stage_log(lookup_run_id, startup_id=startup_id, user_id=user_id, stage="partner", phase="STARTED")
         partner_stage_started = time.perf_counter()
         await ensure_owned()
         decided = await partner_engine.run_startup(
@@ -2127,6 +2199,7 @@ async def _run_on_demand_lookup_inner(
             force_rerun=bool(replace_startup_id),
             bypass_agent_enabled_gate=True,
             startup=handoff_startup,
+            canonical_evaluation_provenance=(canonical_evaluation or {}).get("provenance"),
             canonical_recommendation=canonical_recommendation_state,
             canonical_criteria=canonical_criteria,
             canonical_confidence=canonical_confidence,
@@ -2206,7 +2279,10 @@ async def _run_on_demand_lookup_inner(
                     pipeline_run_id=lookup_run_id,
                     status="writing_memo",
                 )
-                updated_startup = await asyncio.to_thread(storage.get_startup, startup_id)
+                updated_startup = await _read_current_startup(
+                    user_id=user_id, startup_id=startup_id,
+                    startup_repository=startup_repository, storage=storage,
+                )
                 if updated_startup is None:
                     raise RuntimeError("Re-reviewed startup disappeared before memo regeneration")
                 regenerated_memo = await asyncio.to_thread(
@@ -2281,6 +2357,7 @@ async def _run_on_demand_lookup_inner(
         )
     except Exception as e:
         metrics.inc_lookup("error")
+        pipeline_stage_log(lookup_run_id, startup_id=startup_id or "", user_id=user_id, stage=current_stage, phase="FAILED")
         logger.exception("[%s] On-demand lookup error (%s): %s", user_id[:12], company, e)
         message = "Lookup failed with an unexpected error. Try again or check server logs."
         if startup_id:

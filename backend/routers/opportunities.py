@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from identity.models import SourceChannel, SourceObservationInput
 from opportunity_pipeline import OpportunityPipeline
+from investment_analysis.model_gateway import AnalysisBlocked
 from routers.deps import (
     LOOKUP_DAY_POLICY as _LOOKUP_DAY_POLICY,
     LOOKUP_MINUTE_POLICY as _LOOKUP_MINUTE_POLICY,
@@ -66,10 +67,16 @@ async def manual_lookup(request: Request, body: ManualLookupBody):
         external_event_key=(f"manual:{body.lookup_id}" if body.lookup_id else None),
         resolution_payload={"website": body.website} if body.website else None,
     )
-    result = await pipeline.process(
-        user_id=user_id, observation=observation,
-        references=body.references, claims=body.claims,
-    )
+    try:
+        result = await pipeline.process(
+            user_id=user_id, observation=observation,
+            references=body.references, claims=body.claims,
+        )
+    except AnalysisBlocked as exc:
+        raise HTTPException(
+            status_code=409 if exc.code == "analysis_dependencies_changed" else 503,
+            detail={"code": exc.code, "detail": str(exc)},
+        ) from exc
     status = 200 if result.status == "completed" else 409
     if status != 200:
         raise HTTPException(status_code=status, detail=result.__dict__)

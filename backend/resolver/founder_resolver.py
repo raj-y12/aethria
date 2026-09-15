@@ -173,6 +173,7 @@ _NAME_REJECT = frozenset(
         "managing director",
         "general partner",
         "board of directors",
+        "stack exchange network",
     }
 )
 
@@ -436,11 +437,19 @@ def _clean_person_name(raw: str) -> str:
     return name
 
 
+def is_non_person_label(name: str) -> bool:
+    """Reject recognizable role/organization labels without judging identity."""
+    lowered = _clean_person_name(name).casefold()
+    return lowered in {"biomedical engineer", "lead business"} or lowered.endswith((" strategy", " co"))
+
+
 def _is_person_name(name: str) -> bool:
     n = _clean_person_name(name)
     if not n or len(n) > 40:
         return False
     lowered = n.lower()
+    if is_non_person_label(n):
+        return False
     if lowered in _NAME_REJECT:
         return False
     words = n.split()

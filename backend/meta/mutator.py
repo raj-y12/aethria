@@ -498,6 +498,9 @@ class PromptMutator:
             for scout in scout_engine.scouts:
                 if scout.scout_type == scout_type:
                     return scout.system_prompt
+        # Legacy persona mutation cannot rewrite the new evidence/authority contract.
+        if getattr(reviewer_engine, "analysis_contract_version", None):
+            return None
         # Reviewer agents
         if reviewer_engine:
             if agent_name == "DefaultReviewer":

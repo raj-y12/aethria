@@ -51,6 +51,36 @@ const ledger: EvidenceLedger = {
 };
 
 describe('buildMemoDecisionBrief', () => {
+  it('distinguishes a Partner diligence decision from historical insufficient evidence', () => {
+    const result = buildMemoDecisionBrief({ evaluation: {
+      ...evaluation,
+      recommendation: { ...evaluation.recommendation!, recommended_state: 'insufficient_evidence' },
+      provenance: {
+        provenance_version: 'v1', pipeline_run_id: null, pipeline_entry_type: null,
+        company_id: null, opportunity_id: null, scout_run_id: null,
+        source_scout_pipeline_run_id: null, evaluation_run_id: 'evaluation-1',
+        evidence_snapshot_hash: null, evidence_plan_id: null, evidence_artifact_ids: [],
+        claim_ids: [], evidence_links: [], score_origin: 'REVIEWER_ASSESSMENT',
+        score_schema_version: null, evaluation_rubric_version: null,
+        reviewer_rules_version: null, partner_rules_version: null, thesis_version_id: null,
+        policy_version: null, policy_hash: null, partner_rules_hash: null,
+        recommendation_origin: 'PARTNER_ANALYSIS', canonical_recommendation: 'insufficient_evidence',
+        human_review_required: true, criteria: [],
+      },
+    }, ledger });
+    expect(result.lean).toBe('more_diligence');
+    expect(result.leanProvenance).toBe('partner-judgment');
+    expect(result.coverage).toBe('missing');
+  });
+  it('shows shared supporting evidence once while retaining every dimension', () => {
+    const result = buildMemoDecisionBrief({ evaluation: { ...evaluation, criteria: [
+      evaluation.criteria[0], { ...evaluation.criteria[0], criterion: 'market' },
+    ] }, ledger });
+    expect(result.claims).toHaveLength(1);
+    expect(result.claims[0].criterion).toContain('market');
+    expect(result.claims[0].criterion).toContain('regulatory');
+    expect(result.claims[0].sources[0].href).toBe('https://regulator.example/approval');
+  });
   it('blocks canonical insufficient evidence without inventing a machine lean', () => {
     const result = buildMemoDecisionBrief({
       evaluation: {

@@ -209,7 +209,7 @@ describe('Settings focused-mode layout contract', () => {
 
   it('keeps every configuration section in the single column', () => {
     expect(source).toContain('Fund thesis');
-    expect(source).toContain('Decision thresholds');
+    expect(source).toContain('Investment decisions');
     expect(source).toContain('Scoring weights');
     expect(source).toContain('Memo output');
     expect(source).toContain('Decision review workflow');

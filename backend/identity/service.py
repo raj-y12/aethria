@@ -78,6 +78,20 @@ class IdentityService:
         if existing is not None:
             return existing
 
+        resolution_data = observation.resolution_payload or {}
+        if observation.observed_domain and resolution_data.get("alternative_matches"):
+            from resolver.company_resolver import CompanyResolution, website_hint_conflicts
+            resolution = CompanyResolution.model_validate({
+                "query": observation.observed_name, "canonical_name": observation.observed_name,
+                **resolution_data,
+            })
+            if website_hint_conflicts(resolution, observation.observed_domain):
+                return await self.repository.open_identity_case(
+                    observation=observation, observation_id=stored.observation_id,
+                    candidates=self._picker_candidates(observation),
+                    reason_code="conflicting_domain_evidence", confidence=resolution.confidence,
+                )
+
         identifiers = extract_identifier_candidates(observation)
         verified = [
             item

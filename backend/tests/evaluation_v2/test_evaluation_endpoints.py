@@ -9,6 +9,28 @@ from authority.service import AuthorityService
 from security.rate_limiter import InMemorySecurityStore
 
 
+def test_analyst_projection_retains_explanation_without_audit_payload():
+    from routers.evaluations import analyst_evaluation
+    from copy import deepcopy
+    import json
+    record = {"evaluation": {"evaluation_id": "ev", "status": "completed", "claim_snapshot": ["raw" * 2000],
+        "judgment_audit": {"lineage": "internal"}, "policy_hash": "internal"},
+        "criteria": [{"criterion": "market", "score": 6, "reasoning": "Limited evidence",
+            "supporting_claim_ids": ["claim"], "deterministic_adjustments": {
+                "assessment_validation": {"proposed_score": 8, "validated_score": 6, "cap_reason": "Weak support"},
+                "raw_snapshot": "raw" * 2000}}],
+        "recommendation": {"recommended_state": "insufficient_evidence", "decision_drivers": ["Verify demand"]},
+        "provenance": {"recommendation_origin": "PARTNER_ANALYSIS", "evidence_links": ["raw" * 2000]}}
+    original = deepcopy(record)
+    result = analyst_evaluation(record)
+    assert result["criteria"][0]["score"] == 6
+    assert result["criteria"][0]["deterministic_adjustments"]["assessment_validation"]["cap_reason"] == "Weak support"
+    assert result["recommendation"]["decision_drivers"] == ["Verify demand"]
+    assert "policy_hash" not in result["evaluation"]
+    assert len(json.dumps(result)) < len(json.dumps(record)) / 10
+    assert record == original
+
+
 class _AuthorityRepository:
     def __init__(self, mode: RolloutMode):
         self.rollout = RolloutRecord(user_id="user-a", mode=mode, version=1)

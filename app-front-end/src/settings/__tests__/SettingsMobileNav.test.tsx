@@ -45,6 +45,6 @@ describe('SettingsMobileNav', () => {
       />,
     );
 
-    expect(screen.getByRole('option', { name: 'Thresholds — Needs attention' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Decisions — Needs attention' })).toBeInTheDocument();
   });
 });

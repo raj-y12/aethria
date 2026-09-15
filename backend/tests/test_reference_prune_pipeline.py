@@ -55,7 +55,9 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
         last_cycle_escalations = 0
 
         async def run_cycle(self, **kwargs):
-            return 0
+            return StageExecutionResult.skipped_result(
+                stage="partner", code="partner_no_eligible_work", detail="No Partner work.",
+            )
 
     class Thesis:
         version_id = "thesis-live"
@@ -106,7 +108,7 @@ async def test_periodic_pipeline_prunes_after_scout_and_before_reviewer(monkeypa
             "agent_config": {
                 "scouts_enabled": True,
                 "reviewers_enabled": True,
-                "partners_enabled": False,
+                "partners_enabled": True,
             }
         },
     )

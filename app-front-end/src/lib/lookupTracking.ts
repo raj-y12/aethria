@@ -1,4 +1,28 @@
 import type { Startup } from '../types/startup';
+import type { JobStatus } from '../api/jobs';
+
+type QueryInvalidator = { invalidateQueries: (filters: { queryKey: readonly unknown[] }) => unknown };
+
+export function invalidateLookupCompletionQueries(
+  queryClient: QueryInvalidator,
+  startupId: string,
+  opportunityId?: string | null,
+): void {
+  void queryClient.invalidateQueries({ queryKey: ['startup', 'detail', startupId] });
+  void queryClient.invalidateQueries({ queryKey: ['institutional', 'opportunity', 'legacy', startupId] });
+  if (!opportunityId) return;
+  void queryClient.invalidateQueries({ queryKey: ['institutional', 'evidence', opportunityId] });
+  void queryClient.invalidateQueries({ queryKey: ['institutional', 'evaluation', opportunityId] });
+  void queryClient.invalidateQueries({ queryKey: ['institutional', 'rulings', opportunityId] });
+}
+
+export function lookupIsWorking(input: {
+  busy: boolean; cancelPending: boolean; pending: boolean; autoOpened: boolean;
+  decided: boolean; durableStatus?: JobStatus;
+}): boolean {
+  return input.cancelPending || input.busy || (input.pending && !input.autoOpened
+    && !input.decided && input.durableStatus !== 'succeeded');
+}
 
 export type LookupChipStatus = 'scouting' | 'reviewing' | 'decided';
 

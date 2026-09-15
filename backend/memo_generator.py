@@ -147,7 +147,7 @@ def _append_thesis_alignment_section(
         pj = fund_thesis.get("parsed_json") or {}
         vid = fund_thesis.get("version_id", "—")
         vn = fund_thesis.get("version_number", "—")
-        lines.append(f"**Active thesis:** `{vid}` (version {vn})")
+        lines.append(f"**Active thesis:** version {vn}" if for_display else f"**Active thesis:** `{vid}` (version {vn})")
         lines.append("")
         if not for_display:
             lines.append("**Structured mandate**")

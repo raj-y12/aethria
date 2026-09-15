@@ -9,6 +9,11 @@ thesis-blind evaluation or evaluate an ambiguous company.
 from __future__ import annotations
 
 import hashlib
+from uuid import uuid4
+
+from evaluation_v2.provenance import PipelineBinding
+from investment_analysis.model_gateway import AnalysisBlocked
+from pipeline_state import pipeline_stage_log
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional
 
@@ -47,6 +52,8 @@ class PipelineResult:
     observation_id: Optional[str] = None
     evaluation: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
+    pipeline_run_id: Optional[str] = None
+    pipeline_trace: list[Dict[str, Any]] = field(default_factory=list)
 
 
 class OpportunityPipeline:
@@ -86,6 +93,28 @@ class OpportunityPipeline:
         uid = require_user_id(user_id, context="OpportunityPipeline.process")
         if observation.user_id != uid:
             raise ValueError("observation tenant does not match pipeline tenant")
+        pipeline_run_id = str(uuid4())
+        trace: list[Dict[str, Any]] = []
+
+        def record(stage: str, status: str, **metadata: Any) -> None:
+            trace.append({"stage": stage, "status": status, **metadata})
+            pipeline_stage_log(
+                pipeline_run_id, startup_id="", user_id=uid, stage=stage, phase=status,
+            )
+
+        async def observe(stage: str, awaitable: Any) -> Any:
+            record(stage, "STARTED")
+            try:
+                value = await awaitable
+            except AnalysisBlocked as exc:
+                record(stage, "BLOCKED", code=exc.code)
+                raise
+            except Exception:
+                record(stage, "FAILED")
+                raise
+            record(stage, "DONE")
+            return value
+
         references = deduplicate_references(references)
         # Fixed 2026-08-18 (audit HIGH-H8): claims arriving through this
         # parameter come straight from an HTTP request body (the only real
@@ -102,9 +131,11 @@ class OpportunityPipeline:
                 raw for raw in derive_scout_claims(scout_output)
                 if raw.get("claim_type") not in existing_claim_types
             )
-        admission: IdentityAdmission = await self.identity_service.admit(observation)
+        admission: IdentityAdmission = await observe("identity", self.identity_service.admit(observation))
         if admission.blocks_evaluation or not admission.opportunity_id or not admission.company_id:
+            record("identity", "BLOCKED")
             return PipelineResult(
+                pipeline_run_id=pipeline_run_id, pipeline_trace=trace,
                 status="blocked", code="identity_review_required", user_id=uid,
                 observation_id=admission.observation_id,
                 company_id=admission.company_id, metadata={"identity_case_id": admission.identity_case_id},
@@ -112,7 +143,7 @@ class OpportunityPipeline:
 
         # Resolve all prerequisites before touching evaluation.  The loader is
         # intentionally injected to make the gate testable and tenant explicit.
-        prerequisites = await self.prerequisites_loader(user_id=uid)
+        prerequisites = await observe("prerequisites", self.prerequisites_loader(user_id=uid))
         if hasattr(prerequisites, "require_tenant"):
             prerequisites.require_tenant(uid, context="OpportunityPipeline.process")
 
@@ -126,13 +157,16 @@ class OpportunityPipeline:
             if self.triage_repository is not None:
                 await self.triage_repository.create(assessment)
             if assessment.disposition is not TriageDisposition.DEEP_REVIEW:
+                record("evaluation", "SKIPPED", reason=assessment.disposition.value)
                 return PipelineResult(
+                    pipeline_run_id=pipeline_run_id, pipeline_trace=trace,
                     status="completed", code=f"triage_{assessment.disposition.value}",
                     user_id=uid, opportunity_id=admission.opportunity_id,
                     company_id=admission.company_id, observation_id=admission.observation_id,
                     metadata={"triage": assessment.model_dump(mode="json")},
                 )
 
+        record("evidence", "STARTED")
         artifact_ids: list[str] = []
         evidence_item_ids: list[str] = []
         reference_items: list[list[Any]] = []
@@ -259,22 +293,34 @@ class OpportunityPipeline:
                 for link in links
             )
 
-        evaluation = await self.evaluation_repository.evaluate(
+        record("evidence", "DONE", artifact_ids=artifact_ids, claim_ids=[item["claim_id"] for item in persisted_claims])
+        evaluation = await observe("canonical_evaluation", self.evaluation_repository.evaluate(
             user_id=uid, opportunity_id=admission.opportunity_id,
             actor_id=actor_id or uid, trigger_type=trigger,
             policy=prerequisites.policy,
             thesis_version_id=prerequisites.thesis_version_id,
             judgment_audit=judgment_audit,
-        )
+            pipeline_binding=PipelineBinding(
+                user_id=uid, pipeline_run_id=pipeline_run_id,
+                pipeline_entry_type="opportunity_manual_lookup", company_id=admission.company_id,
+            ),
+        ))
         regulatory_context = assemble_regulatory_context(
             claims=persisted_claims,
             evidence=persisted_links,
         )
+        record("evidence_reviewer", "STARTED")
         evidence_review = EvidenceReviewer().review(
             evaluation, regulatory_context=regulatory_context
         )
+        record("evidence_reviewer", "DONE", evaluation_run_id=evaluation.get("evaluation_id"))
+        record("deterministic_partner", "STARTED")
         partner_route = DeterministicPartner().route(evaluation, evidence_review)
+        analysis = (evaluation.get("judgment_audit") or {}).get("investment_analysis")
+        record("deterministic_partner", "DONE", projection_only=True,
+               recommendation_origin="PARTNER_ANALYSIS" if analysis else "CANONICAL_EVALUATION")
         return PipelineResult(
+            pipeline_run_id=pipeline_run_id, pipeline_trace=trace,
             status="completed", code="opportunity_evaluated", user_id=uid,
             opportunity_id=admission.opportunity_id, company_id=admission.company_id,
             observation_id=admission.observation_id, evaluation=evaluation,
@@ -284,5 +330,6 @@ class OpportunityPipeline:
                 "partner_route": partner_route.model_dump(mode="json"),
                 "regulatory_context": regulatory_context,
                 "legacy_compatibility": True,
+                "investment_analysis_trace": (analysis or {}).get("trace", []),
             },
         )

@@ -41,7 +41,7 @@ def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
     }
 
 
-def test_governed_pipeline_captures_manifest_identity_once_from_constructed_engines(
+def test_pipeline_captures_models_and_context_without_claiming_persona_execution(
     monkeypatch,
 ):
     class Controller:
@@ -132,27 +132,22 @@ def test_governed_pipeline_captures_manifest_identity_once_from_constructed_engi
         thesis_ctx=prerequisites.thesis_context,
         evaluation_prerequisites=prerequisites,
     )
-    captured = engines.evaluation_manifest_identity
-    assert isinstance(captured, EvaluationManifestIdentity)
-    assert engines.partner_engine.bound_identity is captured
-    assert engines.partner_engine.received["model"] == "partner-model-captured"
-    assert engines.partner_engine.received["include_deal_context_digest"] is True
-
+    # The shared core records execution identities with the completed analysis,
+    # not a construction-time manifest claiming three persona invocations.
+    assert engines.evaluation_manifest_identity is None
+    assert engines.reviewer_engine.analysis_contract_version == "investment-analysis-v1"
+    assert engines.partner_engine.analysis_contract_version == "investment-analysis-v1"
+    captured = dict(engines.model_metadata)
+    assert captured == {"scout": "scout-model-captured", "reviewer": "reviewer-model-captured", "partner": "partner-model-captured"}
     monkeypatch.setenv("SCOUT_MODEL", "mutated")
     monkeypatch.setenv("REVIEWER_MODEL", "mutated")
     monkeypatch.setenv("PARTNER_MODEL", "mutated")
-    monkeypatch.setenv("PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", "false")
-
-    assert captured.model_identities["scout"].model_id == "scout-model-captured"
-    assert captured.model_identities["reviewer"].model_id == (
-        "reviewer-model-captured"
-    )
-    assert captured.model_identities["partner"].model_id == (
-        "partner-model-captured"
-    )
-    assert captured.dependency_identity.model_dump(mode="python") == (
-        dependency_identity
-    )
+    assert engines.model_metadata == captured
+    assert engines.reviewer_engine.model == captured["reviewer"]
+    assert engines.partner_engine.model == captured["partner"]
+    assert engines.reviewer_engine.active_thesis == prerequisites.thesis_context
+    prerequisites.thesis_context["version_id"] = "changed"
+    assert engines.reviewer_engine.active_thesis["version_id"] == "thesis-v1"
 
 
 def test_decision_ready_metrics_use_bounded_non_tenant_labels():

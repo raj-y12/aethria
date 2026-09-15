@@ -1694,42 +1694,11 @@ class ReviewerEngine:
 
 
 async def main():
-    """
-    Main entry point for running the Reviewer engine.
-    Reads configuration from environment variables.
-    """
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    """Historical scoring engines are replay helpers, not live worker entrypoints."""
+    raise RuntimeError(
+        "legacy_analysis_entrypoint_retired: use backend/run_system.py --user-id=<tenant> "
+        "or the authenticated opportunity evaluation API"
     )
-    
-    # Get configuration from environment
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
-    
-    storage_path = os.getenv("STORAGE_PATH", "data/discoveries.json")
-    interval_seconds = int(os.getenv("REVIEWER_INTERVAL_SECONDS", "60"))
-    model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
-    
-    # Initialize storage
-    storage = Storage(file_path=storage_path)
-    
-    # Create and run engine
-    engine = ReviewerEngine(
-        api_key=api_key,
-        storage=storage,
-        interval_seconds=interval_seconds,
-        model=model,
-    )
-    
-    try:
-        await engine.run_forever()
-    except KeyboardInterrupt:
-        engine.stop()
-        logger.info("Reviewer engine stopped")
 
 
 if __name__ == "__main__":

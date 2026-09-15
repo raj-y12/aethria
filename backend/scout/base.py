@@ -24,7 +24,7 @@ from utils.openai_client import build_openai_client
 from functools import partial
 
 from resolver.company_resolver import CompanyResolution
-from scout.schema import ScoutOutput, validate_scout_output, generate_id
+from scout.schema import ScoutOutput, factual_scout_payload, generate_id
 from utils.financials_grounding import ground_financials
 from tenant_context import require_user_id
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
@@ -132,6 +132,17 @@ def _reject_misattributed_founder_names(
     return kept
 
 
+FACTUAL_SCOUT_BOUNDARY = """
+SCOUT AUTHORITY (applies to all discovery strategies and learned context):
+Establish the company, factual observations and their sources. Identify unknowns
+and conflicting factual claims. Confidence concerns factual reliability only.
+Do not produce investment attractiveness, founder-quality, moat or venture-return
+judgments, an investment thesis, investment assumptions, scores or recommendations.
+Attribute company-reported statements as such. Never infer a financial figure.
+Reviewer interprets the evidence; Partner decides. Return factual Scout v2 JSON.
+"""
+
+
 class Scout(ABC):
     """
     Base class for all Scout agents.
@@ -143,6 +154,16 @@ class Scout(ABC):
     - Emits validated JSON output
     """
     
+    @property
+    def system_prompt(self) -> str:
+        return self._system_prompt
+
+    @system_prompt.setter
+    def system_prompt(self, value: str) -> None:
+        # Promoted tenant prompts can improve retrieval strategy, but cannot
+        # remove the stage's authority boundary. Hashes include this instruction.
+        self._system_prompt = value.replace(FACTUAL_SCOUT_BOUNDARY, "").rstrip() + "\n" + FACTUAL_SCOUT_BOUNDARY
+
     def __init__(
         self,
         scout_type: str,
@@ -200,7 +221,7 @@ class Scout(ABC):
         raw = str(ctx.get("raw_text") or "").strip()
         summary = raw[:4000] if len(raw) > 4000 else raw
         lines = [
-            "\n\nEvaluate this startup relative to the following investment mandate:\n",
+            "\n\nUse the following mandate to target factual discovery. Do not judge investment attractiveness:\n",
             (summary + "\n\n") if summary else "",
             "FUND THESIS (discover a company that fits this mandate; avoid exclusions):\n",
             f"thesis_version_id: {ctx.get('version_id', '')}\n",
@@ -223,7 +244,7 @@ class Scout(ABC):
         if data is None:
             return None
         try:
-            return validate_scout_output(data)
+            return factual_scout_payload(data)
         except ValueError as e:
             payload_preview = "none"
             if isinstance(data, dict):
@@ -281,6 +302,9 @@ class Scout(ABC):
                     return
             except Exception as e:
                 self.logger.debug("Could not load promoted scout prompt: %s", e)
+            # Missing tenant state means use this Scout's built-in prompt, not
+            # another fund's locally promoted prompt from a shared file.
+            return
         try:
             lib_path = Path(__file__).resolve().parent.parent / "data" / "meta" / "prompt_library.json"
             if not lib_path.exists():
@@ -591,7 +615,7 @@ class Scout(ABC):
 
     def _scout_validates(self, data: Dict[str, Any]) -> bool:
         try:
-            validate_scout_output(data)
+            factual_scout_payload(data)
             return True
         except Exception as e:
             self.logger.warning(f"[_scout_validates] Validation failed: {e}")
@@ -895,13 +919,14 @@ class Scout(ABC):
             "Output exactly one JSON object and no other text. "
             "Every required Scout field must be present with correct types: "
             "name, one_line, sector, problem, solution, target_users, why_now, confidence (0-1 number), "
-            "primary_thesis, key_assumptions (array of 2-4 strings), biggest_unknown, references (1-8 strings). "
-            "Optional: funding_stage, est_tam (may be null — prefer order-of-magnitude est_tam when sources allow), "
+            "unknowns and contradictions (arrays of factual limitations, empty when none identified), biggest_unknown, references (1-8 strings). "
+            "Optional: funding_stage, est_tam (may be null — only copy a source-reported est_tam), "
             "location (City, Country code when HQ/primary city is known, e.g. \"Paris, FR\"; null if unknown). "
             "When sources cite traction (customers, pilots, ARR/MRR), reflect it in problem/solution/why_now text. "
             "`name` must be a real operating company's brand or legal name—not a hypothetical venture, not a market theme. "
             "Never return a partial object. Do not use markdown."
         )
+        system += "\n" + FACTUAL_SCOUT_BOUNDARY
         sources_block = (
             render_sources_for_prompt(source_pack["sources"])
             if grounded_enabled and source_pack.get("sources")
@@ -918,7 +943,7 @@ class Scout(ABC):
             + "\n\n"
             + sources_block
             + "\n\nWhen sources are listed above: each references[] string MUST include an http(s) URL copied from those sources. "
-            "key_assumptions must have 2-4 items. Avoid mega-cap incumbents (Google, Microsoft, Amazon, Apple, Meta, etc.)."
+            "Do not produce an investment thesis, investment assumptions, scores, or recommendations. Avoid mega-cap incumbents (Google, Microsoft, Amazon, Apple, Meta, etc.)."
         )
         try:
             response = self.client.chat.completions.create(
@@ -1094,13 +1119,13 @@ class Scout(ABC):
                                 if grounded_enabled and bool(source_pack.get("sources"))
                                 else ""
                             )
-                            + "Find one REAL VC-BACKABLE STARTUP (Seed to Series C, typically private, technology-driven), "
+                            + "Find one REAL STARTUP (Seed to Series C, typically private, technology-driven), "
                             "not a hypothetical idea, not a product category or market theme, and not a mega-cap incumbent like Google, Microsoft, Amazon, Apple, Meta, IBM, Oracle, Salesforce, SAP, or their cloud brands. "
                             "`name` must be that company's actual brand or legal name as used in the wild (not a generic label like \"AI compliance tooling\"). "
                             "Use retrieved snippets aggressively: when sources mention TAM/market size/CAGR, funding round/investors/valuation, customers/pilots/ARR/MRR/users, or founders/executives, "
-                            "you MUST weave those facts into problem, solution, why_now, and primary_thesis, and set `est_tam` / `funding_stage` / `location` when supported (approximate TAM as a string is fine; location as \"City, CC\" e.g. \"Berlin, DE\"). Extract every explicitly named founder or co-founder into `founder_names`; use [] only when the retrieved sources do not name any. "
+                            "you MUST weave those facts into problem, solution, and why_now, and set `est_tam` / `funding_stage` / `location` when supported (TAM must be explicitly reported by a cited source; location as \"City, CC\" e.g. \"Berlin, DE\"). Extract every explicitly named founder or co-founder into `founder_names`; use [] only when the retrieved sources do not name any. "
                             "Output ONLY valid JSON matching the ScoutOutput schema "
-                            "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
+                            "(resources/contracts/schemas/scout_output_v2.json). Exact shape:\n\n"
                             "{\n"
                             '  \"id\": \"uuid\",\\n'
                             f'  \"scout_type\": \"{self.scout_type}\",\\n'
@@ -1112,8 +1137,8 @@ class Scout(ABC):
                             '  \"target_users\": \"string\",\\n'
                             '  \"why_now\": \"string\",\\n'
                             '  \"confidence\": number between 0 and 1,\\n'
-                            '  \"primary_thesis\": \"string (concise: why investable from your lens)\",\\n'
-                            '  \"key_assumptions\": [\"string\", \"string\", ...],  // exactly 2-4 assumptions\\n'
+                            '  "unknowns": ["factual information unavailable from sources"],\n'
+                            '  "contradictions": ["conflicting factual claims with source references"],\n'
                             '  \"biggest_unknown\": \"string (single largest risk or uncertainty)\",\\n'
                             '  \"funding_stage\": \"Pre-Seed\" | \"Seed\" | \"Series A\" | \"Series B\" | \"Series C+\" | \"Unknown\" | null,\\n'
                             '  \"est_tam\": \"string\" | null,\\n'
@@ -1319,7 +1344,7 @@ class Scout(ABC):
                     else ""
                 )
                 + "Output ONLY valid JSON matching the ScoutOutput schema "
-                "(resources/contracts/schemas/scout_output_v1.json). Exact shape:\n\n"
+                "(resources/contracts/schemas/scout_output_v2.json). Exact shape:\n\n"
                 "{\n"
                 # `id` is deliberately absent: it is minted server-side in
                 # `_normalize_scout_ids_inplace` before validation. Asking the
@@ -1334,8 +1359,8 @@ class Scout(ABC):
                 '  "target_users": "string",\n'
                 '  "why_now": "string",\n'
                 '  "confidence": number between 0 and 1,\n'
-                '  "primary_thesis": "string",\n'
-                '  "key_assumptions": ["string", "string"],\n'
+                '  "unknowns": ["factual information unavailable from sources"],\n'
+                '  "contradictions": ["conflicting factual claims with source references"],\n'
                 '  "biggest_unknown": "string",\n'
                 '  "funding_stage": "Pre-Seed" | "Seed" | "Series A" | "Series B" | "Series C+" | "Unknown" | null,\n'
                 '  "est_tam": "string" | null,\n'
@@ -1358,7 +1383,7 @@ class Scout(ABC):
                 "If the evidence appears to point to a different company identity than requested, return nothing. "
                 "If confidence is low or data is incomplete, still return best-effort fields and set unknowns to null. "
                 "Mine retrieved snippets for TAM/market sizing language, funding rounds and investors, customer or usage claims, and founder/executive names—reflect them in the narrative fields. "
-                "Prefer est_tam as an order-of-magnitude when inferable from sources; put supported traction facts in problem/solution/why_now. "
+                "Use est_tam only for a source-reported figure, never infer it; put supported traction facts in problem/solution/why_now. "
                 "You MUST include every top-level key from the schema (name through references); never return a partial object. "
                 "Do not invent references. Output only JSON."
             )
@@ -1502,7 +1527,7 @@ class Scout(ABC):
         if data is None:
             return None
         try:
-            return validate_scout_output(data)
+            return factual_scout_payload(data)
         except Exception as e:
             self.logger.error(f"Company lookup validation failed: {e}")
             return None

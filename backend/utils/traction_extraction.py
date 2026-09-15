@@ -78,6 +78,14 @@ def extract_traction_facts(payload: Dict[str, Any]) -> Optional[Dict[str, str]]:
     never looked" distinguishable downstream.
     """
     text = "\n".join(_iter_snippets(payload))
+    company = str(payload.get("name") or "").strip(" -–—")
+    if company:
+        # Founder profiles also describe universities and former employers.
+        # Only statements whose grammatical subject is this company can supply
+        # its firmographics; unrelated first regex hits are not company facts.
+        subject = re.compile(r"\b" + re.escape(company) + r"\s+(?:has|have|employs|is|was|raised|reports|reported)\b", re.I)
+        text = "\n".join(sentence for sentence in re.split(r"[.!?]\s+|\n+", text)
+                         if subject.search(sentence))
     if not text.strip():
         return None
 

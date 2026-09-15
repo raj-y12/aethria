@@ -450,8 +450,8 @@ def _profile_matches_anchor(
     # name the company at all, which was the larger share of the pollution.
     if not anchor_host:
         return True
-    text = f"{source.title} {source.snippet}"
-    return _text_name_match(company, text) >= 1.0
+    from utils.source_corroboration import source_mentions_company
+    return source_mentions_company(source.model_dump(), company_name=company, anchor_host=anchor_host)
 
 
 def _founder_sources(
@@ -536,6 +536,7 @@ def _build_queries(company: str, *, phase: int, website_hint: Optional[str]) -> 
 
 
 def _extract_founders(sources: List[EvidenceSource], *, company: str = "") -> List[str]:
+    from resolver.founder_resolver import _is_person_name
     target_compact = _compact_name(company) if company else ""
     found: List[str] = []
     for src in sources:
@@ -557,7 +558,7 @@ def _extract_founders(sources: List[EvidenceSource], *, company: str = "") -> Li
                     if name.lower() in _FOUNDER_NAME_REJECT:
                         continue
                     name = re.sub(r"^(?:and|&|,|;|:)\s+", "", name, flags=re.IGNORECASE)
-                    if len(name.split()) < 2:
+                    if not _is_person_name(name):
                         continue
                     if name not in found:
                         found.append(name)
@@ -821,6 +822,17 @@ def _compute_missing_fields(resolution: CompanyResolution) -> List[str]:
     return missing
 
 
+def website_hint_conflicts(resolution: CompanyResolution, website_hint: Optional[str]) -> bool:
+    """A typed domain is a hint, not proof against a retrieved competing identity."""
+    anchor = hostname_from_user_hint(website_hint)
+    if not anchor:
+        return False
+    confirmed = any(s.source_type == "official_site" and s.match_score >= 0.55
+        and registrable_domain(_host_of(s.url)) == registrable_domain(anchor)
+        for s in resolution.evidence_sources)
+    return not confirmed and any(a.match_score >= 0.55 for a in resolution.alternative_matches)
+
+
 def _assign_status(resolution: CompanyResolution, *, website_hint: Optional[str]) -> str:
     """
     FOUND          strong identity (high confidence, canonical anchors)
@@ -854,7 +866,7 @@ def _assign_status(resolution: CompanyResolution, *, website_hint: Optional[str]
     # one -- two same-named-but-different companies routinely land in that
     # band. Use the same 0.55 bar identity anchors are qualified against.
     strong_alternatives = [a for a in resolution.alternative_matches if a.match_score >= 0.55]
-    if strong_alternatives and not website_hint:
+    if strong_alternatives and (not website_hint or website_hint_conflicts(resolution, website_hint)):
         return "NEEDS_REVIEW"
 
     if resolution.confidence >= 0.7:
@@ -939,7 +951,7 @@ def _build_candidates(
         )
 
     # A user-provided website hint pins exactly one company.
-    if website_hint:
+    if website_hint and not website_hint_conflicts(resolution, website_hint):
         anchor = registrable_domain(hostname_from_user_hint(website_hint) or "")
         if anchor:
             pinned = [c for c in candidates if registrable_domain(_host_of(c.website)) == anchor]

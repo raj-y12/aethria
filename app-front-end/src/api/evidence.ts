@@ -106,7 +106,7 @@ export type ClaimCorrectionInput = {
 
 export async function fetchEvidenceLedger(opportunityId: string): Promise<EvidenceLedger> {
   const response = await apiRequest<EvidenceLedgerResponse>(
-    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evidence`,
+    `/api/opportunities/${encodedId(opportunityId, 'opportunityId')}/evidence?view=${import.meta.env.DEV ? 'full' : 'analyst'}`,
   );
   return {
     artifacts: response.artifacts ?? [],

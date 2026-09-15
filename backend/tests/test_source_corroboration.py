@@ -15,6 +15,18 @@ from utils.source_corroboration import (
 
 _ANCHOR = "acme.com"
 
+
+@pytest.mark.parametrize("slug", ["assiduous-solutions", "assiduous-infotech", "assiduous-distributor", "assiduous-home-care"])
+def test_similar_profile_name_does_not_establish_company_identity(slug):
+    assert not source_mentions_company({"url": f"https://linkedin.com/company/{slug}",
+        "title": slug.replace("-", " ").title(), "snippet": "Founded 1962. 1,000 employees."},
+        company_name="Assiduous", anchor_host="assiduous.tech")
+
+
+def test_domain_slug_in_unrelated_url_is_not_company_evidence():
+    assert not source_mentions_company({"url": "https://assiduoussolutions.com", "title": "Home", "snippet": "Services"},
+        company_name="Assiduous", anchor_host="assiduous.tech")
+
 _HOME = {"title": "Acme — Home", "url": "https://acme.com/", "snippet": "We build things."}
 _TEAM = {"title": "Acme — Team", "url": "https://acme.com/team", "snippet": "Our team."}
 _SUB = {"title": "Acme blog", "url": "https://blog.acme.com/post", "snippet": "News."}

@@ -63,6 +63,21 @@ class _Repository:
         )
 
 
+@pytest.mark.asyncio
+async def test_raw_website_hint_cannot_override_conflicting_retrieved_identity():
+    repo = _Repository()
+    result = await IdentityService(repo).admit(SourceObservationInput(
+        user_id="fund-a", channel="manual_lookup", observed_name="Assiduous",
+        observed_domain="assiduous.ai", source_metadata={"operator_confirmed_identity": True},
+        resolution_payload={"query": "Assiduous", "canonical_name": "Assiduous",
+            "website": "https://assiduous.ai", "confidence": 0.9,
+            "alternative_matches": [{"name": "Assiduous", "website": "https://assiduous.tech", "match_score": 1.0, "reason": "competing domain"}],
+            "candidates": [{"name": "Assiduous", "website": "https://assiduous.tech", "confidence": 1.0}]},
+    ))
+    assert result.blocks_evaluation
+    assert not any(call[0] == "create" for call in repo.calls)
+
+
 def _observation(**overrides):
     values = {
         "user_id": "fund-a",

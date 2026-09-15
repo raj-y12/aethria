@@ -36,6 +36,39 @@ function scoring(overrides: Partial<StructuredScoring> = {}): StructuredScoring 
 }
 
 describe('AssessmentScorecard accessibility and robustness', () => {
+  it('explains a constrained Reviewer proposal without exposing lineage identifiers', () => {
+    render(<AssessmentScorecard
+      dimensions={DIMENSIONS} scoring={scoring()} reviewerRows={[]}
+      reviewerConsensus={{ min: null, max: null, spread: null, split: false }}
+      canonicalCriteria={[{
+        criterion_assessment_id: 'internal-criterion', criterion: 'market', score: 6,
+        confidence: 0.6, evidence_sufficiency: 'partial', reasoning: 'Demand is promising.',
+        supporting_claim_ids: ['internal-claim'], contradicting_claim_ids: [],
+        missing_evidence: [], quality_flags: [],
+        deterministic_adjustments: { change_from_prior_review: {
+          previous_score: 5, previous_reasoning: 'Demand had not been independently observed.',
+          score_changed: true, reasoning_changed: true,
+        }, assessment_validation: {
+          reviewer_assessment_id: 'internal-assessment', proposed_score: 8, validated_score: 6,
+          score_status: 'CAPPED', cap_reason: 'Limited independent market evidence.',
+          contradiction_status: 'PRESENT',
+        } },
+      }]}
+    />);
+    fireEvent.click(screen.getByRole('button', { name: /Market/ }));
+    expect(screen.getByText('Reviewer assessment: 8.0/10. Validated: 6.0/10.')).toBeInTheDocument();
+    expect(screen.getByText('Limited independent market evidence.')).toBeInTheDocument();
+    expect(screen.getByText('Conflicting evidence requires diligence.')).toBeInTheDocument();
+    expect(screen.getByText('Previous review: 5.0/10.')).toBeInTheDocument();
+    expect(screen.getByText('Previous reasoning: Demand had not been independently observed.')).toBeInTheDocument();
+    expect(screen.queryByText(/lowest eligible policy anchor/)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('internal-assessment');
+    expect(document.body.textContent).not.toContain('internal-claim');
+    fireEvent.click(screen.getByRole('button', { name: 'How this was scored' }));
+    expect(screen.getByText(/Reviewer proposes each dimension score/)).toBeInTheDocument();
+    expect(screen.queryByText(/anchors low/)).not.toBeInTheDocument();
+  });
+
   it('links each expandable dimension button to its detail panel via aria-controls', () => {
     const structured = scoring({
       market: dimension({ reasoning: ['A specific reason the score landed here.'] }),
@@ -178,10 +211,12 @@ describe('AssessmentScorecard accessibility and robustness', () => {
 
     expect(screen.getByText('Not scored')).toBeInTheDocument();
     expect(screen.getByText(/Decision blocked by evidence/)).toBeInTheDocument();
+    expect(screen.getByText(/Incomplete evidence/)).toBeInTheDocument();
+    expect(screen.queryByText(/Strong evidence/)).not.toBeInTheDocument();
     expect(screen.getByText(/No headline score is shown because required evidence is missing/)).toBeInTheDocument();
   });
 
-  it('names the active canonical rubric and fixed anchors in the method ledger', () => {
+  it('explains historical scoring without exposing internal rubric identifiers', () => {
     render(
       <AssessmentScorecard
         dimensions={DIMENSIONS}
@@ -193,7 +228,8 @@ describe('AssessmentScorecard accessibility and robustness', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'How this was scored' }));
-    expect(screen.getByText('Rubric: 2.0; anchors low 3, mid 5, high 8.')).toBeInTheDocument();
+    expect(screen.getByText(/Historical evidence-based scoring/)).toBeInTheDocument();
+    expect(screen.queryByText(/Rubric: 2.0/)).not.toBeInTheDocument();
   });
 });
 

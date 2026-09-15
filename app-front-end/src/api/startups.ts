@@ -49,6 +49,11 @@ export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionVi
   return {
     id: opportunity.legacy_startup_id ?? opportunity.opportunity_id,
     canonical_opportunity_id: opportunity.opportunity_id,
+    frontend_projection: {
+      source: 'CANONICAL_DECISION_VIEW',
+      original_recommended_state: opportunity.recommended_state ?? null,
+      recommendation_mapping: 'pass -> PASS; every other state -> MONITOR',
+    },
     scout: {
       id: opportunity.opportunity_id,
       scout_type: 'canonical',
@@ -61,6 +66,12 @@ export function canonicalOpportunityToStartup(opportunity: OpportunityDecisionVi
     },
     partner: {
       recommendation: partnerRecommendation,
+      provenance: {
+        original_recommendation_origin: 'CANONICAL_EVALUATION',
+        recommendation_origin: 'PARTNER_CANONICAL_MAPPING',
+        canonical_recommendation: opportunity.recommended_state ?? null,
+        mapped_recommendation: partnerRecommendation,
+      },
       confidence: opportunity.recommendation_confidence ?? undefined,
       decision_drivers: opportunity.decision_drivers ?? [],
       risks: opportunity.principal_risks ?? [],

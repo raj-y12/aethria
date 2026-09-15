@@ -35,6 +35,20 @@ const brief: MemoDecisionBriefModel = {
 };
 
 describe('MemoDecisionBrief', () => {
+  it('keeps long source excerpts behind an expandable control', () => {
+    render(<MemoDecisionBrief brief={{ ...brief, claims: [{ ...brief.claims[0],
+      claim: 'Retrieved source text. '.repeat(40),
+    }] }} />);
+    const disclosure = screen.getByText('Read source excerpt').closest('details');
+    expect(disclosure).not.toHaveAttribute('open');
+    expect(screen.getByRole('link', { name: 'Customer renewal register' })).toBeVisible();
+  });
+  it('attributes new analysis risks to the review and evidence checks', () => {
+    render(<MemoDecisionBrief brief={{ ...brief, leanProvenance: 'partner-judgment' }} />);
+    const risk = screen.getByText('Expansion requires regulatory approval.').closest('li');
+    expect(within(risk!).getByText('Review and evidence checks')).toBeInTheDocument();
+    expect(within(risk!).queryByText('Rule-derived')).not.toBeInTheDocument();
+  });
   it('presents the evidence-coverage region right before the ruling — no lean, mandate, or reviewer tiles', () => {
     render(<MemoDecisionBrief brief={brief} />);
 

@@ -11,7 +11,7 @@ import unicodedata
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from people.models import PersonDraft, PersonHistoryDraft, PersonIdentifierDraft
-from resolver.founder_resolver import FounderCandidate, FounderResolution
+from resolver.founder_resolver import FounderCandidate, FounderResolution, is_non_person_label
 
 
 def normalize_person_name(value: str) -> str:
@@ -59,6 +59,8 @@ def canonicalize_founder_resolution(resolution: FounderResolution, *, company_id
     drafts: list[PersonDraft] = []
     for candidate in resolution.founders:
         name = " ".join(str(candidate.name or "").split())
+        if is_non_person_label(name):
+            continue
         normalized = normalize_person_name(name)
         evidence_urls = tuple(sorted({item.url for item in candidate.evidence if str(item.url or "").strip()}))
         identifiers = [item for item in (

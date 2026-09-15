@@ -15,6 +15,15 @@ from utils.adapters import scout_output_to_scout_info
 from utils.traction_extraction import extract_traction_facts, render_traction_facts
 
 
+def test_company_facts_do_not_come_from_founder_education_or_other_employers():
+    payload = {"name": "Assiduous", "founder_resolution": {"founders": [{"evidence": [{"snippet":
+        "Assiduous consulting ltd is a consulting company.\n"
+        "Ahmadu Bello University has 1,000-2,000 employees, founded in 1962.\n"
+        "Assiduous has 1-10 employees, founded in 2023."}]}]}}
+    facts = extract_traction_facts(payload)
+    assert facts == {"employees": "1-10", "founded": "2023"}
+
+
 # --- the identifier is ours, never the model's -----------------------------
 
 

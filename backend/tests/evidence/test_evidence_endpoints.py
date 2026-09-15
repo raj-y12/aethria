@@ -5,6 +5,18 @@ from types import SimpleNamespace
 from security.rate_limiter import InMemorySecurityStore
 
 
+def test_analyst_evidence_view_keeps_restricted_sources_private(monkeypatch):
+    repo = _Repository()
+    client = _client(monkeypatch, repo)
+    response = client.get("/api/opportunities/opp-1/evidence?view=analyst", headers={"Authorization": "Bearer test"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["artifacts"][0]["source_uri"] is None
+    assert "storage_reference" not in str(body)
+    assert "evidence_plans" not in body
+    assert repo.calls[0][1]["user_id"] == "user-a"
+
+
 class _Repository:
     def __init__(self):
         self.calls = []

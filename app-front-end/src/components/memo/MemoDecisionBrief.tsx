@@ -73,7 +73,7 @@ export default function MemoDecisionBrief({
                       <div className="memoDecisionRiskMeta">
                         <span>{risk.kind === 'risk' ? 'Risk' : 'Gap'}</span>
                         <span>{risk.severity}</span>
-                        <span>Rule-derived</span>
+                        <span>{brief.leanProvenance === 'partner-judgment' ? 'Review and evidence checks' : 'Rule-derived'}</span>
                       </div>
                       <p>{risk.text}</p>
                     </li>
@@ -89,7 +89,12 @@ export default function MemoDecisionBrief({
               <ul>
                 {brief.claims.map((claim) => (
                   <li key={`${claim.claimId}-${claim.relationship}`}>
-                    <p>{claim.claim}</p>
+                    {claim.claim.length > 400 ? (
+                      <details>
+                        <summary>Read source excerpt</summary>
+                        <p>{claim.claim}</p>
+                      </details>
+                    ) : <p>{claim.claim}</p>}
                     <span className="memoDecisionProvenanceMeta">
                       <span>{claim.criterion.replace(/_/g, ' ')}</span>
                       <span>{claim.relationship === 'supports' ? 'Supports' : 'Contradicts'}</span>

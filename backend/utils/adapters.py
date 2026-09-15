@@ -79,6 +79,8 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         primary_thesis=scout_output.get("primary_thesis"),
         key_assumptions=scout_output.get("key_assumptions"),
         biggest_unknown=scout_output.get("biggest_unknown"),
+        unknowns=scout_output.get("unknowns") or [],
+        contradictions=scout_output.get("contradictions") or [],
         funding_stage=scout_output.get("funding_stage"),
         location=(str(scout_output.get("location") or "").strip() or None),
         est_tam=scout_output.get("est_tam"),

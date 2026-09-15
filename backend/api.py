@@ -312,7 +312,7 @@ from authority.service import AuthorityService
 from identity.repository import IdentityRepository
 from identity.service import IdentityService
 from evidence.repository import EvidenceRepository
-from evaluation_v2.repository import EvaluationRepository
+from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
@@ -1765,6 +1765,7 @@ def _partner_dict_for_frontend(partner: dict) -> dict:
         "llm_fallback_reason": partner.get("llm_fallback_reason"),
         "prompt_version": partner.get("prompt_version"),
         "decision_drivers": partner.get("decision_drivers") or [],
+        "provenance": partner.get("provenance"),
     }
 
 
@@ -1775,8 +1776,19 @@ def _enrich_review_for_api_payload(review: Dict[str, Any]) -> Dict[str, Any]:
 
 def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> dict:
     """Transform backend startup dict to app-front-end Startup shape."""
+    from compatibility_projection import legacy_projection_provenance
+    from resolver.founder_resolver import is_non_person_label
+
     sid = raw.get("startup_id", "")
-    scout = raw.get("scout_info") or {}
+    scout = dict(raw.get("scout_info") or {})
+    scout["founder_names"] = [name for name in scout.get("founder_names") or [] if not is_non_person_label(name)]
+    if isinstance(scout.get("company_resolution"), dict):
+        scout["company_resolution"] = {**scout["company_resolution"], "founder_names": [
+            name for name in scout["company_resolution"].get("founder_names") or [] if not is_non_person_label(name)]}
+    if isinstance(scout.get("founder_resolution"), dict):
+        scout["founder_resolution"] = {**scout["founder_resolution"], "founders": [
+            item for item in scout["founder_resolution"].get("founders") or []
+            if not is_non_person_label(item.get("name") or "")]}
     review = raw.get("review_info")
     partner = raw.get("partner_info")
 
@@ -1841,6 +1853,7 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
         "conviction_state": raw.get("conviction_state"),
         "financials": raw.get("financials") if isinstance(raw.get("financials"), dict) else None,
         "agent_trace": raw.get("agent_trace"),
+        "projection_provenance": legacy_projection_provenance(raw),
         "unresolved_at": _to_iso(raw.get("unresolved_at")),
         "is_new_to_user": raw.get("acknowledged_at") is None and not _startup_has_human_ruling(raw),
         "changed_since_last_visit": _is_after(raw.get("updated_at"), last_seen_at),
@@ -3512,6 +3525,9 @@ def _resolve_status_for(resolution, website_hint: Optional[str]) -> str:
     candidates = list(getattr(resolution, "candidates", []) or [])
     if resolution.resolution_status == "NOT_FOUND" or not candidates:
         return "not_found"
+    from resolver.company_resolver import website_hint_conflicts
+    if website_hint_conflicts(resolution, website_hint):
+        return "ambiguous"
     if (website_hint or "").strip():
         return "resolved"
     strong = sum(1 for c in candidates if c.confidence >= _AMBIGUOUS_MIN_CONFIDENCE)

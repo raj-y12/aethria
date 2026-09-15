@@ -21,7 +21,7 @@ from pipeline_state import pipeline_stage_log, upsert_pipeline_state
 from agent_trace import handoff_quality_from_trace
 from compatibility_projection import project_scout_for_runtime
 from evaluation_v2.prerequisites import EvaluationPrerequisites
-from models import EvaluationManifestIdentity
+from models import EvaluationManifestIdentity, PartnerProvenance
 from pipeline_execution import StageExecutionResult
 
 
@@ -322,6 +322,7 @@ class PartnerEngine:
         canonical_recommendation: Optional[str] = None,
         canonical_criteria: Optional[List[Dict[str, Any]]] = None,
         canonical_confidence: Optional[float] = None,
+        canonical_evaluation_provenance: Optional[Dict[str, Any]] = None,
     ) -> Tuple[bool, Optional[Dict[str, Any]]]:
         """
         Run partner decision, validate JSON, write to Supabase, update pipeline state.
@@ -343,6 +344,7 @@ class PartnerEngine:
             canonical_criteria=canonical_criteria,
             canonical_confidence=canonical_confidence,
         )
+        decision_recommendation = decision.get("recommendation")
         from contradiction_gate import apply_contradiction_gate
         partner_guard = apply_contradiction_gate(
             user_id=(getattr(self, "tenant_user_id", None) or uid or ""),
@@ -350,6 +352,7 @@ class PartnerEngine:
             canonical_context=review_output.get("canonical_context_snapshot"),
         )
         decision = dict(partner_guard["guarded_review"])
+        guarded_recommendation = decision.get("recommendation")
         decision["contradiction_guard"] = partner_guard
         persisted_prompt_version = str(decision.get("prompt_version") or "").strip()
         captured_prompt_version = str(
@@ -445,6 +448,46 @@ class PartnerEngine:
         partner_info = partner_output_to_partner_info(decision)
         partner_info.partner_agent_id = self.agent_id
         partner_info.contradiction_guard = partner_guard
+        # Attach after validation: audit metadata must never enter the model's
+        # JSON contract or influence the decision/repair path.
+        mapped_recommendation = PartnerDecisionEngine._recommendation_from_canonical_state(
+            canonical_recommendation
+        )
+        evaluation_lineage = canonical_evaluation_provenance or {}
+        partner_info.provenance = PartnerProvenance(
+            evaluation_run_id=evaluation_lineage.get("evaluation_run_id"),
+            evidence_snapshot_hash=evaluation_lineage.get("evidence_snapshot_hash"),
+            policy_version=evaluation_lineage.get("policy_version"),
+            source_evaluation_pipeline_run_id=evaluation_lineage.get("pipeline_run_id"),
+            original_recommendation_origin=(
+                "CANONICAL_EVALUATION" if canonical_recommendation is not None else "UNKNOWN_LEGACY"
+            ),
+            recommendation_origin=(
+                "PARTNER_CANONICAL_MAPPING" if mapped_recommendation is not None
+                else "DETERMINISTIC_PARTNER"
+            ),
+            canonical_recommendation=canonical_recommendation,
+            mapped_recommendation=mapped_recommendation,
+            decision_recommendation=decision_recommendation,
+            partner_recommendation=partner_info.recommendation,
+            policy_changed_recommendation=(
+                decision_recommendation != mapped_recommendation
+                if mapped_recommendation is not None else None
+            ),
+            guard_changed_recommendation=guarded_recommendation != decision_recommendation,
+            validation_changed_recommendation=partner_info.recommendation != guarded_recommendation,
+            canonical_scores={
+                str(item["criterion"]): item.get("score")
+                for item in (canonical_criteria or [])
+                if isinstance(item, dict) and item.get("criterion")
+            },
+            canonical_confidence=canonical_confidence,
+            partner_rules_version=getattr(getattr(self.decision_engine, "_rules", None), "version", None),
+            # The active canonical mapping does not call an LLM. Configured
+            # model names are not evidence of an executed model invocation.
+            partner_model=None,
+            human_review_required=partner_info.human_review_required,
+        )
 
         try:
             persist_kwargs: Dict[str, Any] = {"pipeline_run_id": pr}
@@ -609,6 +652,7 @@ class PartnerEngine:
                         if canonical_evaluation is not None
                         else None
                     ),
+                    canonical_evaluation_provenance=canonical_evaluation.get("provenance"),
                     canonical_criteria=(
                         canonical_evaluation.get("criteria")
                         if canonical_evaluation is not None
@@ -744,6 +788,7 @@ class PartnerEngine:
         canonical_recommendation: Optional[str] = None,
         canonical_criteria: Optional[List[Dict[str, Any]]] = None,
         canonical_confidence: Optional[float] = None,
+        canonical_evaluation_provenance: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
         Make a partner decision for one specific startup id.
@@ -790,6 +835,7 @@ class PartnerEngine:
                 canonical_recommendation=canonical_recommendation,
                 canonical_criteria=canonical_criteria,
                 canonical_confidence=canonical_confidence,
+                canonical_evaluation_provenance=canonical_evaluation_provenance,
             )
             if success and decision:
                 from utils.adapters import partner_output_to_partner_info
@@ -852,36 +898,11 @@ class PartnerEngine:
 
 
 async def main():
-    """
-    Main entry point for running the Partner engine.
-    Reads configuration from environment variables.
-    """
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    """Historical scoring engines are replay helpers, not live worker entrypoints."""
+    raise RuntimeError(
+        "legacy_analysis_entrypoint_retired: use backend/run_system.py --user-id=<tenant> "
+        "or the authenticated opportunity evaluation API"
     )
-    
-    # Get configuration from environment
-    storage_path = os.getenv("STORAGE_PATH", "data/startups.json")
-    partner_interval = int(os.getenv("PARTNER_INTERVAL_SECONDS", "30"))
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    
-    # Initialize
-    from utils.storage import Storage
-    storage = Storage(file_path=storage_path)
-    engine = PartnerEngine(
-        storage=storage,
-        interval_seconds=partner_interval,
-        use_llm_fallback=use_llm_fallback,
-    )
-    
-    try:
-        await engine.run_forever()
-    except KeyboardInterrupt:
-        engine.stop()
-        logger.info("Partner engine stopped")
 
 
 if __name__ == "__main__":

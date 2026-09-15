@@ -12,6 +12,7 @@ import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
 import ReviewerPanel from './scoring/ReviewerPanel';
 import MemoMasthead from './memo/MemoMasthead';
+import PipelineProvenanceInspector from './memo/PipelineProvenanceInspector';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
 import MemoSectionTitle from './memo/MemoSectionTitle';
@@ -220,7 +221,7 @@ function InvestmentMemoContent(
   // Shared with OpportunityIntelligence below — same React Query keys, so this
   // is one fetch, not two, and the masthead verdict can never drift from the
   // decision workspace's canonical state.
-  const { brief: mastheadBrief, evaluation: canonicalEvaluation } = useMemoDecisionBrief(displayStartup?.id ?? '');
+  const { brief: mastheadBrief, evaluation: canonicalEvaluation, evidence: canonicalEvidence } = useMemoDecisionBrief(displayStartup?.id ?? '');
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
 
@@ -508,6 +509,16 @@ function InvestmentMemoContent(
             }
             readOnly={readOnly}
           />
+
+          {import.meta.env.DEV && (
+            <PipelineProvenanceInspector
+              startup={displayStartup}
+              evaluation={canonicalEvaluation}
+              evidence={canonicalEvidence}
+              brief={mastheadBrief}
+              scorecardEnabled={config.memo.includeScoreReasoning}
+            />
+          )}
 
           {memoPipeline === 'failed' && (
             <div className="memoGateStrip memoGateStrip--error">

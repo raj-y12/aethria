@@ -2,6 +2,7 @@ import type { LookupResultSnapshotProps } from '@aethria/product-chrome';
 import type { EvaluationRecord } from '../api/evaluations';
 import type { Startup } from '../types/startup';
 import { canonicalCriteriaToStructuredScoring } from './canonicalScoring';
+import { partnerRecommendationLabel } from './recommendationSemantics';
 import { badgeTextColorForBackground, DEFAULT_VERDICT_BADGES, type VerdictBadgeConfig } from './fundConfiguration';
 
 const DIMENSION_KEYS = ['market', 'execution', 'product', 'technical', 'defensibility'] as const;
@@ -65,7 +66,7 @@ export function buildLookupSnapshotProps(
   // Lead with the partner recommendation (INVEST / MONITOR / PASS) — the decision,
   // not the reviewer quality band (STRONG/MEDIUM/WEAK). Fall back to band, then status.
   const recommendation = startup.partner?.recommendation;
-  const verdict = recommendation ? `${recommendation}.` : 'REVIEWING.';
+  const verdict = recommendation ? `${partnerRecommendationLabel(startup.partner)?.toUpperCase()}.` : 'REVIEWING.';
 
   // Filled chip, matching DecisionBadge: configured colour is the fill,
   // with a computed contrasting ink for readability.

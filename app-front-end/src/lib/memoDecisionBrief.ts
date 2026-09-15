@@ -16,7 +16,7 @@ export type MemoDecisionBriefStatus =
   | 'blocked'
   | 'recorded'
   | 'unavailable';
-export type MemoDecisionBriefLean = 'advance' | 'monitor' | 'pass' | 'none';
+export type MemoDecisionBriefLean = 'advance' | 'monitor' | 'pass' | 'more_diligence' | 'none';
 export type MemoMandate = 'conflicted' | 'unknown';
 export type MemoEvidenceCoverage = 'sufficient' | 'missing' | 'contradictory' | 'unknown';
 export type MemoReviewerAgreement = 'consistent' | 'contested' | 'unknown';
@@ -61,7 +61,7 @@ export interface MemoRiskGap {
 export interface MemoDecisionBrief {
   status: MemoDecisionBriefStatus;
   lean: MemoDecisionBriefLean;
-  leanProvenance: 'rule-derived' | 'missing';
+  leanProvenance: 'rule-derived' | 'partner-judgment' | 'missing';
   mandate: MemoMandate;
   coverage: MemoEvidenceCoverage;
   agreement: MemoReviewerAgreement;
@@ -266,6 +266,11 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
       const sources = (sourcesByClaim.get(claimId) ?? [])
         .filter((source) => source.link.relationship === relationship);
       const memoSources = toMemoSources(sources);
+      const existing = claims.find((item) => item.claimId === claimId && item.relationship === relationship);
+      if (existing) {
+        existing.criterion = [...new Set([...existing.criterion.split(', '), criterion.criterion])].join(', ');
+        continue;
+      }
       claims.push({
         claimId,
         claim: claim.display_text,
@@ -286,7 +291,9 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
 
   const coverage = coverageFor(evaluation);
   const recommendation = evaluation.recommendation;
-  const lean = leanFor(recommendation?.recommended_state);
+  const lean = evaluation.provenance?.recommendation_origin === 'PARTNER_ANALYSIS'
+    && recommendation?.recommended_state === 'insufficient_evidence'
+    ? 'more_diligence' : leanFor(recommendation?.recommended_state);
   const blocked = coverage === 'missing' || coverage === 'contradictory';
   const ruling = input.ruling
     ? {
@@ -300,7 +307,9 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
   return {
     status: blocked ? 'blocked' : ruling ? 'recorded' : 'ready_for_ruling',
     lean,
-    leanProvenance: recommendation ? 'rule-derived' : 'missing',
+    leanProvenance: recommendation
+      ? evaluation.provenance?.recommendation_origin === 'PARTNER_ANALYSIS' ? 'partner-judgment' : 'rule-derived'
+      : 'missing',
     mandate: recommendation?.mandate_conflicts.length ? 'conflicted' : 'unknown',
     coverage,
     agreement: 'unknown',
@@ -324,6 +333,7 @@ export const MEMO_LEAN_LABELS: Record<MemoDecisionBriefLean, string> = {
   advance: 'Advance',
   monitor: 'Monitor',
   pass: 'Pass',
+  more_diligence: 'More diligence',
   none: 'No system lean',
 };
 

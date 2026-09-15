@@ -1,0 +1,1885 @@
+{
+  "A_strong_verified": {
+    "rationale": "Verified high anchors map advance to INVEST; IC review remains required.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "A_strong_verified-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified market evidence for synthetic startup A_strong_verified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "A_strong_verified-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified product evidence for synthetic startup A_strong_verified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "A_strong_verified-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified technical evidence for synthetic startup A_strong_verified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "A_strong_verified-execution",
+          "claim_type": "execution",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified execution evidence for synthetic startup A_strong_verified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "A_strong_verified-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup A_strong_verified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "A_strong_verified-market",
+          "evidence_item_id": "source-A_strong_verified-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "A_strong_verified-product",
+          "evidence_item_id": "source-A_strong_verified-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "A_strong_verified-technical",
+          "evidence_item_id": "source-A_strong_verified-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "A_strong_verified-execution",
+          "evidence_item_id": "source-A_strong_verified-execution",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "A_strong_verified-defensibility",
+          "evidence_item_id": "source-A_strong_verified-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "facac79c1e9fa160f0bec7b0d73172403f13a663e44914d910e63cb7c0e2d22f",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified market evidence for synthetic startup A_strong_verified.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "A_strong_verified-market"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "product",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified product evidence for synthetic startup A_strong_verified.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "A_strong_verified-product"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "technical",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified technical evidence for synthetic startup A_strong_verified.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "A_strong_verified-technical"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "execution",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified execution evidence for synthetic startup A_strong_verified.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "A_strong_verified-execution"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "defensibility",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified defensibility evidence for synthetic startup A_strong_verified.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "A_strong_verified-defensibility"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "state": "advance",
+        "attention_priority": 80,
+        "confidence": 0.9,
+        "decision_drivers": [
+          "market",
+          "product",
+          "technical"
+        ],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [],
+        "change_conditions": [],
+        "human_review_required": false,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "INVEST",
+      "canonical_recommendation": "advance",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 9,
+      "decision_rationale": "Canonical evaluation recommends advance; Partner applied no secondary score threshold.",
+      "decision_drivers": [
+        "canonical_advance"
+      ],
+      "next_action": "Request Cap Table",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "B_strong_looking_unverified": {
+    "rationale": "High legacy scores cannot rescue unverified source evidence.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "B_strong_looking_unverified-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified market evidence for synthetic startup B_strong_looking_unverified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified product evidence for synthetic startup B_strong_looking_unverified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified technical evidence for synthetic startup B_strong_looking_unverified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-execution",
+          "claim_type": "execution",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified execution evidence for synthetic startup B_strong_looking_unverified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup B_strong_looking_unverified.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "B_strong_looking_unverified-market",
+          "evidence_item_id": "source-B_strong_looking_unverified-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "unverified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-product",
+          "evidence_item_id": "source-B_strong_looking_unverified-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "unverified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-technical",
+          "evidence_item_id": "source-B_strong_looking_unverified-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "unverified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-execution",
+          "evidence_item_id": "source-B_strong_looking_unverified-execution",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "unverified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "B_strong_looking_unverified-defensibility",
+          "evidence_item_id": "source-B_strong_looking_unverified-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "unverified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "84abc9cb7e1d611a77250cb276c6899122c5fb155b03f2ac85f6615fc5a5a76a",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "market"
+          ],
+          "quality_flags": [
+            "no_eligible_supporting_evidence"
+          ],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "product",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "product"
+          ],
+          "quality_flags": [
+            "no_eligible_supporting_evidence"
+          ],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "technical",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "technical"
+          ],
+          "quality_flags": [
+            "no_eligible_supporting_evidence"
+          ],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "execution",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "execution"
+          ],
+          "quality_flags": [
+            "no_eligible_supporting_evidence"
+          ],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "defensibility",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "defensibility"
+          ],
+          "quality_flags": [
+            "no_eligible_supporting_evidence"
+          ],
+          "deterministic_adjustments": {}
+        }
+      ],
+      "recommendation": {
+        "state": "insufficient_evidence",
+        "attention_priority": 0,
+        "confidence": 0.0,
+        "decision_drivers": [],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [
+          "market",
+          "product",
+          "technical",
+          "execution",
+          "defensibility"
+        ],
+        "change_conditions": [
+          "Resolve missing evidence: market",
+          "Resolve missing evidence: product",
+          "Resolve missing evidence: technical",
+          "Resolve missing evidence: execution",
+          "Resolve missing evidence: defensibility"
+        ],
+        "human_review_required": true,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "insufficient_evidence",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 1,
+      "decision_rationale": "Canonical evaluation is blocked by insufficient evidence for defensibility, execution, market, product, technical; Partner did not calculate a substitute score.",
+      "decision_drivers": [
+        "canonical_insufficient_evidence",
+        "missing_defensibility",
+        "missing_execution",
+        "missing_market",
+        "missing_product",
+        "missing_technical"
+      ],
+      "next_action": "1) Human review required\n2) monitor closely",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "C_contradictory": {
+    "rationale": "A scored market with a contradicting source blocks the recommendation.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "C_contradictory-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified market evidence for synthetic startup C_contradictory.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "C_contradictory-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified product evidence for synthetic startup C_contradictory.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "C_contradictory-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified technical evidence for synthetic startup C_contradictory.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "C_contradictory-execution",
+          "claim_type": "execution",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified execution evidence for synthetic startup C_contradictory.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "C_contradictory-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup C_contradictory.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "C_contradictory-market",
+          "evidence_item_id": "source-C_contradictory-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "C_contradictory-product",
+          "evidence_item_id": "source-C_contradictory-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "C_contradictory-technical",
+          "evidence_item_id": "source-C_contradictory-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "C_contradictory-execution",
+          "evidence_item_id": "source-C_contradictory-execution",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "C_contradictory-defensibility",
+          "evidence_item_id": "source-C_contradictory-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "C_contradictory-market",
+          "evidence_item_id": "source-market-contradiction",
+          "relationship": "contradicts",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "e68cb1bcf632f1f84a753aa9aa30d695759f60267cbe49a9ddea7ba702767df3",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": 8.0,
+          "confidence": 0.54,
+          "evidence_sufficiency": "partial",
+          "reasoning": "Scored from one claim: \"Verified market evidence for synthetic startup C_contradictory.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "C_contradictory-market"
+          ],
+          "contradicting_claim_ids": [
+            "C_contradictory-market"
+          ],
+          "missing_evidence": [],
+          "quality_flags": [
+            "contradiction_present"
+          ],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "product",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified product evidence for synthetic startup C_contradictory.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "C_contradictory-product"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "technical",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified technical evidence for synthetic startup C_contradictory.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "C_contradictory-technical"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "execution",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified execution evidence for synthetic startup C_contradictory.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "C_contradictory-execution"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "defensibility",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified defensibility evidence for synthetic startup C_contradictory.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "C_contradictory-defensibility"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "state": "insufficient_evidence",
+        "attention_priority": 80,
+        "confidence": 0.828,
+        "decision_drivers": [
+          "market",
+          "product",
+          "technical"
+        ],
+        "principal_risks": [
+          "market"
+        ],
+        "mandate_conflicts": [],
+        "missing_information": [],
+        "change_conditions": [
+          "Resolve contradictory evidence: market"
+        ],
+        "human_review_required": true,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "insufficient_evidence",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 8,
+      "decision_rationale": "Canonical evaluation is blocked by insufficient evidence for required criteria; Partner did not calculate a substitute score.",
+      "decision_drivers": [
+        "canonical_insufficient_evidence",
+        "contradicting_market"
+      ],
+      "next_action": "1) Human review required\n2) monitor closely",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "D_missing_dimension": {
+    "rationale": "Missing execution stays null, never a numerical zero.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "D_missing_dimension-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified market evidence for synthetic startup D_missing_dimension.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "D_missing_dimension-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified product evidence for synthetic startup D_missing_dimension.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "D_missing_dimension-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified technical evidence for synthetic startup D_missing_dimension.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "D_missing_dimension-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup D_missing_dimension.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "D_missing_dimension-market",
+          "evidence_item_id": "source-D_missing_dimension-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "D_missing_dimension-product",
+          "evidence_item_id": "source-D_missing_dimension-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "D_missing_dimension-technical",
+          "evidence_item_id": "source-D_missing_dimension-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "D_missing_dimension-defensibility",
+          "evidence_item_id": "source-D_missing_dimension-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "2438a344c27022147c8d1dce63e629418e14d9f6ff212819e529f58bba7eaa06",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified market evidence for synthetic startup D_missing_dimension.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "D_missing_dimension-market"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "product",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified product evidence for synthetic startup D_missing_dimension.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "D_missing_dimension-product"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "technical",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified technical evidence for synthetic startup D_missing_dimension.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "D_missing_dimension-technical"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "execution",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "execution"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "defensibility",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified defensibility evidence for synthetic startup D_missing_dimension.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "D_missing_dimension-defensibility"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "state": "insufficient_evidence",
+        "attention_priority": 64,
+        "confidence": 0.72,
+        "decision_drivers": [
+          "market",
+          "product",
+          "technical"
+        ],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [
+          "execution"
+        ],
+        "change_conditions": [
+          "Resolve missing evidence: execution"
+        ],
+        "human_review_required": true,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "insufficient_evidence",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 7,
+      "decision_rationale": "Canonical evaluation is blocked by insufficient evidence for execution; Partner did not calculate a substitute score.",
+      "decision_drivers": [
+        "canonical_insufficient_evidence",
+        "missing_execution"
+      ],
+      "next_action": "1) Human review required\n2) monitor closely",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "E_out_of_mandate": {
+    "rationale": "Canonical advance is held at MONITOR by Partner's mandate gate.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "E_out_of_mandate-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified market evidence for synthetic startup E_out_of_mandate.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "E_out_of_mandate-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified product evidence for synthetic startup E_out_of_mandate.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "E_out_of_mandate-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified technical evidence for synthetic startup E_out_of_mandate.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "E_out_of_mandate-execution",
+          "claim_type": "execution",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified execution evidence for synthetic startup E_out_of_mandate.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "E_out_of_mandate-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 8.0,
+            "score_band": "high"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup E_out_of_mandate.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "E_out_of_mandate-market",
+          "evidence_item_id": "source-E_out_of_mandate-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "E_out_of_mandate-product",
+          "evidence_item_id": "source-E_out_of_mandate-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "E_out_of_mandate-technical",
+          "evidence_item_id": "source-E_out_of_mandate-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "E_out_of_mandate-execution",
+          "evidence_item_id": "source-E_out_of_mandate-execution",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "E_out_of_mandate-defensibility",
+          "evidence_item_id": "source-E_out_of_mandate-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "80465fae586e5bc79ce103a763e7caa65ab69d1fe4598c0b6e7d907990367c47",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified market evidence for synthetic startup E_out_of_mandate.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "E_out_of_mandate-market"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "product",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified product evidence for synthetic startup E_out_of_mandate.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "E_out_of_mandate-product"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "technical",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified technical evidence for synthetic startup E_out_of_mandate.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "E_out_of_mandate-technical"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "execution",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified execution evidence for synthetic startup E_out_of_mandate.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "E_out_of_mandate-execution"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        },
+        {
+          "criterion": "defensibility",
+          "score": 8.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified defensibility evidence for synthetic startup E_out_of_mandate.\" (scored 8.0, 90% confidence, high band)",
+          "supporting_claim_ids": [
+            "E_out_of_mandate-defensibility"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              8.0
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "state": "advance",
+        "attention_priority": 80,
+        "confidence": 0.9,
+        "decision_drivers": [
+          "market",
+          "product",
+          "technical"
+        ],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [],
+        "change_conditions": [],
+        "human_review_required": false,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "advance",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 9,
+      "decision_rationale": "Canonical evaluation recommends advance; Partner applied no secondary score threshold. Held for mandate exception: strong company, outside this fund's thesis.",
+      "decision_drivers": [
+        "canonical_advance"
+      ],
+      "next_action": "1) Mandate exception review\n2) strong company, off-thesis. IC must grant an explicit exception to proceed.",
+      "mandate_gate": "held",
+      "mandate_override_required": true,
+      "fund_fit": 1.0,
+      "fund_fit_label": "Outside thesis",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "F_legacy_canonical_diverge": {
+    "rationale": "Legacy 9 versus canonical 6 stays divergent: 6 is the inclusive MONITOR boundary.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [
+        {
+          "claim_id": "F_legacy_canonical_diverge-market",
+          "claim_type": "market",
+          "normalized_value": {
+            "criterion_score": 6.0,
+            "score_band": "mid"
+          },
+          "display_text": "Verified market evidence for synthetic startup F_legacy_canonical_diverge.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-product",
+          "claim_type": "product",
+          "normalized_value": {
+            "criterion_score": 6.0,
+            "score_band": "mid"
+          },
+          "display_text": "Verified product evidence for synthetic startup F_legacy_canonical_diverge.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-technical",
+          "claim_type": "technical",
+          "normalized_value": {
+            "criterion_score": 6.0,
+            "score_band": "mid"
+          },
+          "display_text": "Verified technical evidence for synthetic startup F_legacy_canonical_diverge.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-execution",
+          "claim_type": "execution",
+          "normalized_value": {
+            "criterion_score": 6.0,
+            "score_band": "mid"
+          },
+          "display_text": "Verified execution evidence for synthetic startup F_legacy_canonical_diverge.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-defensibility",
+          "claim_type": "defensibility",
+          "normalized_value": {
+            "criterion_score": 6.0,
+            "score_band": "mid"
+          },
+          "display_text": "Verified defensibility evidence for synthetic startup F_legacy_canonical_diverge.",
+          "assertion_class": "externally_verified",
+          "status": "current",
+          "confidence": 0.9
+        }
+      ],
+      "links": [
+        {
+          "claim_id": "F_legacy_canonical_diverge-market",
+          "evidence_item_id": "source-F_legacy_canonical_diverge-market",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-product",
+          "evidence_item_id": "source-F_legacy_canonical_diverge-product",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-technical",
+          "evidence_item_id": "source-F_legacy_canonical_diverge-technical",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-execution",
+          "evidence_item_id": "source-F_legacy_canonical_diverge-execution",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        },
+        {
+          "claim_id": "F_legacy_canonical_diverge-defensibility",
+          "evidence_item_id": "source-F_legacy_canonical_diverge-defensibility",
+          "relationship": "supports",
+          "support_strength": 0.9,
+          "verification_state": "verified",
+          "source_quality": 0.9,
+          "trust_class": "independent",
+          "untrusted_input": false,
+          "prompt_injection_detected": false,
+          "evidence_effective_at": "2026-09-01T00:00:00+00:00",
+          "evidence_expires_at": "2027-01-01T00:00:00+00:00",
+          "artifact_effective_at": "2026-09-01T00:00:00+00:00",
+          "retrieved_at": "2026-09-01T01:00:00+00:00"
+        }
+      ]
+    },
+    "evaluation": {
+      "snapshot_hash": "a65ee12c46f27be29359c7ae7405a029f4e5b2267d3e15486e7dc5687feca3af",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": 6.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified market evidence for synthetic startup F_legacy_canonical_diverge.\" (scored 6.0, 90% confidence, mid band)",
+          "supporting_claim_ids": [
+            "F_legacy_canonical_diverge-market"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              6.0
+            ]
+          }
+        },
+        {
+          "criterion": "product",
+          "score": 6.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified product evidence for synthetic startup F_legacy_canonical_diverge.\" (scored 6.0, 90% confidence, mid band)",
+          "supporting_claim_ids": [
+            "F_legacy_canonical_diverge-product"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              6.0
+            ]
+          }
+        },
+        {
+          "criterion": "technical",
+          "score": 6.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified technical evidence for synthetic startup F_legacy_canonical_diverge.\" (scored 6.0, 90% confidence, mid band)",
+          "supporting_claim_ids": [
+            "F_legacy_canonical_diverge-technical"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              6.0
+            ]
+          }
+        },
+        {
+          "criterion": "execution",
+          "score": 6.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified execution evidence for synthetic startup F_legacy_canonical_diverge.\" (scored 6.0, 90% confidence, mid band)",
+          "supporting_claim_ids": [
+            "F_legacy_canonical_diverge-execution"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              6.0
+            ]
+          }
+        },
+        {
+          "criterion": "defensibility",
+          "score": 6.0,
+          "confidence": 0.9,
+          "evidence_sufficiency": "sufficient",
+          "reasoning": "Scored from one claim: \"Verified defensibility evidence for synthetic startup F_legacy_canonical_diverge.\" (scored 6.0, 90% confidence, mid band)",
+          "supporting_claim_ids": [
+            "F_legacy_canonical_diverge-defensibility"
+          ],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [],
+          "quality_flags": [],
+          "deterministic_adjustments": {
+            "aggregation": "lowest_eligible_claim_score",
+            "eligible_anchor_scores": [
+              6.0
+            ]
+          }
+        }
+      ],
+      "recommendation": {
+        "state": "monitor",
+        "attention_priority": 60,
+        "confidence": 0.9,
+        "decision_drivers": [
+          "market",
+          "product",
+          "technical"
+        ],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [],
+        "change_conditions": [],
+        "human_review_required": false,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "monitor",
+      "human_review_required": false,
+      "company_quality": null,
+      "conviction_level": 9,
+      "decision_rationale": "Canonical evaluation recommends monitor; Partner applied no secondary score threshold.",
+      "decision_drivers": [
+        "canonical_monitor"
+      ],
+      "next_action": "1) Human review required\n2) monitor closely",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  },
+  "G_insufficient_evidence": {
+    "rationale": "No claims or links yields insufficient_evidence and human review.",
+    "policy": {
+      "policy_version_id": "phase0-fixture-policy-v1",
+      "policy_hash": "15774f15ac87434aa89e60701788203f6258faaee0e78b5a7fa90ab546e1a250",
+      "rubric_version": "tenant-rubric:phase0-fixture-policy-v1",
+      "partner_rules_version": "4.0",
+      "partner_rules_hash": "ada471d59517fd206caa39b6f166f15edcb783b3bc49c78c76485c2bec664280"
+    },
+    "evidence_state": {
+      "claims": [],
+      "links": []
+    },
+    "evaluation": {
+      "snapshot_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "criteria": [
+        {
+          "criterion": "market",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "market"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "product",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "product"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "technical",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "technical"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "execution",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "execution"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        },
+        {
+          "criterion": "defensibility",
+          "score": null,
+          "confidence": 0.0,
+          "evidence_sufficiency": "insufficient",
+          "reasoning": "No eligible scored claim was present in the immutable snapshot.",
+          "supporting_claim_ids": [],
+          "contradicting_claim_ids": [],
+          "missing_evidence": [
+            "defensibility"
+          ],
+          "quality_flags": [],
+          "deterministic_adjustments": {}
+        }
+      ],
+      "recommendation": {
+        "state": "insufficient_evidence",
+        "attention_priority": 0,
+        "confidence": 0.0,
+        "decision_drivers": [],
+        "principal_risks": [],
+        "mandate_conflicts": [],
+        "missing_information": [
+          "market",
+          "product",
+          "technical",
+          "execution",
+          "defensibility"
+        ],
+        "change_conditions": [
+          "Resolve missing evidence: market",
+          "Resolve missing evidence: product",
+          "Resolve missing evidence: technical",
+          "Resolve missing evidence: execution",
+          "Resolve missing evidence: defensibility"
+        ],
+        "human_review_required": true,
+        "change_explanation": null
+      }
+    },
+    "legacy_reviewer_scores": {
+      "market": 9.0,
+      "product": 9.0,
+      "technical": 9.0,
+      "execution": 9.0,
+      "defensibility": 9.0
+    },
+    "partner": {
+      "recommendation": "MONITOR",
+      "canonical_recommendation": "insufficient_evidence",
+      "human_review_required": true,
+      "company_quality": null,
+      "conviction_level": 1,
+      "decision_rationale": "Canonical evaluation is blocked by insufficient evidence for defensibility, execution, market, product, technical; Partner did not calculate a substitute score.",
+      "decision_drivers": [
+        "canonical_insufficient_evidence",
+        "missing_defensibility",
+        "missing_execution",
+        "missing_market",
+        "missing_product",
+        "missing_technical"
+      ],
+      "next_action": "1) Human review required\n2) monitor closely",
+      "mandate_gate": "clear",
+      "mandate_override_required": false,
+      "fund_fit": 9.0,
+      "fund_fit_label": "Strong fit",
+      "fund_fit_confidence": 0.9
+    }
+  }
+}

@@ -58,7 +58,7 @@ def pipeline_stage_log(
     startup_id: str,
     user_id: str,
     stage: str,
-    phase: Literal["STARTED", "DONE"],
+    phase: Literal["STARTED", "DONE", "FAILED", "SKIPPED", "BLOCKED", "RETRIED"],
 ) -> None:
     rid = (pipeline_run_id or "").strip() or "—"
     uid = (user_id or "").strip()

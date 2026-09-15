@@ -389,6 +389,16 @@ class PartnerRulesV4(PartnerRules):
         return self
 
 
+class PartnerRulesV5(PartnerRulesV4):
+    """Same safety data shape, with live Reviewer/Partner authority (ADR-0016).
+
+    Legacy mapping fields remain parseable for historical consumers; the shared
+    investment-analysis core never uses them to choose an action.
+    """
+
+    version: Literal["5.0"]
+
+
 def _validate_shared_cross_section_invariants(
     thresholds: ScoreThresholds | ScoreThresholdsV4,
     llm_triggers: LLMFallbackTriggers,
@@ -464,7 +474,7 @@ def parse_partner_rules(document: PartnerRules | dict[str, Any]) -> PartnerRules
         return document
     if not isinstance(document, dict):
         raise ValueError("partner_rules must be an object")
-    model = PartnerRulesV4 if document.get("version") == "4.0" else PartnerRulesV3
+    model = {"5.0": PartnerRulesV5, "4.0": PartnerRulesV4}.get(document.get("version"), PartnerRulesV3)
     return model.model_validate(document)
 
 

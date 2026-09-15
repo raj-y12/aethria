@@ -18,13 +18,15 @@ function dimensionFromCriterion(criterion: CriterionAssessment | undefined): Sco
     // `reasoning` when components is empty (AssessmentScorecard.tsx renderRow).
     components: {},
     reasoning: criterion?.reasoning ? [criterion.reasoning] : null,
-    weaknesses: criterion?.quality_flags?.length ? criterion.quality_flags : null,
+    weaknesses: criterion?.quality_flags?.length
+      ? criterion.quality_flags.map((flag) => flag.replace(/_/g, ' ')) : null,
   };
 }
 
-/** Adapts canonical `evaluate_snapshot()` criteria onto the StructuredScoring shape
+/** Adapts persisted authoritative criteria onto the StructuredScoring shape
  * AssessmentScorecard renders. Returns null when there's no canonical evaluation yet
- * (falls back to the legacy reviewer path — see reviewScoring.ts). */
+ * Current criteria validate Reviewer proposals; historical criteria retain their
+ * original evaluator semantics. Missing evaluations have no score fallback. */
 export function canonicalCriteriaToStructuredScoring(
   evaluation: EvaluationRecord | null | undefined,
 ): StructuredScoring | null {
