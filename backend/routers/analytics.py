@@ -29,7 +29,7 @@ from settings_repository import SettingsRepository
 from batch1.context import reset_state, set_state
 from batch1.repository import Batch1Repository
 from batch4a.repository import Batch4ARepository
-from startup_repository import StartupRepository
+from startups import StartupRepository
 
 logger = logging.getLogger("api.analytics")
 router = APIRouter()

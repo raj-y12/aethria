@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from context_assembler import ContextAssembler
-from context_assembler import CanonicalContextProvider
+from context import ContextAssembler
+from context import CanonicalContextProvider
 
 
 NOW = datetime(2026, 8, 12, tzinfo=timezone.utc)

@@ -25,23 +25,19 @@ from functools import partial
 
 from resolver.company_resolver import CompanyResolution
 from scout.schema import ScoutOutput, factual_scout_payload, generate_id
-from utils.financials_grounding import ground_financials
+from scout.tools import ground_financials
 from tenant_context import require_user_id
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
-from utils.reference_verify import (
+from research.reference_verify import (
     finalize_scout_references,
     filter_references_to_allowlist,
     hostname_from_user_hint,
     registrable_domain,
 )
-from utils.recency import recency_query, scout_recency_directive
-from utils.source_corroboration import filter_sources_to_anchor
-from utils.scout_discovery_queries import (
-    build_discovery_queries,
-    build_discovery_recency_query,
-    thesis_terms,
-)
-from utils.retrieval_grounding import (
+from research.recency import recency_query, scout_recency_directive
+from research.source_corroboration import filter_sources_to_anchor
+from scout.tools import build_discovery_queries, build_discovery_recency_query, thesis_terms
+from research.retrieval_grounding import (
     log_pre_filter_cited_urls,
     render_sources_for_prompt,
     retrieve_source_pack_merged,

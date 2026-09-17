@@ -3,7 +3,7 @@ from copy import deepcopy
 import json
 import re
 
-from utils.source_corroboration import source_mentions_company, host_of, is_anchor_host
+from research.source_corroboration import source_mentions_company, host_of, is_anchor_host
 from resolver.founder_resolver import is_non_person_label
 
 

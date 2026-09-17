@@ -15,9 +15,9 @@ from urllib.error import HTTPError
 
 import pytest
 
-from utils.exa_client import exa_search, query_intent, semantic_query
-from utils.search_providers import provider_search, reset_providers
-from utils.search_results import ProviderSearchResults
+from research.exa_client import exa_search, query_intent, semantic_query
+from research.search_providers import provider_search, reset_providers
+from research.search_results import ProviderSearchResults
 
 
 class _Response:
@@ -65,7 +65,7 @@ def captured_body(monkeypatch):
         return _Response(state["payload"])
 
     monkeypatch.setenv("EXA_API_KEY", "exa-key")
-    monkeypatch.setattr("utils.exa_client.urlopen", fake_urlopen)
+    monkeypatch.setattr("research.exa_client.urlopen", fake_urlopen)
     return state
 
 
@@ -224,7 +224,7 @@ def test_missing_api_key_is_a_disabled_diagnostic():
 @pytest.mark.parametrize("payload", [{"error": "bad request"}, {"results": "nope"}, []])
 def test_malformed_responses_are_errors_not_silent_empty(monkeypatch, payload):
     monkeypatch.setenv("EXA_API_KEY", "exa-key")
-    monkeypatch.setattr("utils.exa_client.urlopen", lambda *a, **k: _Response(payload))
+    monkeypatch.setattr("research.exa_client.urlopen", lambda *a, **k: _Response(payload))
 
     rows = exa_search("acme")
 
@@ -235,7 +235,7 @@ def test_malformed_responses_are_errors_not_silent_empty(monkeypatch, payload):
 
 def test_zero_results_reports_empty_not_success(monkeypatch):
     monkeypatch.setenv("EXA_API_KEY", "exa-key")
-    monkeypatch.setattr("utils.exa_client.urlopen", lambda *a, **k: _Response(_payload([])))
+    monkeypatch.setattr("research.exa_client.urlopen", lambda *a, **k: _Response(_payload([])))
 
     rows = exa_search("acme")
 
@@ -254,8 +254,8 @@ def test_rate_limit_retries_then_reports_rate_limited(monkeypatch):
         attempts += 1
         raise HTTPError("https://api.exa.ai/search", 429, "limited", {}, BytesIO())
 
-    monkeypatch.setattr("utils.exa_client.urlopen", limited)
-    monkeypatch.setattr("utils.exa_client.time.sleep", lambda _: None)
+    monkeypatch.setattr("research.exa_client.urlopen", limited)
+    monkeypatch.setattr("research.exa_client.time.sleep", lambda _: None)
 
     rows = exa_search("acme")
 
@@ -274,8 +274,8 @@ def test_timeout_retries_then_reports_timeout(monkeypatch):
         attempts += 1
         raise TimeoutError("read timed out")
 
-    monkeypatch.setattr("utils.exa_client.urlopen", slow)
-    monkeypatch.setattr("utils.exa_client.time.sleep", lambda _: None)
+    monkeypatch.setattr("research.exa_client.urlopen", slow)
+    monkeypatch.setattr("research.exa_client.time.sleep", lambda _: None)
 
     rows = exa_search("acme")
 
@@ -329,14 +329,14 @@ def test_exa_urls_are_passed_to_firecrawl_and_content_wins(monkeypatch):
         return [{"url": "https://acme.com", "content": "full page markdown"}]
 
     monkeypatch.setattr(
-        "utils.search_providers.exa_search",
+        "research.search_providers.exa_search",
         lambda *a, **k: ProviderSearchResults(
             [{"title": "Acme", "url": "https://acme.com", "highlight": "short highlight"}],
             {"provider": "exa", "outcome": "success", "reason": None, "result_count": 1,
              "query_type": "company", "cost_usd": 0.01},
         ),
     )
-    monkeypatch.setattr("utils.search_providers.firecrawl_scrape", fake_scrape)
+    monkeypatch.setattr("research.search_providers.firecrawl_scrape", fake_scrape)
 
     rows = provider_search("acme", max_results=5)
 
@@ -349,7 +349,7 @@ def test_exa_urls_are_passed_to_firecrawl_and_content_wins(monkeypatch):
 def test_firecrawl_failure_falls_back_to_exa_highlight_with_provenance(monkeypatch):
     monkeypatch.setenv("EXA_API_KEY", "exa-key")
     monkeypatch.setattr(
-        "utils.search_providers.exa_search",
+        "research.search_providers.exa_search",
         lambda *a, **k: ProviderSearchResults(
             [{"title": "Acme", "url": "https://acme.com", "highlight": "short highlight"}],
             {"provider": "exa", "outcome": "success", "reason": None, "result_count": 1,
@@ -360,7 +360,7 @@ def test_firecrawl_failure_falls_back_to_exa_highlight_with_provenance(monkeypat
     def boom(urls, timeout=None):
         raise RuntimeError("firecrawl down")
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_scrape", boom)
+    monkeypatch.setattr("research.search_providers.firecrawl_scrape", boom)
 
     rows = provider_search("acme", max_results=5)
 
@@ -373,7 +373,7 @@ def test_firecrawl_failure_falls_back_to_exa_highlight_with_provenance(monkeypat
 def test_diagnostics_carry_discovery_quality_and_tier_history(monkeypatch):
     monkeypatch.setenv("EXA_API_KEY", "exa-key")
     monkeypatch.setattr(
-        "utils.search_providers.exa_search",
+        "research.search_providers.exa_search",
         lambda *a, **k: ProviderSearchResults(
             [
                 {"title": "Acme", "url": "https://acme.com", "highlight": "h"},
@@ -383,7 +383,7 @@ def test_diagnostics_carry_discovery_quality_and_tier_history(monkeypatch):
              "query_type": "company"},
         ),
     )
-    monkeypatch.setattr("utils.search_providers.firecrawl_scrape", lambda urls, timeout=None: [])
+    monkeypatch.setattr("research.search_providers.firecrawl_scrape", lambda urls, timeout=None: [])
 
     rows = provider_search("acme", max_results=5)
 
@@ -397,7 +397,7 @@ def test_diagnostics_carry_discovery_quality_and_tier_history(monkeypatch):
 
 def test_exa_leads_the_chain_and_firecrawl_answers_when_it_is_empty(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.exa_search",
+        "research.search_providers.exa_search",
         lambda *a, **k: ProviderSearchResults(
             [], {"provider": "exa", "outcome": "empty", "reason": "no_usable_results", "result_count": 0}
         ),
@@ -406,7 +406,7 @@ def test_exa_leads_the_chain_and_firecrawl_answers_when_it_is_empty(monkeypatch)
         [{"title": "FC", "url": "https://fc.example", "snippet": "answer"}],
         {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": 1},
     )
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", lambda *a, **k: firecrawl_rows)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", lambda *a, **k: firecrawl_rows)
 
     rows = provider_search("acme", max_results=5)
 
@@ -417,13 +417,13 @@ def test_exa_leads_the_chain_and_firecrawl_answers_when_it_is_empty(monkeypatch)
 def test_primary_provider_override_moves_a_tier_to_the_head(monkeypatch):
     monkeypatch.setenv("RETRIEVAL_PRIMARY_PROVIDER", "firecrawl")
     monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
+        "research.search_providers.firecrawl_search",
         lambda *a, **k: ProviderSearchResults(
             [], {"provider": "firecrawl", "outcome": "empty", "reason": "no_usable_results", "result_count": 0}
         ),
     )
     monkeypatch.setattr(
-        "utils.search_providers.exa_search",
+        "research.search_providers.exa_search",
         lambda *a, **k: ProviderSearchResults(
             [], {"provider": "exa", "outcome": "empty", "reason": "no_usable_results", "result_count": 0}
         ),
@@ -438,12 +438,12 @@ def test_one_tier_raising_does_not_sink_the_tiers_behind_it(monkeypatch):
     def boom(*args, **kwargs):
         raise RuntimeError("exa down")
 
-    monkeypatch.setattr("utils.search_providers.exa_search", boom)
+    monkeypatch.setattr("research.search_providers.exa_search", boom)
     firecrawl_rows = ProviderSearchResults(
         [{"title": "FC", "url": "https://fc.example", "snippet": "answer"}],
         {"provider": "firecrawl", "outcome": "success", "reason": None, "result_count": 1},
     )
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", lambda *a, **k: firecrawl_rows)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", lambda *a, **k: firecrawl_rows)
 
     rows = provider_search("acme", max_results=5)
 
@@ -457,7 +457,7 @@ def test_complete_chain_failure_returns_empty_with_every_tier_recorded(monkeypat
         ("exa_search", "exa"), ("firecrawl_search", "firecrawl")
     ):
         monkeypatch.setattr(
-            f"utils.search_providers.{target}",
+            f"research.search_providers.{target}",
             lambda *a, _p=provider, **k: ProviderSearchResults(
                 [], {"provider": _p, "outcome": "error", "reason": "request_error", "result_count": 0}
             ),
@@ -472,19 +472,19 @@ def test_complete_chain_failure_returns_empty_with_every_tier_recorded(monkeypat
 
 def test_chain_failure_degrades_to_duckduckgo_not_to_nothing(monkeypatch):
     """The keyless fallback still sits behind the whole chain."""
-    from utils.retrieval_grounding import retrieve_source_pack
+    from research.retrieval_grounding import retrieve_source_pack
 
     for target, provider in (
         ("exa_search", "exa"), ("firecrawl_search", "firecrawl")
     ):
         monkeypatch.setattr(
-            f"utils.search_providers.{target}",
+            f"research.search_providers.{target}",
             lambda *a, _p=provider, **k: ProviderSearchResults(
                 [], {"provider": _p, "outcome": "error", "reason": "request_error", "result_count": 0}
             ),
         )
     monkeypatch.setattr(
-        "utils.retrieval_grounding._fallback_search",
+        "research.retrieval_grounding._fallback_search",
         lambda query, max_results: ProviderSearchResults(
             [{"title": "DDG", "url": "https://ddg.example", "snippet": ""}],
             {"provider": "duckduckgo_html_fallback", "outcome": "success", "reason": None, "result_count": 1},

@@ -81,7 +81,7 @@ document store, and fund-thesis embeddings are stored as JSONB arrays rather tha
 ### D6 · Two storage implementations
 
 `backend/utils/storage.py` (local JSON) mirrors the interface of
-`backend/supabase_storage.py`. Only the Supabase path is production; the file
+`backend/legacy_supabase/storage.py`. Only the Supabase path is production; the file
 path is a dev convenience that must nonetheless be kept behaviourally close, and
 divergence between them has caused real bugs historically.
 

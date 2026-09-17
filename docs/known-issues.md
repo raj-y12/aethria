@@ -58,8 +58,8 @@ The entries below were confirmed from source and test evidence, then fixed.
 
 **Status:** resolved · **Priority:** P0 · **Surface:** investment decision integrity ·
 **Verified in:** the 2026-08-03 Workvivo production lookup, `backend/pipeline_runner.py`,
-`backend/reviewer/engine.py`, `backend/supabase_storage.py`,
-`backend/utils/financials_grounding.py`, `backend/authority/service.py`,
+`backend/reviewer/engine.py`, `backend/legacy_supabase/storage.py`,
+`backend/scout/tools/financials_grounding.py`, `backend/authority/service.py`,
 `app-front-end/src/lib/reviewScoring.ts`, and
 `app-front-end/src/lib/founderMemo.ts` · **Fixed by:** `backend/pipeline_runner.py`
 (reload persisted startup before Partner), `backend/identity/ownership_gate.py` (new),

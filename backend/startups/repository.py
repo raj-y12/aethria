@@ -280,7 +280,7 @@ class StartupRepository:
         settings: dict[str, Any] | None = None,
     ) -> bool:
         uid = require_user_id(user_id, context="StartupRepository.update_review")
-        from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+        from context import merge_scout_info_enrichment
         from utils.founder_enrichment import merge_founder_resolution_into_scout_info
         from agent_trace import build_review_trace
 
@@ -498,7 +498,7 @@ class StartupRepository:
     async def remove_startups_without_references(self, user_id: str) -> int:
         """Best-effort tenant-scoped pruning of autonomous rows without evidence."""
         uid = require_user_id(user_id, context="StartupRepository.remove_startups_without_references")
-        from utils.reference_validation import is_generic_reference
+        from research.reference_validation import is_generic_reference
 
         async with self.pool.acquire() as connection:
             async with connection.transaction():

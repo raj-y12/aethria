@@ -14,7 +14,7 @@ from models import (
     ScoutInfo,
     Startup,
 )
-from supabase_storage import SupabaseStartupsStorage, _dict_to_row
+from legacy_supabase.storage import SupabaseStartupsStorage, _dict_to_row
 
 
 class _Builder:

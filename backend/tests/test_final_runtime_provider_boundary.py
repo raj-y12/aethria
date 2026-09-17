@@ -8,13 +8,13 @@ BACKEND = Path(__file__).parents[1]
 RUNTIME_MODULES = (
     "api.py",
     "pipeline_runner.py",
-    "admin_service.py",
+    "admin/service.py",
     "evaluation_v2/prerequisites.py",
     "meta/analyser.py",
     "routers/deps.py",
     "routers/fund_thesis.py",
     "routers/meta.py",
-    "startup_repository.py",
+    "startups/repository.py",
     "services/scoring/policy_store.py",
     "services/scoring/policy_upgrade.py",
 )
@@ -30,7 +30,9 @@ def _module_level_supabase_imports(path: Path) -> list[str]:
             names = [node.module or ""]
         else:
             continue
-        found.extend(name for name in names if name.startswith("supabase"))
+        found.extend(
+            name for name in names if name.startswith("supabase") or name.startswith("legacy_supabase")
+        )
     return found
 
 
@@ -45,7 +47,10 @@ def test_normal_runtime_modules_have_no_module_level_supabase_imports():
 
 
 def test_migrated_meta_and_startup_boundaries_do_not_import_legacy_storage():
-    for relative in ("meta/analyser.py", "startup_repository.py"):
+    for relative in ("meta/analyser.py", "startups/repository.py"):
         source = (BACKEND / relative).read_text()
         assert "supabase_doc_store" not in source
+        assert "legacy_supabase.doc_store" not in source
         assert "from supabase_storage" not in source
+        assert "from legacy_supabase.storage" not in source
+        assert "legacy_supabase import" not in source

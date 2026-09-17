@@ -92,13 +92,12 @@ SupabaseStartupsStorage = None
 
 
 def get_service_client():
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
-from utils.reference_validation import is_generic_reference
+from research.reference_validation import is_generic_reference
 from utils.prompt_version import hash_prompt
-from regulatory_context import CanonicalReviewerRegulatoryContextProvider
-from context_assembler import CanonicalContextProvider
+from context import CanonicalContextProvider, CanonicalReviewerRegulatoryContextProvider
 from identity.repository import IdentityConflictError, IdentityRepository
 from evidence.repository import EvidenceRepository
 from batch1.context import reset_state, set_state
@@ -109,8 +108,8 @@ from batch3.context import reset_state as reset_batch3_state, set_state as set_b
 from batch3.repository import Batch3Repository
 from batch4a.context import reset_state as reset_batch4a_state, set_state as set_batch4a_state, get_state as get_batch4a_state
 from batch4a.repository import Batch4ARepository
-from startup_repository import StartupReadStorageAdapter, StartupRepository
-from startup_id_alias_repository import StartupIdAliasRepository
+from startups import StartupReadStorageAdapter, StartupRepository
+from startups import StartupIdAliasRepository
 
 logger = logging.getLogger("pipeline_runner")
 _visible_logger = logging.getLogger("uvicorn.error")
@@ -480,7 +479,7 @@ def _build_storage_sync(user_id: str, settings: Optional[Dict[str, Any]] = None)
     from jobs.fencing import current_lease_fence
     storage_type = SupabaseStartupsStorage
     if storage_type is None:
-        from supabase_storage import SupabaseStartupsStorage as storage_type
+        from legacy_supabase.storage import SupabaseStartupsStorage as storage_type
 
     storage = storage_type(get_service_client(), user_id, settings=settings)
     ownership_fence = current_lease_fence()
@@ -737,7 +736,7 @@ async def _admit_autonomous_discoveries(
                 startup_id,
             )
         if evidence_repository is not None and admission.company_id and admission.opportunity_id:
-            from canonical_scout_claims import persist_scout_claims
+            from context import persist_scout_claims
 
             bridge = await persist_scout_claims(
                 user_id=user_id,
@@ -793,7 +792,7 @@ async def _admit_named_lookup_before_review(
             opportunity_id=existing.opportunity_id, confidence=1,
         )
         if evidence_repository is not None:
-            from canonical_scout_claims import persist_scout_claims
+            from context import persist_scout_claims
 
             await persist_scout_claims(
                 user_id=user_id, company_id=existing.company_id,
@@ -1688,7 +1687,7 @@ def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
     content of any links it names (max 3, best-effort — a dead or unreachable link
     simply contributes nothing). Runs blocking HTTP; call via asyncio.to_thread.
     """
-    from utils.search_providers import extract_pages
+    from research.search_providers import extract_pages
 
     text = (additional_context or "").strip()
     urls = _OPERATOR_URL_RE.findall(text)[:3]

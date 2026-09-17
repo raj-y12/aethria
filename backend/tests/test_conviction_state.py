@@ -1,4 +1,4 @@
-from conviction_state import build_conviction_patch
+from context import build_conviction_patch
 
 
 def test_build_conviction_patch_appends_history_with_score_snapshot_and_config_version():

@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel, Field
 
 from tenant_context import require_user_id
-from utils.reference_verify import hostname_from_user_hint, registrable_domain
+from research.reference_verify import hostname_from_user_hint, registrable_domain
 
 logger = logging.getLogger("resolver.founder")
 
@@ -408,7 +408,7 @@ def _default_search(*, queries: List[str], user_id: str, **kwargs: Any) -> Dict[
     Kept as a thin indirection so a dedicated people-search provider can be
     registered without touching any extraction logic.
     """
-    from utils.search_providers import search_source_pack
+    from research.search_providers import search_source_pack
 
     return search_source_pack(
         queries=queries,
@@ -678,7 +678,7 @@ def _augment_with_team_pages(
     if limit <= 0:
         return 0
 
-    from utils.search_providers import extract_pages
+    from research.search_providers import extract_pages
 
     by_url = {e.url.lower().rstrip("/"): e for e in evidence}
     targets = [

@@ -28,7 +28,7 @@ def test_prompt_safety_leaves_benign_evidence_unflagged_but_still_isolated():
 
 
 def test_source_rendering_isolates_malicious_retrieved_snippet():
-    from utils.retrieval_grounding import render_sources_for_prompt
+    from research.retrieval_grounding import render_sources_for_prompt
 
     rendered = render_sources_for_prompt(
         [
@@ -51,7 +51,7 @@ def test_source_rendering_isolates_malicious_retrieved_title():
     target's own site, exactly as attacker-controlled as the snippet -- but
     only the snippet went through isolate_untrusted_text; titles were
     interpolated raw into the prompt."""
-    from utils.retrieval_grounding import render_sources_for_prompt
+    from research.retrieval_grounding import render_sources_for_prompt
 
     rendered = render_sources_for_prompt(
         [

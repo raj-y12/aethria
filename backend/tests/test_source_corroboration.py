@@ -6,7 +6,7 @@ nothing else — no funding coverage, no team reporting, no profile pages.
 """
 import pytest
 
-from utils.source_corroboration import (
+from research.source_corroboration import (
     TRUSTED_CORROBORATION_DOMAINS,
     filter_sources_to_anchor,
     keep_source_for_anchor,
@@ -182,7 +182,7 @@ def test_scout_lookup_pack_keeps_corroboration(monkeypatch):
 
 
 def test_reviewer_and_scout_paths_agree(monkeypatch):
-    from utils.reviewer_gap_retrieval import _restrict_pack_to_lookup_website
+    from reviewer.gap_retrieval import _restrict_pack_to_lookup_website
 
     pack = {"sources": [_HOME, _NEWS, _LINKEDIN, _UNRELATED], "url_allowlist": set()}
     out = _restrict_pack_to_lookup_website(

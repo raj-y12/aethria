@@ -608,7 +608,7 @@ def _bootstrap_default_thesis_or_raise(client: Any, uid: str) -> None:
     Fully idempotent: if versions already exist but active_version_id is null, re-links to the
     most recent version instead of creating a new one (prevents spurious version inflation).
     """
-    from fund_thesis_ops import create_fund_thesis_version_for_user
+    from fund_thesis.ops import create_fund_thesis_version_for_user
     from datetime import datetime, timezone
 
     # Check current state before doing any writes.

@@ -1,7 +1,7 @@
 """Post-review ScoutInfo enrichment."""
 
 from models import ScoutInfo
-from utils.scout_post_review_enrichment import (
+from context import (
     infer_funding_stage_from_text,
     infer_funding_stage_from_review_text_enabled,
     merge_scout_info_enrichment,

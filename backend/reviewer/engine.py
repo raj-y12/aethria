@@ -25,8 +25,8 @@ from services.scoring.policy_compiler import compile_policy_from_fund_config
 from services.reviewer_resolution import apply_resolution_to_primary
 from reviewer.aethria_view import build_aethria_view
 from utils.founder_enrichment import founder_resolution_for_review
-from founder_context import build_founder_context
-from utils.reviewer_gap_retrieval import enrich_scout_for_reviewer_llm
+from context import build_founder_context
+from reviewer.gap_retrieval import enrich_scout_for_reviewer_llm
 from evaluation_v2.prerequisites import EvaluationPrerequisites
 from evaluation_v2.governed_scoring import (
     GovernedScoringError,
@@ -789,7 +789,7 @@ class ReviewerEngine:
         self, review_output: Dict[str, Any], canonical_context: Dict[str, Any] | None
     ) -> tuple[Dict[str, Any], Dict[str, Any]]:
         """Apply the shared deterministic evidence guard before persistence."""
-        from contradiction_gate import apply_contradiction_gate
+        from context import apply_contradiction_gate
 
         audit = apply_contradiction_gate(
             user_id=self.tenant_user_id,
@@ -1559,7 +1559,7 @@ class ReviewerEngine:
             ).model_dump(mode="json")
 
             from utils.adapters import reviewer_output_to_review_info
-            from contradiction_gate import apply_contradiction_gate
+            from context import apply_contradiction_gate
             single_reviews = self._build_single_reviews(successful_results)
 
             canonical_context_snapshot = scout_for_llm.get("_canonical_context")

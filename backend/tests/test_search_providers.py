@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from utils.search_providers import (
+from research.search_providers import (
     ChainedSearchProvider,
     FirecrawlSearchProvider,
     SEARCH_CATEGORIES,
@@ -97,7 +97,7 @@ def test_firecrawl_maps_news_category_to_the_news_topic(monkeypatch):
         seen.update({"topic": topic, "days": days})
         return []
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", fake_firecrawl)
     FirecrawlSearchProvider().search("q", max_results=5, category="news", days=30)
     assert seen == {"topic": "news", "days": 30}
 
@@ -110,7 +110,7 @@ def test_firecrawl_maps_non_news_categories_to_the_general_topic(monkeypatch, ca
         seen.update({"topic": topic, "days": days})
         return []
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", fake_firecrawl)
     FirecrawlSearchProvider().search("q", max_results=5, category=category, days=30)
     # `days` is a news-only control and must not leak into other categories.
     assert seen == {"topic": "general", "days": None}
@@ -217,7 +217,7 @@ def test_a_raising_provider_degrades_to_empty_results_with_diagnostics():
 
 
 def test_retrieval_grounding_routes_through_the_category_provider():
-    from utils.retrieval_grounding import retrieve_source_pack
+    from research.retrieval_grounding import retrieve_source_pack
 
     company = _RecordingProvider(
         "company-co",
@@ -233,7 +233,7 @@ def test_retrieval_grounding_routes_through_the_category_provider():
 
 
 def test_merged_pack_sends_the_recency_query_to_the_news_provider():
-    from utils.retrieval_grounding import retrieve_source_pack_merged
+    from research.retrieval_grounding import retrieve_source_pack_merged
 
     news = _RecordingProvider(
         "news-co",

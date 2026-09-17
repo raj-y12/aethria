@@ -2,9 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from competition_knowledge import derive_competition_claims
-from canonical_scout_claims import derive_scout_claims
-from context_assembler import ContextAssembler
+from context import ContextAssembler, derive_competition_claims, derive_scout_claims
 from reviewer.engine import ReviewerEngine
 
 

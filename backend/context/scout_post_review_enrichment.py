@@ -18,8 +18,8 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from models import ScoutInfo
-from utils.reference_verify import extract_http_urls, normalize_url_for_match
-from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
+from research.reference_verify import extract_http_urls, normalize_url_for_match
+from context.scout_field_gaps import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
 

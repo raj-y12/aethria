@@ -1,4 +1,4 @@
-from contradiction_gate import apply_contradiction_gate
+from context import apply_contradiction_gate
 
 
 def _packet(claim_type, *, excerpt="Verified evidence", relationship="supports", verification="verified", access="public", user_id="fund-a"):

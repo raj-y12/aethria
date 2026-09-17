@@ -2,8 +2,8 @@ import asyncio
 import json
 import logging
 
-from founder_context import build_founder_context
-from founder_context import apply_founder_grounding_guard
+from context import build_founder_context
+from context import apply_founder_grounding_guard
 from resolver.founder_resolver import (
     FounderCandidate,
     FounderEvidence,

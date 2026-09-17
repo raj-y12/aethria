@@ -201,7 +201,7 @@ def build_reviewer_regulatory_context(
         "has_expansion_risk": has_supported("regulatory_expansion_risk"),
         "has_contradiction": has_contradiction,
     }
-    from context_assembler import add_context_contract
+    from context.assembler import add_context_contract
 
     return add_context_contract(
         packet,

@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from utils.reference_verify import extract_http_urls
+from research.reference_verify import extract_http_urls
 
 
 _MISSING_LABELS = {

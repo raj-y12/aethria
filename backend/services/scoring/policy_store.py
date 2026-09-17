@@ -25,13 +25,13 @@ POLICY_TABLE = "fund_policy_versions"
 # Historical CLI/test compatibility only. Governed runtime uses
 # FundIntelligenceRepository and never invokes these adapters.
 def list_get_all(table: str, *, user_id: str):
-    from supabase_doc_store import list_get_all as _list_get_all
+    from legacy_supabase.doc_store import list_get_all as _list_get_all
 
     return _list_get_all(table, user_id=user_id)
 
 
 def list_append(table: str, record: Dict[str, Any], *, user_id: str):
-    from supabase_doc_store import list_append as _list_append
+    from legacy_supabase.doc_store import list_append as _list_append
 
     return _list_append(table, record, user_id=user_id)
 

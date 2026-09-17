@@ -194,7 +194,7 @@ def build_founder_context(
         "has_conflict": has_conflict,
         "missing_information": sorted(missing),
     }
-    from context_assembler import add_context_contract
+    from context.assembler import add_context_contract
 
     founder_evidence = [
         {

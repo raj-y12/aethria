@@ -14,7 +14,7 @@ def _isolated_admin_security_state(monkeypatch):
 
 
 def test_admin_token_round_trip(monkeypatch):
-    from admin_auth import issue_admin_token, verify_admin_token
+    from admin import issue_admin_token, verify_admin_token
 
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
     now = datetime(2026, 4, 26, tzinfo=timezone.utc)
@@ -26,7 +26,7 @@ def test_admin_token_round_trip(monkeypatch):
 
 
 def test_admin_token_rejects_wrong_secret(monkeypatch):
-    from admin_auth import issue_admin_token, verify_admin_token
+    from admin import issue_admin_token, verify_admin_token
 
     now = datetime(2026, 4, 26, tzinfo=timezone.utc)
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
@@ -39,7 +39,7 @@ def test_admin_token_rejects_wrong_secret(monkeypatch):
 
 
 def test_admin_token_rejects_expired_token(monkeypatch):
-    from admin_auth import issue_admin_token, verify_admin_token
+    from admin import issue_admin_token, verify_admin_token
 
     issued_at = datetime(2026, 4, 26, 12, 0, tzinfo=timezone.utc)
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
@@ -52,7 +52,7 @@ def test_admin_token_rejects_expired_token(monkeypatch):
 
 
 def test_validate_admin_secret_uses_constant_time_compare(monkeypatch):
-    from admin_auth import validate_admin_secret
+    from admin import validate_admin_secret
 
     monkeypatch.setenv("ADMIN_DASHBOARD_SECRET", "correct horse battery staple")
 
@@ -159,7 +159,7 @@ def test_a_future_admin_route_that_forgets_its_own_auth_check_is_still_rejected(
 
 def test_admin_overview_uses_admin_service_with_valid_token(monkeypatch):
     import api
-    from admin_auth import issue_admin_token
+    from admin import issue_admin_token
 
     events = []
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")

@@ -11,7 +11,7 @@ import os
 from typing import Any, Dict, List, Mapping, Set
 
 from services.scoring.extraction_layer import EXPECTED_COMPONENTS, _scout_narrative_bundle
-from utils.reference_verify import extract_http_urls, normalize_url_for_match
+from research.reference_verify import extract_http_urls, normalize_url_for_match
 
 
 def _truthy(key: str, default: str = "false") -> bool:

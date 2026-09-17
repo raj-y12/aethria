@@ -4,9 +4,9 @@ from uuid import uuid4
 
 import pytest
 
-from startup_id_alias_repository import StartupIdAliasConflict, StartupIdAliasRepository
-from startup_id_alias_backfill import load_reconciliation_artifact, repository_rows
-from startup_resolver import CanonicalStartupResolver
+from startups import StartupIdAliasConflict, StartupIdAliasRepository
+from startups import load_reconciliation_artifact, repository_rows
+from startups import CanonicalStartupResolver
 
 
 pytestmark = pytest.mark.skipif(

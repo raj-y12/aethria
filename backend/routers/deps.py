@@ -36,7 +36,7 @@ from portfolio.store import PortfolioStore
 from portfolio.cost_control import CostController
 from utils.storage import Storage
 from utils.timeutil import utcnow, ensure_aware
-from startup_repository import StartupRepository
+from startups import StartupRepository
 
 logger = logging.getLogger("api.deps")
 
@@ -169,13 +169,13 @@ def get_root() -> Path:
 # --- Storage helpers --------------------------------------------------------
 def get_service_client():
     """Load the legacy Supabase client only for compatibility routes."""
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
 
 
 def _supabase_storage_type():
-    from supabase_storage import SupabaseStartupsStorage
+    from legacy_supabase.storage import SupabaseStartupsStorage
 
     return SupabaseStartupsStorage
 

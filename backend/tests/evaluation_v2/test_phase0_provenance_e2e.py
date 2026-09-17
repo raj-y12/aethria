@@ -113,7 +113,7 @@ async def test_evidence_to_evaluation_reviewer_partner_and_api_provenance(monkey
     engine._supabase_client_uid = lambda: (None, "tenant-a")
     partner_args = dict(canonical_recommendation=baseline.recommendation.state.value, canonical_criteria=evaluated["criteria"], canonical_confidence=baseline.recommendation.confidence)
     partner_baseline, _ = engine.decision_engine.decide_with_execution_identity(scout, database.review, fund_thesis=engine.fund_thesis, **partner_args)
-    from contradiction_gate import apply_contradiction_gate
+    from context import apply_contradiction_gate
     baseline_guard = apply_contradiction_gate(user_id="tenant-a", review=partner_baseline, canonical_context=None)
     partner_baseline = dict(baseline_guard["guarded_review"])
     partner_baseline["contradiction_guard"] = baseline_guard

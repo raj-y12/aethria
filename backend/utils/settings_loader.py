@@ -628,7 +628,7 @@ async def is_scout_citation_allowlist_enforced(user_id: Optional[str] = None, *,
 
 async def get_canonical_website_hostname(user_id: Optional[str] = None, *, repository: SettingsRepository | None = None) -> Optional[str]:
     try:
-        from utils.reference_verify import hostname_from_user_hint
+        from research.reference_verify import hostname_from_user_hint
     except ImportError:
         return None
     raw = ((await load_settings(user_id, repository=repository)).get("fund_identity") or {}).get("canonical_website")

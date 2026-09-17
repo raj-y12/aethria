@@ -6,7 +6,7 @@ narrative were treated as current traction for a company acquired in 2023.
 Acquired companies are ineligible for an automatic decision unless
 independently verified as a new spinout; this module is deliberately
 conservative (regex over grounded/reviewer text, same rule-based style as
-utils/scout_post_review_enrichment.py's funding-stage inference) and routes a
+context/scout_post_review_enrichment.py's funding-stage inference) and routes a
 hit to human review rather than ever auto-deciding PASS or INVEST on it.
 """
 from __future__ import annotations

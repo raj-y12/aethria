@@ -1,6 +1,4 @@
-from commercial_knowledge import derive_commercial_claims
-from canonical_scout_claims import derive_scout_claims
-from context_assembler import ContextAssembler
+from context import ContextAssembler, derive_commercial_claims, derive_scout_claims
 
 
 def _claims(text):

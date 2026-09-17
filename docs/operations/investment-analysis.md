@@ -203,7 +203,7 @@ were updated for intentional product/version changes; historical goldens were no
 | `backend/investment_analysis/stages.py` | Runner callbacks; no legacy score authority. |
 | `backend/evidence/factual.py` | Exact scoped source quotations and deduplication. |
 | `backend/scout/{base,engine,schema,scouts}.py` | Factual Scout contract/prompts and preserved discovery infrastructure. |
-| `backend/canonical_scout_claims.py` | Honest unverified status for snippet claims. |
+| `backend/context/scout_claims.py` | Honest unverified status for snippet claims. |
 | `backend/evaluation_v2/{repository,service,evidence_projection,partner_rules}.py` | Immutable contracts/history, source snapshots and v5 parser. |
 | `backend/pipeline_runner.py`, `backend/api.py`, `backend/opportunity_pipeline.py` | Production entry-point convergence. |
 | `backend/routers/{evaluations,opportunities,meta}.py` | Scoped refresh, operator convergence and named blocks. |
@@ -440,7 +440,7 @@ unrelated pre-existing HomePage/settings work were preserved.
 - `backend/investment_analysis/prompts.py`: evidence-first attribution instructions.
 - `backend/investment_analysis/projection.py`: canonical action provenance.
 - `backend/evidence/retrieval.py`: relevant-source filtering before corroboration.
-- `backend/canonical_scout_claims.py`: avoid repeated canonical claim creation.
+- `backend/context/scout_claims.py`: avoid repeated canonical claim creation.
 - `backend/resolver/founder_resolver.py`, `backend/resolver/company_resolver.py`,
   `backend/people/service.py`, `backend/utils/founder_enrichment.py`: reject
   non-person founder labels before enrichment/persistence.
@@ -531,7 +531,7 @@ and lineage assertions were preserved and the Phase 0 fixture was not edited.
 
 Files changed in this follow-up: `backend/utils/{lookup_input,source_corroboration,
 traction_extraction}.py`, `backend/resolver/{company_resolver,founder_resolver}.py`,
-`backend/identity/service.py`, `backend/api.py`, `backend/canonical_scout_claims.py`,
+`backend/identity/service.py`, `backend/api.py`, `backend/context/scout_claims.py`,
 `backend/investment_analysis/grounding.py`; matching regressions in
 `backend/tests/{test_lookup_dispatch,test_source_corroboration,test_memo_data_integrity}.py`,
 `backend/tests/identity/test_identity_service.py`, and
@@ -613,7 +613,7 @@ Logs: `/tmp/glitch-final-backend.log`, `/tmp/glitch-frontend.log`,
 Exact files changed for this follow-up:
 
 - `backend/investment_analysis/grounding.py`: precise domain-matched identity label.
-- `backend/utils/source_corroboration.py`: contiguous company-phrase matching.
+- `backend/research/source_corroboration.py`: contiguous company-phrase matching.
 - `backend/investment_analysis/repository.py`: company-scoped claim reads,
   identity label selection, stale historical identity detection and prior-context guard.
 - `backend/evaluation_v2/evidence_projection.py`: same-company/opportunity evidence joins.

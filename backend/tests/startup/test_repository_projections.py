@@ -2,7 +2,7 @@ import pytest
 from types import SimpleNamespace
 
 from api import _list_projection_to_frontend
-from startup_repository import StartupRepository, _queue_reasons_for_startup
+from startups import StartupRepository, _queue_reasons_for_startup
 
 
 class _Connection:

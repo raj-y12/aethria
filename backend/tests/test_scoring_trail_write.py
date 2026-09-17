@@ -3,7 +3,7 @@
 from batch4a.context import reset_state, set_state
 from batch4a.repository import Batch4AState
 
-from supabase_storage import SupabaseStartupsStorage
+from legacy_supabase.storage import SupabaseStartupsStorage
 
 
 class _InsertBuilder:
@@ -47,7 +47,7 @@ def _trace():
     }
 
 
-from supabase_storage import SupabaseStartupsStorage
+from legacy_supabase.storage import SupabaseStartupsStorage
 
 
 def test_record_scoring_trail_inserts_denormalized_row_and_full_trace():

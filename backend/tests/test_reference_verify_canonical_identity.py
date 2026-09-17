@@ -1,4 +1,4 @@
-from utils.reference_verify import filter_references_by_company_relevance, finalize_scout_references
+from research.reference_verify import filter_references_by_company_relevance, finalize_scout_references
 from resolver.company_resolver import CompanyResolution
 from scout.base import Scout
 

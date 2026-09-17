@@ -8,7 +8,7 @@ from agent_trace import (
 )
 from api import _backend_to_frontend
 from models import ScoutInfo, Startup
-from supabase_storage import _dict_to_row, _row_to_dict
+from legacy_supabase.storage import _dict_to_row, _row_to_dict
 
 
 def test_scout_trace_flags_thin_sources_and_on_demand_no_thesis():

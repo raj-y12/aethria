@@ -3,7 +3,7 @@ Legacy Supabase-backed compatibility storage for the startups table.
 
 This module is retained only for migration/import tooling and pool-less legacy
 tests or development fallback. Normal runtime startup reads and writes use
-``startup_repository.StartupRepository`` and must not construct this class.
+``startups.StartupRepository`` and must not construct this class.
 
 Row-level upserts and targeted selects (no full-table delete+rewrite).
 Requires migrations 20260401000001_startups_list_projection_and_indexes.sql and
@@ -34,7 +34,7 @@ from agent_trace import (
     handoff_quality_from_trace,
     merge_stage_trace,
 )
-from utils.reference_validation import is_generic_reference
+from research.reference_validation import is_generic_reference
 from utils.partner_codes import normalize_recommendation
 from utils.storage import _merge_startup_dict_patch
 
@@ -1030,7 +1030,7 @@ class SupabaseStartupsStorage:
                 )
             return False
         if enrichment_review_output is not None:
-            from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+            from context import merge_scout_info_enrichment
 
             st.scout_info = merge_scout_info_enrichment(
                 st.scout_info,

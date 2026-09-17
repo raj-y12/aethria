@@ -397,7 +397,7 @@ async def test_persistent_agent_loop_runs_cycles_sequentially_and_stops_when_dis
 
 
 def test_admin_token_includes_jti(monkeypatch):
-    from admin_auth import issue_admin_token, verify_admin_token
+    from admin import issue_admin_token, verify_admin_token
 
     monkeypatch.setenv("ADMIN_TOKEN_SECRET", "test-token-secret-with-at-least-32-bytes")
 
@@ -421,7 +421,7 @@ def test_admin_routes_can_be_disabled_in_production(monkeypatch):
 
 def test_admin_overview_rate_limited_by_admin_token(monkeypatch):
     import api
-    from admin_auth import issue_admin_token
+    from admin import issue_admin_token
     from security.rate_limiter import InMemorySecurityStore
 
     monkeypatch.setenv("ADMIN_DASHBOARD_ENABLED", "true")

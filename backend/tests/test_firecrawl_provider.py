@@ -7,9 +7,9 @@ from urllib.error import HTTPError
 
 import pytest
 
-from utils.firecrawl_client import firecrawl_search
-from utils.search_providers import reset_providers
-from utils.search_results import ProviderSearchResults
+from research.firecrawl_client import firecrawl_search
+from research.search_providers import reset_providers
+from research.search_results import ProviderSearchResults
 
 
 class _Response:
@@ -46,7 +46,7 @@ def test_success_normalizes_markdown_and_deduplicates_urls(monkeypatch):
             {"title": "No URL", "description": "ignored"},
         ]},
     }
-    monkeypatch.setattr("utils.firecrawl_client.urlopen", lambda *args, **kwargs: _Response(payload))
+    monkeypatch.setattr("research.firecrawl_client.urlopen", lambda *args, **kwargs: _Response(payload))
 
     result = firecrawl_search("acme", max_results=5)
 
@@ -62,7 +62,7 @@ def test_success_normalizes_markdown_and_deduplicates_urls(monkeypatch):
 ])
 def test_malformed_responses_are_errors_not_silent_empty(monkeypatch, payload):
     monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-key")
-    monkeypatch.setattr("utils.firecrawl_client.urlopen", lambda *args, **kwargs: _Response(payload))
+    monkeypatch.setattr("research.firecrawl_client.urlopen", lambda *args, **kwargs: _Response(payload))
 
     result = firecrawl_search("acme")
 
@@ -81,8 +81,8 @@ def test_rate_limit_retries_then_reports_rate_limited(monkeypatch):
         attempts += 1
         raise HTTPError("https://api.firecrawl.dev/v2/search", 429, "limited", {"Retry-After": "0"}, BytesIO())
 
-    monkeypatch.setattr("utils.firecrawl_client.urlopen", limited)
-    monkeypatch.setattr("utils.firecrawl_client.time.sleep", lambda _: None)
+    monkeypatch.setattr("research.firecrawl_client.urlopen", limited)
+    monkeypatch.setattr("research.firecrawl_client.time.sleep", lambda _: None)
 
     result = firecrawl_search("acme")
 
@@ -93,7 +93,7 @@ def test_rate_limit_retries_then_reports_rate_limited(monkeypatch):
 
 def test_zero_results_has_populated_empty_diagnostic(monkeypatch):
     monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-key")
-    monkeypatch.setattr("utils.firecrawl_client.urlopen", lambda *args, **kwargs: _Response({"success": True, "data": {"web": []}}))
+    monkeypatch.setattr("research.firecrawl_client.urlopen", lambda *args, **kwargs: _Response({"success": True, "data": {"web": []}}))
 
     result = firecrawl_search("acme")
 

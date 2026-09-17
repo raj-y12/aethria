@@ -179,7 +179,7 @@ def founder_resolution_from_gap_pack(
         extract_founder_candidates,
         resolve_founders,
     )
-    from utils.reference_verify import hostname_from_user_hint
+    from research.reference_verify import hostname_from_user_hint
 
     company = str(scout.get("name") or "").strip()
     if not company or not is_founder_resolution_enabled():

@@ -2,7 +2,7 @@
 
 import pytest
 
-from utils.reviewer_structured_signals_clamp import clamp_structured_signals_evidence
+from reviewer.structured_signals_clamp import clamp_structured_signals_evidence
 
 
 def test_ungrounded_label_is_cleared_by_default(monkeypatch):

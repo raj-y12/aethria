@@ -13,7 +13,7 @@ from fund_intelligence.models import (
     ProposalReviewAction,
 )
 from fund_intelligence.service import build_override_pattern, can_publish, override_attribution
-from fund_thesis_repository import FundThesisRepository
+from fund_thesis import FundThesisRepository
 from tenant_context import require_user_id
 from utils.db_rows import db_row
 

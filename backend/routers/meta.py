@@ -40,7 +40,7 @@ from fund_thesis import (
 )
 from batch1.context import reset_state, set_state
 from batch1.repository import Batch1Repository
-from startup_repository import StartupReadStorageAdapter
+from startups import StartupReadStorageAdapter
 
 logger = logging.getLogger("api.meta")
 router = APIRouter()

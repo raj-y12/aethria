@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from models import ScoutInfo
-from supabase_storage import SupabaseStartupsStorage
+from legacy_supabase.storage import SupabaseStartupsStorage
 
 
 class _FakeTable:

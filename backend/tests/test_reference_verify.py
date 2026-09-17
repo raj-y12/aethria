@@ -5,7 +5,7 @@ from scout.schema import validate_scout_output
 
 
 def test_registrable_domain_and_parallel_detection():
-    from utils.reference_verify import (
+    from research.reference_verify import (
         is_parallel_same_slug_different_registrable,
         registrable_domain,
         reference_has_anchor_conflict,
@@ -22,7 +22,7 @@ def test_registrable_domain_and_parallel_detection():
 
 
 def test_filter_anchor_conflicts():
-    from utils.reference_verify import filter_references_anchor_conflicts
+    from research.reference_verify import filter_references_anchor_conflicts
 
     refs = [
         "Us https://aethria.co/",
@@ -39,7 +39,7 @@ def test_no_anchor_keeps_same_slug_other_tld():
     """On-demand lookups pass anchor_hostname=None so a same-named company's real
     references survive (e.g. looking up 'Aethria' must not drop aethria.com just
     because the fund's site is aethria.co)."""
-    from utils.reference_verify import filter_references_anchor_conflicts
+    from research.reference_verify import filter_references_anchor_conflicts
 
     refs = ["Co https://aethria.com/about", "Co https://aethria.co/"]
     out = filter_references_anchor_conflicts(refs, None)
@@ -143,7 +143,7 @@ def test_schema_requires_https_in_reference_line():
 
 def test_finalize_skips_probe_when_env_set(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "references": [
@@ -159,7 +159,7 @@ def test_finalize_skips_probe_when_env_set(monkeypatch):
 
 def test_finalize_drops_company_irrelevant_sources(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "name": "TinyPay",
@@ -178,7 +178,7 @@ def test_finalize_drops_company_irrelevant_sources(monkeypatch):
 
 def test_company_relevance_rejects_similar_name_collision(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "name": "Acme Robotics",
@@ -197,7 +197,7 @@ def test_company_relevance_rejects_similar_name_collision(monkeypatch):
 
 def test_company_relevance_uses_whole_tokens_not_substrings(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "name": "Linear",
@@ -216,7 +216,7 @@ def test_company_relevance_uses_whole_tokens_not_substrings(monkeypatch):
 
 def test_company_relevance_keeps_relevant_citation_even_with_prompt_injection_text(monkeypatch):
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "name": "TinyPay",
@@ -233,11 +233,11 @@ def test_company_relevance_keeps_relevant_citation_even_with_prompt_injection_te
 
 
 def test_filter_references_by_url_probe_keeps_inconclusive_company_source(monkeypatch):
-    from utils.reference_verify import filter_references_by_url_probe
+    from research.reference_verify import filter_references_by_url_probe
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setattr(
-        "utils.reference_verify.probe_url_status",
+        "research.reference_verify.probe_url_status",
         lambda url, timeout=4.0: "inconclusive",
     )
     output = {
@@ -250,11 +250,11 @@ def test_filter_references_by_url_probe_keeps_inconclusive_company_source(monkey
 
 
 def test_filter_references_by_url_probe_drops_hard_dead_link(monkeypatch):
-    from utils.reference_verify import filter_references_by_url_probe
+    from research.reference_verify import filter_references_by_url_probe
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setattr(
-        "utils.reference_verify.probe_url_status",
+        "research.reference_verify.probe_url_status",
         lambda url, timeout=4.0: "unreachable",
     )
     output = {
@@ -269,11 +269,11 @@ def test_filter_references_by_url_probe_drops_hard_dead_link(monkeypatch):
 def test_filter_references_by_url_probe_lenient_keeps_hard_dead_link(monkeypatch):
     # On-demand lookups are user-intentional: a dead probe (or a dark retrieval
     # provider) must not delete the citation and drop the requested company.
-    from utils.reference_verify import filter_references_by_url_probe
+    from research.reference_verify import filter_references_by_url_probe
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setattr(
-        "utils.reference_verify.probe_url_status",
+        "research.reference_verify.probe_url_status",
         lambda url, timeout=4.0: "unreachable",
     )
     output = {
@@ -289,7 +289,7 @@ def test_filter_references_by_url_probe_runs_independent_references_concurrently
     import threading
     import time
 
-    from utils.reference_verify import filter_references_by_url_probe
+    from research.reference_verify import filter_references_by_url_probe
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setenv("REFERENCE_PROBE_CONCURRENCY", "2")
@@ -307,7 +307,7 @@ def test_filter_references_by_url_probe_runs_independent_references_concurrently
             active -= 1
         return "reachable"
 
-    monkeypatch.setattr("utils.reference_verify.probe_url_status", probe)
+    monkeypatch.setattr("research.reference_verify.probe_url_status", probe)
     references = [
         "TinyPay official site - https://tinypay.example/",
         "TinyPay funding - https://news.example/tinypay",
@@ -322,11 +322,11 @@ def test_filter_references_by_url_probe_runs_independent_references_concurrently
 def test_finalize_lenient_lookup_restores_refs_when_all_pruned(monkeypatch):
     # When every reference fails the live probe, a lenient (lookup) finalize keeps the
     # model's URL-bearing citations as a fallback so the company is not dropped to zero.
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setattr(
-        "utils.reference_verify.probe_url_status",
+        "research.reference_verify.probe_url_status",
         lambda url, timeout=4.0: "unreachable",
     )
     output = {
@@ -350,7 +350,7 @@ def test_finalize_lenient_lookup_does_not_restore_anchor_rejected_citations(monk
     genuinely about "Linearity", not the target "Linear" -- would have been
     restored wholesale once relevance filtering pruned them to zero."""
     monkeypatch.setenv("SKIP_REFERENCE_URL_VERIFY", "1")
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     output = {
         "name": "Linear",
@@ -367,11 +367,11 @@ def test_finalize_lenient_lookup_does_not_restore_anchor_rejected_citations(monk
 
 def test_finalize_strict_still_drops_when_all_pruned(monkeypatch):
     # Default (autonomous pipeline) behavior is unchanged: no fallback, refs are dropped.
-    from utils.reference_verify import finalize_scout_references
+    from research.reference_verify import finalize_scout_references
 
     monkeypatch.delenv("SKIP_REFERENCE_URL_VERIFY", raising=False)
     monkeypatch.setattr(
-        "utils.reference_verify.probe_url_status",
+        "research.reference_verify.probe_url_status",
         lambda url, timeout=4.0: "unreachable",
     )
     output = {
@@ -385,7 +385,7 @@ def test_finalize_strict_still_drops_when_all_pruned(monkeypatch):
 
 
 def test_filter_references_to_allowlist_keeps_only_allowed_urls():
-    from utils.reference_verify import filter_references_to_allowlist
+    from research.reference_verify import filter_references_to_allowlist
 
     refs = [
         "[S1] Hivery - https://hivery.com/",
@@ -402,7 +402,7 @@ def test_filter_references_to_allowlist_keeps_only_allowed_urls():
 
 
 def test_filter_references_to_allowlist_rejects_phonetic_domain_mismatch():
-    from utils.reference_verify import filter_references_to_allowlist
+    from research.reference_verify import filter_references_to_allowlist
 
     refs = [
         "[S1] Hivery profile - https://rivery.io/company",
@@ -414,7 +414,7 @@ def test_filter_references_to_allowlist_rejects_phonetic_domain_mismatch():
 
 
 def test_filter_references_to_allowlist_accepts_equivalent_url_variants():
-    from utils.reference_verify import filter_references_to_allowlist
+    from research.reference_verify import filter_references_to_allowlist
 
     refs = [
         "[S1] Company site - https://www.hivery.com/?ref=abc",
@@ -426,7 +426,7 @@ def test_filter_references_to_allowlist_accepts_equivalent_url_variants():
 
 
 def test_filter_references_to_allowlist_accepts_same_host_different_path():
-    from utils.reference_verify import filter_references_to_allowlist
+    from research.reference_verify import filter_references_to_allowlist
 
     refs = [
         "[S1] Story - https://techcrunch.com/2025/01/01/company-raises",

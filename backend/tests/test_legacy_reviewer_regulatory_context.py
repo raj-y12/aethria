@@ -2,7 +2,7 @@ import asyncio
 from types import SimpleNamespace
 import pytest
 
-from regulatory_context import (
+from context import (
     apply_regulatory_grounding_guard,
     build_reviewer_regulatory_context,
     CanonicalReviewerRegulatoryContextProvider,

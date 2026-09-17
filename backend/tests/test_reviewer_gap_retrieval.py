@@ -1,6 +1,6 @@
 """Reviewer gap-triggered supplemental retrieval."""
 
-from utils.reviewer_gap_retrieval import (
+from reviewer.gap_retrieval import (
     build_gap_queries,
     enrich_scout_for_reviewer_llm,
     fetch_reviewer_gap_pack,
@@ -73,7 +73,7 @@ def test_enrich_adds_supplement_when_pack_non_empty(monkeypatch):
             "url_allowlist": {"https://a.com"},
         }
 
-    monkeypatch.setattr("utils.reviewer_gap_retrieval.fetch_reviewer_gap_pack", fake_pack)
+    monkeypatch.setattr("reviewer.gap_retrieval.fetch_reviewer_gap_pack", fake_pack)
     base = {
         "name": "Co",
         "est_tam": None,
@@ -103,7 +103,7 @@ def test_enrich_skips_broad_gap_search_when_operator_context_is_present(monkeypa
     def unexpected_pack(*args, **kwargs):
         raise AssertionError("broad gap retrieval should be skipped for add-context")
 
-    monkeypatch.setattr("utils.reviewer_gap_retrieval.fetch_reviewer_gap_pack", unexpected_pack)
+    monkeypatch.setattr("reviewer.gap_retrieval.fetch_reviewer_gap_pack", unexpected_pack)
     out = enrich_scout_for_reviewer_llm(
         {
             "name": "Acme",
@@ -152,7 +152,7 @@ def test_reviewer_gap_retrieval_keeps_trusted_external_corroboration(monkeypatch
             },
         }
 
-    monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
+    monkeypatch.setattr("research.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
     pack = fetch_reviewer_gap_pack(
         {
             "name": "Aethria",
@@ -182,7 +182,7 @@ def test_reviewer_gap_retrieval_runs_for_missing_founders_even_when_other_fields
         captured.update(kwargs)
         return {"provider": "exa", "sources": [{"url": "https://techcrunch.com/aethria"}]}
 
-    monkeypatch.setattr("utils.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
+    monkeypatch.setattr("research.retrieval_grounding.retrieve_source_pack_merged", fake_retrieve)
     pack = fetch_reviewer_gap_pack(
         {
             "name": "Aethria",

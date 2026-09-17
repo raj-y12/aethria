@@ -166,7 +166,7 @@ def build_discovery_recency_query(
     thesis_ctx: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Label for the recency/news query, narrowed to the mandate's sectors."""
-    from utils.recency import recency_query
+    from research.recency import recency_query
 
     terms = thesis_terms(thesis_ctx)
     sectors = terms.get("sectors") or []

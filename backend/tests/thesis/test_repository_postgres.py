@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from fund_thesis_repository import FundThesisRepository
+from fund_thesis import FundThesisRepository
 
 
 pytestmark = pytest.mark.skipif(

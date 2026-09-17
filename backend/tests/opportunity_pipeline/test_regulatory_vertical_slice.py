@@ -4,7 +4,7 @@ import pytest
 
 from identity.models import IdentityAdmission, IdentityStatus, SourceChannel, SourceObservationInput
 from opportunity_pipeline import OpportunityPipeline
-from regulatory_context import (
+from context import (
     assemble_regulatory_context,
     derive_regulatory_claims,
     deduplicate_references,

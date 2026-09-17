@@ -268,7 +268,7 @@ def http_reachable(url: str, timeout: float = 4.0) -> bool:
 
 
 def reference_string_verified(ref: str, timeout: float = 4.0) -> bool:
-    from utils.reference_validation import is_generic_reference
+    from research.reference_validation import is_generic_reference
 
     if not isinstance(ref, str) or not ref.strip() or is_generic_reference(ref):
         return False

@@ -1,4 +1,4 @@
-from canonical_scout_claims import derive_scout_claims
+from context import derive_scout_claims
 
 
 def test_source_snippets_do_not_make_scout_claims_externally_verified():
@@ -14,7 +14,7 @@ def test_source_snippets_do_not_make_scout_claims_externally_verified():
 async def test_persisted_scout_claims_and_evidence_remain_unverified():
     from types import SimpleNamespace
     from unittest.mock import AsyncMock
-    from canonical_scout_claims import persist_scout_claims
+    from context import persist_scout_claims
 
     repository = SimpleNamespace(
         get_ledger=AsyncMock(return_value={"claims": [], "claim_evidence_links": []}),

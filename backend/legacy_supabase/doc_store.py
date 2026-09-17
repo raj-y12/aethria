@@ -13,7 +13,7 @@ T = TypeVar("T")
 from uuid import uuid4
 
 from tenant_context import require_user_id
-from supabase_client import get_service_client
+from legacy_supabase.client import get_service_client
 
 logger = logging.getLogger(__name__)
 

@@ -95,9 +95,9 @@ from routers.deps import (
     ADMIN_LOGIN_POLICY as _ADMIN_LOGIN_POLICY,
     ADMIN_OVERVIEW_POLICY as _ADMIN_OVERVIEW_POLICY,
 )
-from admin_auth import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
-from admin_audit import record_admin_audit_event
-from admin_service import build_admin_overview
+from admin import admin_token_ttl_seconds, issue_admin_token, validate_admin_secret, verify_admin_token
+from admin import record_admin_audit_event
+from admin import build_admin_overview
 from memo_generator import MemoGenerator
 from meta.agent import MetaAgent  # For manual trigger
 from meta.reweighter import load_weights
@@ -121,7 +121,7 @@ from user_state.repository import UserStateRepository
 from settings_repository import SettingsRepository
 from batch1.context import reset_state, set_state
 from batch1.repository import Batch1Repository
-from startup_repository import StartupRepository, startup_dict
+from startups import StartupRepository, startup_dict
 from db.migration_runner import inspect_migration_head
 
 
@@ -130,14 +130,14 @@ _PORTABLE_MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "db" / "migr
 
 def get_service_client():
     """Load the legacy Supabase client only when a compatibility path needs it."""
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
 
 
 def _is_supabase_storage(value: Any) -> bool:
     """Identify the legacy adapter without making it a normal runtime import."""
-    from supabase_storage import SupabaseStartupsStorage
+    from legacy_supabase.storage import SupabaseStartupsStorage
 
     return isinstance(value, SupabaseStartupsStorage)
 
@@ -336,20 +336,18 @@ from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisMissingError,
     FundThesisQueryError,
+    FundThesisRepository,
     _bootstrap_default_thesis_or_raise,
+    bootstrap_default_thesis_with_repository,
     compute_thesis_alignment_stats,
     get_active_thesis,
     get_active_thesis_metadata,
-    thesis_has_embeddings,
-    bootstrap_default_thesis_with_repository,
-)
-from fund_thesis_ops import (
     sync_fund_config_to_active_thesis,
     sync_fund_config_to_active_thesis_with_repository,
+    thesis_has_embeddings,
 )
-from fund_thesis_repository import FundThesisRepository
 from models import FundConfig, FundMemory, Startup, UserPreferences
-from conviction_state import build_conviction_patch
+from context import build_conviction_patch
 from core import policy_resolver
 from utils.partner_codes import (
     LEGACY_TO_RECOMMENDATION,
@@ -1302,8 +1300,8 @@ async def _lifespan(app: FastAPI):
     # it hides drift. This makes it a single visible signal instead.
     if os.getenv("USE_SUPABASE_STORAGE") == "1":
         try:
-            from supabase_client import get_service_client
-            from supabase_storage import detect_schema_drift
+            from legacy_supabase.client import get_service_client
+            from legacy_supabase.storage import detect_schema_drift
 
             drift = detect_schema_drift(get_service_client())
             if drift:

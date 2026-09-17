@@ -1,5 +1,5 @@
-"""Tests for fund_thesis_ops.backfill_thesis_embeddings (tenant-scoped, idempotent)."""
-import fund_thesis_ops as ops
+"""Tests for fund_thesis.ops.backfill_thesis_embeddings (tenant-scoped, idempotent)."""
+import fund_thesis.ops as ops
 
 
 class _Query:

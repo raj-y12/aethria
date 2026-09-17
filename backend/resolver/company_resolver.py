@@ -29,9 +29,9 @@ from pydantic import BaseModel, Field
 from core.policy_resolver import get_identity_disambiguation_rules
 from resolver.identity_disambiguation import disambiguate_identity
 from tenant_context import require_user_id
-from utils.reference_verify import hostname_from_user_hint, registrable_domain
-from utils.retrieval_grounding import retrieve_source_pack_merged
-from utils.search_providers import extract_pages
+from research.reference_verify import hostname_from_user_hint, registrable_domain
+from research.retrieval_grounding import retrieve_source_pack_merged
+from research.search_providers import extract_pages
 
 logger = logging.getLogger("resolver.company")
 
@@ -450,7 +450,7 @@ def _profile_matches_anchor(
     # name the company at all, which was the larger share of the pollution.
     if not anchor_host:
         return True
-    from utils.source_corroboration import source_mentions_company
+    from research.source_corroboration import source_mentions_company
     return source_mentions_company(source.model_dump(), company_name=company, anchor_host=anchor_host)
 
 

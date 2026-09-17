@@ -1,6 +1,6 @@
 import pytest
 
-from admin_audit import record_admin_audit_event
+from admin import record_admin_audit_event
 
 
 class _Acquire:
