@@ -1,8 +1,15 @@
 """
-AETHRIA Reviewer Layer
+AETHRIA Reviewer Layer — LEGACY / COMPATIBILITY, not the authoritative
+runtime path.
 
-The Reviewer layer evaluates Scout discoveries and provides
-structured assessments of quality, realism, and fundability.
+The three-persona Reviewer implementation this package holds is retired for
+live decision-making. The current, authoritative Reviewer phase lives in
+`backend/investment_analysis/` (see its README and ADR-0016). This package
+is kept for historical replay, Phase-0 golden fixtures, and because
+`ReviewerEngine` is still constructed as a compatibility component by
+`pipeline_runner.py`/`api.py`. Do not add new product behaviour here; if you
+are implementing a new Reviewer capability, it belongs in
+`investment_analysis/`.
 """
 from reviewer.base import Reviewer
 from reviewer.gap_retrieval import enrich_scout_for_reviewer_llm

@@ -2,8 +2,10 @@
 
 The original three-persona Reviewer implementation. **Historical
 compatibility code** — the current evidence-first Reviewer lives in
-`backend/investment_analysis/` (ARCHITECTURE.md §3.1, ADR-0016). Retained
-while migration is in progress; do not add new product behaviour here.
+`backend/investment_analysis/` (ARCHITECTURE.md §3.1, ADR-0016 — Accepted,
+not a migration in progress). Retained for historical replay and because
+`ReviewerEngine` is still used as a compatibility component; do not add new
+product behaviour here.
 
 ## Purpose
 
