@@ -295,6 +295,7 @@ jobs:
           tests/identity/test_identity_repository_postgres.py
           tests/fund_intelligence/test_fund_intelligence_postgres.py
           tests/thesis/test_repository_postgres.py
+          tests/semantic_evaluation/test_repository_postgres.py
           tests/security/test_security_repository_postgres.py
           tests/settings/test_settings_loader_postgres.py
           tests/test_job_schedule.py

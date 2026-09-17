@@ -25,6 +25,7 @@ from settings_repository import SettingsRepository
 from utils.settings_loader import DEFAULT_SETTINGS
 from core.policy_resolver import get_evaluation_rubric
 from pipeline_contracts.models import Lineage, Identity, ReviewerOutput
+from semantic_evaluation.repository import SemanticEvaluationRepository
 from tenant_context import require_user_id
 from .model_gateway import ModelGateway, AnalysisBlocked
 from .service import analyze
@@ -233,7 +234,8 @@ class InvestmentAnalysisRepository(EvaluationRepository):
                                    snapshot=snapshot, policy=policy, context=context, generate=generate,
                                    evaluation_at=analysis_at, reviewer_model=reviewer_model, partner_model=partner_model,
                                    prior_review=reused_review, prior_snapshot=prior_snapshot,
-                                   research=research if review_mode == "full" else None)
+                                   research=research if review_mode == "full" else None,
+                                   semantic_evaluation_repository=SemanticEvaluationRepository(self.pool))
             current_prerequisites = await self._prerequisites(uid)
             if (current_prerequisites.policy != policy
                     or current_prerequisites.thesis_version_id != thesis_version_id
