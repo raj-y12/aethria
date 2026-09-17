@@ -157,13 +157,6 @@ if ENABLED:
         ["path", "outcome"],
         registry=REGISTRY,
     )
-    SEMANTIC_EVALUATIONS = Counter(
-        "aethria_semantic_evaluations_total",
-        "Shadow semantic evaluation calls by evaluation_type, provider, and status. "
-        "Observability only; never used to gate the counted call's caller.",
-        ["evaluation_type", "provider", "status"],
-        registry=REGISTRY,
-    )
     LOOKUPS = Counter(
         "aethria_lookups_total",
         "On-demand lookups, by outcome.",
@@ -302,9 +295,6 @@ def observe_pipeline_stage(
 _DECISION_READY_COHORTS = {"manual_lookup", "autonomous_discovery"}
 _EVALUATION_PATHS = {"manual_lookup", "autonomous_discovery", "rerun"}
 _OUTCOMES = {"success", "error", "incomplete"}
-_SEMANTIC_EVALUATION_TYPES = {"evidence_relevance", "claim_support", "research_usefulness"}
-_SEMANTIC_EVALUATION_PROVIDERS = {"mock", "jev"}
-_SEMANTIC_EVALUATION_STATUSES = {"success", "timeout", "provider_error", "budget_skipped", "disabled"}
 _JOB_TYPES = {"pipeline_cycle", "company_lookup"}
 _JOB_TRANSITIONS = {
     "accepted",
@@ -443,19 +433,6 @@ def inc_evaluation_manifest(*, path: str, outcome: str) -> None:
         ).inc()
     except Exception as e:  # pragma: no cover
         logger.debug("inc_evaluation_manifest failed: %s", e)
-
-
-def inc_semantic_evaluation(*, evaluation_type: str, provider: str, status: str) -> None:
-    if not ENABLED:
-        return
-    try:
-        SEMANTIC_EVALUATIONS.labels(
-            evaluation_type=_allowlisted(evaluation_type, _SEMANTIC_EVALUATION_TYPES),
-            provider=_allowlisted(provider, _SEMANTIC_EVALUATION_PROVIDERS),
-            status=_allowlisted(status, _SEMANTIC_EVALUATION_STATUSES),
-        ).inc()
-    except Exception as e:  # pragma: no cover
-        logger.debug("inc_semantic_evaluation failed: %s", e)
 
 
 def inc_durable_job(*, job_type: str, transition: str) -> None:

@@ -353,18 +353,6 @@ REGISTRY: List[EnvVar] = [
     EnvVar("DEAL_CONTEXT_LOG_PIPELINE", "bool", "", "Scoring / misc", "Log deal-context assembly during pipeline."),
     EnvVar("AETHRIA_TOKEN_COST_PER_1K_USD", "float", "0.001", "Scoring / misc", "Assumed $/1k tokens for cost estimates."),
 
-    # --- Semantic evaluation (shadow-only; see backend/semantic_evaluation/README.md) ---
-    EnvVar("SEMANTIC_EVALUATION_ENABLED", "bool", "false", "Semantic evaluation",
-           "Master switch. When false, evaluate() always returns status=disabled without calling any provider or persisting anything."),
-    EnvVar("SEMANTIC_EVALUATION_ROLLOUT_MODE", "str", "shadow", "Semantic evaluation",
-           "Only 'shadow' is implemented: observations are recorded, never read to affect authoritative Scout/Reviewer/Partner behaviour. Any other value is rejected at read time."),
-    EnvVar("SEMANTIC_EVALUATION_PROVIDER", "str", "mock", "Semantic evaluation",
-           "Provider backing evaluate(). 'jev' is not implemented yet."),
-    EnvVar("SEMANTIC_EVALUATION_TIMEOUT_SECONDS", "float", "5", "Semantic evaluation",
-           "Hard timeout for one provider call; exceeding it yields status=timeout rather than blocking the caller."),
-    EnvVar("SEMANTIC_EVALUATION_MAX_CALLS_PER_MINUTE", "int", "60", "Semantic evaluation",
-           "Simple in-process rate cap, deliberately decoupled from any tenant's real analysis budget so a runaway shadow loop can never compete with Reviewer/Partner spend. Exceeding it yields status=budget_skipped. Placeholder until a real dollar-cost CostController envelope is wired in alongside a paid provider."),
-
     # --- Local contract tests ------------------------------------------------
     EnvVar("TEST_DATABASE_URL", "secret", "", "Local contract tests",
            "Vanilla PostgreSQL DSN used only by PostgreSQL contract tests."),

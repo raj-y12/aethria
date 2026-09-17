@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from datetime import datetime
 from hashlib import sha256
 import json
-from typing import Awaitable, Callable, Optional
+from typing import Awaitable, Callable
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -24,10 +24,6 @@ from pipeline_contracts.models import (
     Identity, Lineage, PolicyVersions, StageMetadata, ReasoningUnit,
     ReviewerOutput, ReviewerAssessment, AnalysisSection, ReviewStatus, ReasoningType,
 )
-from semantic_evaluation.models import SemanticEvaluationInput, SemanticEvaluationType, SemanticQuestion
-from semantic_evaluation.providers.base import SemanticEvaluationProvider
-from semantic_evaluation.repository import SemanticEvaluationRepository
-from semantic_evaluation.service import schedule_shadow_evaluation
 from .models import ReviewerDraft, PartnerDraft, PartnerAction, PartnerDecision, AnalysisResult
 from .prompts import REVIEWER_PROMPT, PARTNER_PROMPT, REVIEWER_PROMPT_VERSION, PARTNER_PROMPT_VERSION
 from .validation import validate_assessments
@@ -146,51 +142,13 @@ def _bind_review(draft: ReviewerDraft, *, lineage: Lineage, identity: Identity,
     )
 
 
-def _shadow_claim_support_input(
-    *, review: ReviewerOutput, admitted_snapshot: list[dict],
-    lineage: Lineage,
-) -> SemanticEvaluationInput | None:
-    """Best-effort CLAIM_SUPPORT input from this analysis's own review — or
-    None if there is nothing meaningful to ask about. Never raises: a
-    malformed shape here must not affect the caller, so callers should treat
-    a None return the same as any other reason not to fire a shadow call."""
-    try:
-        claims_by_id = {str(claim["claim_id"]): claim for claim in admitted_snapshot}
-        for assessment in review.assessments:
-            for unit in assessment.reasoning_units:
-                claim_ids = list(unit.references.claim_ids)
-                if not claim_ids or not unit.text:
-                    continue
-                claim_text = str(claims_by_id.get(claim_ids[0], {}).get("display_text") or "")
-                if not claim_text:
-                    continue
-                return SemanticEvaluationInput(
-                    evaluation_type=SemanticEvaluationType.CLAIM_SUPPORT,
-                    state={"claim": claim_text, "evidence_excerpt": unit.text},
-                    questions=[SemanticQuestion(
-                        question_id="claim_support",
-                        text="Does the evidence excerpt support the claim?",
-                    )],
-                    claim_ids=claim_ids,
-                    source_ids=list(unit.references.source_ids),
-                    pipeline_run_id=lineage.pipeline_run_id,
-                    startup_id=lineage.company_id,
-                    opportunity_id=lineage.opportunity_id,
-                )
-    except Exception:  # noqa: BLE001 - shadow input construction must never affect analyze()
-        return None
-    return None
-
-
 async def analyze(*, user_id: str, lineage: Lineage, identity: Identity,
                   snapshot: list[dict], policy: EvaluationPolicy, context: dict,
                   generate: Generate, evaluation_at: datetime,
                   reviewer_model: str | None = None, partner_model: str | None = None,
                   prior_review: ReviewerOutput | None = None,
                   prior_snapshot: list[dict] | None = None,
-                  research: Callable[[list[str]], Awaitable[tuple[list[dict], datetime]]] | None = None,
-                  semantic_evaluation_repository: Optional[SemanticEvaluationRepository] = None,
-                  semantic_evaluation_provider: Optional[SemanticEvaluationProvider] = None) -> AnalysisResult:
+                  research: Callable[[list[str]], Awaitable[tuple[list[dict], datetime]]] | None = None) -> AnalysisResult:
     uid = require_user_id(user_id, context="investment_analysis")
     if lineage.user_id != uid:
         raise ValueError("analysis tenant mismatch")
@@ -382,13 +340,5 @@ async def analyze(*, user_id: str, lineage: Lineage, identity: Identity,
         )
     audit_context = {**deepcopy(context), **({"targeted_research": research_audit} if research_audit else {}),
                      **({"evidence_packet": packet_audit} if packet_audit else {})}
-    # Shadow-only: observes this analysis's own review, never reads its own
-    # result, never awaited. See semantic_evaluation/README.md for the
-    # invariant this must uphold — a SHADOW result can never reach anything
-    # below this line, because there is nothing below this line but return.
-    shadow_input = _shadow_claim_support_input(review=review, admitted_snapshot=admitted_snapshot, lineage=lineage)
-    if shadow_input is not None:
-        schedule_shadow_evaluation(shadow_input, user_id=uid, repository=semantic_evaluation_repository,
-                                   provider=semantic_evaluation_provider)
     return AnalysisResult(trace=trace, review_reused=prior_review is not None, context_snapshot=audit_context, reviewer=review, validation=validation, partner=partner,
         evaluation=EvaluationResult(snapshot_hash=digest, criteria=criteria, recommendation=recommendation))
