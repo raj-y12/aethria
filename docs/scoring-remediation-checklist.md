@@ -429,7 +429,7 @@ Work one task at a time, tick it only when its **Validation gate** passes.
   calls it once per startup after the primary review is finalized (best-effort — a
   trail-write failure can never break a review; no-op on file-storage dev backends).
   - Files: `supabase/migrations/20260604000002_scoring_trail.sql`,
-    `backend/supabase_storage.py` (`record_scoring_trail`),
+    `backend/legacy_supabase/storage.py` (`record_scoring_trail`),
     `backend/reviewer/engine.py` (`_persist_scoring_trail` + call site),
     `backend/tests/test_scoring_trail_write.py` (new).
   - **Validation gate:** ✅ migration **APPLIED to aethria-prod** (`scoring_trails` exists,

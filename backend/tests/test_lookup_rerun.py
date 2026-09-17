@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from models import Financials, PartnerInfo, PartnerSnapshot, ReviewInfo, ScoutInfo, Startup
 from pipeline_runner import _OPERATOR_URL_RE
-from supabase_storage import SupabaseStartupsStorage, _dict_to_row
+from legacy_supabase.storage import SupabaseStartupsStorage, _dict_to_row
 
 
 class _Builder:

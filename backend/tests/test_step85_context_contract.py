@@ -1,6 +1,4 @@
-from context_assembler import ContextAssembler
-from founder_context import build_founder_context
-from regulatory_context import build_reviewer_regulatory_context
+from context import ContextAssembler, build_founder_context, build_reviewer_regulatory_context
 
 
 def test_context_assembler_exposes_one_stable_snapshot_shape():

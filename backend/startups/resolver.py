@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from startup_id_alias_repository import StartupIdAliasRepository
-from startup_repository import StartupRepository
+from startups.id_alias_repository import StartupIdAliasRepository
+from startups.repository import StartupRepository
 
 
 class CanonicalStartupResolver:

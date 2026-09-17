@@ -35,7 +35,7 @@ from pipeline_runner import run_one_pipeline_cycle
 from tenant_context import require_user_id
 from utils.job_schedule import configure_schedule_repository
 from retrieval_cache.repository import RetrievalCacheRepository
-from utils.retrieval_grounding import configure_retrieval_cache
+from research.retrieval_grounding import configure_retrieval_cache
 
 
 class ColorFormatter(logging.Formatter):

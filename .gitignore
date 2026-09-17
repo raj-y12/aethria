@@ -62,8 +62,9 @@ supabase/.temp/
 .agent/
 .impeccable/critique/
 
-# Local developer tools and generated tool output
-tools/
+# Local developer tools and generated tool output (repo root only — do not
+# shadow package directories named tools/, e.g. backend/scout/tools/)
+/tools/
 
 # Checked-in maintenance scripts
 !backend/scripts/

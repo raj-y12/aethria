@@ -1,9 +1,9 @@
-from utils.retrieval_grounding import retrieve_source_pack, retrieve_source_pack_merged
+from research.retrieval_grounding import retrieve_source_pack, retrieve_source_pack_merged
 
 
 def test_retrieve_source_pack_uses_the_chain(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
+        "research.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [
             {"title": "Hivery", "url": "https://hivery.com", "snippet": "profile"}
         ],
@@ -29,7 +29,7 @@ def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
             {"title": "C", "url": "https://c.com", "snippet": "third"},
         ]
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", fake_firecrawl)
     pack = retrieve_source_pack_merged(
         queries=["Acme startup funding", "Acme traction customers"],
         user_id="u1",
@@ -54,7 +54,7 @@ def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
         # general queries flood enough rows to fill a small cap on their own
         return [{"title": f"g{i}", "url": f"https://g{i}.com", "snippet": "x"} for i in range(8)]
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", fake_firecrawl)
     pack = retrieve_source_pack_merged(
         queries=["Acme funding", "Acme product", "Acme founders"],
         recency_query="Acme latest news 2026 acquisition merger",
@@ -72,10 +72,10 @@ def test_recency_query_runs_first_as_news_and_survives_cap(monkeypatch):
 
 def test_retrieve_source_pack_empty_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
+        "research.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
-    monkeypatch.setattr("utils.retrieval_grounding._fallback_search", lambda query, max_results: [])
+    monkeypatch.setattr("research.retrieval_grounding._fallback_search", lambda query, max_results: [])
     pack = retrieve_source_pack(query="unknown", user_id="u1", max_results=3)
     assert pack["sources"] == []
     assert pack["url_allowlist"] == set()
@@ -90,9 +90,9 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
             return [{"title": "Chain result", "url": "https://chain.example", "snippet": "x"}]
         return []
 
-    monkeypatch.setattr("utils.search_providers.firecrawl_search", fake_firecrawl)
+    monkeypatch.setattr("research.search_providers.firecrawl_search", fake_firecrawl)
     monkeypatch.setattr(
-        "utils.retrieval_grounding._fallback_search",
+        "research.retrieval_grounding._fallback_search",
         lambda query, max_results: [{"title": "DDG result", "url": "https://ddg.example", "snippet": "x"}],
     )
     pack = retrieve_source_pack_merged(
@@ -104,11 +104,11 @@ def test_retrieve_source_pack_merged_reports_mixed_providers(monkeypatch):
 
 def test_retrieve_source_pack_reports_provider_chain_when_no_results(monkeypatch):
     monkeypatch.setattr(
-        "utils.search_providers.firecrawl_search",
+        "research.search_providers.firecrawl_search",
         lambda query, max_results, time_range=None, topic=None, days=None: [],
     )
     monkeypatch.setattr(
-        "utils.retrieval_grounding._fallback_search",
+        "research.retrieval_grounding._fallback_search",
         lambda query, max_results: [],
     )
 

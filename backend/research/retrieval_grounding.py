@@ -16,10 +16,10 @@ from typing import Any, Dict, List, Set
 import certifi
 
 import metrics
-from utils.reference_verify import extract_http_urls, normalize_url_for_match
-from utils.search_providers import normalize_category, provider_name, provider_search
-from utils.search_results import ProviderSearchResults
-from utils.retrieval_cache import RetrievalCache, build_retrieval_identity, freshness_ttl_seconds, key_lock
+from research.reference_verify import extract_http_urls, normalize_url_for_match
+from research.search_providers import normalize_category, provider_name, provider_search
+from research.search_results import ProviderSearchResults
+from retrieval_cache import RetrievalCache, build_retrieval_identity, freshness_ttl_seconds, key_lock
 from security.prompt_safety import flag_prompt_injection, isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger("retrieval_grounding")
@@ -512,7 +512,7 @@ def retrieve_source_pack_merged(
     # the cap. The recency query runs against the news category (recency-ranked),
     # with a general-search fallback if news returns nothing.
     if rq:
-        from utils.recency import coarse_time_range, recency_window_days
+        from research.recency import coarse_time_range, recency_window_days
 
         tr = recency_time_range or coarse_time_range()
         reserved = int(os.getenv("SCOUT_RECENCY_RESERVED_SLOTS", "5"))

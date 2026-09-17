@@ -2,7 +2,7 @@
 
 Scout JSON remains the compatibility payload used by the existing Reviewer and
 Partner paths. When a Scout payload also contains source snippets, the bounded
-bridge in `backend/canonical_scout_claims.py` derives only four decision-bearing
+bridge in `backend/context/scout_claims.py` derives only four decision-bearing
 claim families:
 
 - `funding_stage`

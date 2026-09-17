@@ -23,7 +23,6 @@ from portfolio.repository import PortfolioRepository
 from decisions.repository import DecisionRepository
 from settings_repository import SettingsRepository
 from utils.settings_loader import DEFAULT_SETTINGS
-from reviewer.base import DEFAULT_MAX_COMPLETION_TOKENS
 from core.policy_resolver import get_evaluation_rubric
 from pipeline_contracts.models import Lineage, Identity, ReviewerOutput
 from tenant_context import require_user_id
@@ -32,6 +31,12 @@ from .service import analyze
 from .evidence import prepare_factual_evidence
 from .models import AnalysisResult
 from .dependencies import AnalysisDependencyStatus, DependencyState, inspect_analysis_dependencies
+
+# Default completion-token budget for this repository's own ModelGateway
+# construction. Deliberately independent of reviewer/base.py's identically-named
+# constant: that one feeds the legacy Reviewer's own retry-budget doubling
+# (REVIEWER_MAX_COMPLETION_TOKENS), which this path does not use.
+DEFAULT_MAX_COMPLETION_TOKENS = 16384
 
 
 class InvestmentAnalysisRepository(EvaluationRepository):

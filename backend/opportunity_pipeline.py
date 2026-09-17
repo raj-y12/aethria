@@ -34,12 +34,12 @@ from identity.models import IdentityAdmission, SourceObservationInput
 from tenant_context import require_user_id
 from triage.models import TriageDisposition
 from agents.canonical import DeterministicPartner, EvidenceReviewer
-from regulatory_context import (
+from context import (
     assemble_regulatory_context,
     deduplicate_references,
     derive_regulatory_claims,
+    derive_scout_claims,
 )
-from canonical_scout_claims import derive_scout_claims
 
 
 @dataclass(frozen=True)

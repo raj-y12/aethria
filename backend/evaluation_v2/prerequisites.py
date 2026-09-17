@@ -40,7 +40,7 @@ _GOVERNED_POLICY_NOT_FOUND = object()
 
 def get_service_client():
     """Legacy dev/test seam; production thesis resolution uses PostgreSQL."""
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
 

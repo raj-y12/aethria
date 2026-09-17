@@ -7,7 +7,7 @@ mega-cap name, every such discovery was dropped outright.
 import pytest
 
 from scout.schema import validate_scout_output
-from utils.reference_validation import is_megacap_company
+from research.reference_validation import is_megacap_company
 
 # Real venture-scale names that the old substring matcher rejected.
 _REGRESSION_NAMES = [

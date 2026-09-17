@@ -197,7 +197,7 @@ async def test_runtime_limits_load_from_saved_settings(monkeypatch):
 
 def test_sync_fund_config_to_active_thesis_validates_user_id_without_name_error(monkeypatch):
     import fund_thesis
-    from fund_thesis_ops import sync_fund_config_to_active_thesis
+    from fund_thesis import sync_fund_config_to_active_thesis
 
     fc = _fund_config()
     raw = fund_config_raw_text(fc)
@@ -224,8 +224,8 @@ def test_sync_fund_config_to_active_thesis_validates_user_id_without_name_error(
 
 def test_sync_fund_config_does_not_block_settings_deploy_on_embedding(monkeypatch):
     import fund_thesis
-    import fund_thesis_ops
-    from fund_thesis_ops import sync_fund_config_to_active_thesis
+    import fund_thesis.ops as fund_thesis_ops
+    from fund_thesis import sync_fund_config_to_active_thesis
 
     calls = []
     monkeypatch.setattr(fund_thesis, "get_active_thesis", lambda client, user_id: None)

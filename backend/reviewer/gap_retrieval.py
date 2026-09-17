@@ -11,9 +11,9 @@ import os
 from typing import Any, Dict, List
 
 
-from utils.reference_verify import hostname_from_user_hint
-from utils.source_corroboration import filter_sources_to_anchor
-from utils.scout_field_gaps import is_missing_tam, is_weak_funding_stage
+from research.reference_verify import hostname_from_user_hint
+from research.source_corroboration import filter_sources_to_anchor
+from context import is_missing_tam, is_weak_funding_stage
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ def fetch_reviewer_gap_pack(scout: Dict[str, Any], user_id: str) -> Dict[str, An
     if not queries:
         return None
 
-    from utils.retrieval_grounding import retrieve_source_pack_merged
+    from research.retrieval_grounding import retrieve_source_pack_merged
 
     try:
         max_per = int(os.getenv("REVIEWER_GAP_MAX_PER_QUERY", "6"))
@@ -205,7 +205,7 @@ def build_reviewer_supplement_block(scout: Dict[str, Any], user_id: str) -> str:
     """
     Render retrieved snippets for the reviewer user message, or empty string.
     """
-    from utils.retrieval_grounding import render_sources_for_prompt
+    from research.retrieval_grounding import render_sources_for_prompt
 
     pack = fetch_reviewer_gap_pack(scout, user_id)
     if not pack:
@@ -218,7 +218,7 @@ def enrich_scout_for_reviewer_llm(scout_output: Dict[str, Any], user_id: str) ->
     Shallow copy of scout payload with optional _reviewer_web_supplement for the Reviewer LLM only.
     Do not persist; deterministic scoring should use the original scout dict.
     """
-    from utils.retrieval_grounding import render_sources_for_prompt
+    from research.retrieval_grounding import render_sources_for_prompt
 
     out = dict(scout_output)
     # An add-context re-review already has a deliberate evidence delta (including

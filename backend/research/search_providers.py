@@ -30,9 +30,9 @@ import os
 from typing import Any, Dict, List, Literal, Optional, Protocol, Sequence, runtime_checkable
 
 import metrics
-from utils.exa_client import exa_search, is_company_domain
-from utils.firecrawl_client import firecrawl_scrape, firecrawl_search
-from utils.search_results import ProviderSearchResults
+from research.exa_client import exa_search, is_company_domain
+from research.firecrawl_client import firecrawl_scrape, firecrawl_search
+from research.search_results import ProviderSearchResults
 
 logger = logging.getLogger("search_providers")
 
@@ -429,7 +429,7 @@ def search_source_pack(
     that only care about *which* provider answers (e.g. the founder resolver) do
     not need to know about the merge/allowlist machinery.
     """
-    from utils.retrieval_grounding import retrieve_source_pack_merged
+    from research.retrieval_grounding import retrieve_source_pack_merged
 
     return retrieve_source_pack_merged(
         queries=queries,

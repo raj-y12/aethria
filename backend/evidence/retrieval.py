@@ -22,7 +22,7 @@ from evidence.models import (
     VerificationState,
 )
 from evidence.service import detect_prompt_injection
-from utils.retrieval_grounding import retrieve_source_pack_merged
+from research.retrieval_grounding import retrieve_source_pack_merged
 from utils.text_sanitize import strip_markdown_links
 
 # Fixed 2026-08-17 (audit CRITICAL-2): this used to be 3, silently capping

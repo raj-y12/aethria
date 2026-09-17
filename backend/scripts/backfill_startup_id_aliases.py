@@ -14,8 +14,8 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from jobs.postgres import create_pool
-from startup_id_alias_backfill import load_reconciliation_artifact, repository_rows
-from startup_id_alias_repository import StartupIdAliasRepository
+from startups import load_reconciliation_artifact, repository_rows
+from startups import StartupIdAliasRepository
 
 
 async def _run(apply: bool) -> dict[str, int | str]:

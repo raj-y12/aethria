@@ -28,19 +28,19 @@ SETTINGS_TABLE = "settings"
 
 
 def doc_get_strict(table: str, key: str, *, user_id: str):
-    from supabase_doc_store import doc_get_strict as _doc_get_strict
+    from legacy_supabase.doc_store import doc_get_strict as _doc_get_strict
 
     return _doc_get_strict(table, key, user_id=user_id)
 
 
 def list_get_all_strict(table: str, *, user_id: str):
-    from supabase_doc_store import list_get_all_strict as _list_get_all_strict
+    from legacy_supabase.doc_store import list_get_all_strict as _list_get_all_strict
 
     return _list_get_all_strict(table, user_id=user_id)
 
 
 def get_service_client():
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
 

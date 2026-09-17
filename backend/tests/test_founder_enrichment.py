@@ -331,7 +331,7 @@ def test_review_failure_is_swallowed(monkeypatch):
 
 
 def test_gap_retrieval_retains_sources_for_reuse(monkeypatch):
-    from utils import reviewer_gap_retrieval
+    from reviewer import gap_retrieval as reviewer_gap_retrieval
 
     monkeypatch.setattr(
         reviewer_gap_retrieval,

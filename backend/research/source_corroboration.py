@@ -20,7 +20,7 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 from urllib.parse import urlparse
 
-from utils.reference_verify import registrable_domain
+from research.reference_verify import registrable_domain
 
 # Publications and databases that report on private companies. Presence here only
 # makes a source *eligible*; it still has to mention the company to be kept.

@@ -5,7 +5,7 @@ financial figure, and asserts the deterministic gate drops it. A regression in a
 of these is a trust failure, so they are intentionally strict.
 """
 
-from utils.financials_grounding import ground_financials, verify_proposal, _build_sources_by_url
+from scout.tools.financials_grounding import ground_financials, verify_proposal, _build_sources_by_url
 
 
 def _pack(*sources):

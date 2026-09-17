@@ -113,7 +113,7 @@ an operational decision outside this migration.
 
 Fund-thesis reads used by periodic evaluation are verified against the
 provider-neutral PostgreSQL contract in `db/migrations/`, through the shared
-asyncpg pool and `backend/fund_thesis_repository.py`. The repository reads the
+asyncpg pool and `backend/fund_thesis/repository.py`. The repository reads the
 active version, version history, embeddings, missing-embedding worklist, and
 pipeline links with explicit tenant predicates. Thesis creation, activation,
 and embedding backfill use the bounded canonical repository paths. Policy

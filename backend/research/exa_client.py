@@ -37,9 +37,9 @@ from urllib.request import Request, urlopen
 import certifi
 
 import metrics
-from utils.reference_verify import normalize_url_for_match
+from research.reference_verify import normalize_url_for_match
 from utils.retry import retry_delay
-from utils.search_results import ProviderSearchResults
+from research.search_results import ProviderSearchResults
 
 logger = logging.getLogger("exa")
 

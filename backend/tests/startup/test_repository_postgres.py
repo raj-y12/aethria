@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-from startup_repository import StartupRepository
+from startups import StartupRepository
 
 
 pytestmark = pytest.mark.skipif(
@@ -432,7 +432,7 @@ async def test_removing_one_startup_also_removes_pipeline_state():
 
 
 def test_startup_repository_has_only_explicit_targeted_write_sql():
-    source = (Path(__file__).parents[2] / "startup_repository.py").read_text(encoding="utf-8")
+    source = (Path(__file__).parents[2] / "startups" / "repository.py").read_text(encoding="utf-8")
     assert "upsert_startup" not in source.lower()
     assert "display_name=" not in source.lower()
     assert "upsert_startup" not in source.lower()

@@ -25,27 +25,25 @@ from fund_thesis import (
     FundThesisIncompleteError,
     FundThesisQueryError,
     _bootstrap_default_thesis_or_raise,
+    activate_fund_thesis_version_with_repository,
+    backfill_thesis_embeddings_with_repository,
     bootstrap_default_thesis_with_repository,
     compute_thesis_alignment_stats,
+    create_fund_thesis_version_with_repository,
     get_active_thesis,
     get_active_thesis_metadata,
     thesis_has_embeddings,
 )
-from fund_thesis_ops import (
-    activate_fund_thesis_version_with_repository,
-    backfill_thesis_embeddings_with_repository,
-    create_fund_thesis_version_with_repository,
-)
 from pipeline_runner import reprocess_startups_missing_fund_thesis
 from pipeline_execution import PipelineExecutionState
-from startup_repository import StartupRepository
+from startups import StartupRepository
 
 router = APIRouter()
 
 
 def get_service_client():
     """Legacy dev/test seam; normal thesis routes require PostgreSQL."""
-    from supabase_client import get_service_client as _get_service_client
+    from legacy_supabase.client import get_service_client as _get_service_client
 
     return _get_service_client()
 

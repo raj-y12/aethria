@@ -6,7 +6,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterable, List, Mapping
 
-from clerk_admin import list_active_sessions_by_user, list_clerk_users
+from admin.clerk import list_active_sessions_by_user, list_clerk_users
 
 
 def _now() -> datetime:
@@ -197,7 +197,7 @@ def build_admin_overview_from_rows(
 
 def _fetch_rows(table: str, columns: str) -> List[Dict[str, Any]]:
     try:
-        from supabase_client import get_service_client
+        from legacy_supabase.client import get_service_client
         response = get_service_client().table(table).select(columns).execute()
         rows = response.data if hasattr(response, "data") else []
         return rows if isinstance(rows, list) else []

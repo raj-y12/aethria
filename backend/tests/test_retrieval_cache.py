@@ -1,11 +1,11 @@
 from datetime import timedelta
 
-from utils.retrieval_cache import (
+from retrieval_cache import (
     build_retrieval_identity,
     freshness_ttl_seconds,
     normalize_retrieval_url,
 )
-from utils import retrieval_grounding
+from research import retrieval_grounding
 
 
 def test_retrieval_identity_is_stable_across_query_whitespace_and_case():

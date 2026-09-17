@@ -11,7 +11,7 @@ from uuid import uuid4
 import json
 import re
 
-from utils.reference_validation import (
+from research.reference_validation import (
     is_generic_reference,
     is_megacap_company,
     validate_references_not_only_incumbent_domains,

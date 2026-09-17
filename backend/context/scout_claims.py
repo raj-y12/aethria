@@ -24,8 +24,8 @@ from evidence.models import (
     VerificationState,
 )
 from evidence.service import detect_prompt_injection
-from competition_knowledge import derive_competition_claims
-from commercial_knowledge import derive_commercial_claims
+from context.competition_knowledge import derive_competition_claims
+from context.commercial_knowledge import derive_commercial_claims
 from tenant_context import require_user_id
 
 

@@ -499,7 +499,7 @@ def test_pipeline_capture_snapshots_actual_engine_models_providers_and_prompts(
 
 
 def _storage(monkeypatch, startup=None):
-    supabase_storage = importlib.import_module("supabase_storage")
+    supabase_storage = importlib.import_module("legacy_supabase.storage")
     storage = object.__new__(supabase_storage.SupabaseStartupsStorage)
     storage._user_id = "manifest-user"
     storage._client = MagicMock()
@@ -572,7 +572,7 @@ def test_partner_persistence_uses_captured_identity_without_environment_reads(
         "reviewer": {"status": "completed", "pipeline_run_id": run_id},
     }
     storage, updated = _storage(monkeypatch, startup)
-    supabase_storage = importlib.import_module("supabase_storage")
+    supabase_storage = importlib.import_module("legacy_supabase.storage")
     monkeypatch.setattr(
         supabase_storage.os,
         "getenv",

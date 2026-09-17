@@ -19,9 +19,8 @@ from utils.openai_client import build_openai_client
 from reviewer.schema import ReviewerOutput, normalize_investment_read, validate_reviewer_output
 from utils.prompt_version import hash_prompt
 from utils.traction_extraction import render_traction_facts
-from utils.recency import reviewer_recency_directive
-from regulatory_context import apply_regulatory_grounding_guard
-from founder_context import apply_founder_grounding_guard, resolved_founder_names
+from research.recency import reviewer_recency_directive
+from context import apply_founder_grounding_guard, apply_regulatory_grounding_guard, resolved_founder_names
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
 
 

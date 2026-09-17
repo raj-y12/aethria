@@ -345,7 +345,7 @@ class PartnerEngine:
             canonical_confidence=canonical_confidence,
         )
         decision_recommendation = decision.get("recommendation")
-        from contradiction_gate import apply_contradiction_gate
+        from context import apply_contradiction_gate
         partner_guard = apply_contradiction_gate(
             user_id=(getattr(self, "tenant_user_id", None) or uid or ""),
             review=decision,

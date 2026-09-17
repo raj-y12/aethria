@@ -5,7 +5,7 @@ the LLM prompt and never the search itself.
 """
 import pytest
 
-from utils.scout_discovery_queries import (
+from scout.tools.discovery_queries import (
     build_discovery_queries,
     build_discovery_recency_query,
     thesis_terms,

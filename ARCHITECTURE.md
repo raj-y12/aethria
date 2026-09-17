@@ -98,10 +98,10 @@ engine implementations remain for compatibility while migration is in progress
 
 ### 3.2 The fund thesis gate
 
-`backend/fund_thesis.py` holds the per-user investment mandate. Runtime periodic
-evaluation reads an existing thesis through the shared asyncpg pool via
-`backend/fund_thesis_repository.py`; the repository is tenant-scoped and
-read-only. The short-lived per-user cache remains in `fund_thesis.py`
+`backend/fund_thesis/core.py` holds the per-user investment mandate. Runtime
+periodic evaluation reads an existing thesis through the shared asyncpg pool via
+`backend/fund_thesis/repository.py`; the repository is tenant-scoped and
+read-only. The short-lived per-user cache remains in `fund_thesis/core.py`
 (`FUND_THESIS_CACHE_TTL_SECONDS`, default 10 seconds). PostgreSQL publication,
 activation, bootstrap/repair, and embedding upsert invalidate it only after the
 transaction commits. Bootstrap and mutation paths remain on the legacy
@@ -244,6 +244,20 @@ that sequences these for a manual lookup, making the fail-closed ordering
 explicit so a caller cannot accidentally run a thesis-blind evaluation or
 evaluate an ambiguous company.
 
+**`backend/evaluation/` vs `backend/evaluation_v2/`**: unrelated packages
+despite the name. `evaluation/` is offline measurement tooling — the
+golden-set runner and evaluation-manifest builder used to check the current
+pipeline against versioned invariants (see its own module docstring). It is
+not part of the canonical institutional layer above; `evaluation_v2/` is.
+
+**`backend/agents/`**: a small, deterministic (non-LLM) canonical
+evidence-review and routing adapter (`EvidenceReviewer`, `DeterministicPartner`
+in `agents/canonical.py`), used only by `opportunity_pipeline.py`. Despite the
+name, it is unrelated to the LLM-driven Scout/Reviewer/Partner personas in
+`scout/`, `reviewer/`, `partner/`, and `investment_analysis/` — it translates
+an already-immutable evaluation into an explainable review/route, and never
+calls a model.
+
 **Rollout modes** (`authority/models.py::RolloutMode`):
 `legacy → shadow → backfill → canonical_write → canonical_read`, with
 reconciliation and rollback endpoints under `/api/authority/*`. Workflow state
@@ -257,8 +271,8 @@ See [ADR-0006](docs/adr/0006-canonical-identity-layer.md).
 
 | Concern | Implementation |
 |---|---|
-| Startup CRUD | `backend/startup_repository.py` over asyncpg; `supabase_storage.py` is compatibility-only. |
-| Key-value documents | Domain repositories and Batch 1–4 state snapshots over asyncpg; `supabase_doc_store.py` is compatibility-only. |
+| Startup CRUD | `backend/startups/repository.py` over asyncpg; `legacy_supabase/storage.py` is compatibility-only. |
+| Key-value documents | Domain repositories and Batch 1–4 state snapshots over asyncpg; `legacy_supabase/doc_store.py` is compatibility-only. |
 | Portfolio artefacts | `backend/portfolio/store.py` + `repository.py`. |
 | Durable jobs & canonical domain | Direct PostgreSQL via `asyncpg` (`backend/jobs/postgres.py`), pooled and lease-aware. |
 | Dev fallback | `backend/utils/storage.py` — local JSON under `backend/data/`. **Dev only**; production requires the shared PostgreSQL pool. |
@@ -267,6 +281,16 @@ Provider-neutral schema lives in `db/migrations/`, applied append-only through
 `app_migrations.schema_migrations`. Historical `supabase/migrations/` files are
 immutable source material. `supabase/clear_all_tables.sql` is not part of any
 automated path.
+
+**`batch1/`–`batch4a/` naming**: these package names are migration-order, not
+domain names — each is the Nth slice of legacy Supabase JSON storage migrated
+to a dedicated asyncpg repository, and the four cover unrelated domains:
+`batch1` is generic key-value documents/lists (the doc_store replacement),
+`batch2` is scout feed cache + meta rejection patterns/metrics, `batch3` is
+the five portfolio collections, `batch4a` is pipeline state + scoring-trail
+audit history. Renaming them to domain-based names would touch every call
+site across the pipeline for a cosmetic gain, so they're documented here
+instead; see each package's own module docstrings for its exact fields.
 
 ---
 

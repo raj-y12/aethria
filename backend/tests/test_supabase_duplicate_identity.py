@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
 from models import ScoutInfo
-from supabase_storage import SupabaseStartupsStorage
+from legacy_supabase.storage import SupabaseStartupsStorage
 
 
 class _Query:

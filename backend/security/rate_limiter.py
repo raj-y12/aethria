@@ -202,7 +202,7 @@ def build_security_store() -> InMemorySecurityStore | SupabaseSecurityStore:
     use_supabase = env_config.use_supabase_storage()
     if use_supabase and env_config.supabase_configured():
         try:
-            from supabase_client import get_service_client
+            from legacy_supabase.client import get_service_client
 
             return SupabaseSecurityStore(get_service_client())
         except Exception as exc:

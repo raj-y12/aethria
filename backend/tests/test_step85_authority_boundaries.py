@@ -1,6 +1,6 @@
 from models import ScoutInfo
-from canonical_scout_claims import derive_scout_claims
-from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+from context import derive_scout_claims
+from context import merge_scout_info_enrichment
 
 
 def test_post_review_enrichment_is_explicitly_derived_compatibility_data():

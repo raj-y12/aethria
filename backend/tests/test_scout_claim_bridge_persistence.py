@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from canonical_scout_claims import persist_scout_claims
+from context import persist_scout_claims
 
 
 @pytest.mark.asyncio

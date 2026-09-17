@@ -13,7 +13,7 @@ from identity.models import (
     SourceObservationInput,
     VerificationStatus,
 )
-from utils.reference_verify import hostname_from_user_hint, registrable_domain
+from research.reference_verify import hostname_from_user_hint, registrable_domain
 
 
 _NON_COMPANY_DOMAINS = {

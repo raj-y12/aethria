@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 
 def test_build_admin_overview_combines_clerk_sessions_settings_and_stats():
-    from admin_service import build_admin_overview_from_rows
+    from admin import build_admin_overview_from_rows
 
     now = datetime(2026, 4, 26, 12, 30, tzinfo=timezone.utc)
 

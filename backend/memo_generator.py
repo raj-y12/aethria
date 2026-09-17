@@ -16,7 +16,7 @@ from datetime import datetime
 from utils.timeutil import utcnow
 
 from models import Startup
-from utils.recency import memo_recency_note
+from research.recency import memo_recency_note
 from utils.traction_extraction import render_traction_facts
 
 _logger_memo = logging.getLogger("memo_generation")

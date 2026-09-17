@@ -249,7 +249,7 @@ def validate_references_not_only_incumbent_domains(references: List[str]) -> Non
     Raise ValueError if every http(s) URL in references resolves to a registrable domain
     we treat as a large incumbent-only source (e.g. only stripe.com links).
     """
-    from utils.reference_verify import extract_http_urls, registrable_domain
+    from research.reference_verify import extract_http_urls, registrable_domain
 
     regs: list[str] = []
     for line in references:

@@ -1,7 +1,7 @@
 from types import SimpleNamespace
 
-import supabase_storage as ss
-from supabase_storage import detect_schema_drift
+import legacy_supabase.storage as ss
+from legacy_supabase.storage import detect_schema_drift
 
 
 class _FakeQuery:

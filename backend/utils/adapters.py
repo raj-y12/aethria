@@ -16,7 +16,7 @@ from utils.traction_extraction import extract_traction_facts
 def financials_from_scout_output(scout_output: Dict[str, Any]) -> Financials:
     """Build Financials from the scout's grounding-verified financial values.
 
-    Reads `financials_grounded` (produced by utils.financials_grounding.ground_financials),
+    Reads `financials_grounded` (produced by scout.tools.financials_grounding.ground_financials),
     which contains only values that passed the deterministic source-citation gate, plus the
     revenue_/funding_/valuation_missing flags. When absent (e.g. ungrounded path), returns an
     empty Financials — never a guessed value.

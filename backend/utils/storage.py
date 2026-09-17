@@ -16,7 +16,7 @@ import os
 
 from models import Startup, ScoutInfo, ReviewInfo, PartnerInfo, Financials
 import env_config
-from utils.reference_validation import is_generic_reference
+from research.reference_validation import is_generic_reference
 from utils.partner_codes import normalize_recommendation
 
 
@@ -207,7 +207,7 @@ class Storage:
                     self.logger.error(f"Invalid startup {startup_id} in storage: {e}")
                     return data
                 if enrichment_review_output is not None:
-                    from utils.scout_post_review_enrichment import merge_scout_info_enrichment
+                    from context import merge_scout_info_enrichment
 
                     startup.scout_info = merge_scout_info_enrichment(
                         startup.scout_info,

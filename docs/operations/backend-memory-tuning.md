@@ -81,8 +81,8 @@ Medium at boot; high if it prevents loop storms.
 Affected files/functions:
 
 - `backend/api.py::admin_overview`
-- `backend/admin_service.py::build_admin_overview`
-- `backend/admin_service.py::_fetch_rows`
+- `backend/admin/service.py::build_admin_overview`
+- `backend/admin/service.py::_fetch_rows`
 
 Why it matters:
 
@@ -113,7 +113,7 @@ Affected files/functions:
 - `backend/meta/analyser.py::_read_agent_metrics`
 - `backend/meta/analyser.py::_read_mutation_log`
 - `backend/meta/mutator.py::_read_json_list`
-- `backend/supabase_doc_store.py::list_get_all`
+- `backend/legacy_supabase/doc_store.py::list_get_all`
 
 Why it matters:
 
@@ -139,15 +139,15 @@ Medium.
 
 Affected files/functions:
 
-- `backend/supabase_storage.py::_fetch_all_raw`
-- `backend/supabase_storage.py::get_all_startups`
-- `backend/supabase_storage.py::get_all`
-- `backend/supabase_storage.py::_atomic_update`
-- `backend/supabase_storage.py::replace_all`
-- `backend/supabase_storage.py::_legacy_get_startups_with_decision`
-- `backend/supabase_storage.py::get_startups_requiring_human_review` fallback
-- `backend/supabase_storage.py::count_unreviewed` fallback
-- `backend/supabase_storage.py::count_undecided` fallback
+- `backend/legacy_supabase/storage.py::_fetch_all_raw`
+- `backend/legacy_supabase/storage.py::get_all_startups`
+- `backend/legacy_supabase/storage.py::get_all`
+- `backend/legacy_supabase/storage.py::_atomic_update`
+- `backend/legacy_supabase/storage.py::replace_all`
+- `backend/legacy_supabase/storage.py::_legacy_get_startups_with_decision`
+- `backend/legacy_supabase/storage.py::get_startups_requiring_human_review` fallback
+- `backend/legacy_supabase/storage.py::count_unreviewed` fallback
+- `backend/legacy_supabase/storage.py::count_undecided` fallback
 
 Why it matters:
 

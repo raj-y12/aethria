@@ -165,7 +165,7 @@ create index on fund_thesis_embeddings using ivfflat (embedding vector_cosine_op
    indexes (`startups_user_list_location_idx`, `startups_user_list_lookup_id_idx`, redundant
    `*_user_id_idx` covered by composite PKs). Pure cleanup, no app change.
 2. **`startups` split** — biggest egress win. New `startup_reviews`, backfill, repoint detail/memo
-   reads, then slim `startups`. Do behind the storage layer (`supabase_storage.py`) so callers don't change.
+   reads, then slim `startups`. Do behind the storage layer (`legacy_supabase/storage.py`) so callers don't change.
 3. **`kv_store` collapse** — route doc-store through it; migrate data namespace by namespace.
 4. **`event_log` + retention** — move the 4 logs; add the prune job.
 5. **pgvector** — last; needs the extension (trivial on self-hosted Postgres).
@@ -185,7 +185,7 @@ Steps 1–2 are the egress fixes. Steps 3–5 are long-run cleanliness best done
   apply contract to Supabase prod untested.
 - **Steps 3–5 — do during the Postgres migration**, not on Supabase (avoids double work).
 
-### Code changes the contract depends on (`backend/supabase_storage.py`)
+### Code changes the contract depends on (`backend/legacy_supabase/storage.py`)
 The expand/contract DDL is inert until these land. Scope = move `review_info`/`agent_trace`/
 `financials`/`investment_memo_markdown` to `startup_reviews`; keep `scout_info`/`partner_info` on the row.
 1. **`_dict_to_row`** — stop writing `review_info`/`agent_trace`/`financials`/`investment_memo_markdown`
