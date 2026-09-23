@@ -237,17 +237,25 @@ def _run_query_wave(
 def _normalize_sources(raw_results: List[Dict[str, str]]) -> List[Dict[str, str]]:
     cap = _snippet_char_cap()
     out: List[Dict[str, str]] = []
-    for i, row in enumerate(raw_results):
+    for row in raw_results:
         title = str(row.get("title") or "").strip()
         url = str(row.get("url") or "").strip()
         snippet = str(row.get("snippet") or "").strip()
         if not title or not url:
             continue
+        lead = snippet[:300].lstrip().lower()
+        if re.match(r"^(?:http\s+)?(?:error\s+)?(?:401|403|404|429|50[0-4])\b", lead) and any(
+            marker in lead for marker in (
+                "that's an error", "server cannot process the request", "bad request",
+                "access denied", "page not found", "service unavailable",
+            )
+        ):
+            continue
         if len(snippet) > cap:
             snippet = snippet[:cap]
         out.append(
             {
-                "source_id": _source_id(i),
+                "source_id": _source_id(len(out)),
                 "title": title,
                 "url": url,
                 "snippet": snippet,
