@@ -26,15 +26,15 @@ export default function LookupReadyNotice({ name, recommendation, recommendation
       {name ? (
         <motion.div
           key="lookup-ready"
-          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0 }}
+          initial={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -8 }}
+          animate={{ opacity: 1, height: 'auto', y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, height: 0, y: -8 }}
           transition={{ duration: reduceMotion ? 0.12 : 0.28, ease: EASE }}
-          className="relative z-10 w-full overflow-hidden border-y border-oxford/[0.12] bg-paper"
+          className="lookup-ready-notice relative z-10 w-full overflow-hidden bg-transparent px-phi-4 py-phi-2 sm:px-phi-5"
           role="status"
           aria-live="polite"
         >
-          <div className="mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 px-phi-5 py-phi-3 sm:px-phi-7">
+          <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-phi-3 rounded-2xl border border-oxford/25 bg-paper px-phi-4 py-phi-3 sm:px-phi-5">
             <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="type-label-section">Dispatch complete</p>
@@ -47,7 +47,7 @@ export default function LookupReadyNotice({ name, recommendation, recommendation
             <button
               type="button"
               onClick={onOpen}
-              className="type-action shrink-0 border-b border-oxford/25 pb-0.5 text-oxford transition-colors hover:border-oxford hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
+              className="type-action shrink-0 rounded-full border border-oxford bg-oxford px-phi-4 py-phi-2 text-paper transition-colors hover:bg-charcoal btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
             >
               Open memo →
             </button>
