@@ -4,6 +4,7 @@ import {
   findTrackedLookupStartup,
   lookupChipStatus,
   rerunHasSettled,
+  rerunDecisionReady,
   lookupIsWorking,
   invalidateLookupCompletionQueries,
 } from '../lookupTracking';
@@ -122,11 +123,11 @@ describe('rerunHasSettled', () => {
     expect(rerunHasSettled({ startup, acceptedAt: DISPATCHED_AT })).toBe(false);
   });
 
-  it('accepts a fresh review even before a new partner decision', () => {
+  it('keeps a fresh review in progress until the new partner decision', () => {
     const startup = makeStartup({
       timestamps: { partnered_at: '2026-07-28T09:00:00Z', reviewed_at: '2026-07-29T12:01:00Z' },
     });
-    expect(rerunHasSettled({ startup, acceptedAt: DISPATCHED_AT })).toBe(true);
+    expect(rerunHasSettled({ startup, acceptedAt: DISPATCHED_AT })).toBe(false);
   });
 
   it('does not guess without a dispatch time or a row', () => {
@@ -144,6 +145,34 @@ describe('rerunHasSettled', () => {
         acceptedAt: 'nonsense',
       }),
     ).toBe(false);
+  });
+});
+
+describe('rerunDecisionReady', () => {
+  const oldDecision = makeStartup({
+    timestamps: { partnered_at: '2026-07-28T09:00:00Z' },
+  });
+  const freshDecision = makeStartup({
+    timestamps: { partnered_at: '2026-07-29T12:05:00Z' },
+  });
+
+  it('does not show the preserved memo as complete while a re-review runs', () => {
+    expect(rerunDecisionReady({ startup: oldDecision, acceptedAt: DISPATCHED_AT,
+      memoStatus: 'ready', jobStatus: 'running' })).toBe(false);
+    expect(rerunDecisionReady({ startup: oldDecision, acceptedAt: DISPATCHED_AT,
+      memoStatus: 'ready', jobStatus: 'succeeded' })).toBe(false);
+  });
+
+  it('waits for the new partner decision and a successful job', () => {
+    const reviewOnly = makeStartup({ timestamps: {
+      reviewed_at: '2026-07-29T12:01:00Z', partnered_at: '2026-07-28T09:00:00Z',
+    } });
+    expect(rerunDecisionReady({ startup: reviewOnly, acceptedAt: DISPATCHED_AT,
+      memoStatus: 'ready', jobStatus: 'succeeded' })).toBe(false);
+    expect(rerunDecisionReady({ startup: freshDecision, acceptedAt: DISPATCHED_AT,
+      memoStatus: 'ready', jobStatus: 'running' })).toBe(false);
+    expect(rerunDecisionReady({ startup: freshDecision, acceptedAt: DISPATCHED_AT,
+      memoStatus: 'ready', jobStatus: 'succeeded' })).toBe(true);
   });
 });
 

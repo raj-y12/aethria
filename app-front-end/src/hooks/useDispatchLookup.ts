@@ -17,7 +17,7 @@ import { getQueryConfig, type QueryLiveGate } from '../lib/queryIntent';
 import { buildLookupSnapshotProps } from '../lib/productChromeMappers';
 import { resolveLookupFailure } from '../lib/lookupFailure';
 import { supersedeLookupRetryQueries } from '../lib/lookupRetrySupersession';
-import { findTrackedLookupStartup, lookupChipStatus, rerunHasSettled, lookupIsWorking, invalidateLookupCompletionQueries } from '../lib/lookupTracking';
+import { findTrackedLookupStartup, lookupChipStatus, rerunHasSettled, rerunDecisionReady, lookupIsWorking, invalidateLookupCompletionQueries } from '../lib/lookupTracking';
 import {
   getDispatchLookupStorageKey,
   loadDispatchLookupSnapshot,
@@ -449,9 +449,14 @@ export function useDispatchLookup({
   // SSE + the idle-gated global poll alone; with the analyst idle on the takeover
   // (and SSE unreliable behind a buffering proxy) the row froze at Review, so it
   // never reached Decide and the result snapshot never rendered. Poll until a
-  // partner recommendation lands (lookup decided), then stop.
+  // partner recommendation lands (or the re-review's new memo is persisted), then stop.
   const lookupDecided = pendingLookup?.isRerun
-    ? memoStatusQuery.data?.status === 'ready'
+    ? rerunDecisionReady({
+        startup: pendingLookupMatch,
+        acceptedAt: pendingLookup.acceptedAt,
+        memoStatus: memoStatusQuery.data?.status,
+        jobStatus: durableJobQuery.data?.status ?? pendingLookup.durableStatus,
+      })
     : !!pendingLookupMatch?.partner?.recommendation || memoStatusQuery.data?.status === 'ready';
   const rerunDecisionComplete = pendingLookup?.isRerun
     ? memoStatusQuery.data?.pipeline_status === 'writing_memo' || lookupDecided
@@ -587,7 +592,7 @@ export function useDispatchLookup({
   // in-flight pipeline, null once decided (the result snapshot takes over).
   const progress = useMemo((): LookupProgress | null => {
     if (!dispatching && !pendingLookup) return null;
-    if (pendingLookupMatch?.partner?.recommendation) return null;
+    if (lookupDecided) return null;
     return {
       query: activeQuery || pendingLookup?.queryLabel || '',
       name: pendingLookupMatch?.scout?.name ?? null,

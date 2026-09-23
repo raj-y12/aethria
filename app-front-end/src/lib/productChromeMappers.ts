@@ -53,15 +53,13 @@ export function buildLookupSnapshotProps(
   queryLabel?: string,
   verdictBadges?: VerdictBadgeConfig[],
   evaluation?: EvaluationRecord | null,
-): LookupResultSnapshotProps | null {
+): LookupResultSnapshotProps {
   const review = startup.review;
-  if (!review) return null;
 
-  // Canonical evidence evaluation is the sole score source. A lookup result
-  // without it stays pending rather than presenting reviewer numerics.
+  // Canonical evidence evaluation is the sole score source. Keep the result
+  // visible when it is unavailable, with unscored dimensions instead of old scores.
   const canonicalScoring = canonicalCriteriaToStructuredScoring(evaluation);
   const scoring = canonicalScoring;
-  if (!scoring) return null;
 
   // Lead with the partner recommendation (INVEST / MONITOR / PASS) — the decision,
   // not the reviewer quality band (STRONG/MEDIUM/WEAK). Fall back to band, then status.
@@ -80,16 +78,16 @@ export function buildLookupSnapshotProps(
   const metaParts = [sector, stage].filter(Boolean);
 
   const thesisBits: string[] = [];
-  if (review.thesis_matches_fund === true) thesisBits.push('Thesis-aligned');
-  if (review.thesis_matches_fund === false) thesisBits.push('Thesis deviation');
-  if (typeof review.thesis_alignment_score === 'number') {
+  if (review?.thesis_matches_fund === true) thesisBits.push('Thesis-aligned');
+  if (review?.thesis_matches_fund === false) thesisBits.push('Thesis deviation');
+  if (typeof review?.thesis_alignment_score === 'number') {
     thesisBits.push(`${Math.round(review.thesis_alignment_score * 100)}% alignment`);
   }
 
   // The standfirst is the review's own synthesis — thesis fit already has its
   // dedicated mono line below, so thesis_fit_line here would say it twice.
   const summary =
-    review.overall_summary?.trim() ||
+    review?.overall_summary?.trim() ||
     startup.scout.one_line?.trim() ||
     'Analyst review in progress.';
 

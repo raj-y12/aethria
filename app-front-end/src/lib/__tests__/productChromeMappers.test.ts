@@ -62,8 +62,18 @@ function evaluationRecord(criteria: CriterionAssessment[]): EvaluationRecord {
 }
 
 describe('buildLookupSnapshotProps', () => {
-  it('does not render a score snapshot without a canonical evaluation', () => {
-    expect(buildLookupSnapshotProps(startup(), undefined, undefined, null)).toBeNull();
+  it('keeps the result visible without a canonical evaluation, with no legacy scores', () => {
+    const props = buildLookupSnapshotProps(startup(), undefined, undefined, null);
+    expect(props?.companyName).toBe('Notion Labs');
+    expect(props?.dimensions.map((dimension) => dimension.score)).toEqual([
+      null, null, null, null, null,
+    ]);
+  });
+
+  it('keeps a decided result visible when Reviewer output is unavailable', () => {
+    const props = buildLookupSnapshotProps(startup({ review: undefined }), undefined, undefined, null);
+    expect(props?.companyName).toBe('Notion Labs');
+    expect(props?.summary).toBe('Productivity software.');
   });
 
   it('shows a dimension as unscored (null) when canonical evidence is insufficient, even though legacy has a number', () => {

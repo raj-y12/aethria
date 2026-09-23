@@ -72,10 +72,10 @@ interface RerunSettledInputs {
   acceptedAt?: string;
 }
 
-/** Whether a re-review has produced fresh downstream output.
+/** Whether a re-review has produced a fresh partner decision.
  *
  * A re-review keeps its previous review/partner while replacements generate, so
- * their mere presence proves nothing — only a timestamp newer than the dispatch
+ * their mere presence proves nothing — only a partner timestamp newer than dispatch
  * does. Without an accepted-at there is no way to tell old output from new, so
  * this reports false rather than guessing.
  */
@@ -83,11 +83,20 @@ export function rerunHasSettled({ startup, acceptedAt }: RerunSettledInputs): bo
   if (!startup || !acceptedAt) return false;
   const dispatchedAt = Date.parse(acceptedAt);
   if (!Number.isFinite(dispatchedAt)) return false;
-  return [startup.timestamps?.partnered_at, startup.timestamps?.reviewed_at].some((value) => {
-    if (!value) return false;
-    const at = Date.parse(value);
-    return Number.isFinite(at) && at >= dispatchedAt;
-  });
+  const partneredAt = Date.parse(startup.timestamps?.partnered_at ?? '');
+  return Number.isFinite(partneredAt) && partneredAt >= dispatchedAt;
+}
+
+/** The old memo remains readable during a re-review, so its ready flag alone
+ * cannot finish Dispatch. Require a new partner timestamp and completed job. */
+export function rerunDecisionReady({ startup, acceptedAt, memoStatus, jobStatus }: {
+  startup: Startup | null;
+  acceptedAt?: string;
+  memoStatus?: string;
+  jobStatus?: JobStatus;
+}): boolean {
+  return memoStatus === 'ready' && jobStatus === 'succeeded'
+    && rerunHasSettled({ startup, acceptedAt });
 }
 
 interface LookupChipStatusInputs {
