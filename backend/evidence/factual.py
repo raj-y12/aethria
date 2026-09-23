@@ -27,10 +27,12 @@ async def retain_verified_source_statements(*, user_id: str, company_id: str, op
                 or str(artifact.get("opportunity_id")) != opportunity_id):
             raise ValueError("Source evidence is outside the requested tenant/company/opportunity scope")
         selected.append((item_id, item, artifact))
-    current_statements = {str(claim["claim_id"]) for claim in ledger["claims"]
-                          if claim.get("claim_type") == "source_statement" and claim.get("status") == "current"}
+    # A withdrawn source statement remains in history and must never be
+    # recreated from the same item during a later re-review.
+    recorded_statements = {str(claim["claim_id"]) for claim in ledger["claims"]
+                           if claim.get("claim_type") == "source_statement"}
     linked = {str(link["evidence_item_id"]) for link in ledger["claim_evidence_links"]
-              if str(link["claim_id"]) in current_statements}
+              if str(link["claim_id"]) in recorded_statements}
     created = 0
     for item_id, item, artifact in selected:
         text = str(item.get("display_excerpt") or "").strip()

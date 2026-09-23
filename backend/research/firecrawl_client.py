@@ -18,6 +18,7 @@ import certifi
 import metrics
 from utils.retry import retry_delay
 from research.search_results import ProviderSearchResults
+from research.reference_validation import is_scraped_http_error_page
 
 logger = logging.getLogger("firecrawl")
 
@@ -229,7 +230,7 @@ def firecrawl_scrape(urls: List[str], timeout: float | None = None) -> List[Dict
                     data = json.loads(response.read().decode("utf-8"))
                 payload = data.get("data") if isinstance(data, dict) and data.get("success") is True else None
                 content = str(payload.get("markdown") or "").strip() if isinstance(payload, dict) else ""
-                if content:
+                if content and not is_scraped_http_error_page(content):
                     extracted.append({"url": url, "content": content[:markdown_max]})
                 break
             except HTTPError as error:

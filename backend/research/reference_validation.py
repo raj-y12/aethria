@@ -9,6 +9,19 @@ import re
 from typing import List
 from urllib.parse import urlparse
 
+
+_HTTP_ERROR_PREFIX = re.compile(r"^(?:http\s+)?(?:error\s+)?(?:401|403|404|429|50[0-4])\b")
+_HTTP_ERROR_MARKERS = (
+    "that's an error", "server cannot process the request", "bad request",
+    "access denied", "page not found", "service unavailable",
+)
+
+
+def is_scraped_http_error_page(content: str) -> bool:
+    """Recognize a provider's successful scrape of a site's HTTP error page."""
+    lead = str(content or "")[:300].lstrip().casefold().replace("’", "'").replace("‘", "'")
+    return bool(_HTTP_ERROR_PREFIX.match(lead)) and any(marker in lead for marker in _HTTP_ERROR_MARKERS)
+
 # Placeholder that does NOT prove a company exists; reject discoveries using only this
 _GENERIC_REF_PATTERNS = (
     "general domain knowledge",

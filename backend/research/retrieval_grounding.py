@@ -17,6 +17,7 @@ import certifi
 
 import metrics
 from research.reference_verify import extract_http_urls, normalize_url_for_match
+from research.reference_validation import is_scraped_http_error_page
 from research.search_providers import normalize_category, provider_name, provider_search
 from research.search_results import ProviderSearchResults
 from retrieval_cache import RetrievalCache, build_retrieval_identity, freshness_ttl_seconds, key_lock
@@ -243,13 +244,7 @@ def _normalize_sources(raw_results: List[Dict[str, str]]) -> List[Dict[str, str]
         snippet = str(row.get("snippet") or "").strip()
         if not title or not url:
             continue
-        lead = snippet[:300].lstrip().lower()
-        if re.match(r"^(?:http\s+)?(?:error\s+)?(?:401|403|404|429|50[0-4])\b", lead) and any(
-            marker in lead for marker in (
-                "that's an error", "server cannot process the request", "bad request",
-                "access denied", "page not found", "service unavailable",
-            )
-        ):
+        if is_scraped_http_error_page(snippet):
             continue
         if len(snippet) > cap:
             snippet = snippet[:cap]

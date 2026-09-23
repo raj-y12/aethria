@@ -7,7 +7,7 @@ from urllib.error import HTTPError
 
 import pytest
 
-from research.firecrawl_client import firecrawl_search
+from research.firecrawl_client import firecrawl_scrape, firecrawl_search
 from research.search_providers import reset_providers
 from research.search_results import ProviderSearchResults
 
@@ -52,6 +52,25 @@ def test_success_normalizes_markdown_and_deduplicates_urls(monkeypatch):
 
     assert result == [{"title": "Acme", "url": "https://example.com/a", "snippet": "markdown wins"}]
     assert result.diagnostics["outcome"] == "success"
+
+
+def test_scrape_rejects_http_error_page_markdown(monkeypatch):
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "fc-key")
+
+    def response(request, **_kwargs):
+        url = json.loads(request.data)["url"]
+        markdown = (
+            "Error 401 (Bad Request)!!1 **401.** That’s an error. "
+            "The server cannot process the request because it is malformed."
+            if url.endswith("/blocked") else "Protex AI builds industrial safety software."
+        )
+        return _Response({"success": True, "data": {"markdown": markdown}})
+
+    monkeypatch.setattr("research.firecrawl_client.urlopen", response)
+
+    assert firecrawl_scrape(["https://example.com/blocked", "https://example.com/valid"]) == [
+        {"url": "https://example.com/valid", "content": "Protex AI builds industrial safety software."}
+    ]
 
 
 @pytest.mark.parametrize("payload", [

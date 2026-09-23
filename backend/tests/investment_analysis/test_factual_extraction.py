@@ -38,8 +38,8 @@ async def test_factual_extraction_copies_scoped_source_without_model_scores_or_i
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("change", ["foreign_id", "foreign_tenant", "foreign_company", "unverified", "injection", "already_linked"])
-async def test_extraction_rejects_foreign_sources_and_reuses_current_claims(change):
+@pytest.mark.parametrize("change", ["foreign_id", "foreign_tenant", "foreign_company", "unverified", "injection", "already_linked", "withdrawn"])
+async def test_extraction_rejects_foreign_sources_and_does_not_recreate_recorded_claims(change):
     source = ledger()
     ids = ["e1"]
     if change == "foreign_id":
@@ -54,6 +54,9 @@ async def test_extraction_rejects_foreign_sources_and_reuses_current_claims(chan
         source["artifacts"][0]["prompt_injection_detected"] = True
     elif change == "already_linked":
         source["claims"] = [{"claim_id": "c1", "claim_type": "source_statement", "status": "current"}]
+        source["claim_evidence_links"] = [{"claim_id": "c1", "evidence_item_id": "e1"}]
+    elif change == "withdrawn":
+        source["claims"] = [{"claim_id": "c1", "claim_type": "source_statement", "status": "withdrawn"}]
         source["claim_evidence_links"] = [{"claim_id": "c1", "evidence_item_id": "e1"}]
     repository = SimpleNamespace(get_ledger=AsyncMock(return_value=source), create_claim=AsyncMock())
     args = dict(user_id="fund-a", company_id="company-a", opportunity_id="opp-a",
