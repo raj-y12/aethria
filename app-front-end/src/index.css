@@ -4844,16 +4844,16 @@ textarea {
   position: absolute;
   z-index: 60;
   right: auto;
-  bottom: 0;
-  left: calc(var(--dock-size) / 2);
-  width: min(240px, calc(100vw - 72px));
+  bottom: -6px;
+  left: -6px;
+  width: min(310px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
 }
 
 .lookup-ready-notice--dispatch .lookup-ready-notice__plate {
   max-width: none;
-  height: var(--dock-size);
-  padding-left: calc(var(--dock-size) + 10px);
+  height: calc(var(--dock-size) + 12px);
+  padding-left: calc(var(--dock-size) + 14px);
   box-shadow: 0 6px 18px -10px rgba(10, 22, 41, 0.24);
 }

@@ -46,7 +46,7 @@ export default function LookupReadyNotice({
             className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 rounded-full border border-oxford/30 bg-paper px-phi-4 py-phi-2 text-left transition-colors hover:border-oxford/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 sm:px-phi-5"
           >
             <span className="min-w-0 flex-1">
-              <span className="block font-mono text-[9px] font-medium uppercase leading-tight tracking-[0.12em] text-oxford/60">Dispatch ready</span>
+              <span className="block font-mono text-[9px] font-medium uppercase leading-tight tracking-[0.12em] text-oxford/60">Dispatch complete</span>
               <span className="mt-0.5 block truncate font-sans text-[12px] font-semibold leading-tight tracking-[-0.01em] text-oxford">{name}</span>
             </span>
             {recommendation ? (
