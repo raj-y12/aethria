@@ -4,38 +4,33 @@ import { describe, expect, it, vi } from 'vitest';
 import LookupReadyNotice from '../LookupReadyNotice';
 
 describe('LookupReadyNotice', () => {
-  it('presents a completed memo as an inline Dispatch handoff', () => {
+  it('presents a completed memo as a compact clickable Dispatch notice', () => {
     render(
       <LookupReadyNotice
         name="Aethria"
         recommendation="INVEST"
         onOpen={() => undefined}
-        onDismiss={() => undefined}
       />,
     );
 
-    expect(screen.getByRole('status')).toHaveTextContent('Memo ready');
+    expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.getByText('Aethria')).toBeInTheDocument();
-    expect(screen.getByLabelText('INVEST')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open memo →' })).toBeInTheDocument();
-    expect(screen.getByRole('status').querySelector('[aria-hidden="true"]')).toHaveClass('bg-oxford', 'signal-dot-breathe');
+    expect(screen.getByText('INVEST')).toHaveClass('bg-oxford', 'text-paper');
+    expect(screen.getByRole('button', { name: 'Open memo for Aethria, INVEST' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
   });
 
-  it('opens and dismisses through explicit controls', () => {
+  it('opens the memo when the notice is clicked', () => {
     const onOpen = vi.fn();
-    const onDismiss = vi.fn();
     render(
       <LookupReadyNotice
         name="Aethria"
         onOpen={onOpen}
-        onDismiss={onDismiss}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open memo →' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss memo ready notification' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open memo for Aethria' }));
 
     expect(onOpen).toHaveBeenCalledOnce();
-    expect(onDismiss).toHaveBeenCalledOnce();
   });
 });

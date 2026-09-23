@@ -1,5 +1,4 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import DecisionBadge from './DecisionBadge';
 import { usePrefersReducedMotion } from '../hooks';
 import { tokens } from '../design-system/tokens';
 
@@ -11,7 +10,6 @@ export interface LookupReadyNoticeProps {
   recommendation?: 'INVEST' | 'PASS' | 'MONITOR' | null;
   recommendationLabel?: string | null;
   onOpen: () => void;
-  onDismiss: () => void;
   placement?: 'inline' | 'dispatch';
   className?: string;
 }
@@ -22,7 +20,6 @@ export default function LookupReadyNotice({
   recommendation,
   recommendationLabel,
   onOpen,
-  onDismiss,
   placement = 'inline',
   className = '',
 }: LookupReadyNoticeProps) {
@@ -42,32 +39,22 @@ export default function LookupReadyNotice({
           role="status"
           aria-live="polite"
         >
-            <div className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-phi-3 rounded-2xl border border-oxford/25 bg-paper px-phi-4 py-phi-3 sm:px-phi-5">
-              <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="type-label-section">Dispatch complete</p>
-                <p className="mt-phi-1 truncate font-sans text-[15px] font-semibold leading-tight tracking-[-0.02em] text-oxford">
-                  <span className="sr-only">Memo ready: </span>
-                  {name}
-                </p>
-              </div>
-              {recommendation ? <DecisionBadge variant={recommendationLabel === 'More diligence' ? 'escalation' : recommendation} label={recommendationLabel?.toUpperCase()} /> : null}
-              <button
-                type="button"
-                onClick={onOpen}
-                className="type-action shrink-0 rounded-full border border-oxford bg-oxford px-phi-4 py-phi-2 text-paper transition-colors hover:bg-charcoal btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
-              >
-                Open memo →
-              </button>
-              <button
-                type="button"
-                onClick={onDismiss}
-                aria-label="Dismiss memo ready notification"
-                className="type-action shrink-0 border-0 bg-transparent p-1 text-oxford/65 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35"
-              >
-                Dismiss
-              </button>
-            </div>
+          <button
+            type="button"
+            onClick={onOpen}
+            aria-label={`Open memo for ${name}${recommendationLabel ? `, ${recommendationLabel}` : ''}`}
+            className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 rounded-full border border-oxford/30 bg-paper px-phi-4 py-phi-2 text-left transition-colors hover:border-oxford/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 sm:px-phi-5"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block font-mono text-[9px] font-medium uppercase leading-tight tracking-[0.12em] text-oxford/60">Dispatch ready</span>
+              <span className="mt-0.5 block truncate font-sans text-[12px] font-semibold leading-tight tracking-[-0.01em] text-oxford">{name}</span>
+            </span>
+            {recommendation ? (
+              <span className="shrink-0 rounded-full bg-oxford px-phi-3 py-phi-1 font-mono text-[9px] font-medium uppercase leading-tight tracking-[0.08em] text-paper">
+                {recommendationLabel ?? recommendation}
+              </span>
+            ) : null}
+          </button>
         </motion.div>
       ) : null}
     </AnimatePresence>

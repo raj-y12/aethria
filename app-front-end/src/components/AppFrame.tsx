@@ -618,7 +618,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                       recommendation: dispatch.lookupReady?.partner?.recommendation ?? null,
                       recommendationLabel: partnerRecommendationLabel(dispatch.lookupReady?.partner),
                       onOpen: dispatch.openLookupMemo,
-                      onDismiss: dispatch.dismissReady,
                     }}
                     onDispatch={dispatch.openCommandBar}
                     override={spineOverride}
@@ -642,7 +641,6 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
                 recommendationLabel={partnerRecommendationLabel(dispatch.lookupReady?.partner)}
                 onOpen={dispatch.openLookupMemo}
-                onDismiss={dispatch.dismissReady}
                 className={showWorkspaceSpine ? 'lg:hidden' : ''}
               />
               {children}

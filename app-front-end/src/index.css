@@ -4831,6 +4831,13 @@ textarea {
   position: relative;
   display: inline-flex;
   flex: none;
+  width: var(--dock-size);
+  height: var(--dock-size);
+}
+
+.aethria-spine-dispatch-anchor > .aethria-spine-dispatch-float {
+  position: relative;
+  z-index: 2;
 }
 
 .lookup-ready-notice--dispatch {
@@ -4838,13 +4845,15 @@ textarea {
   z-index: 60;
   right: auto;
   bottom: 0;
-  left: calc(100% + 10px);
-  width: min(390px, calc(100vw - 72px));
+  left: 0;
+  width: min(260px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
 }
 
 .lookup-ready-notice--dispatch .lookup-ready-notice__plate {
   max-width: none;
-  box-shadow: 0 10px 30px -12px rgba(10, 22, 41, 0.28);
+  height: var(--dock-size);
+  padding-left: calc(var(--dock-size) + 10px);
+  box-shadow: 0 6px 18px -10px rgba(10, 22, 41, 0.24);
 }
