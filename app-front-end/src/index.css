@@ -4823,5 +4823,7 @@ textarea {
   max-width: none;
   height: calc(var(--dock-size) + 12px);
   padding-left: calc(var(--dock-size) + 14px);
+  padding-right: var(--space-3);
+  padding-block: var(--space-1);
   box-shadow: 0 6px 18px -10px rgba(10, 22, 41, 0.24);
 }

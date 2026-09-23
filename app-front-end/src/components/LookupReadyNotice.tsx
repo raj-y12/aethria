@@ -43,7 +43,7 @@ export default function LookupReadyNotice({
             type="button"
             onClick={onOpen}
             aria-label={`Open memo for ${name}${recommendationLabel ? `, ${recommendationLabel}` : ''}`}
-            className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 rounded-xl border border-oxford/30 bg-paper px-phi-4 py-phi-2 text-left transition-colors hover:border-oxford/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 sm:px-phi-5"
+            className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 rounded-full border border-oxford/30 bg-paper px-phi-4 py-phi-2 text-left transition-colors hover:border-oxford/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 sm:px-phi-5"
           >
             <span className="min-w-0 flex-1">
               <span className="block font-mono text-[9px] font-medium uppercase leading-tight tracking-[0.12em] text-oxford/60">Dispatch complete</span>
