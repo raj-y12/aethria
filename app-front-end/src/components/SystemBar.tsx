@@ -158,14 +158,18 @@ export function SpineNavButton({
           aria-hidden
         />
       ) : null}
+      {running ? (
+        <svg
+          className="aethria-dispatch-progress-ring"
+          viewBox="0 0 100 36"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <rect x="1" y="1" width="98" height="34" rx="17" />
+        </svg>
+      ) : null}
       <span className="relative inline-flex min-w-0 items-center gap-phi-2">
         <WorkspaceGlyph label={label} />
-        {running ? (
-          <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe ${onPaper ? 'bg-oxford' : 'bg-white'}`}
-            aria-hidden
-          />
-        ) : null}
         <span className="aethria-nav-label truncate">{label}</span>
       </span>
       {shortcut ? (
