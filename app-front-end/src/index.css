@@ -1657,10 +1657,6 @@ textarea {
   line-height: 1.08;
 }
 
-.aethria-fund > div:first-child header [class*='gap-x-phi-7'] {
-  gap: 26px;
-}
-
 .aethria-fund > div:nth-child(2) > div {
   padding-top: 18px;
 }
@@ -1679,29 +1675,6 @@ textarea {
 
 .aethria-fund > div:first-child .border-b {
   border-color: transparent;
-}
-
-.aethria-fund > div:first-child nav,
-.aethria-fund > div:first-child [role='tablist'] {
-  display: flex;
-  gap: 0;
-  overflow-x: auto;
-}
-
-.aethria-fund > div:first-child nav button,
-.aethria-fund > div:first-child [role='tablist'] button {
-  min-height: 34px;
-  padding: 0 13px 9px;
-  border-bottom: 2px solid transparent;
-  white-space: nowrap;
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.aethria-fund > div:first-child nav button[aria-selected='true'],
-.aethria-fund > div:first-child [role='tablist'] button[aria-selected='true'] {
-  border-bottom-color: currentColor;
 }
 
 .aethria-settings .focus-frame::before,
@@ -3436,8 +3409,8 @@ textarea {
   background-image: none;
 }
 
-/* Fund refinement: the instrument shares the page canvas. Facets are a quiet
-   switcher; the active state is type weight and underline, never a tile. */
+/* Fund refinement: the instrument shares the page canvas. Facets are a
+   segmented pill (SystemIntelligence FundFacetNav), styled in the component. */
 .aethria-fund > div:first-child,
 .aethria-fund > div:first-child > div,
 .aethria-fund > div:first-child .bg-surface-canvas,
@@ -3453,23 +3426,6 @@ textarea {
 .aethria-fund > div:first-child nav,
 .aethria-fund > div:first-child [role='tablist'] {
   border-color: transparent;
-}
-
-.aethria-fund > div:first-child nav button,
-.aethria-fund > div:first-child [role='tablist'] button,
-.aethria-fund [role='tablist'] button {
-  border-bottom-color: transparent;
-  background: transparent !important;
-}
-
-.aethria-fund > div:first-child nav button[aria-selected='true'],
-.aethria-fund > div:first-child [role='tablist'] button[aria-selected='true'],
-.aethria-fund [role='tablist'] button[aria-selected='true'] {
-  font-weight: 600;
-}
-
-.aethria-fund [role='tablist'] button > span.absolute {
-  background: transparent !important;
 }
 
 .aethria-fund .border-t,
@@ -4105,6 +4061,18 @@ textarea {
   .aethria-spine-dispatch-float[data-nav-label]:focus-visible::after {
     opacity: 1;
     transform: translateY(-50%) translateX(0);
+  }
+
+  .aethria-spine-dispatch-anchor--notice > .aethria-spine-dispatch-float[data-nav-label]::after {
+    top: auto;
+    bottom: calc(100% + 9px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+  }
+
+  .aethria-spine-dispatch-anchor--notice > .aethria-spine-dispatch-float[data-nav-label]:hover::after,
+  .aethria-spine-dispatch-anchor--notice > .aethria-spine-dispatch-float[data-nav-label]:focus-visible::after {
+    transform: translateX(-50%) translateY(0);
   }
 
 /* Entry/admin surfaces use the same modern operating-surface language as the

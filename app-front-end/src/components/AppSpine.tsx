@@ -617,7 +617,7 @@ export default function AppSpine({
           </div>
         </aside>
 
-        <div className="aethria-spine-dispatch-anchor">
+        <div className={`aethria-spine-dispatch-anchor${dispatchReadyNotice.name ? " aethria-spine-dispatch-anchor--notice" : ""}`}>
           <LookupReadyNotice {...dispatchReadyNotice} placement="dispatch" />
           <SpineNavButton
             label="Dispatch"
