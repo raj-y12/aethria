@@ -37,7 +37,7 @@ async def test_postgres_roundtrip_and_tenant_isolation(repository_factory=None):
     try:
         await conn.execute("insert into companies(company_id,user_id,canonical_name) values($1,$2,'Synthetic Phase 0')", company, uid)
         await conn.execute("insert into source_observations(observation_id,user_id,channel,observed_name,company_id) values($1,$2,'manual_lookup','Synthetic Phase 0',$3)", observation, uid, company)
-        await conn.execute("insert into opportunities(opportunity_id,user_id,company_id,first_observation_id,latest_observation_id,legacy_startup_id) values($1,$2,$3,$4,$4,$5)", opportunity, uid, company, observation, startup)
+        await conn.execute("insert into opportunities(opportunity_id,user_id,company_id,first_observation_id,latest_observation_id,legacy_startup_id,workflow_state) values($1,$2,$3,$4,$4,$5,'admitted')", opportunity, uid, company, observation, startup)
         await conn.execute("insert into startups(startup_id,user_id,scout_info,financials,agent_trace) values($1,$2,'{}','{}',$3::jsonb)", startup, uid, json.dumps({"scout": trace}))
         await conn.execute("update companies set canonical_domain='example.test' where user_id=$1 and company_id=$2", uid, company)
         evidence = EvidenceRepository(Pool())
