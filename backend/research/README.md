@@ -27,7 +27,8 @@ provider response is normalised into before anything downstream sees it.
   provider SDK.
 - `search_results.py`: the shared `ProviderSearchResults` shape.
 - `retrieval_grounding.py`: the cache-aware retrieval entrypoint
-  (`retrieve_source_pack`), wiring providers to `retrieval_cache`.
+  (`retrieve_source_pack`), wiring providers to `retrieval_cache` and excluding
+  scraped HTTP error pages before sources reach evidence consumers.
 - `reference_validation.py` / `reference_verify.py` / `source_corroboration.py`:
   source quality — URL/domain validation, reachability probing, anchor and
   corroboration checks. Consumed broadly (scout, identity, resolver) since

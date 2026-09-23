@@ -14,6 +14,36 @@ def test_retrieve_source_pack_uses_the_chain(monkeypatch):
     assert "https://hivery.com" in pack["url_allowlist"]
 
 
+def test_retrieve_source_pack_rejects_scraped_http_error_pages(monkeypatch):
+    monkeypatch.setattr(
+        "research.search_providers.firecrawl_search",
+        lambda query, max_results, time_range=None, topic=None, days=None: [
+            {
+                "title": "Inside Protex AI",
+                "url": "https://youtube.com/watch?v=example",
+                "snippet": "Error 401 (Bad Request)!!1 **401.** That's an error. The server cannot process the request because it is malformed. It should not be retried. Back Skip navigation Inside Protex AI",
+            },
+            {
+                "title": "Protex AI company profile",
+                "url": "https://protex.ai/company",
+                "snippet": "Protex AI builds workplace safety software.",
+            },
+            {
+                "title": "Authentication industry report",
+                "url": "https://example.com/auth-report",
+                "snippet": "The report discusses HTTP 401 errors in enterprise software.",
+            },
+        ],
+    )
+
+    pack = retrieve_source_pack(query="Protex AI", user_id="u1", max_results=3)
+
+    assert [source["url"] for source in pack["sources"]] == [
+        "https://protex.ai/company", "https://example.com/auth-report"
+    ]
+    assert "https://youtube.com/watch?v=example" not in pack["url_allowlist"]
+
+
 def test_retrieve_source_pack_merged_dedupes_urls(monkeypatch):
     calls: list[str] = []
 
