@@ -4641,7 +4641,9 @@ textarea {
   background: var(--color-oxford);
   color: var(--color-paper);
   padding: 0 16px;
-  transition: flex-grow 520ms var(--motion-ease), background-color 260ms var(--motion-ease), color 260ms var(--motion-ease), padding 260ms var(--motion-ease), border-radius 260ms var(--motion-ease);
+  /* Animate flex-basis too: changing it instantly makes the quiet cards snap
+     into circles before the active card begins to expand. */
+  transition: flex 620ms cubic-bezier(0.22, 1, 0.36, 1), background-color 420ms var(--motion-ease), color 420ms var(--motion-ease), padding 420ms var(--motion-ease), border-radius 420ms var(--motion-ease);
 }
 
 .aethria-home .desk-home__workspaces .aethria-home__workspace-card:hover,
@@ -4661,12 +4663,14 @@ textarea {
 }
 
 .aethria-home .desk-home__workspace-card .aethria-home__workspace-circle {
-  width: auto;
-  height: auto;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: currentColor;
+  transition: border-radius 520ms cubic-bezier(0.22, 1, 0.36, 1), background-color 420ms var(--motion-ease), color 420ms var(--motion-ease);
 }
 
 .aethria-home .desk-home__workspace-card .aethria-home__workspace-circle .aethria-nav-glyph {
@@ -4674,24 +4678,23 @@ textarea {
   height: 16px;
 }
 
-/* On intent, the active destination takes the available width while the
-   quiet destinations reduce to the original Oxford icon circles. :has keeps
-   the same interaction available to keyboard focus without adding JS state. */
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover),
+/* The parent records the hovered or focused door so every card receives a
+   concrete flex-basis change that the browser can interpolate. */
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='0'] .aethria-home__workspace-card:not(:nth-child(1)),
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:not(:nth-child(2)),
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:not(:nth-child(3)),
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) {
-  flex: 0 0 54px;
+  flex-basis: 54px;
   justify-content: center;
   gap: 0;
   padding-inline: 0;
-  background: transparent;
+  background: var(--color-oxford);
 }
 
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover) .aethria-home__workspace-label,
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-label {
   display: none;
 }
 
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover) .aethria-home__workspace-circle,
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-circle {
   width: 52px;
   height: 52px;
@@ -4700,9 +4703,7 @@ textarea {
   color: var(--color-paper);
 }
 
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:hover,
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
-  flex-grow: 2;
   background: var(--color-oxford);
   color: var(--color-paper);
   border-radius: 999px;
@@ -4740,6 +4741,37 @@ textarea {
 .aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aethria-home .desk-home__workspaces .aethria-home__workspace-card,
+  .aethria-home .desk-home__workspaces .aethria-home__workspace-circle {
+    transition: none;
+  }
+}
+
+/* Keep the row on a fixed three-cell flex track and animate each door's basis.
+   The equal base widths and 54px compact widths add up with the 4px gaps, so
+   the row's outside edges remain anchored throughout the slide. */
+.aethria-home .desk-home__workspaces [role='navigation'] {
+  display: flex;
+  gap: 4px;
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card {
+  width: calc((100% - 8px) / 3);
+  flex: 0 0 calc((100% - 8px) / 3);
+  transition: flex-basis 680ms cubic-bezier(0.22, 1, 0.36, 1), padding 420ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='0'] .aethria-home__workspace-card:nth-child(1),
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:nth-child(2),
+.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:nth-child(3) {
+  flex-basis: calc(100% - 116px);
+}
+
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
+  flex-basis: calc(100% - 116px);
 }
 
 @media (prefers-reduced-motion: reduce) {

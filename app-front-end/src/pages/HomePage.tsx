@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { motion } from 'framer-motion';
 import Reveal from '../components/Reveal';
@@ -26,10 +26,12 @@ function HomeDoor({
   label,
   index,
   onClick,
+  onActiveChange,
 }: {
   label: string;
   index: number;
   onClick: () => void;
+  onActiveChange: (index: number | null) => void;
 }) {
   const reduceMotion = usePrefersReducedMotion();
 
@@ -46,6 +48,11 @@ function HomeDoor({
         delay: 0.18 + index * 0.04,
       })}
       data-nav-label={label}
+      data-workspace-index={index}
+      onHoverStart={() => onActiveChange(index)}
+      onHoverEnd={() => onActiveChange(null)}
+      onFocus={() => onActiveChange(index)}
+      onBlur={() => onActiveChange(null)}
       className="aethria-home__workspace-card group relative flex items-center justify-between gap-phi-3 overflow-hidden px-phi-5 py-phi-5 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
     >
       {/* A whisper of oxford tint lifts the cell — airy, never a slab. */}
@@ -117,6 +124,7 @@ function PipelineIndicator({ state }: { state: SpinePipelineState }) {
 export default function HomePage({ data, sinceAway: _sinceAway }: { data: SystemData; sinceAway: ActivitySummary | null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [activeWorkspace, setActiveWorkspace] = useState<number | null>(null);
   const { openDispatch, pipelineState } = useAppFrame();
   // What the agents did since the last visit (marks the report seen; null when
   // the login screen already presented it or nothing happened).
@@ -301,20 +309,23 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
         {!showFundReadinessUnavailable && !showFirstRun && !showPublishPrompt ? (
           <section className="desk-home__workspaces" aria-label="Workspaces">
             <p className="type-label-section text-oxford/50">Workspaces</p>
-            <div className="mt-phi-3 grid grid-cols-3 gap-phi-3" role="navigation" aria-label="Workspaces">
+            <div className="mt-phi-3 grid grid-cols-3 gap-phi-3" role="navigation" aria-label="Workspaces" data-active-index={activeWorkspace ?? ''}>
               <HomeDoor
                 label="Dispatch"
                 index={0}
+                onActiveChange={setActiveWorkspace}
                 onClick={openDispatch}
               />
               <HomeDoor
                 label="Portfolio"
                 index={1}
+                onActiveChange={setActiveWorkspace}
                 onClick={() => navigate('/v1/portfolio')}
               />
               <HomeDoor
                 label="Fund"
                 index={2}
+                onActiveChange={setActiveWorkspace}
                 onClick={() => navigate('/v1/fund')}
               />
             </div>
