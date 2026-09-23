@@ -4845,8 +4845,8 @@ textarea {
   z-index: 60;
   right: auto;
   bottom: 0;
-  left: 0;
-  width: min(260px, calc(100vw - 72px));
+  left: calc(var(--dock-size) / 2);
+  width: min(240px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
 }
