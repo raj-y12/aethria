@@ -44,7 +44,7 @@ function AuthorityRolloutNotice({
     <div
       role={blockedReason ? 'alert' : 'status'}
       aria-label="Authority rollout status"
-      className={`flex flex-none flex-wrap items-center gap-x-phi-4 gap-y-phi-1 border-b px-6 py-2 type-label-tab ${blockedReason ? 'border-escalation/30 bg-escalation/10 text-oxford' : 'border-oxford/10 bg-paper text-oxford/70'}`}
+      className={`flex flex-none flex-wrap items-center gap-x-phi-4 gap-y-phi-1 border-l-2 px-6 py-2 type-label-tab ${blockedReason ? 'border-escalation text-oxford' : 'border-oxford/25 bg-paper text-oxford/70'}`}
     >
       <span>Authority: {rolloutLabel(status.mode)}</span>
       <span>Reconciliation: {reconciliation}</span>
@@ -138,9 +138,9 @@ function AppShell() {
       <AppFrame
         data={systemData}
         startupsError={systemData.startupsError}
-        // Bare = spine dissolves: the front door and Settings are both focused,
-        // Dispatch-style takeovers with their own way back to the app.
-        chrome={!isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}
+        // Fey keeps the workspace dock persistent across overview, worklists,
+        // settings, and detail surfaces; the page changes, the navigation does not.
+        chrome="full"
       >
         <ErrorBoundary key={pathname} label="workspace">
           {isSettingsRoute ? (

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { motion } from 'framer-motion';
 import Reveal from '../components/Reveal';
+import { WorkspaceGlyph } from '../components/SystemBar';
 import { useAppFrame } from '../components/AppFrame';
 import AgentLogoutModal from '../components/AgentLogoutModal';
 import { useAgentLogoutFlow } from '../hooks/useAgentLogoutFlow';
@@ -44,17 +45,19 @@ function HomeDoor({
         ease: tokens.motion.ease,
         delay: 0.18 + index * 0.04,
       })}
-      className="group relative flex flex-col items-center gap-phi-3 overflow-hidden px-phi-5 py-phi-6 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30"
+      data-nav-label={label}
+      className="aethria-home__workspace-card group relative flex items-center justify-between gap-phi-3 overflow-hidden px-phi-5 py-phi-5 text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
     >
       {/* A whisper of oxford tint lifts the cell — airy, never a slab. */}
       <span
         aria-hidden
         className={`pointer-events-none absolute inset-0 z-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
       />
-      <span className="relative z-10 inline-block px-[3px]">
-        <span
-          className={`type-action type-action-strong block transition-[transform,color] duration-300 ${EASE} group-hover:-translate-y-[1px] group-hover:text-oxford`}
-        >
+      <span className="relative z-10 flex flex-col items-center gap-phi-2">
+        <span className="aethria-home__workspace-circle">
+          <WorkspaceGlyph label={label} />
+        </span>
+        <span className={`aethria-home__workspace-label type-action type-action-strong block transition-colors duration-300 ${EASE} group-hover:text-oxford`}>
           {label}
         </span>
       </span>
@@ -108,20 +111,17 @@ function PipelineIndicator({ state }: { state: SpinePipelineState }) {
 /**
  * Home — the front door as a briefing. One centered column on paper: the mark,
  * the situation spoken in serif, the few deals on the desk (the door to Flow),
- * and two quiet doors to Portfolio and Fund.
- * Content doubles as navigation; the type and the hairlines do the work.
+ * and three focused workspace actions at the bottom.
+ * Content doubles as navigation; the type and the quiet geometry do the work.
  */
 export default function HomePage({ data, sinceAway: _sinceAway }: { data: SystemData; sinceAway: ActivitySummary | null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { openDispatch, dispatchActive, pipelineState } = useAppFrame();
+  const { openDispatch, pipelineState } = useAppFrame();
   // What the agents did since the last visit (marks the report seen; null when
   // the login screen already presented it or nothing happened).
-  const {
-    agentActionPending,
-    requestLogout,
-    logoutModalProps,
-  } = useAgentLogoutFlow();
+  const { agentActionPending, requestLogout, logoutModalProps } = useAgentLogoutFlow();
+  const reduceMotion = usePrefersReducedMotion();
   const { mandatePublished, unknown: fundReadinessUnknown, loading: fundReadinessLoading } = useFundReadiness();
   const { startups } = data;
 
@@ -171,35 +171,35 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
   const showFundReadinessUnavailable = mandatePrompt === 'unavailable';
 
   return (
-    <div className="paper-dot-grid relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
-      {/* sm:px-phi-7 (55px) clears the focus-frame brackets, which reach 40px
-          past the framed body; px-phi-6 (34px) would not. */}
-      <div className="flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
+    <div className="paper-dot-grid desk-home aethria-home relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
+      {/* Keep enough horizontal breathing room for the bracket frame at every
+          desktop width while allowing the content to use the full viewport. */}
+      <div className="desk-home__inner flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
         {/* ── The mark ── */}
-        <Reveal delay={0.02} y={-6}>
+        <Reveal delay={0.02} y={-6} className="desk-home__brand">
           <p className="text-center font-wordmark text-[clamp(18px,1.45vw,23px)] font-medium leading-tight text-oxford">
             Aethria<span className="wordmark-dot">.</span>
           </p>
         </Reveal>
 
         {/* ── The dateline + pipeline readout. No rule — the headline carries the page. ── */}
-        <Reveal delay={0.1} className="mt-phi-7 w-full max-w-[42rem]">
+        <Reveal delay={0.1} className="desk-home__date mt-phi-7 w-full max-w-[42rem]">
           <p className="type-label-section text-oxford/50 flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 tabular-nums">
             <span>Today</span>
           </p>
         </Reveal>
 
         {/* ── The framed briefing — the login page's bracket move ── */}
-        <div className="focus-frame mt-phi-4 flex w-full max-w-[42rem] flex-col items-center">
+        <div className="desk-home__briefing focus-frame mt-phi-4 flex w-full max-w-[42rem] flex-col items-start">
         {showFundReadinessUnavailable ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 data-testid="home-briefing" className="type-display m-0 max-w-[16ch] text-center text-[clamp(36px,5vw,62px)] font-semibold leading-[1.02] tracking-[-0.025em] text-oxford">
+              <h1 data-testid="home-briefing" className="type-display m-0 max-w-[16ch] text-left text-[clamp(36px,5vw,62px)] font-semibold leading-[1.02] tracking-[-0.025em] text-oxford">
                 Reading the mandate.
               </h1>
             </Reveal>
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-note text-center text-oxford/65">
+              <p className="type-note text-left text-oxford/65">
                 Aethria could not verify fund readiness. Retry when the control plane is available.
               </p>
             </Reveal>
@@ -207,13 +207,13 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
         ) : showFirstRun ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 data-testid="home-briefing" className="type-display m-0 max-w-[16ch] text-center text-[clamp(36px,5vw,62px)] font-semibold leading-[1.02] tracking-[-0.025em] text-oxford">
+              <h1 data-testid="home-briefing" className="type-display m-0 max-w-[16ch] text-left text-[clamp(36px,5vw,62px)] font-semibold leading-[1.02] tracking-[-0.025em] text-oxford">
                 Define your mandate.
               </h1>
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-note text-center text-oxford/65">
+              <p className="type-note text-left text-oxford/65">
                 Aethria won't scout or evaluate until a fund mandate is published.
               </p>
             </Reveal>
@@ -230,13 +230,13 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
         ) : showPublishPrompt ? (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-left text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 Publish your mandate.
               </h1>
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-note text-center text-oxford/65">
+              <p className="type-note text-left text-oxford/65">
                 Aethria has a saved thesis, but it is not published as the live mandate yet.
               </p>
             </Reveal>
@@ -253,124 +253,94 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
         ) : (
           <>
             <Reveal delay={0.16} y={10} className="mt-phi-6">
-              <h1 className="type-display m-0 max-w-[22ch] text-center text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
+              <h1 className="type-display m-0 max-w-[22ch] text-left text-[clamp(24px,3.2vw,38px)] font-normal leading-[1.08] tracking-[-0.01em] text-oxford">
                 {headline}
               </h1>
             </Reveal>
 
             <Reveal delay={0.24} className="mt-phi-5">
-              <p className="type-meta text-oxford/50 flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-phi-1 text-center tabular-nums">
+              <p className="type-meta text-oxford/50 flex flex-wrap items-center justify-start gap-x-phi-3 gap-y-phi-1 text-left tabular-nums">
                 <span role="status">{openUp.toLocaleString()} open in the docket</span>
                 <span aria-hidden className="text-oxford/20">·</span>
                 <PipelineIndicator state={pipelineState} />
               </p>
             </Reveal>
 
-            {/* ── On the desk — the door to Flow, carrying its scent ── */}
-            {attention.length > 0 && (
-              <Reveal delay={0.34} className="mt-phi-7 w-full max-w-[46rem]">
-                <button
-                  type="button"
-                  onClick={() => navigate('/v1/flow')}
-                  aria-label={`On the desk: ${attention.map((s) => s.scout.name).join(', ')}. Open Flow.`}
-                  className={`group relative block w-full overflow-hidden px-phi-2 py-phi-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-oxford/30`}
-                >
-                  {/* The same whisper of oxford tint as the doors. */}
-                  <span
-                    aria-hidden
-                    className={`pointer-events-none absolute inset-0 bg-oxford opacity-0 transition-opacity duration-[420ms] ${EASE} group-hover:opacity-[0.04]`}
-                  />
-                  <span className="relative flex items-baseline justify-between border-b border-oxford/[0.1] pb-phi-2">
-                    <span className="type-label-section text-oxford/50">
-                      The desk
-                    </span>
-                    <span
-                      className={`type-action text-oxford/60 transition-[transform,color] duration-300 ${EASE} group-hover:translate-x-[2px] group-hover:text-oxford/80`}
-                    >
-                      Flow →
-                    </span>
-                  </span>
-                  <span className="relative mt-phi-3 block divide-y divide-oxford/[0.04]">
-                    {attention.map((s) => {
-                      const reason = getDealAttentionReason(s);
-                      const urgent = Boolean(s.partner?.human_review_required);
-                      return (
-                        <span key={s.id} className="flex flex-col gap-phi-1 py-phi-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-phi-4">
-                          <span className="type-display truncate text-[19px] font-medium leading-snug text-oxford">
-                            {s.scout.name}
-                          </span>
-                          <span
-                            className={`type-meta tabular-nums sm:shrink-0 ${
-                              urgent ? 'text-escalation/80' : 'text-oxford/50'
-                            }`}
-                          >
-                            {reason}
-                          </span>
-                        </span>
-                      );
-                    })}
-                  </span>
-                  {attentionOverflow > 0 && (
-                    <span className="type-meta relative mt-phi-2 block tabular-nums text-oxford/45">
-                      + {attentionOverflow} more
-                    </span>
-                  )}
-                </button>
-              </Reveal>
-            )}
-
-            {/* ── Two quiet doors ── */}
-            <div className="mt-phi-6 w-full max-w-[46rem]">
-              <div
-                className="grid grid-cols-2 divide-x divide-oxford/[0.08]"
-                role="navigation"
-                aria-label="Workspaces"
-              >
-                <HomeDoor
-                  label="Portfolio"
-                  index={0}
-                  onClick={() => navigate('/v1/portfolio')}
-                />
-                <HomeDoor
-                  label="Fund"
-                  index={1}
-                  onClick={() => navigate('/v1/fund')}
-                />
-              </div>
-            </div>
           </>
         )}
+        {attention.length > 0 && !showFundReadinessUnavailable && !showFirstRun && !showPublishPrompt ? (
+          <Reveal delay={0.34} className="desk-home__attention-section">
+            <button
+              type="button"
+              onClick={() => navigate('/v1/flow')}
+              aria-label={`On the desk: ${attention.map((s) => s.scout.name).join(', ')}. Open Flow.`}
+              className="desk-home__attention group relative block w-full overflow-hidden rounded-[14px] px-phi-4 py-phi-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            >
+              <span aria-hidden className="pointer-events-none absolute inset-0 bg-oxford opacity-0 transition-opacity duration-[420ms] group-hover:opacity-[0.04]" />
+              <span className="relative flex items-baseline justify-between border-b border-oxford/[0.1] pb-phi-2">
+                <span className="type-label-section text-oxford/50">The desk</span>
+                <span className="type-action text-oxford/60 transition-[transform,color] duration-300 group-hover:translate-x-[2px] group-hover:text-oxford/80">Flow →</span>
+              </span>
+              <span className="relative mt-phi-3 block divide-y divide-oxford/[0.04]">
+                {attention.map((s) => {
+                  const reason = getDealAttentionReason(s);
+                  const urgent = Boolean(s.partner?.human_review_required);
+                  return (
+                    <span key={s.id} className="flex flex-col gap-phi-1 py-phi-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-phi-4">
+                      <span className="type-display truncate text-[19px] font-medium leading-snug text-oxford">{s.scout.name}</span>
+                      <span className={`type-meta tabular-nums sm:shrink-0 ${urgent ? 'text-escalation/80' : 'text-oxford/50'}`}>{reason}</span>
+                    </span>
+                  );
+                })}
+              </span>
+              {attentionOverflow > 0 ? <span className="type-meta relative mt-phi-2 block tabular-nums text-oxford/45">+ {attentionOverflow} more</span> : null}
+            </button>
+          </Reveal>
+        ) : null}
+
+        {!showFundReadinessUnavailable && !showFirstRun && !showPublishPrompt ? (
+          <section className="desk-home__workspaces" aria-label="Workspaces">
+            <p className="type-label-section text-oxford/50">Workspaces</p>
+            <div className="mt-phi-3 grid grid-cols-3 gap-phi-3" role="navigation" aria-label="Workspaces">
+              <HomeDoor
+                label="Dispatch"
+                index={0}
+                onClick={openDispatch}
+              />
+              <HomeDoor
+                label="Portfolio"
+                index={1}
+                onClick={() => navigate('/v1/portfolio')}
+              />
+              <HomeDoor
+                label="Fund"
+                index={2}
+                onClick={() => navigate('/v1/fund')}
+              />
+            </div>
+          </section>
+        ) : null}
+
         </div>
 
-        {/* ── The footer — identity, quiet, then the few actions, quieter still ── */}
-        <Reveal delay={0.36} className="mt-phi-7 flex flex-col items-center gap-phi-2">
-          <div className="flex flex-wrap items-center justify-center gap-x-phi-3 gap-y-1">
-            <button
-              type="button"
-              onClick={openDispatch}
-              className="type-action text-oxford/50 transition-colors hover:text-oxford btn-interaction"
-            >
-              {dispatchActive ? 'Lookup running' : 'Dispatch ⌘K'}
-            </button>
-            <span aria-hidden className="text-oxford/20">·</span>
-            <Link
-              to="/v1/settings"
-              className="type-action text-oxford/50 transition-colors hover:text-oxford btn-interaction"
-            >
-              Settings
-            </Link>
-            <span aria-hidden className="text-oxford/20">·</span>
-            <button
-              type="button"
-              onClick={requestLogout}
-              disabled={agentActionPending}
-              className="type-action text-oxford/50 transition-colors hover:text-oxford disabled:opacity-50 btn-interaction"
-            >
-              {agentActionPending ? 'Updating…' : 'Log out'}
-            </button>
-          </div>
-        </Reveal>
       </div>
+
+      <motion.button
+        type="button"
+        className="aethria-logout-float"
+        aria-label="Log out"
+        title="Log out"
+        onClick={requestLogout}
+        disabled={agentActionPending}
+        whileHover={reduceMotion ? undefined : { y: -1 }}
+        whileTap={reduceMotion ? undefined : { scale: 0.94 }}
+        transition={transitionOrReduced(reduceMotion, {
+          duration: tokens.motion.duration.micro,
+          ease: tokens.motion.ease,
+        })}
+      >
+        <WorkspaceGlyph label="logout" />
+      </motion.button>
 
       <AgentLogoutModal {...logoutModalProps} />
     </div>

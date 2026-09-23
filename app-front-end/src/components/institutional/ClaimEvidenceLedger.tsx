@@ -30,13 +30,13 @@ function ClaimCorrection({ claim, onDone }: { claim: Claim; onDone: () => void }
   return (
     <div className="mt-phi-3 border-t border-oxford/10 pt-phi-3">
       <div className="grid gap-phi-3 sm:grid-cols-[150px_1fr]">
-        <select aria-label="Correction action" value={action} onChange={(event) => setAction(event.target.value as typeof action)} className="border border-oxford/15 bg-paper px-2 py-2 type-action">
+        <select aria-label="Correction action" value={action} onChange={(event) => setAction(event.target.value as typeof action)} className="border-0 border-b border-oxford/20 bg-transparent px-0 py-2 type-action">
           <option value="mark_stale">Mark stale</option>
           <option value="contradict">Contradict</option>
           <option value="withdraw">Withdraw</option>
           <option value="supersede">Supersede</option>
         </select>
-        <input aria-label="Correction rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="Why this claim changed" className="border border-oxford/15 bg-transparent px-3 py-2 text-sm text-oxford" />
+        <input aria-label="Correction rationale" value={rationale} onChange={(event) => setRationale(event.target.value)} placeholder="Why this claim changed" className="border-0 border-b border-oxford/20 bg-transparent px-0 py-2 text-sm text-oxford" />
       </div>
       <div className="mt-phi-2 flex gap-phi-2">
         <button type="button" onClick={() => mutation.mutate()} disabled={rationale.trim().length < 3 || mutation.isPending} className="type-action bg-oxford px-3 py-2 text-paper disabled:opacity-35">Record correction</button>

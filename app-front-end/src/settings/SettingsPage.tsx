@@ -22,6 +22,8 @@ import {
   type FundThesisSummary,
 } from '../api/fundThesis';
 import { useFundConfiguration, usePrefersReducedMotion } from '../hooks';
+import CompactPolicy, { CompactThesis } from './CompactSettings';
+import DecisionThresholdsPanel from './DecisionThresholdsPanel';
 import FundThesisConfirmationModal from './FundThesisConfirmationModal';
 import SettingsActionDialog from './SettingsActionDialog';
 import SettingsTopBar, { type SettingsStatusTone } from './SettingsTopBar';
@@ -40,6 +42,7 @@ import {
   type PendingChange,
   type FundThesisChangeSet,
   type SectionId,
+  type SettingsPersistenceGroup,
 } from './settingsModel';
 
 import {
@@ -64,6 +67,7 @@ import {
   loadPolicyPublishRecovery,
   savePolicyPublishRecovery,
 } from './policyPublishRecovery';
+import { StepButton, WeightInput } from './WeightControls';
 
 const SELECT_CHEVRON =
   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%231a2b48' fill-opacity='0.45' d='M0 3h10L5 8z'/%3E%3C/svg%3E\")";
@@ -170,7 +174,7 @@ function ToggleRow({
   hint?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-phi-5 py-phi-3">
+    <div className="settings-toggle-row flex items-center justify-between gap-phi-5 py-phi-3">
       <div className="min-w-0">
         <label htmlFor={id} className="type-body-sm text-oxford">{label}</label>
         {hint && <p className="type-note mt-phi-1 leading-snug text-oxford/70">{hint}</p>}
@@ -217,7 +221,7 @@ function ChipGroup({
               type="button"
               aria-pressed={active}
               onClick={() => toggle(option)}
-              className={`type-action inline-flex min-h-[36px] items-center justify-center rounded-none px-phi-3 text-xs transition-colors ${active ? 'bg-oxford text-paper' : 'bg-oxford/[0.045] text-oxford/70 hover:bg-oxford/[0.075]'}`}
+              className={`settings-choice type-action inline-flex min-h-[36px] items-center justify-center rounded-none border-b-2 border-transparent bg-transparent px-phi-3 text-xs transition-colors ${active ? 'border-oxford font-semibold text-oxford' : 'text-oxford/65 hover:border-oxford/30 hover:text-oxford'}`}
             >
               {option}
             </button>
@@ -225,76 +229,6 @@ function ChipGroup({
         })}
       </div>
     </div>
-  );
-}
-
-/**
- * Commits on blur/Enter, not per keystroke. Rebalancing is destructive — typing
- * "100" one character at a time would redistribute three times and flatten the
- * other weights to an even split with no way back.
- */
-function WeightInput({
-  label,
-  value,
-  onCommit,
-}: {
-  label: string;
-  value: number;
-  onCommit: (value: number) => void;
-}) {
-  const [text, setText] = useState(String(value));
-
-  useEffect(() => {
-    setText(String(value));
-  }, [value]);
-
-  const commit = () => {
-    const parsed = Number.parseInt(text, 10);
-    const next = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : value;
-    setText(String(next));
-    if (next !== value) onCommit(next);
-  };
-
-  return (
-    <input
-      type="number"
-      min={0}
-      max={100}
-      value={text}
-      onChange={(event) => setText(event.target.value.replace(/[^\d]/g, ''))}
-      onBlur={commit}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter') event.currentTarget.blur();
-      }}
-      // type-data bakes in font-size: 13px, so the display size needs to force past it
-      className="type-data w-full border-0 bg-transparent p-0 text-center !text-[clamp(1.8rem,3vw,2.6rem)] leading-none text-oxford outline-none focus:ring-0"
-      aria-label={`${label} weight`}
-    />
-  );
-}
-
-/** Replaces the native number spinner, which is unstylable past `appearance: none`. */
-function StepButton({
-  label,
-  disabled,
-  onClick,
-  children,
-}: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="type-data flex h-6 w-6 items-center justify-center leading-none text-oxford/65 transition-colors hover:text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/40 disabled:pointer-events-none disabled:text-oxford/15"
-    >
-      {children}
-    </button>
   );
 }
 
@@ -330,7 +264,7 @@ function RoomSection({
 
 function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-phi-4 py-phi-5 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
+    <div className="settings-specrow grid gap-phi-4 py-phi-5 sm:grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] sm:items-start sm:gap-phi-5">
       <p className="type-label-section pt-phi-2 text-xs text-oxford/70">{label}</p>
       <div className="min-w-0">{children}</div>
     </div>
@@ -354,7 +288,7 @@ function EditorialStatus({
       ? 'bg-escalation/75'
       : 'bg-oxford/30';
   return (
-    <div className="grid gap-x-phi-4 gap-y-phi-2 py-phi-4 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
+    <div className="settings-status grid gap-x-phi-4 gap-y-phi-2 py-phi-4 sm:grid-cols-[minmax(6rem,32%)_minmax(0,1fr)] sm:items-baseline">
       <p className="type-label-section text-xs text-oxford/70">{label}</p>
       <p className="type-body-sm inline-flex items-center gap-phi-2 text-oxford">
         <span className={`h-1.5 w-1.5 shrink-0 ${dotClass}`} aria-hidden />
@@ -377,14 +311,16 @@ function GroupHeader({ title, description }: { title: string; description: strin
 function SettingsGroup({
   title,
   description,
+  groupId,
   children,
 }: {
   title: string;
   description: string;
+  groupId?: SettingsPersistenceGroup;
   children: React.ReactNode;
 }) {
   return (
-    <section className="settings-gallery-section">
+    <section className="settings-gallery-section" data-settings-group={groupId}>
       <div className="focus-frame">
         <GroupHeader title={title} description={description} />
         {children}
@@ -393,7 +329,16 @@ function SettingsGroup({
   );
 }
 
-export default function SettingsPage() {
+interface SettingsPageProps {
+  embedded?: boolean;
+  embeddedGroup?: SettingsPersistenceGroup;
+  initialSection?: SectionId;
+  onClose?: () => void;
+  /** Embedded only: each increment is a back request from the dock button. */
+  backSignal?: number;
+}
+
+export default function SettingsPage({ embedded = false, embeddedGroup, initialSection, onClose, backSignal }: SettingsPageProps) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { userId } = useAuth();
@@ -401,9 +346,10 @@ export default function SettingsPage() {
   const requestedSection = typeof window === 'undefined'
     ? null
     : new URLSearchParams(window.location.search).get('section');
-  const requestedSectionId = SETTINGS_SECTIONS.some((section) => section.id === requestedSection)
-    ? requestedSection as SectionId
-    : null;
+  const requestedSectionId = initialSection
+    ?? (SETTINGS_SECTIONS.some((section) => section.id === requestedSection)
+      ? requestedSection as SectionId
+      : null);
 
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -658,6 +604,9 @@ export default function SettingsPage() {
   const updateMandate = <K extends keyof FundConfiguration['mandate']>(key: K, value: FundConfiguration['mandate'][K]) =>
     updateDraft((current) => ({ ...current, mandate: { ...current.mandate, [key]: value } }));
 
+  const updateThreshold = <K extends keyof FundConfiguration['thresholds']>(key: K, value: FundConfiguration['thresholds'][K]) =>
+    updateDraft((current) => ({ ...current, thresholds: { ...current.thresholds, [key]: value } }));
+
   const updateRisk = <K extends keyof FundConfiguration['risk']>(key: K, value: FundConfiguration['risk'][K]) =>
     updateDraft((current) => ({ ...current, risk: { ...current.risk, [key]: value } }));
 
@@ -857,7 +806,13 @@ export default function SettingsPage() {
     setErrors([]);
   };
 
-  const navigateBack = () => navigate('/v1');
+  const navigateBack = () => {
+    if (onClose) {
+      onClose();
+      return;
+    }
+    navigate('/v1');
+  };
 
   const requestExit = () => {
     if (hasPendingPolicyChanges) {
@@ -873,6 +828,19 @@ export default function SettingsPage() {
     setDialog(null);
     navigateBack();
   };
+
+  // The dock's cog turns into the back button; it asks here so an undeployed
+  // draft still gets the "Leave settings?" confirmation.
+  // Only a change after mount is a request: the dock's counter keeps its value
+  // between panels, so a fresh mount must not read the old count as a press.
+  const requestExitRef = useRef(requestExit);
+  requestExitRef.current = requestExit;
+  const seenBackSignalRef = useRef(backSignal);
+  useEffect(() => {
+    if (backSignal === seenBackSignalRef.current) return;
+    seenBackSignalRef.current = backSignal;
+    requestExitRef.current();
+  }, [backSignal]);
 
   useEffect(() => {
     if (!hasPendingPolicyChanges) return;
@@ -926,8 +894,13 @@ export default function SettingsPage() {
     );
   }
 
+  const liveThesisLabel = thesisSummary?.active_version_number != null
+    ? `Fund Thesis v${thesisSummary.active_version_number}${agentsStatus?.mandate_published === false ? ' · awaiting publication' : ''}`
+    : 'Not published';
+
   return (
-    <div className="page-transition-enter settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden lg:pl-[var(--spine-width)]">
+    <div className={`aethria-settings page-transition-enter settings-gallery-room flex min-h-0 flex-1 flex-col overflow-hidden${embedded ? ` settings-page--embedded settings-page--embedded-${embeddedGroup ?? 'thesis'}` : ' lg:pl-[var(--spine-width)]'}`}>
+      {embedded ? null : (
       <SettingsTopBar
         live={pendingChanges.length === 0 && pendingPolicyPublish == null}
         saving={saving}
@@ -943,6 +916,7 @@ export default function SettingsPage() {
         attentionSection={attentionSection}
         onNavigate={scrollToSection}
       />
+      )}
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div
@@ -973,9 +947,19 @@ export default function SettingsPage() {
               </header>
               <p className="settings-gallery-intro">Define what you invest in, how deals are scored, and how the pipeline operates.</p>
                   <SettingsGroup
+                    groupId="thesis"
                     title="Fund thesis"
                     description="Your investment mandate. Publishing creates the thesis version used by Scout, Reviewer, and Partner."
                   >
+                  {embedded ? (
+                    <CompactThesis
+                      draft={draft}
+                      updateMandate={updateMandate}
+                      options={{ stages: stageOptions, geographies: geographyOptions, sectors: sectorOptions }}
+                      liveThesis={liveThesisLabel}
+                    />
+                  ) : (
+                  <>
 
                   <RoomSection
                     id="thesis"
@@ -1027,23 +1011,35 @@ export default function SettingsPage() {
                       <p className="type-body-sm text-oxford">{draft.versionLabel}</p>
                     </SpecRow>
                     <SpecRow label="Live thesis">
-                      <p className="type-body-sm text-oxford">
-                        {thesisSummary?.active_version_number != null
-                          ? `Fund Thesis v${thesisSummary.active_version_number}${agentsStatus?.mandate_published === false ? ' · awaiting publication' : ''}`
-                          : 'Not published'}
-                      </p>
+                      <p className="type-body-sm text-oxford">{liveThesisLabel}</p>
                     </SpecRow>
                   </RoomSection>
 
+                  </>
+                  )}
                   </SettingsGroup>
 
                   <SettingsGroup
+                    groupId="policy"
                     title="Decision policy"
                     description="How evidence is scored, escalated, and routed. Changes stay in draft until you deploy a new policy version."
                   >
+                  {embedded ? (
+                    <CompactPolicy
+                      draft={draft}
+                      updateDraft={updateDraft}
+                      updateThreshold={updateThreshold}
+                      updateRisk={updateRisk}
+                      updateMemo={updateMemo}
+                      setWeight={setWeight}
+                      weightValidation={weightValidation}
+                      bandErrors={bandValidation.valid ? [] : bandValidation.errors}
+                    />
+                  ) : (
+                  <>
 
                 {!bandValidation.valid && (
-                  <div className="border-l-2 border-escalation/35 bg-escalation/[0.035] py-phi-3 pl-phi-3">
+                  <div className="border-l-2 border-escalation/45 py-phi-3 pl-phi-3">
                     {bandValidation.errors.map((error) => <p key={error} className="type-body-sm text-escalation/75">{error}</p>)}
                   </div>
                 )}
@@ -1058,6 +1054,11 @@ export default function SettingsPage() {
                       uncertainty, and your fund mandate to decide whether to advance, pass, monitor,
                       or request more diligence. A score alone does not determine the recommendation.
                     </p>
+                    <DecisionThresholdsPanel
+                      draft={draft}
+                      updateDraft={updateDraft}
+                      updateThreshold={updateThreshold}
+                    />
                   </RoomSection>
 
                   <RoomSection
@@ -1157,9 +1158,12 @@ export default function SettingsPage() {
                     </div>
                   </RoomSection>
 
+                  </>
+                  )}
                   </SettingsGroup>
 
                   <SettingsGroup
+                    groupId="runtime"
                     title="Workspace runtime"
                     description="Operational limits for this workspace. Changes here save immediately and affect the running system."
                   >
@@ -1168,7 +1172,7 @@ export default function SettingsPage() {
                     id="budget"
                     title="Cost budget"
                   >
-                    <div className="grid gap-x-phi-8 sm:grid-cols-2">
+                    <div className="settings-ledger grid gap-x-phi-8 sm:grid-cols-2">
                       <SpecRow label="Token limit per run"><p className="type-data text-[1.35rem]">{settings.cost_budget.max_tokens_per_run.toLocaleString()} tokens</p></SpecRow>
                       <SpecRow label="Cooldown between runs"><p className="type-data text-[1.35rem]">{settings.cost_budget.cooldown_seconds}s</p></SpecRow>
                       <SpecRow label="Daily spend ceiling (USD)"><p className="type-data text-[1.35rem]">${settings.cost_budget.daily_cost_ceiling.toLocaleString()}</p></SpecRow>
@@ -1180,6 +1184,7 @@ export default function SettingsPage() {
                   </SettingsGroup>
 
                   <SettingsGroup
+                    groupId="system"
                     title="System"
                     description="Agent governance, readiness, and operator diagnostics. Changes to prompts and calibration remain explicitly reviewed."
                   >
@@ -1275,6 +1280,35 @@ export default function SettingsPage() {
           </main>
         </div>
       </div>
+
+      {embedded ? (
+        <div className="settings-embedded-deploy">
+          <span
+            className={`settings-embedded-deploy__status type-status ${topBarStatus.tone === 'error' ? 'text-escalation/85' : topBarStatus.tone === 'draft' || topBarStatus.tone === 'progress' ? 'text-escalation/80' : 'text-oxford/70'}`}
+            aria-live="polite"
+            role={topBarStatus.tone === 'error' ? 'alert' : 'status'}
+          >
+            <span className={`h-1.5 w-1.5 shrink-0 ${topBarStatus.tone === 'error' || topBarStatus.tone === 'draft' || topBarStatus.tone === 'progress' ? 'bg-escalation/70' : 'bg-oxford'}`} aria-hidden />
+            {topBarStatus.message}
+          </span>
+          <button
+            type="button"
+            onClick={() => setDialog('restore')}
+            disabled={saving}
+            className="settings-embedded-deploy__restore type-action text-oxford/70 transition-colors hover:text-oxford disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Restore defaults
+          </button>
+          <button
+            type="button"
+            onClick={requestDeploy}
+            disabled={saving || !hasPendingPolicyChanges}
+            className="btn-aethria-solid disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {pendingPolicyPublish ? (saving ? 'Retrying…' : 'Retry publish') : (saving ? 'Deploying…' : 'Deploy changes')}
+          </button>
+        </div>
+      ) : null}
 
       <FundThesisConfirmationModal
         open={thesisConfirmation != null}

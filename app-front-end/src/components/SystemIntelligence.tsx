@@ -53,15 +53,15 @@ export function FundFacetNav({
             role="tab"
             aria-selected={isActive}
             onClick={() => onTabChange(tab.key)}
-            className={`type-action group relative min-h-[32px] shrink-0 px-phi-4 py-phi-1 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive ? 'bg-surface-selected text-oxford' : 'text-oxford/65 hover:bg-oxford/[0.04] hover:text-oxford/80'
-            }`}
+              className={`type-action group relative min-h-[32px] shrink-0 px-phi-4 py-phi-1 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              isActive ? 'text-oxford' : 'text-oxford/65 hover:bg-oxford/[0.04] hover:text-oxford/80'
+              }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
           >
             {isActive ? (
               <motion.span
                 layoutId="fund-facet-active"
-                className="absolute inset-0 bg-surface-selected"
+                className="absolute inset-x-phi-4 bottom-0 h-px bg-oxford"
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: tokens.motion.easeInOut }}
                 aria-hidden
               />

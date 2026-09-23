@@ -14,7 +14,6 @@ import { getEvidenceConfidenceLabel, isLowEvidence } from './ConfidenceIndicator
 import {
   buildComponentDrivers,
   cleanReasoningList,
-  dimensionBriefTake,
 } from '../../lib/scoringRationale';
 import Popover from '../ui/Popover';
 import ReviewerPanel, {
@@ -86,10 +85,8 @@ export default function AssessmentScorecard({
   const insufficientEvidence = canonicalRecommendationState === 'insufficient_evidence';
   const overallScore = insufficientEvidence ? null : (presentation?.overall_score ?? scoring.overall_score);
   const overallBand = insufficientEvidence
-    ? 'Decision blocked by evidence'
+    ? 'Not scored'
     : (presentation?.overall_band ?? getScoreBand(scoring.overall_score, presentation?.score_bands ?? undefined).label);
-  const evidenceLabel = insufficientEvidence ? 'Incomplete evidence'
-    : presentation?.confidence_label ?? getEvidenceConfidenceLabel(scoring.overall_confidence);
   const bandCopy = (presentation?.score_bands ?? [])
     .map((band) => `${band.min}–${band.max} ${band.label}`)
     .join(' · ');
@@ -153,10 +150,6 @@ export default function AssessmentScorecard({
     // the way it suppresses lowConfidence's overlapping "evidence is thin" message.
     const personaResolution = dimension.components?.persona_resolution;
     const disputed = !unscored && personaResolution?.strategy === 'conservative_mean_floor';
-    const take = unscored
-      ? 'No supporting evidence — excluded from the overall.'
-      : dimensionBriefTake(dimension, presDim);
-
     const allDrivers = buildComponentDrivers(dimension.components ?? {});
     // Separate what the score rests on from what's still unknown, so an analyst can see
     // "this 5.8 is 1 real signal + 4 gaps" at a glance rather than a flat undifferentiated list.
@@ -164,6 +157,9 @@ export default function AssessmentScorecard({
     const gaps = allDrivers.filter((d) => d.status === 'missing');
     const reasoning = allDrivers.length === 0 ? cleanReasoningList(dimension.reasoning) : [];
     const weaknesses = cleanReasoningList(dimension.weaknesses);
+    const take = reasoning[0] ?? evidence[0]?.text ?? gaps[0]?.text ?? weaknesses[0] ?? (
+      unscored ? 'Required evidence is not available for this dimension.' : 'Score recorded; supporting detail is available below.'
+    );
     const isOpen = expanded.has(dim.key);
     const hasCanonicalLedger = Boolean(canonicalCriterion);
     const hasDetail =
@@ -209,17 +205,14 @@ export default function AssessmentScorecard({
           >
             {renderNumbers(scoreText)}
           </span>
-          <span className="memoScoreTake">
-            {renderNumbers(take)}
-            {lowConfidence && <span className="memoScoreTakeFlag">low evidence</span>}
-            {disputed && <span className="memoScoreTakeFlag">personas diverged</span>}
-          </span>
+          <span className="memoScoreView">View details</span>
           {hasDetail && (
             <span aria-hidden className={isOpen ? 'memoScoreChevron memoScoreChevron--open' : 'memoScoreChevron'}>
               ›
             </span>
           )}
         </button>
+        <p className="memoScoreTake">{renderNumbers(take)}</p>
 
         <AnimatePresence initial={false}>
           {isOpen && hasDetail && (
@@ -340,21 +333,15 @@ export default function AssessmentScorecard({
 
   return (
     <div className="memoAssessmentCard">
-      {/* Headline — overall score reads as a figure, band + evidence as a quiet tag. */}
+      {/* Headline — only show a figure when an overall score is actually available. */}
       <div className="memoScoreHead">
-        <p className="memoScoreHeadline">
-          {overallScore == null ? (
-            <span className="memoScoreHeadlineValue">Not scored</span>
-          ) : (
-            <>
-              <span className="memoScoreHeadlineValue">{renderNumbers(overallScore.toFixed(1))}</span>
-              <span className="memoScoreHeadlineMax">/ 10</span>
-            </>
-          )}
-          <span className="memoScoreHeadlineTag">
-            {[overallBand, evidenceLabel ? `${evidenceLabel} evidence` : null].filter(Boolean).join('  ·  ')}
-          </span>
-        </p>
+        {overallScore != null ? (
+          <p className="memoScoreHeadline">
+            <span className="memoScoreHeadlineValue">{renderNumbers(overallScore.toFixed(1))}</span>
+            <span className="memoScoreHeadlineMax">/ 10</span>
+            <span className="memoScoreHeadlineTag">{overallBand}</span>
+          </p>
+        ) : null}
         <Popover
           reduceMotion={reduceMotion}
           align="end"
@@ -373,12 +360,16 @@ export default function AssessmentScorecard({
         </Popover>
       </div>
       <p className="memoScoreBasis">
-        <strong>Score basis:</strong>{' '}
-        {insufficientEvidence
-          ? 'No headline score is shown because required evidence is missing or contradictory.'
-          : scoreBasis.length > 0
-          ? `${scoreBasis.join(' + ')}; overall is the mean of these scored dimensions. Unscored dimensions are excluded.`
-          : 'No driver has enough supporting evidence to contribute to the overall score.'}
+        {insufficientEvidence ? (
+          'Overall unavailable: required evidence is missing or contradictory.'
+        ) : (
+          <>
+            <strong>Score basis:</strong>{' '}
+            {scoreBasis.length > 0
+              ? `${scoreBasis.join(' + ')}; overall is the mean of these scored dimensions. Unscored dimensions are excluded.`
+              : 'No driver has enough supporting evidence to contribute to the overall score.'}
+          </>
+        )}
       </p>
       {dispersionLine && <p className="memoScoreSub">{renderNumbers(dispersionLine)}</p>}
 

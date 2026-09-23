@@ -307,13 +307,19 @@
     @apply bg-oxford text-paper;
   }
   .btn-aethria-solid {
-    @apply inline-flex items-center justify-center cursor-pointer rounded-none bg-oxford text-paper font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
+    @apply inline-flex items-center justify-center cursor-pointer rounded-full bg-oxford text-paper font-mono text-[11px] uppercase tracking-[0.12em] whitespace-nowrap transition-opacity duration-150 ease-in-out btn-interaction;
     height: 36px;
     padding: 0 40px;
   }
   .btn-aethria-solid:hover {
     @apply opacity-90;
     background-color: rgba(var(--color-oxford-rgb), 0.85);
+  }
+
+  /* Solid Oxford actions that use the utility directly should share the same
+     pill treatment as the canonical action button. */
+  button.bg-oxford {
+    border-radius: 999px;
   }
 }
 
@@ -865,6 +871,17 @@
   transform: translate(-50%, -50%);
 }
 
+/* Keep the sign-in brackets square; only the action button uses a pill shape. */
+.focus-frame--auth::before {
+  border-radius: 999px;
+}
+.focus-frame--auth::after {
+  border-radius: 0;
+}
+.auth-enter-button {
+  border-radius: 999px;
+}
+
 /* Dispatch idle-placeholder caret — ported from web-front-end's `.query-caret`,
    a blinking solid block after the "› look up …" prompt voice. Decorative only. */
 @keyframes query-caret-blink {
@@ -1121,4 +1138,3653 @@
   .min-h-\[40px\] {
     min-height: 44px;
   }
+}
+
+/* Fey-inspired layout pass: wider working surface, calm row hierarchy, and
+   semantic groupings carried by rules rather than stacked cards. */
+.desk-home > .desk-home__inner {
+  justify-content: flex-start;
+  align-items: stretch;
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-top: clamp(28px, 5vh, 64px);
+}
+
+.desk-home .focus-frame {
+  align-items: stretch;
+  max-width: none;
+}
+
+.desk-home .focus-frame::before,
+.desk-home .focus-frame::after {
+  top: -14px;
+  bottom: -14px;
+  width: 14px;
+  border-color: rgba(var(--color-oxford-rgb), 0.26);
+}
+
+.desk-home .focus-frame::before {
+  left: -26px;
+  border-right: 0;
+}
+
+.desk-home .focus-frame::after {
+  right: -26px;
+  border-left: 0;
+}
+
+.desk-home .desk-home__inner > .text-center {
+  text-align: left;
+}
+
+.desk-home__brand,
+.desk-home__date,
+.desk-home__briefing,
+.desk-home__footer {
+  width: 100%;
+}
+
+.desk-home__inner {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
+  align-content: start;
+  column-gap: clamp(28px, 5vw, 72px);
+  row-gap: 0;
+}
+
+.desk-home__brand,
+.desk-home__date {
+  grid-column: 1 / -1;
+}
+
+.desk-home__briefing {
+  grid-column: 1;
+  grid-row: 3 / span 2;
+}
+
+.desk-home__summary {
+  grid-column: 2;
+  grid-row: 3;
+  align-self: start;
+  width: 100%;
+  margin-top: 14px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.12);
+}
+
+.desk-home__summary-head,
+.desk-home__summary-row,
+.desk-home__summary-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.desk-home__summary-head {
+  min-height: 38px;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+}
+
+.desk-home__summary-list {
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+}
+
+.desk-home__summary-row {
+  min-height: 42px;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.06);
+  color: rgba(var(--color-oxford-rgb), 0.7);
+  font-size: 12px;
+}
+
+.desk-home__summary-row:hover {
+  color: var(--color-oxford);
+}
+
+.desk-home__summary-action {
+  width: 100%;
+  min-height: 40px;
+  border: 0;
+  background: transparent;
+  color: rgba(var(--color-oxford-rgb), 0.65);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.desk-home__summary-action:hover {
+  color: var(--color-oxford);
+}
+
+.desk-home__brand p,
+.desk-home__date p {
+  text-align: left;
+}
+
+.desk-home__date {
+  max-width: none !important;
+  margin-top: 20px;
+}
+
+.desk-home__date p {
+  justify-content: flex-start;
+}
+
+.desk-home__briefing {
+  max-width: 720px !important;
+}
+
+.desk-home__footer {
+  align-items: flex-start;
+  max-width: 720px;
+  grid-column: 2;
+  grid-row: 4;
+  margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .desk-home__inner {
+    display: flex !important;
+  }
+
+  .desk-home__summary {
+    order: 4;
+    margin-top: 22px;
+  }
+
+  .desk-home__footer {
+    order: 5;
+  }
+}
+
+/* Home refinement: Fey's hierarchy comes from placement and rhythm here, not
+   framed cards or alternating paper tones. Keep every surface on the same
+   Aethria canvas and let the content carry the emphasis. */
+.aethria-home .desk-home__date,
+.aethria-home .desk-home__briefing,
+.aethria-home .desk-home__summary,
+.aethria-home .desk-home__footer {
+  border-color: transparent;
+  background: transparent;
+}
+
+.aethria-home .desk-home__briefing,
+.aethria-home .desk-home__summary {
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'],
+.aethria-home .desk-home__workspace-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
+  padding-inline: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:first-child {
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) > span {
+  border-color: rgba(var(--color-oxford-rgb), 0.06);
+}
+
+.aethria-home .desk-home__summary-head,
+.aethria-home .desk-home__summary-row,
+.aethria-home .desk-home__summary-list {
+  border-color: transparent;
+}
+
+.aethria-home .desk-home__summary-row {
+  padding-inline: 0;
+}
+
+.aethria-home .desk-home__summary-row:hover,
+.aethria-home .desk-home__summary-action:hover,
+.aethria-home .desk-home__workspace-card:hover {
+  background: transparent;
+}
+
+.aethria-home .desk-home__workspace-card {
+  padding-inline: 0;
+  transform: none;
+}
+
+.aethria-home .desk-home__workspace-card:hover {
+  color: rgba(var(--color-oxford-rgb), 0.68);
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] {
+  border-left: 0;
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] > button {
+  border-left: 0;
+}
+
+.aethria-home .desk-home__footer {
+  padding-top: 0;
+}
+
+/* Home is the command surface: keep the briefing in a left-aligned working
+   column so it reads like Fey's dashboard rather than a centered landing page. */
+.desk-home .desk-home__inner .focus-frame {
+  align-items: stretch;
+  width: 100%;
+  max-width: none;
+  margin-top: 14px;
+}
+
+.desk-home .desk-home__inner .focus-frame h1,
+.desk-home .desk-home__inner .focus-frame p {
+  text-align: left;
+}
+
+.desk-home .desk-home__inner .focus-frame > * {
+  align-self: flex-start;
+}
+
+.desk-home .desk-home__inner .focus-frame > .mt-phi-7,
+.desk-home .desk-home__inner .focus-frame > .mt-phi-6 {
+  width: min(100%, 720px);
+  max-width: 720px;
+}
+
+.desk-home .desk-home__inner .focus-frame > .mt-phi-7:has([role='navigation']) {
+  width: min(100%, 720px);
+}
+
+[data-testid='position-row'] > div:hover,
+.aethria-queue-list button:hover,
+.aethria-queue-list [role='button']:hover {
+  background-color: rgba(var(--color-oxford-rgb), 0.045);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  border-radius: 0;
+}
+
+input,
+select,
+textarea {
+  background: rgba(var(--color-paper-rgb), 0.08);
+  color: var(--color-oxford);
+}
+
+/* ── Fey component language ────────────────────────────────────────────────
+   The reference is a layout system, not a palette: compact rails, toolbars
+   that read as one line, ruled tables, and detail surfaces that share the
+   page instead of floating as cards. All color and type values remain the
+   Aethria tokens above. */
+
+.aethria-main {
+  --fey-rule: rgba(var(--color-oxford-rgb), 0.12);
+  --fey-rule-soft: rgba(var(--color-oxford-rgb), 0.07);
+}
+
+.aethria-spine {
+  width: var(--spine-width);
+  padding-inline: 14px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.aethria-spine nav[aria-label='Workspaces'] {
+  gap: 0;
+}
+
+.aethria-spine nav[aria-label='Workspaces'] a,
+.aethria-spine nav[aria-label='Workspaces'] button {
+  min-height: 34px;
+  padding-inline: 10px;
+  border-left: 2px solid transparent;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aethria-flow__workspace {
+  gap: 0;
+}
+
+.aethria-flow__workspace > [class*='shrink-0'] {
+  padding-inline: 0;
+  border-right: 1px solid var(--fey-rule);
+}
+
+.aethria-flow__workspace > [class*='shrink-0'] > div {
+  max-width: none;
+}
+
+.aethria-flow__workspace > [class*='shrink-0'] .aethria-docket {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.aethria-docket {
+  border: 0;
+  border-top: 1px solid var(--fey-rule);
+  background: transparent;
+}
+
+.aethria-docket::before,
+.aethria-docket::after {
+  display: none;
+}
+
+.aethria-queue-surface {
+  background: transparent;
+}
+
+.aethria-queue-surface > .sticky {
+  position: sticky;
+  top: 0;
+  padding: 10px 0 0;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--fey-rule);
+}
+
+.aethria-queue-surface > .sticky > div:first-child {
+  min-height: 38px;
+  padding: 0 10px 9px;
+  border-bottom: 0;
+}
+
+.aethria-queue-surface .aethria-queue-list {
+  padding-top: 0;
+}
+
+.aethria-queue-columns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 28px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--fey-rule-soft);
+  color: rgba(var(--color-oxford-rgb), 0.5);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.aethria-queue-surface .aethria-queue-list > div {
+  border-bottom: 1px solid var(--fey-rule-soft);
+}
+
+.aethria-queue-surface .aethria-queue-list [role='button'] {
+  min-height: 58px;
+  padding: 13px 10px;
+  border-left: 2px solid transparent;
+  background: transparent;
+}
+
+.aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true'] {
+  border-left-color: currentColor;
+  background: rgba(var(--color-oxford-rgb), 0.045);
+}
+
+.aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true'] h2 {
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.aethria-queue-surface .type-meta {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.aethria-queue-surface .sticky input[type='search'] {
+  height: 28px;
+  min-width: 180px;
+  border-bottom: 1px solid var(--fey-rule);
+  background: transparent;
+}
+
+.aethria-queue-surface .sticky button,
+.aethria-queue-surface .sticky select {
+  min-height: 28px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aethria-queue-surface .sticky [role='region'] {
+  border-top: 1px solid var(--fey-rule-soft);
+  padding: 10px;
+}
+
+.aethria-queue-surface .sticky [role='region'] button {
+  min-height: 28px;
+  padding-inline: 9px;
+  border: 1px solid var(--fey-rule);
+  background: transparent;
+}
+
+.aethria-portfolio .workspaceLayout,
+.aethria-fund .workspaceLayout {
+  max-width: 1240px;
+}
+
+.aethria-portfolio section,
+.aethria-fund section {
+  border-top: 1px solid var(--fey-rule);
+  padding-top: 15px;
+}
+
+.aethria-portfolio [data-testid='position-row'] > div,
+.aethria-portfolio ul button {
+  min-height: 54px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  border-left: 2px solid transparent;
+}
+
+.aethria-portfolio [data-testid='position-row'] > div:hover,
+.aethria-portfolio ul button:hover {
+  border-left-color: currentColor;
+}
+
+.aethria-portfolio [data-testid='position-row'] .font-display,
+.aethria-portfolio ul button .font-display {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.aethria-portfolio > div:first-child > header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px 36px;
+  padding-bottom: 16px;
+}
+
+.aethria-portfolio > div:first-child > header > p,
+.aethria-portfolio > div:first-child > header > h1 {
+  grid-column: 1;
+}
+
+.aethria-portfolio > div:first-child > header > p {
+  grid-row: 1;
+}
+
+.aethria-portfolio > div:first-child > header > h1 {
+  grid-row: 2;
+}
+
+.aethria-portfolio > div:first-child > header > div:last-child {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.aethria-portfolio > div:first-child > header h1 {
+  max-width: 32ch;
+  margin-top: 5px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.08;
+}
+
+.aethria-portfolio > div:first-child > header > div:last-child {
+  margin-top: 0;
+  gap: 26px;
+}
+
+.aethria-portfolio > div:first-child > .grid {
+  padding-top: 18px;
+}
+
+.aethria-fund > div:first-child header {
+  align-items: end;
+  gap: 18px 36px;
+  padding-bottom: 16px;
+}
+
+.aethria-fund > div:first-child header h1 {
+  margin-top: 5px;
+  font-size: clamp(24px, 2.2vw, 30px);
+  line-height: 1.08;
+}
+
+.aethria-fund > div:first-child header [class*='gap-x-phi-7'] {
+  gap: 26px;
+}
+
+.aethria-fund > div:nth-child(2) > div {
+  padding-top: 18px;
+}
+
+.aethria-portfolio .type-meta,
+.aethria-fund .type-meta,
+.aethria-fund .type-label-section {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.aethria-fund > div:first-child {
+  border-bottom: 1px solid var(--fey-rule);
+}
+
+.aethria-fund > div:first-child .border-b {
+  border-color: transparent;
+}
+
+.aethria-fund > div:first-child nav,
+.aethria-fund > div:first-child [role='tablist'] {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.aethria-fund > div:first-child nav button,
+.aethria-fund > div:first-child [role='tablist'] button {
+  min-height: 34px;
+  padding: 0 13px 9px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.aethria-fund > div:first-child nav button[aria-selected='true'],
+.aethria-fund > div:first-child [role='tablist'] button[aria-selected='true'] {
+  border-bottom-color: currentColor;
+}
+
+.aethria-settings .focus-frame::before,
+.aethria-settings .focus-frame::after {
+  display: none;
+}
+
+.aethria-settings .focus-frame {
+  max-width: 980px;
+  border-top: 1px solid var(--fey-rule);
+  padding-top: 20px;
+}
+
+.aethria-settings .settings-gallery-section {
+  padding-block: 0 20px;
+}
+
+.aethria-settings .settings-gallery-section + .settings-gallery-section {
+  margin-top: 20px;
+}
+
+.aethria-settings input,
+.aethria-settings textarea,
+.aethria-settings select {
+  border: 1px solid var(--fey-rule);
+  border-radius: 0;
+  background: transparent;
+}
+
+.memoPanel--embedded {
+  border-left: 1px solid rgba(var(--color-oxford-rgb), 0.14);
+}
+
+.memoPanel--embedded .memoMasthead,
+.memoPanel--embedded .memoBody {
+  max-width: none;
+  padding-inline: 24px;
+}
+
+.memoPanel--embedded .memoMasthead {
+  padding-top: 24px;
+}
+
+.memoPanel--embedded .memoMastheadCompany,
+.memoPanel--embedded .memoCoverCompany {
+  font-family: var(--font-sans);
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.memoPanel--embedded .memoDocSection,
+.memoPanel--embedded .memoDossier,
+.memoPanel--embedded .memoScorecard {
+  border-top: 1px solid var(--memo-rule);
+  padding-top: 18px;
+}
+
+/* Shared Fey treatment for transient UI: a thin ruled surface, compact header,
+   and no ornamental elevation. This covers command palettes, review drawers,
+   import panels, and the small disclosure popovers used by the workspaces. */
+.aethria-main [role='tooltip'] {
+  border-radius: 0;
+  box-shadow: none;
+  padding: 11px 12px;
+}
+
+.aethria-main [role='dialog'] > aside,
+.aethria-main [role='dialog'] > div,
+.aethria-main [role='dialog'] .focus-frame {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.aethria-main [role='dialog'] header {
+  min-height: 52px;
+  padding-block: 13px;
+  border-bottom-color: var(--fey-rule);
+}
+
+.aethria-main [role='dialog'] h1,
+.aethria-main [role='dialog'] h2 {
+  margin-top: 0;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.15;
+}
+
+.aethria-main [role='tablist'] {
+  gap: 0;
+  border-bottom: 1px solid var(--fey-rule);
+}
+
+.aethria-main [role='tablist'] button {
+  min-height: 34px;
+  padding: 0 11px 8px;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  white-space: nowrap;
+}
+
+.aethria-main [role='tablist'] button[aria-selected='true'] {
+  border-bottom-color: currentColor;
+  background: transparent;
+}
+
+.aethria-dispatch-command {
+  background: rgba(var(--color-paper-rgb), 0.96);
+}
+
+.aethria-dispatch-command > .relative.z-10 {
+  min-height: 100%;
+  justify-content: center;
+  padding: 28px 24px 96px;
+}
+
+.aethria-dispatch-command > .relative.z-10 > [role='list'] {
+  width: min(100%, 620px);
+}
+
+.aethria-dispatch-command h1 {
+  max-width: 24ch !important;
+  font-size: clamp(20px, 2.6vw, 30px) !important;
+  line-height: 1.15 !important;
+}
+
+.aethria-dispatch-command [aria-label='Active dispatches'] {
+  width: min(100%, 620px);
+  margin-bottom: 20px;
+  padding-block: 10px;
+}
+
+.aethria-dispatch-command [aria-label='Active dispatches'] button {
+  min-height: 32px;
+  border-radius: 0;
+  padding: 7px 9px;
+}
+
+.aethria-dispatch-command textarea,
+.aethria-dispatch-command input {
+  max-width: 620px;
+}
+
+@media (max-width: 1023px) {
+  .aethria-flow__workspace > [class*='shrink-0'] {
+    border-right: 0;
+  }
+
+  .memoPanel--embedded {
+    border-left: 0;
+  }
+}
+
+/* Fey's primary navigation is a floating command dock, not a permanent
+   application sidebar. Keep the existing rail semantics and actions, but
+   present them as the compact bottom navigator used across Fey's workspaces. */
+@media (min-width: 1024px) {
+  .aethria-spine-dock {
+    position: fixed;
+    z-index: 45;
+    left: 50%;
+    bottom: var(--dock-bottom);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    transform: translateX(-50%) translateY(var(--workspace-chrome-y, 0px));
+  }
+
+  :root {
+    --dock-bottom: clamp(18px, 2.2vh, 28px);
+    --dock-hit-size: clamp(40px, 3.8vh, 48px);
+    --dock-control-size: 32px;
+    --dock-inset: 4px;
+    --dock-size: calc(var(--dock-control-size) + (var(--dock-inset) * 2));
+    --dock-nav-gap: 12px;
+  }
+
+  .aethria-spine {
+    position: relative;
+    z-index: 45;
+    left: auto;
+    bottom: auto;
+    display: flex;
+    width: auto !important;
+    height: var(--dock-size);
+    min-height: var(--dock-size);
+    transform: none;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: var(--dock-inset);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+  }
+
+  .aethria-spine > div:first-child,
+  .aethria-spine > div:first-child > nav {
+    display: contents;
+  }
+
+  .aethria-spine > div:first-child > div:first-child,
+  .aethria-spine > div:nth-child(2) {
+    display: none;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'],
+  .aethria-spine nav[aria-label='Section navigation'] {
+    display: flex;
+    width: max-content;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--dock-nav-gap);
+  }
+
+  .aethria-spine > div:first-child > nav[aria-label='Workspaces'],
+  .aethria-spine > div:first-child > nav[aria-label='Section navigation'] {
+    display: flex !important;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] > div,
+  .aethria-spine nav[aria-label='Section navigation'] > div {
+    display: none;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button,
+  .aethria-spine nav[aria-label='Section navigation'] button {
+    width: var(--dock-control-size);
+    flex: 0 0 var(--dock-control-size);
+    height: var(--dock-control-size);
+    min-height: var(--dock-control-size);
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    justify-content: center;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button:hover,
+  .aethria-spine nav[aria-label='Section navigation'] button:hover {
+    border-left: 0;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button > span:first-child,
+  .aethria-spine nav[aria-label='Section navigation'] button > span:first-child {
+    justify-content: center;
+  }
+
+  .aethria-spine .aethria-nav-label,
+  .aethria-spine nav[aria-label='Workspaces'] button > span:last-child,
+  .aethria-spine nav[aria-label='Section navigation'] button > span:last-child {
+    display: none;
+  }
+
+  .aethria-spine .aethria-nav-glyph {
+    width: 17px;
+    height: 17px;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button > span:first-child > span.signal-dot-breathe {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 5px;
+    height: 5px;
+  }
+
+  .aethria-spine .aethria-spine-divider {
+    display: block;
+    width: 1px;
+    height: 24px;
+    margin: 0 2px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .aethria-spine .aethria-spine-divider > div {
+    display: none;
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button[data-nav-label]::after,
+  .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]::after {
+    position: absolute;
+    bottom: calc(100% + 9px);
+    left: 50%;
+    z-index: 2;
+    width: max-content;
+    max-width: 140px;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 999px;
+    background: var(--color-oxford);
+    color: rgba(255, 255, 255, 0.82);
+    content: attr(data-nav-label);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    text-transform: uppercase;
+    transform: translate(-50%, 4px);
+    transition: opacity 160ms var(--motion-ease), transform 160ms var(--motion-ease);
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button[data-nav-label]:hover::after,
+  .aethria-spine nav[aria-label='Workspaces'] button[data-nav-label]:focus-visible::after,
+  .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]:hover::after,
+  .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]:focus-visible::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .aethria-spine nav[aria-label='Workspaces'] button > span.relative:first-child,
+  .aethria-spine nav[aria-label='Section navigation'] button > span.relative:first-child {
+    pointer-events: none;
+  }
+}
+
+@media (max-width: 1023px) {
+  .aethria-settings-dock {
+    display: none;
+  }
+
+  .aethria-mobile-header {
+    min-height: 60px;
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .aethria-mobile-menu-button {
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .aethria-mobile-menu-glyph {
+    display: inline-flex;
+    width: 16px;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .aethria-mobile-menu-glyph > span {
+    display: block;
+    height: 1px;
+    width: 16px;
+    background: currentColor;
+    transform-origin: center;
+    transition: transform 180ms var(--motion-ease), opacity 180ms var(--motion-ease);
+  }
+
+  .aethria-mobile-menu-button[aria-expanded='true'] .aethria-mobile-menu-glyph > span:first-child {
+    transform: translateY(3px) rotate(45deg);
+  }
+
+  .aethria-mobile-menu-button[aria-expanded='true'] .aethria-mobile-menu-glyph > span:last-child {
+    transform: translateY(-3px) rotate(-45deg);
+  }
+
+  .aethria-mobile-menu {
+    padding-top: 8px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .aethria-mobile-menu > div {
+    gap: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .aethria-mobile-menu button {
+    min-height: 48px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-inline: 4px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .aethria-mobile-menu .aethria-nav-glyph {
+    width: 17px;
+    height: 17px;
+    flex: 0 0 17px;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .aethria-mobile-menu button[aria-current='page'] {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-paper);
+  }
+
+  .aethria-mobile-menu button:last-child {
+    margin-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .aethria-settings {
+    padding-left: 0 !important;
+  }
+}
+
+/* Settings follows Fey's settings screen: one quiet top bar, a horizontal
+   section switcher, and the editor below it. The floating workspace dock stays
+   independent at the bottom of the viewport. */
+@media (min-width: 1024px) {
+  .aethria-settings-topbar {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    width: 100% !important;
+    border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.12) !important;
+    border-right: 0 !important;
+  }
+
+  .aethria-settings-topbar > div {
+    height: auto !important;
+    min-height: 58px;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 18px !important;
+    padding: 10px 24px !important;
+  }
+
+  .aethria-settings-topbar > div > div:first-child {
+    flex-shrink: 0;
+    padding: 0 !important;
+  }
+
+  .aethria-settings-topbar nav[aria-label='Settings areas'] {
+    order: 0 !important;
+    width: auto !important;
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 2px !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+  }
+
+  .aethria-settings-topbar nav[aria-label='Settings areas'] button {
+    width: auto;
+    min-height: 32px;
+    padding: 0 10px;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+  }
+
+  .aethria-settings-topbar nav[aria-label='Settings areas'] button[aria-pressed='true'] {
+    border-bottom-color: currentColor;
+    background: transparent;
+  }
+
+  .aethria-settings-topbar > div > div:last-child {
+    margin-top: 0 !important;
+    margin-left: auto !important;
+    width: auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 12px !important;
+    padding: 0 !important;
+  }
+
+  .aethria-settings-topbar > div > div:last-child > span {
+    max-width: 180px;
+  }
+}
+
+/* Shared component pass: every repeated control, row, section, and state now
+   follows the same Fey-inspired rules. These are structural treatments only;
+   the Aethria semantic palette and type roles remain the source of truth. */
+.aethria-main button,
+.aethria-main [role='button'],
+.aethria-main a,
+.aethria-main select,
+.aethria-main input,
+.aethria-main textarea {
+  transition-property: background-color, border-color, color, opacity, transform;
+  transition-duration: 150ms;
+  transition-timing-function: var(--motion-ease);
+}
+
+.aethria-main button:active,
+.aethria-main [role='button']:active,
+.aethria-main a.btn-interaction:active {
+  transform: translateY(1px);
+}
+
+.aethria-main button:disabled,
+.aethria-main input:disabled,
+.aethria-main select:disabled,
+.aethria-main textarea:disabled {
+  cursor: not-allowed;
+}
+
+.aethria-room-header {
+  position: relative;
+  min-height: 118px;
+  padding-bottom: 18px;
+}
+
+.aethria-room-header__copy {
+  max-width: 52rem;
+}
+
+.aethria-room-header__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.aethria-room-header__eyebrow::before {
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+  content: '';
+  opacity: 0.45;
+}
+
+.aethria-room-header__title {
+  text-wrap: balance;
+}
+
+.aethria-room-header__readouts {
+  align-self: end;
+  border-top: 1px solid var(--fey-rule-soft);
+  padding-top: 10px;
+}
+
+.aethria-room-header__readouts > div {
+  align-items: end;
+}
+
+.aethria-queue-header {
+  border-top: 1px solid var(--fey-rule);
+}
+
+.aethria-queue-header__toolbar {
+  min-height: 44px;
+  padding-top: 7px;
+}
+
+.aethria-queue-header__toolbar > div:last-child {
+  border-left: 1px solid var(--fey-rule-soft);
+  padding-left: 10px;
+}
+
+.aethria-queue-header__filters {
+  border-bottom: 1px solid var(--fey-rule-soft);
+  padding-bottom: 10px;
+}
+
+.aethria-queue-header__filters [role='group'] {
+  border-left: 1px solid var(--fey-rule-soft);
+  padding-left: 10px;
+}
+
+.aethria-queue-header__filters button {
+  min-height: 28px;
+  border: 1px solid var(--fey-rule-soft);
+  background: transparent;
+  padding-inline: 9px;
+}
+
+.aethria-queue-header__filters button[aria-pressed='true'] {
+  border-color: var(--fey-rule);
+  background: rgba(var(--color-oxford-rgb), 0.07);
+  color: var(--color-oxford);
+}
+
+.aethria-docket-row {
+  border-bottom: 1px solid var(--fey-rule-soft);
+  border-left: 2px solid transparent;
+}
+
+.aethria-docket-row:hover {
+  border-left-color: rgba(var(--color-oxford-rgb), 0.28);
+}
+
+.aethria-docket-row[aria-pressed='true'] {
+  border-left-color: currentColor;
+}
+
+.aethria-docket-row__body {
+  position: relative;
+}
+
+.aethria-docket-row__body::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 100%;
+  border-right: 1px solid currentColor;
+  content: '';
+  opacity: 0;
+  transform: translateX(10px);
+  transition: opacity 150ms var(--motion-ease), transform 150ms var(--motion-ease);
+}
+
+.aethria-docket-row:hover .aethria-docket-row__body::after,
+.aethria-docket-row[aria-pressed='true'] .aethria-docket-row__body::after {
+  opacity: 0.22;
+  transform: translateX(0);
+}
+
+.aethria-verdict {
+  min-height: 22px;
+  border: 1px solid currentColor;
+  padding: 3px 7px;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+}
+
+.aethria-empty-state {
+  border-top: 1px solid var(--fey-rule);
+  border-bottom: 1px solid var(--fey-rule-soft);
+  min-height: 13rem;
+}
+
+.aethria-empty-state__mark {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--fey-rule);
+  align-items: center;
+  justify-content: center;
+}
+
+.aethria-empty-state__mark::after {
+  position: absolute;
+  inset: 7px;
+  border: 1px solid currentColor;
+  content: '';
+  opacity: 0.32;
+}
+
+.aethria-empty-state__mark > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aethria-empty-state__body {
+  max-width: 42ch;
+}
+
+.aethria-main section:not([aria-label='Pipeline and mandate']):not([aria-label='Active dispatches']) {
+  scroll-margin-top: var(--space-5);
+}
+
+@media (max-width: 767px) {
+  .aethria-room-header {
+    min-height: 0;
+    gap: 21px;
+  }
+
+  .aethria-room-header__readouts {
+    width: 100%;
+  }
+
+  .aethria-queue-header__toolbar > div:last-child {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .aethria-queue-header__filters [role='group'] {
+    border-left: 0;
+    border-top: 1px solid var(--fey-rule-soft);
+    padding-top: 8px;
+    padding-left: 0;
+  }
+
+  .aethria-docket-row__body::after {
+    display: none;
+  }
+}
+
+/* ── Home page: modern Fey-style command overview ──────────────────────────
+   Home is an operating surface now: a compact header, one dominant action
+   panel, a quiet metrics rail, and two direct workspace entries. It keeps the
+   existing Aethria palette/type tokens but drops the editorial landing-page
+   composition. */
+.aethria-home {
+  background: var(--color-paper);
+}
+
+.aethria-home > .desk-home__inner {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  column-gap: clamp(18px, 3vw, 40px);
+  row-gap: 18px;
+  max-width: 1280px;
+  padding: clamp(24px, 4vw, 48px) clamp(20px, 4vw, 64px) 112px;
+}
+
+.aethria-home .desk-home__brand {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  width: auto;
+}
+
+.aethria-home .desk-home__brand p {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.aethria-home .desk-home__date {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: stretch;
+  width: auto;
+  max-width: none !important;
+  margin-top: 0;
+  border-bottom: 1px solid var(--fey-rule-soft);
+  padding-bottom: 10px;
+}
+
+.aethria-home .desk-home__date p {
+  justify-content: flex-end;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.aethria-home .desk-home__briefing {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: stretch;
+  width: auto;
+  max-width: none !important;
+  min-height: 410px;
+  margin-top: 0 !important;
+  border: 1px solid var(--fey-rule);
+  border-radius: 16px;
+  background: var(--color-paper-bright);
+  padding: clamp(24px, 4vw, 42px);
+}
+
+.aethria-home .desk-home__briefing h1 {
+  max-width: 18ch !important;
+  font-family: var(--font-sans) !important;
+  font-size: clamp(28px, 4vw, 48px) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.04em !important;
+  line-height: 1.02 !important;
+  text-wrap: balance;
+}
+
+.aethria-home .desk-home__briefing > div {
+  width: 100%;
+  max-width: none !important;
+}
+
+.aethria-home .desk-home__briefing > div:has(button[aria-label^='On the desk']) {
+  margin-top: 32px;
+  border-top: 1px solid var(--fey-rule);
+  padding-top: 16px;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
+  border: 1px solid var(--fey-rule-soft);
+  border-radius: 11px;
+  background: rgba(var(--color-paper-rgb), 0.34);
+  padding: 0 16px;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:first-child {
+  padding-top: 13px;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) {
+  margin-top: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) > span {
+  min-height: 48px;
+  align-items: center;
+  border-color: var(--fey-rule-soft);
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) > span:last-child {
+  border-bottom: 0;
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.aethria-home .desk-home__workspace-card {
+  min-height: 68px;
+  align-items: flex-start;
+  justify-content: space-between;
+  border: 1px solid var(--fey-rule-soft);
+  border-radius: 11px;
+  background: rgba(var(--color-paper-rgb), 0.26);
+  padding: 15px 16px;
+  transition: border-color 150ms var(--motion-ease), background-color 150ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspace-card:hover {
+  border-color: var(--fey-rule);
+  background: rgba(var(--color-paper-rgb), 0.62);
+}
+
+.aethria-home .desk-home__workspace-card > span:last-child {
+  display: none;
+}
+
+.aethria-home .desk-home__summary {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: stretch;
+  width: auto;
+  margin-top: 0;
+  border: 1px solid var(--fey-rule);
+  border-radius: 16px;
+  background: var(--color-paper-bright);
+  padding: 20px;
+}
+
+.aethria-home .desk-home__summary-head {
+  min-height: 34px;
+  border-bottom: 1px solid var(--fey-rule-soft);
+}
+
+.aethria-home .desk-home__summary-row {
+  min-height: 48px;
+  border-bottom-color: var(--fey-rule-soft);
+}
+
+.aethria-home .desk-home__summary-row:hover {
+  padding-inline: 7px;
+  background: rgba(var(--color-oxford-rgb), 0.04);
+}
+
+.aethria-home .desk-home__summary-action {
+  min-height: 44px;
+  margin-top: 6px;
+  padding-inline: 7px;
+  border-radius: 8px;
+}
+
+.aethria-home .desk-home__summary-action:hover {
+  background: rgba(var(--color-oxford-rgb), 0.06);
+}
+
+.aethria-home .desk-home__footer {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  width: 100%;
+  max-width: none;
+  align-items: flex-start;
+  margin-top: 0;
+  border-top: 1px solid var(--fey-rule-soft);
+  padding-top: 14px;
+}
+
+.aethria-home .desk-home__footer > div {
+  justify-content: flex-start;
+}
+
+@media (max-width: 760px) {
+  .aethria-home > .desk-home__inner {
+    display: flex !important;
+    gap: 14px;
+    padding: 22px 16px 96px;
+  }
+
+  .aethria-home .desk-home__brand,
+  .aethria-home .desk-home__date,
+  .aethria-home .desk-home__briefing,
+  .aethria-home .desk-home__summary,
+  .aethria-home .desk-home__footer {
+    width: 100%;
+  }
+
+  .aethria-home .desk-home__date {
+    order: 1;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .aethria-home .desk-home__date p {
+    justify-content: flex-start;
+  }
+
+  .aethria-home .desk-home__briefing {
+    order: 2;
+    min-height: 0;
+    padding: 22px 16px;
+  }
+
+  .aethria-home .desk-home__summary {
+    order: 3;
+    padding: 16px;
+  }
+
+  .aethria-home .desk-home__footer {
+    order: 4;
+  }
+}
+
+/* Home refinement: keep the Fey-inspired hierarchy in placement and rhythm,
+   not framed cards or alternating surface colors. */
+.aethria-home .desk-home__date,
+.aethria-home .desk-home__briefing,
+.aethria-home .desk-home__summary,
+.aethria-home .desk-home__footer {
+  border-color: transparent;
+  background: transparent;
+}
+
+.aethria-home .desk-home__briefing,
+.aethria-home .desk-home__summary {
+  border: 0;
+  border-radius: 0;
+  padding-inline: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'],
+.aethria-home .desk-home__workspace-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
+  padding-inline: 0;
+}
+
+.aethria-home .desk-home__briefing > div:has(button[aria-label^='On the desk']) {
+  border-top-color: rgba(var(--color-oxford-rgb), 0.1);
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) > span,
+.aethria-home .desk-home__summary-head,
+.aethria-home .desk-home__summary-row {
+  border-color: rgba(var(--color-oxford-rgb), 0.08);
+}
+
+.aethria-home .desk-home__summary-head,
+.aethria-home .desk-home__summary-row,
+.aethria-home .desk-home__summary-action {
+  background: transparent;
+}
+
+.aethria-home .desk-home__summary-row:hover,
+.aethria-home .desk-home__summary-action:hover,
+.aethria-home .desk-home__workspace-card:hover {
+  border-color: transparent;
+  background: transparent;
+}
+
+.aethria-home .desk-home__workspace-card {
+  padding-inline: 0;
+  transition: opacity 150ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspace-card:hover {
+  opacity: 0.68;
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] {
+  border-left: 0;
+}
+
+.aethria-home .desk-home__footer {
+  border-top-color: transparent;
+  padding-top: 0;
+}
+
+/* Keep the workspace doors in the briefing's natural flow. The summary rail
+   already establishes the row height; a forced minimum here makes the doors
+   collide visually with the footer actions at desktop widths. */
+.aethria-home .desk-home__briefing {
+  min-height: 0;
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] {
+  margin-top: 28px;
+}
+
+.aethria-home .desk-home__footer {
+  margin-top: 52px;
+}
+
+/* Home composition: one clear briefing column beside one system rail. The
+   earlier version spread the same content across a tall centered frame, which
+   made the desk and workspace links feel detached from the headline. */
+.aethria-home > .desk-home__inner {
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
+  grid-template-rows: auto auto auto;
+  align-content: start;
+  column-gap: clamp(32px, 6vw, 88px);
+  row-gap: clamp(36px, 6vw, 64px);
+  padding: clamp(28px, 5vw, 56px) clamp(20px, 5vw, 72px) 112px;
+}
+
+.aethria-home .desk-home__briefing {
+  align-self: start;
+  min-height: 0;
+  margin-top: 0 !important;
+  padding: 0;
+}
+
+.aethria-home .desk-home__briefing > div {
+  align-items: flex-start;
+  margin-top: 0;
+}
+
+.aethria-home .desk-home__briefing > div > h1 {
+  margin-top: 24px;
+}
+
+.aethria-home .desk-home__briefing > div > p {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.aethria-home .desk-home__briefing > div:has(button[aria-label^='On the desk']) {
+  margin-top: 40px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
+  padding: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:first-child {
+  padding-top: 0;
+}
+
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] > span:nth-child(2) > span {
+  min-height: 44px;
+}
+
+.aethria-home .desk-home__briefing [role='navigation'] {
+  margin-top: 32px;
+  gap: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.aethria-home .desk-home__workspace-card {
+  min-height: 44px;
+  padding: 12px 0;
+}
+
+.aethria-home .desk-home__summary {
+  align-self: start;
+  min-height: 0;
+  margin-top: 12px;
+  padding: 12px 0 0 28px;
+}
+
+.aethria-home .desk-home__summary-head {
+  min-height: 30px;
+}
+
+.aethria-home .desk-home__footer {
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* Home controls use soft geometry and stateful surfaces without shadows. */
+.aethria-home .desk-home__attention {
+  border-radius: 0;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+  background: var(--color-paper-bright);
+  transition: background-color 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__attention:hover {
+  background: #e6e4e1;
+}
+
+.aethria-home .desk-home__workspace-card,
+.aethria-home .aethria-home__workspace-card {
+  border-radius: 0;
+  background: var(--color-paper-bright);
+  padding-inline: 16px;
+  transition: background-color 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspace-card:hover,
+.aethria-home .aethria-home__workspace-card:hover {
+  background: #e6e4e1;
+  opacity: 1;
+}
+
+.aethria-home .desk-home__summary-row {
+  border-bottom: 0;
+  border-radius: 0;
+  padding-inline: 10px;
+  transition: background-color 160ms var(--motion-ease), transform 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__summary-row:hover {
+  background: rgba(var(--color-oxford-rgb), 0.06);
+  padding-inline: 10px;
+  transform: translateX(2px);
+}
+
+.aethria-home .desk-home__summary-action {
+  width: 100%;
+  border-radius: 0;
+  background: rgba(var(--color-oxford-rgb), 0.085);
+  padding-inline: 12px;
+  transition: background-color 160ms var(--motion-ease), transform 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__summary-action:hover {
+  background: rgba(var(--color-oxford-rgb), 0.14);
+  transform: translateY(-1px);
+}
+
+/* Final Home reset: this is a starting screen, not a dashboard mosaic. Keep
+   the reading order vertical so the next action is obvious at a glance. */
+.aethria-home.paper-dot-grid {
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+.aethria-home > .desk-home__inner {
+  display: flex !important;
+  max-width: 900px;
+  align-items: stretch;
+  gap: 0;
+  padding: clamp(28px, 6vw, 72px) clamp(20px, 5vw, 48px) 112px;
+}
+
+.aethria-home .desk-home__brand {
+  align-self: flex-start;
+  width: auto;
+}
+
+.aethria-home .desk-home__date {
+  align-self: flex-start;
+  width: auto;
+  margin-top: 52px;
+  padding: 0;
+  border: 0;
+}
+
+.aethria-home .desk-home__date p {
+  justify-content: flex-start;
+}
+
+.aethria-home .desk-home__workspaces {
+  width: 100%;
+  margin-top: 28px;
+}
+
+.aethria-home .desk-home__attention-section {
+  width: 100%;
+  margin-top: 40px;
+  order: 3;
+}
+
+.aethria-home .desk-home__summary {
+  display: block !important;
+  height: 112px !important;
+  flex: 0 0 112px;
+  width: 100%;
+  margin-top: 32px;
+  padding: 18px 0 0;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.1);
+  order: 2;
+}
+
+.aethria-home .desk-home__summary-head {
+  border-bottom: 0;
+}
+
+.aethria-home .desk-home__summary-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.aethria-home .desk-home__summary-row {
+  min-height: 52px;
+  padding: 0 12px;
+  background: rgba(var(--color-oxford-rgb), 0.045);
+}
+
+.aethria-home .desk-home__summary-action {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 8px;
+}
+
+.aethria-home .desk-home__footer {
+  align-self: flex-start;
+  width: auto;
+  margin-top: 16px;
+  order: 5;
+}
+
+.aethria-home .desk-home__workspaces {
+  order: 4;
+}
+
+@media (max-width: 760px) {
+  .aethria-home > .desk-home__inner {
+    gap: 0;
+    padding: 24px 20px 96px;
+  }
+
+  .aethria-home .desk-home__date {
+    margin-top: 28px;
+  }
+
+  .aethria-home .desk-home__briefing {
+    margin-top: 28px !important;
+  }
+
+  .aethria-home .desk-home__summary {
+    display: block;
+    margin-top: 40px;
+  }
+
+  .aethria-home .desk-home__summary-list {
+    grid-template-columns: 1fr;
+    margin-top: 12px;
+  }
+
+  .aethria-home .desk-home__summary-action {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 8px;
+  }
+
+  .aethria-home .desk-home__summary {
+    height: 220px !important;
+    flex-basis: 220px;
+  }
+}
+
+@media (max-width: 760px) {
+  .aethria-home > .desk-home__inner {
+    display: flex !important;
+    gap: 28px;
+    padding: 24px 20px 96px;
+  }
+
+  .aethria-home .desk-home__briefing {
+    padding: 0;
+  }
+
+  .aethria-home .desk-home__briefing > div:has(button[aria-label^='On the desk']) {
+    margin-top: 32px;
+  }
+
+  .aethria-home .desk-home__summary {
+    margin-top: 0;
+    padding: 0;
+  }
+
+  .aethria-home .desk-home__workspace-card,
+  .aethria-home .aethria-home__workspace-card {
+    padding-inline: 14px;
+  }
+
+  .aethria-home .desk-home__footer {
+    margin-top: 0;
+  }
+}
+
+/* Keep the home surface unified: affordance comes from spacing and motion,
+   not separate filled color blocks. */
+.aethria-home .desk-home__attention,
+.aethria-home .desk-home__workspace-card,
+.aethria-home .aethria-home__workspace-card,
+.aethria-home .desk-home__summary-row,
+.aethria-home .desk-home__summary-action {
+  background: transparent;
+}
+
+.aethria-home .desk-home__attention:hover,
+.aethria-home .desk-home__workspace-card:hover,
+.aethria-home .aethria-home__workspace-card:hover,
+.aethria-home .desk-home__summary-row:hover,
+.aethria-home .desk-home__summary-action:hover {
+  background: transparent;
+}
+
+.aethria-home .desk-home__attention > span:first-child,
+.aethria-home .desk-home__workspace-card > span:first-child,
+.aethria-home .aethria-home__workspace-card > span:first-child {
+  display: none;
+}
+
+.aethria-home .desk-home__workspace-card,
+.aethria-home .aethria-home__workspace-card {
+  min-height: 58px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+  padding: 14px 0;
+  transition: border-color 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspace-card:hover,
+.aethria-home .aethria-home__workspace-card:hover {
+  border-color: rgba(var(--color-oxford-rgb), 0.42);
+}
+
+.aethria-home .desk-home__summary-action {
+  min-height: 48px;
+  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+  padding: 12px 0;
+}
+
+.aethria-home .desk-home__summary-action:hover {
+  border-color: rgba(var(--color-oxford-rgb), 0.42);
+}
+
+.aethria-home .desk-home__summary-row {
+  min-height: 48px;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.14);
+  padding: 0 0 10px;
+  transition: border-color 160ms var(--motion-ease), transform 160ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__summary-row:hover {
+  border-color: rgba(var(--color-oxford-rgb), 0.42);
+  transform: translateX(3px);
+}
+
+/* The home metrics are a centered readout, not a row of mini-cards. */
+.aethria-home .desk-home__summary-row {
+  min-height: 58px;
+  border: 0;
+  padding: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.aethria-home .desk-home__summary-row:hover {
+  border: 0;
+}
+
+/* Three evenly divided circular destinations at the foot of the page. */
+.aethria-home .desk-home__workspaces {
+  /* Keep the three destinations on one measured baseline near the bottom of
+     the paper frame. The equal grid columns preserve their x rhythm while
+     auto space makes the bottom inset stable at the viewport height. */
+  margin-top: auto;
+}
+
+@media (min-width: 761px) {
+  .aethria-home > .desk-home__inner {
+    position: relative;
+  }
+
+  .aethria-home .desk-home__workspaces {
+    position: absolute;
+    right: clamp(20px, 5vw, 48px);
+    bottom: clamp(24px, 4vh, 48px);
+    left: clamp(20px, 5vw, 48px);
+    width: auto;
+    margin-top: 0;
+  }
+
+  .aethria-home .desk-home__briefing.focus-frame .desk-home__workspaces {
+    position: static;
+    inset: auto;
+    width: 100%;
+    margin-top: 28px;
+  }
+
+  .aethria-home .desk-home__briefing.focus-frame [role='navigation'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.aethria-home .desk-home__workspaces [role='navigation'] {
+  width: 100%;
+  gap: 0;
+}
+
+.aethria-home .desk-home__workspace-card,
+.aethria-home .aethria-home__workspace-card {
+  min-height: 108px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 12px 0;
+  transform: none;
+}
+
+.aethria-home .desk-home__footer {
+  margin-top: 16px;
+}
+
+.aethria-home .desk-home__workspace-card:hover,
+.aethria-home .aethria-home__workspace-card:hover {
+  border: 0;
+}
+
+.aethria-home .aethria-home__workspace-circle {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--color-oxford);
+  border-radius: 999px;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  transition: background-color 160ms var(--motion-ease), color 160ms var(--motion-ease);
+}
+
+.aethria-home .aethria-home__workspace-circle .aethria-nav-glyph {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.aethria-home {
+  min-height: 100dvh;
+  height: 100dvh;
+}
+
+.aethria-home > .desk-home__inner {
+  min-height: 100%;
+  box-sizing: border-box;
+  padding-block: clamp(24px, 4vh, 48px);
+}
+
+@media (min-width: 761px) {
+  .aethria-home > .desk-home__inner {
+    justify-content: center;
+  }
+}
+
+.aethria-home .desk-home__workspace-card,
+.aethria-home .aethria-home__workspace-card {
+  overflow: visible;
+}
+
+.aethria-home .aethria-home__workspace-label {
+  display: none;
+}
+
+/* Flow refinement: keep the docket open and continuous. State is carried by
+   type, spacing, and a small active accent rather than filled tabs or frames. */
+.aethria-flow {
+  background: var(--color-paper);
+}
+
+.aethria-flow > .workspaceLayout,
+.aethria-flow .aethria-flow__workspace,
+.aethria-flow .aethria-docket,
+.aethria-flow .aethria-queue-surface,
+.aethria-flow .aethria-queue-surface > .sticky {
+  background: transparent;
+}
+
+.aethria-flow .aethria-flow__workspace > [class*='shrink-0'] {
+  border-right-color: transparent;
+}
+
+.aethria-flow .aethria-docket {
+  border-top-color: transparent;
+}
+
+.aethria-flow .aethria-queue-surface > .sticky {
+  border-bottom-color: transparent;
+}
+
+.aethria-flow nav[aria-label='Queue views'] button,
+.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'],
+.aethria-flow nav[aria-label='Queue views'] .new-arrival-pulse {
+  background: transparent !important;
+}
+
+.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'] {
+  font-weight: 600;
+}
+
+.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'] > span.absolute {
+  background: transparent !important;
+}
+
+.aethria-flow .aethria-queue-columns,
+.aethria-flow .aethria-queue-surface .aethria-queue-list > div,
+.aethria-flow .aethria-docket-row {
+  border-color: transparent;
+}
+
+.aethria-flow .aethria-queue-surface .aethria-queue-list [role='button'],
+.aethria-flow .aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true'] {
+  border-left-color: transparent;
+  background: transparent;
+}
+
+.aethria-flow .aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true'] {
+  color: var(--color-oxford);
+}
+
+.aethria-flow .aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true']::before {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  content: '';
+}
+
+.aethria-flow .aethria-docket-row:hover,
+.aethria-flow .aethria-docket-row[aria-pressed='true'] {
+  border-left-color: transparent;
+  background: transparent;
+}
+
+.aethria-flow .aethria-docket-row__body::after {
+  display: none;
+}
+
+.aethria-flow .aethria-queue-surface .sticky [role='region'] button {
+  border: 0;
+  background: transparent;
+}
+
+.aethria-flow .aethria-queue-surface .sticky input[type='search'] {
+  border-bottom-color: transparent;
+}
+
+.aethria-flow .aethria-queue-surface .sticky [role='region'] {
+  border-top-color: transparent;
+}
+
+@media (min-width: 768px) {
+  .aethria-flow .aethria-flow__workspace > div {
+    padding-bottom: 0;
+  }
+
+  .aethria-flow .aethria-flow__workspace > div .aethria-docket {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+.aethria-flow .aethria-docket-row .aethria-verdict,
+.aethria-flow .aethria-verdict {
+  border: 0;
+  padding-inline: 0;
+}
+
+/* Flow page pass: a compact queue/list-detail relationship. Selection is
+   carried by weight and the verdict text; the row itself stays on the same
+   canvas so the memo remains the visual focus when it opens. */
+.aethria-flow .aethria-queue-list [role='button'],
+.aethria-flow .aethria-queue-list button {
+  min-height: 52px;
+  padding-block: 10px;
+  border-left: 0 !important;
+  background: transparent !important;
+}
+
+.aethria-flow .aethria-queue-list [role='button'][aria-pressed='true'],
+.aethria-flow .aethria-queue-list button[aria-pressed='true'] {
+  background: transparent !important;
+  font-weight: 600;
+}
+
+.aethria-flow .aethria-queue-list [role='button'][aria-pressed='true'] h2,
+.aethria-flow .aethria-queue-list button[aria-pressed='true'] h2 {
+  font-weight: 650;
+}
+
+.aethria-flow .aethria-docket > p {
+  border-top-color: transparent;
+}
+
+/* The floating workspace dock belongs to the viewport, so scrollable Flow
+   columns need a quiet landing zone beneath it. This keeps the memo's ruling
+   controls and the docket footer reachable instead of hiding them underneath
+   navigation. */
+.aethria-flow .aethria-flow__workspace > div,
+.aethria-flow .aethria-flow__workspace > aside {
+  padding-bottom: 72px;
+}
+
+@media (min-width: 768px) {
+  .aethria-flow .aethria-flow__workspace > div {
+    padding-bottom: 0;
+  }
+}
+
+.aethria-flow .aethria-flow__workspace > aside {
+  scrollbar-gutter: stable;
+}
+
+/* Portfolio refinement: a single record surface. Sections separate by rhythm
+   and column structure; no ledger cards, row rails, or alternating fills. */
+.aethria-portfolio > div:first-child > header,
+.aethria-portfolio > div:first-child > header.border-b,
+.aethria-portfolio section,
+.aethria-portfolio [data-testid='position-row'],
+.aethria-portfolio li {
+  border-color: transparent;
+}
+
+.aethria-portfolio section {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.aethria-portfolio .rule-draw {
+  display: none;
+}
+
+.aethria-portfolio [data-testid='position-row'] > div,
+.aethria-portfolio ul button {
+  border-left-color: transparent;
+  background: transparent;
+}
+
+.aethria-portfolio [data-testid='position-row'] > div:hover,
+.aethria-portfolio ul button:hover {
+  border-left-color: transparent;
+  background: transparent;
+  opacity: 0.72;
+}
+
+.aethria-portfolio > div:first-child > .grid {
+  row-gap: 34px;
+}
+
+/* Portfolio page pass: make the record read as a dense operating view. The
+   hierarchy comes from a measured header and aligned rows, not containers. */
+.aethria-portfolio > div:first-child {
+  max-width: 1320px;
+  padding-inline: clamp(20px, 3.5vw, 52px);
+}
+
+.aethria-portfolio > div:first-child > header {
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.92fr);
+  column-gap: clamp(28px, 5vw, 72px);
+  align-items: end;
+}
+
+.aethria-portfolio > div:first-child > header > h1 {
+  max-width: 25ch;
+  margin-top: 0;
+}
+
+.aethria-portfolio > div:first-child > header > div:last-child {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: end;
+  gap: 18px;
+  min-width: 0;
+}
+
+.aethria-portfolio > div:first-child > header > div:last-child > div {
+  min-width: 0;
+}
+
+.aethria-portfolio > div:first-child > .grid {
+  grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.72fr);
+  column-gap: clamp(34px, 5vw, 72px);
+  padding-top: 28px;
+}
+
+.aethria-portfolio section {
+  min-width: 0;
+}
+
+.aethria-portfolio [data-testid='position-row'] > div,
+.aethria-portfolio ul button {
+  min-height: 60px;
+  padding-block: 13px;
+}
+
+.aethria-portfolio [aria-label='Watchlist'] ul button {
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .aethria-portfolio > div:first-child > header {
+    display: block;
+  }
+
+  .aethria-portfolio > div:first-child > header > div:last-child {
+    margin-top: 24px;
+  }
+}
+
+.aethria-portfolio,
+.aethria-fund {
+  padding-bottom: 72px;
+}
+
+.aethria-fund > div:nth-child(2) > div {
+  padding-bottom: 96px;
+}
+
+.aethria-portfolio section,
+.aethria-fund section {
+  margin-bottom: 4px;
+}
+
+.aethria-flow.paper-dot-grid,
+.aethria-portfolio.paper-dot-grid,
+.aethria-fund.paper-dot-grid {
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+/* Fund refinement: the instrument shares the page canvas. Facets are a quiet
+   switcher; the active state is type weight and underline, never a tile. */
+.aethria-fund > div:first-child,
+.aethria-fund > div:first-child > div,
+.aethria-fund > div:first-child .bg-surface-canvas,
+.aethria-fund > div:nth-child(2),
+.aethria-fund > div:nth-child(2) > div,
+.aethria-fund .bg-surface-canvas {
+  background: transparent !important;
+}
+
+.aethria-fund > div:first-child,
+.aethria-fund > div:first-child .border-b,
+.aethria-fund > div:first-child header,
+.aethria-fund > div:first-child nav,
+.aethria-fund > div:first-child [role='tablist'] {
+  border-color: transparent;
+}
+
+.aethria-fund > div:first-child nav button,
+.aethria-fund > div:first-child [role='tablist'] button,
+.aethria-fund [role='tablist'] button {
+  border-bottom-color: transparent;
+  background: transparent !important;
+}
+
+.aethria-fund > div:first-child nav button[aria-selected='true'],
+.aethria-fund > div:first-child [role='tablist'] button[aria-selected='true'],
+.aethria-fund [role='tablist'] button[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.aethria-fund [role='tablist'] button > span.absolute {
+  background: transparent !important;
+}
+
+.aethria-fund .border-t,
+.aethria-fund .border-b,
+.aethria-fund .border-y,
+.aethria-fund .border-l,
+.aethria-fund .border-r,
+.aethria-fund .border-dashed {
+  border-color: transparent !important;
+}
+
+.aethria-fund .divide-y {
+  --tw-divide-opacity: 0;
+}
+
+/* Settings refinement: one horizontal control bar and an open editing canvas.
+   Inputs keep a quiet bottom cue, but no field or section is boxed. */
+.aethria-settings {
+  padding-left: 0 !important;
+  background: var(--color-paper);
+}
+
+.aethria-settings.paper-dot-grid,
+.aethria-settings .paper-dot-grid {
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+.aethria-settings-topbar {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+.aethria-settings-topbar > div {
+  min-height: 58px;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 18px !important;
+  padding: 10px 24px !important;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] {
+  order: 0 !important;
+  width: auto !important;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] button {
+  flex: 0 0 auto;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] button .aethria-nav-label {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] button,
+.aethria-settings-topbar nav[aria-label='Settings areas'] button[aria-pressed='true'] {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent !important;
+  white-space: nowrap;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] button[aria-pressed='true'] {
+  font-weight: 600;
+}
+
+.aethria-settings-topbar nav[aria-label='Settings areas'] button > span.absolute {
+  background: transparent !important;
+}
+
+.aethria-settings-topbar > div > div:last-child {
+  margin-top: 0 !important;
+  margin-left: auto !important;
+  width: auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 0 !important;
+}
+
+.aethria-settings .settings-gallery-content {
+  max-width: 1120px;
+  padding: 28px 28px 80px;
+}
+
+.aethria-settings .settings-gallery-plate-head {
+  border: 0;
+  margin-bottom: 12px;
+  padding-bottom: 0;
+}
+
+.aethria-settings .settings-gallery-intro {
+  margin-bottom: 18px;
+}
+
+.aethria-settings .settings-gallery-section:first-of-type {
+  padding-top: 0;
+}
+
+.aethria-settings .settings-gallery-section,
+.aethria-settings .settings-gallery-section + .settings-gallery-section,
+.aethria-settings .focus-frame {
+  border: 0;
+  margin-top: 0;
+  padding-block: 28px;
+}
+
+.aethria-settings .focus-frame::before,
+.aethria-settings .focus-frame::after {
+  display: none;
+}
+
+.aethria-settings input,
+.aethria-settings textarea,
+.aethria-settings select {
+  border: 0;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.16);
+  background: transparent;
+}
+
+.aethria-settings select {
+  background-repeat: no-repeat !important;
+  background-position: right 2px center !important;
+  background-size: 10px 10px !important;
+  padding-right: 28px;
+}
+
+.aethria-settings input:focus,
+.aethria-settings textarea:focus,
+.aethria-settings select:focus {
+  border-bottom-color: rgba(var(--color-oxford-rgb), 0.45);
+}
+
+/* Dispatch refinement: a command surface, not a bordered dialog stack. */
+.aethria-dispatch-command.paper-dot-grid {
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+.aethria-dispatch-command section,
+.aethria-dispatch-command [aria-label='Active dispatches'],
+.aethria-dispatch-command [class*='border-y'],
+.aethria-dispatch-command [class*='border-t'],
+.aethria-dispatch-command [class*='border-b'] {
+  border-color: transparent !important;
+}
+
+.aethria-dispatch-command [role='list'] button,
+.aethria-dispatch-command button[class*='border'] {
+  border-color: transparent !important;
+  background: transparent;
+}
+
+.aethria-dispatch-command [role='list'] button[aria-pressed='true'] {
+  background: transparent !important;
+  font-weight: 600;
+}
+
+.aethria-dispatch-command input,
+.aethria-dispatch-command textarea {
+  border-color: transparent !important;
+  background: transparent;
+}
+
+@media (min-width: 900px) {
+  .aethria-settings .settings-gallery-section > .focus-frame > .group-index {
+    display: grid;
+    grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
+    align-items: start;
+    column-gap: 48px;
+    padding-bottom: 24px;
+  }
+
+  .aethria-settings .settings-gallery-section > .focus-frame > .group-index p {
+    margin-top: 0;
+  }
+
+  .aethria-settings .settings-gallery-section > .focus-frame > section {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.42fr) minmax(0, 1.58fr);
+    align-items: start;
+    column-gap: 42px;
+    padding-block: 20px;
+  }
+
+  .aethria-settings .settings-gallery-section > .focus-frame > section > div:first-child {
+    padding-top: 3px;
+  }
+
+  .aethria-settings .settings-gallery-section > .focus-frame > section > div:last-child {
+    min-width: 0;
+  }
+}
+
+.aethria-logout-float {
+  display: none;
+}
+
+/* Navigation polish: one selected layer and Dispatch as a separate action. */
+@media (min-width: 1024px) {
+  .aethria-spine .aethria-spine-nav-button[aria-pressed='true'] {
+    border-left: 0;
+    border-radius: 999px;
+  }
+
+  .aethria-settings-dock {
+    position: fixed;
+    bottom: var(--dock-bottom);
+    left: clamp(18px, 2.4vw, 46px);
+    z-index: 46;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    isolation: isolate;
+    /* Menu rect the panel grows from / shrinks to (see the panel-grow keyframes):
+       4 categories + the pipeline block. Keep in step with the menu rules. */
+    --dock-menu-w: 184px;
+    --dock-menu-h: 336px;
+    /* The toggle's open tint (oxford on paper) as a solid, so the menu and
+       panel are exactly the button's color and hide what is behind them. */
+    --dock-surface: color-mix(in srgb, var(--color-oxford) 5%, var(--color-paper));
+  }
+
+  .aethria-logout-float {
+    position: fixed;
+    right: clamp(18px, 2.4vw, 46px);
+    bottom: var(--dock-bottom);
+    z-index: 46;
+    display: grid;
+    width: var(--dock-size);
+    height: var(--dock-size);
+    min-height: var(--dock-size);
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: rgba(var(--color-oxford-rgb), 0.58);
+  }
+
+  .aethria-logout-float:hover,
+  .aethria-logout-float:focus-visible {
+    background: transparent;
+    color: var(--color-oxford);
+    outline: none;
+  }
+
+  .aethria-logout-float:disabled {
+    cursor: wait;
+    opacity: 0.6;
+  }
+
+  .aethria-logout-float .aethria-nav-glyph {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .aethria-settings-dock::before {
+    position: absolute;
+    inset: -28px;
+    z-index: -1;
+    border-radius: 24px;
+    background: rgba(var(--color-paper-rgb), 0.22);
+    content: '';
+    opacity: 0;
+    pointer-events: none;
+    filter: blur(20px);
+    backdrop-filter: blur(28px);
+    transition: opacity 160ms var(--motion-ease);
+  }
+
+  .aethria-settings-dock.is-open::before {
+    opacity: 1;
+  }
+
+  .aethria-settings-dock__pullout {
+    position: fixed;
+    bottom: calc(var(--dock-bottom) + var(--dock-size) + 8px);
+    left: clamp(18px, 2.4vw, 46px);
+    z-index: 45;
+    display: flex;
+    flex-direction: column;
+    width: min(1080px, calc(100vw - clamp(36px, 4.8vw, 92px)));
+    /* Sized by its content so nothing scrolls; the cap is the viewport. */
+    max-height: min(92vh, 900px);
+    overflow: hidden;
+    border-radius: 16px;
+    background: var(--dock-surface);
+    container: settings-pullout / inline-size;
+  }
+
+  /* The menu unmounts when a category opens; the panel grows out of its
+     rectangle (--dock-menu-w × --dock-menu-h, bottom-left) and the content fades in. */
+  @media (prefers-reduced-motion: no-preference) {
+    .aethria-settings-dock__pullout {
+      animation: aethria-settings-panel-grow 240ms var(--motion-ease) both;
+    }
+
+    .aethria-settings-dock__pullout > .aethria-settings {
+      animation: aethria-settings-panel-content 160ms 90ms var(--motion-ease) both;
+    }
+
+    .aethria-settings-dock__pullout.is-closing {
+      animation: aethria-settings-panel-shrink 220ms var(--motion-ease) both;
+    }
+
+    .aethria-settings-dock__pullout.is-closing > .aethria-settings {
+      animation: aethria-settings-panel-content-out 100ms var(--motion-ease) both;
+    }
+  }
+
+  @keyframes aethria-settings-panel-grow {
+    from { clip-path: inset(calc(100% - var(--dock-menu-h)) calc(100% - var(--dock-menu-w)) 0 0 round 16px); }
+    to { clip-path: inset(0 0 0 0 round 16px); }
+  }
+
+  @keyframes aethria-settings-panel-shrink {
+    from { clip-path: inset(0 0 0 0 round 16px); }
+    to { clip-path: inset(calc(100% - var(--dock-menu-h)) calc(100% - var(--dock-menu-w)) 0 0 round 16px); }
+  }
+
+  @keyframes aethria-settings-panel-content {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes aethria-settings-panel-content-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings {
+    flex: 0 1 auto;
+    min-height: 0;
+    background: transparent;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .bg-paper,
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-gallery-room {
+    background: transparent !important;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .sticky {
+    display: none !important;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-embedded-deploy .btn-aethria-solid {
+    min-height: 34px;
+    padding: 0 14px;
+    border-radius: 999px;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded-thesis [data-settings-group]:not([data-settings-group='thesis']),
+  .aethria-settings-dock__pullout .settings-page--embedded-policy [data-settings-group]:not([data-settings-group='policy']),
+  .aethria-settings-dock__pullout .settings-page--embedded-runtime [data-settings-group]:not([data-settings-group='runtime']),
+  .aethria-settings-dock__pullout .settings-page--embedded-system [data-settings-group]:not([data-settings-group='system']) {
+    display: none;
+  }
+
+  .aethria-settings-dock__menu {
+    display: flex;
+    width: 184px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px;
+    border-radius: 16px;
+    background: var(--dock-surface);
+    /* Grows out of the cog, which sits under its bottom-left corner. */
+    transform-origin: 0 100%;
+    will-change: opacity, transform;
+  }
+
+  .aethria-settings-dock__item {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(var(--color-oxford-rgb), 0.68);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+    will-change: transform;
+    transition: background-color 150ms var(--motion-ease), color 150ms var(--motion-ease);
+  }
+
+  .aethria-settings-dock__item:hover,
+  .aethria-settings-dock__item:focus-visible {
+    background: rgba(var(--color-oxford-rgb), 0.06);
+    color: var(--color-oxford);
+    outline: none;
+  }
+
+  /* Pipeline controls under the categories: heading, then one 34px row per
+     switch. Fixed heights so the menu's height is the --dock-menu-h above. */
+  .aethria-settings-dock__pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+    padding-top: 4px;
+  }
+
+  .aethria-settings-dock__pipeline-title {
+    display: flex;
+    height: 24px;
+    align-items: center;
+    padding: 0 10px;
+    color: rgba(var(--color-oxford-rgb), 0.55);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .aethria-settings-dock__pipeline-row {
+    display: flex;
+    height: 34px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    color: var(--color-oxford);
+    font-family: var(--font-sans);
+    font-size: 13px;
+  }
+
+  .aethria-settings-dock__pipeline-note {
+    padding: 4px 10px 0;
+    color: var(--color-escalation);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .aethria-settings-dock__toggle {
+    display: grid;
+    width: var(--dock-size);
+    height: var(--dock-size);
+    min-height: var(--dock-size);
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    /* Opaque: a translucent tint let whatever sat behind the dock show through. */
+    background: var(--dock-surface);
+    color: rgba(var(--color-oxford-rgb), 0.68);
+    transition: background-color 150ms var(--motion-ease), color 150ms var(--motion-ease);
+  }
+
+  .aethria-settings-dock__toggle:hover,
+  .aethria-settings-dock__toggle:focus-visible {
+    background: color-mix(in srgb, var(--color-oxford) 9%, var(--color-paper));
+    color: var(--color-oxford);
+    outline: none;
+  }
+
+  /* Open: exactly the menu and panel color, so the three read as one object. */
+  .aethria-settings-dock.is-open .aethria-settings-dock__toggle {
+    background: var(--dock-surface);
+    color: var(--color-oxford);
+  }
+
+  .aethria-settings-dock__toggle .aethria-nav-glyph {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.35;
+    opacity: 0.68;
+    transform: rotate(0deg);
+    transition: opacity 150ms var(--motion-ease), transform 700ms var(--motion-ease);
+  }
+
+  .aethria-settings-dock__toggle:hover .aethria-nav-glyph,
+  .aethria-settings-dock__toggle:focus-visible .aethria-nav-glyph,
+  .aethria-settings-dock.is-open .aethria-settings-dock__toggle .aethria-nav-glyph {
+    opacity: 1;
+  }
+
+  .aethria-settings-dock__toggle:hover .aethria-nav-glyph {
+    transform: rotate(360deg);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aethria-settings-dock__toggle .aethria-nav-glyph {
+      transition-duration: 0ms;
+    }
+  }
+
+  /* One button, three glyphs sharing the cell and cross-rotating: cog when the
+     dock is closed, X while the category menu is open, back arrow inside a
+     category. */
+  .aethria-settings-dock__toggle > * {
+    grid-area: 1 / 1;
+  }
+
+  .aethria-settings-dock__back,
+  .aethria-settings-dock__x {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.5;
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.6);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .aethria-settings-dock__back,
+    .aethria-settings-dock__x {
+      transition: opacity 200ms var(--motion-ease), transform 400ms var(--motion-ease);
+    }
+  }
+
+  .aethria-settings-dock.is-open .aethria-settings-dock__toggle .aethria-nav-glyph {
+    opacity: 0;
+    transform: rotate(180deg) scale(0.6);
+  }
+
+  .aethria-settings-dock.is-open:not(.is-panel) .aethria-settings-dock__x,
+  .aethria-settings-dock.is-panel .aethria-settings-dock__back {
+    opacity: 1;
+    transform: none;
+  }
+
+  @keyframes aethria-settings-dock-open {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .aethria-spine-dispatch-float {
+    position: relative;
+    top: auto;
+    left: auto;
+    bottom: auto;
+    z-index: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: var(--dock-size);
+    height: var(--dock-size);
+    min-height: var(--dock-size);
+    padding: 0;
+    place-items: center;
+    border-radius: 999px;
+    background: var(--color-oxford) !important;
+    color: rgba(255, 255, 255, 0.6);
+    transform: none;
+  }
+
+  .aethria-spine-dispatch-float:hover,
+  .aethria-spine-dispatch-float:focus-visible {
+    background: var(--color-oxford) !important;
+    color: rgba(255, 255, 255, 0.88);
+  }
+
+  .aethria-spine-dispatch-float > span:first-child {
+    display: grid;
+    width: 18px;
+    height: 18px;
+    justify-self: center;
+    place-items: center;
+  }
+
+  .aethria-spine-dispatch-float .aethria-nav-label,
+  .aethria-spine-dispatch-float > span:last-child {
+    display: none;
+  }
+
+  .aethria-spine-dispatch-float .aethria-nav-glyph {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .aethria-spine-dispatch-float[data-nav-label]::after {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 9px);
+    z-index: 2;
+    width: max-content;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: var(--color-oxford);
+    color: var(--color-paper);
+    content: attr(data-nav-label);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    opacity: 0;
+    pointer-events: none;
+    text-transform: uppercase;
+    transform: translateY(-50%) translateX(-4px);
+    transition: opacity 160ms var(--motion-ease), transform 160ms var(--motion-ease);
+  }
+
+  .aethria-spine-dispatch-float[data-nav-label]:hover::after,
+  .aethria-spine-dispatch-float[data-nav-label]:focus-visible::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+
+/* Entry/admin surfaces use the same modern operating-surface language as the
+   workspaces: one canvas, measured rules, and state carried by type. */
+.aethria-admin {
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
+.aethria-admin__stat {
+  min-width: 0;
+  padding-block: 8px 18px;
+  border-bottom: 1px solid var(--fey-rule-soft);
+}
+
+.aethria-admin__status {
+  min-height: 24px;
+  border-bottom: 2px solid transparent;
+  color: rgba(var(--color-oxford-rgb), 0.55);
+}
+
+.aethria-admin__status.is-active {
+  border-bottom-color: currentColor;
+  color: var(--color-oxford);
+  font-weight: 600;
+}
+
+.aethria-admin__filters {
+  padding-block: 16px;
+  border-block: 1px solid var(--fey-rule-soft);
+}
+
+.aethria-admin__filters button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding-inline: 0;
+  color: rgba(var(--color-oxford-rgb), 0.6);
+}
+
+.aethria-admin__filters button:hover,
+.aethria-admin__filters button:focus-visible {
+  color: var(--color-oxford);
+}
+
+.aethria-admin__filters button[aria-pressed='true'] {
+  border-bottom-color: currentColor;
+  color: var(--color-oxford);
+  font-weight: 600;
+}
+
+.aethria-admin__table {
+  border-top: 1px solid var(--fey-rule);
+}
+
+.aethria-admin__table thead {
+  background: transparent;
+}
+
+.aethria-admin__table tbody tr {
+  border-top-color: var(--fey-rule-soft);
+}
+
+.aethria-admin-login {
+  border-top: 1px solid var(--fey-rule);
+  border-bottom: 1px solid var(--fey-rule);
+}
+}
+
+/* Workspace hierarchy: keep the operating surfaces modern and product-like.
+   The display face remains available for authored memo content, but page
+   chrome, headings, and company rows use the existing sans token so the app
+   does not read like an editorial spread. */
+.aethria-home .type-display,
+.aethria-home .font-display,
+.aethria-flow .type-display,
+.aethria-portfolio .type-display,
+.aethria-portfolio .font-display,
+.aethria-fund .aethria-room-header__title,
+.aethria-fund .type-display,
+.aethria-settings .type-display,
+.aethria-settings h1,
+.aethria-settings h2 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.035em;
+}
+
+.aethria-home .type-display,
+.aethria-flow .type-display,
+.aethria-portfolio .type-display,
+.aethria-fund .aethria-room-header__title,
+.aethria-settings h1,
+.aethria-settings h2 {
+  font-weight: 600;
+}
+
+.aethria-home .font-display,
+.aethria-portfolio .font-display {
+  font-weight: 600;
+}
+
+/* Compact rows (settings/CompactSettings.tsx): one line per setting, label left,
+   control right. Fields are soft fills on hover/focus, not underlines. */
+.aethria-settings .compact-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.aethria-settings .compact-section {
+  padding-bottom: 20px;
+  break-inside: avoid;
+}
+
+.aethria-settings .compact-span {
+  column-span: all;
+  margin-bottom: 12px;
+}
+
+/* Open book: two balanced pages with a hairline spine, when the panel is wide
+   enough. Sections never split across pages. Below that it is one column. */
+@container settings-pullout (min-width: 760px) {
+  .aethria-settings .compact-body {
+    display: block;
+    column-count: 2;
+    column-gap: 56px;
+    column-rule: 1px solid rgba(var(--color-oxford-rgb), 0.08);
+  }
+}
+
+.aethria-settings .compact-field {
+  border: 0;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 2px;
+  text-align: right;
+  color: var(--color-oxford);
+  outline: none;
+  transition: border-color 150ms var(--motion-ease);
+}
+
+.aethria-settings .compact-field:hover {
+  border-bottom-color: rgba(var(--color-oxford-rgb), 0.5);
+}
+
+.aethria-settings .compact-field:focus {
+  border-bottom-color: var(--color-oxford);
+}
+
+.aethria-settings .compact-field::placeholder {
+  color: rgba(var(--color-oxford-rgb), 0.4);
+}
+
+.aethria-settings textarea.compact-field {
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+  padding: 8px 10px;
+}
+
+.aethria-settings textarea.compact-field:focus {
+  border-color: var(--color-oxford);
+}
+
+.aethria-settings .compact-field[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.aethria-settings .compact-field[type='number']::-webkit-inner-spin-button,
+.aethria-settings .compact-field[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+/* The narrative opener reads as a field too: same underline. */
+.aethria-settings .compact-summary {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 18rem;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+  border-radius: 0;
+  background: transparent;
+  padding: 6px 2px;
+  color: var(--color-oxford);
+  transition: border-color 150ms var(--motion-ease);
+}
+
+.aethria-settings .compact-summary:hover,
+.aethria-settings .compact-summary[aria-expanded='true'] {
+  border-bottom-color: rgba(var(--color-oxford-rgb), 0.5);
+}
+
+.aethria-settings .compact-summary:focus-visible {
+  border-bottom-color: var(--color-oxford);
+  outline: none;
+}
+
+.aethria-settings .compact-seg {
+  display: inline-flex;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.aethria-settings .compact-seg button {
+  min-height: 26px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  padding: 0 12px;
+  color: rgba(var(--color-oxford-rgb), 0.7);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  transition: background-color 150ms var(--motion-ease), color 150ms var(--motion-ease);
+}
+
+.aethria-settings .compact-seg button:hover {
+  color: var(--color-oxford);
+}
+
+.aethria-settings .compact-seg button[aria-checked='true'] {
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}
+
+.aethria-settings .compact-switch,
+.aethria-settings-dock__menu .compact-switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 150ms var(--motion-ease), border-color 150ms var(--motion-ease);
+}
+
+.aethria-settings .compact-switch::after,
+.aethria-settings-dock__menu .compact-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(var(--color-oxford-rgb), 0.5);
+  content: '';
+  transition: transform 150ms var(--motion-ease), background-color 150ms var(--motion-ease);
+}
+
+.aethria-settings .compact-switch[aria-checked='true'],
+.aethria-settings-dock__menu .compact-switch[aria-checked='true'] {
+  border-color: var(--color-oxford);
+  background: var(--color-oxford);
+}
+
+.aethria-settings .compact-switch[aria-checked='true']::after,
+.aethria-settings-dock__menu .compact-switch[aria-checked='true']::after {
+  background: var(--color-paper);
+  transform: translateX(14px);
+}
+
+.aethria-settings .compact-switch:focus-visible,
+.aethria-settings-dock__menu .compact-switch:focus-visible {
+  outline: 2px solid rgba(var(--color-oxford-rgb), 0.4);
+  outline-offset: 2px;
+}
+
+.aethria-settings .compact-weight {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px 4px;
+}
+
+/* h2.type-label-section is a mono label, not a heading: undo the blanket h2 rule above. */
+.aethria-settings h2.type-label-section {
+  font-family: var(--font-mono);
+  font-weight: 400;
+  letter-spacing: 0.09em;
+}
+
+/* Empty states should feel intentional, not like a boxed placeholder. */
+.aethria-empty-state {
+  min-height: 16rem;
+  border-top: 0;
+  border-bottom: 0;
+  padding-block: 56px 64px;
+}
+
+.aethria-empty-state__mark {
+  width: 18px;
+  height: 18px;
+  border: 0;
+}
+
+.aethria-empty-state__mark::after {
+  inset: 5px;
+  border: 0;
+  background: currentColor;
+  opacity: 0.24;
+}
+
+/* Dispatch is a focused command workspace: a single input line and type
+   hierarchy, with no editorial title treatment or nested button plates. */
+.aethria-dispatch-command h1,
+.aethria-dispatch-command h2,
+.aethria-dispatch-command h3 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.aethria-dispatch-command [role='list'] button {
+  border: 0 !important;
+  border-bottom: 1px solid transparent !important;
+  padding-inline: 0;
+}
+
+.aethria-dispatch-command [role='list'] button[aria-pressed='true'] {
+  border-bottom-color: currentColor !important;
+  font-weight: 600;
+}
+
+/* Verdicts are annotations, not mini-panels. Keep the emergency escalation
+   state filled, but let ordinary recommendations sit directly in the record. */
+.aethria-verdict--flat {
+  min-width: 0;
+  padding-inline: 0;
+  padding-block: 0;
+  border: 0 !important;
+  background: transparent !important;
+}
+
+/* Embedded settings controls: keep the pullout focused on the form itself. */
+@media (min-width: 1024px) {
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-gallery-plate-head,
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-gallery-intro {
+    display: none;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-gallery-content {
+    max-width: none;
+    padding: 4px 20px 24px;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-choice {
+    min-height: 26px;
+    padding: 0 10px;
+    border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+    border-radius: 999px;
+    background: transparent;
+    color: rgba(var(--color-oxford-rgb), 0.72);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-choice:hover,
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-choice:focus-visible {
+    border-color: rgba(var(--color-oxford-rgb), 0.6);
+    background: transparent;
+    color: var(--color-oxford);
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-choice[aria-pressed='true'] {
+    border-color: var(--color-oxford);
+    background: var(--color-oxford);
+    color: var(--color-paper);
+  }
+
+  /* Compact pullout layout. One group: heading, sections, and label | field rows. The page grids key off the
+     viewport (≥900px), which is wrong for a fixed-width panel, so they are reset
+     here and the row grid follows the panel's own width instead. */
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section,
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section + .settings-gallery-section,
+  .aethria-settings-dock__pullout .aethria-settings .focus-frame {
+    padding-block: 0;
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section > .focus-frame > .group-index {
+    display: block;
+    padding-block: 12px 0;
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section > .focus-frame > .group-index h2 {
+    font-size: 22px;
+    line-height: 1.15;
+  }
+
+  /* The category title says what it is, and the footer already says "Draft
+     changes · N pending", so the description line is dropped in the dock. */
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section > .focus-frame > .group-index p {
+    display: none;
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section > .focus-frame > section {
+    display: block;
+    padding-block: 12px 0;
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings .settings-gallery-section > .focus-frame > section > div:first-child {
+    padding-top: 0;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow {
+    grid-template-columns: 120px minmax(0, 1fr);
+    gap: 20px;
+    padding-block: 6px;
+  }
+
+  /* A row whose fields carry their own labels doesn't need the row label too
+     ("IDENTITY" beside "FUND NAME"). Rows with no field label (Version, budget
+     ledger) keep it: it is the only label there. */
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow:has(label) {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow:has(label) > p {
+    display: none;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow > p {
+    padding-top: 6px;
+  }
+
+  /* Quiet labels: sentence-case sans. Only section titles stay mono caps, as
+     the one anchor per block. */
+  .aethria-settings-dock__pullout .settings-page--embedded .type-label-section {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: rgba(var(--color-oxford-rgb), 0.62);
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded h2.type-label-section {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: rgba(var(--color-oxford-rgb), 0.7);
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-toggle-row {
+    padding-block: 6px;
+  }
+
+  .aethria-settings-dock__pullout #thresholds p {
+    padding-block: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow > div .grid {
+    gap: 10px 16px;
+  }
+
+  /* Fields are underlines (see .compact-field for the compact rows); legacy
+     fields such as the ladder's inputs keep the base underline, made a touch
+     stronger so they read as boxes to type in. */
+  .aethria-settings-dock__pullout .aethria-settings :is(input, select).border-b {
+    border-bottom-color: rgba(var(--color-oxford-rgb), 0.28);
+  }
+
+  .aethria-settings-dock__pullout .aethria-settings select.border-b {
+    padding-right: 28px;
+  }
+
+  /* Read-only ledger: one line per figure, label left, value right. */
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-ledger {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-ledger .settings-specrow {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 12px;
+    padding-block: 4px;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-ledger .settings-specrow > p {
+    padding-top: 0;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-ledger .settings-specrow .type-data {
+    font-size: 13px;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-status {
+    padding-block: 8px;
+  }
+
+  @container settings-pullout (max-width: 640px) {
+    .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+    }
+
+    .aethria-settings-dock__pullout .settings-page--embedded .settings-specrow > p {
+      padding-top: 0;
+    }
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-embedded-deploy {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    min-height: 52px;
+    padding: 10px 20px;
+    background: transparent;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-embedded-deploy__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-right: auto;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-embedded-deploy__restore {
+    min-height: 28px;
+    padding: 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .aethria-settings-dock__pullout .settings-page--embedded .settings-embedded-deploy .btn-aethria-solid {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 12px;
+    border-radius: 999px !important;
+    font-size: 9px;
+  }
+}
+
+/* Home workspace destinations use the same filled segmented-control language
+   as the ruling choices: one shared pill, clean internal joins, and labels
+   visible alongside their icons. */
+.aethria-home .desk-home__workspaces [role='navigation'] {
+  display: flex;
+  gap: 4px;
+  overflow: visible;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 52px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  padding: 0 16px;
+  transition: flex-grow 520ms var(--motion-ease), background-color 260ms var(--motion-ease), color 260ms var(--motion-ease), padding 260ms var(--motion-ease), border-radius 260ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card:hover,
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible {
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card > span.relative {
+  flex-direction: row;
+  gap: 10px;
+}
+
+.aethria-home .desk-home__workspace-label,
+.aethria-home .aethria-home__workspace-label {
+  display: none;
+}
+
+.aethria-home .desk-home__workspace-card .aethria-home__workspace-circle {
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: currentColor;
+}
+
+.aethria-home .desk-home__workspace-card .aethria-home__workspace-circle .aethria-nav-glyph {
+  width: 16px;
+  height: 16px;
+}
+
+/* On intent, the active destination takes the available width while the
+   quiet destinations reduce to the original Oxford icon circles. :has keeps
+   the same interaction available to keyboard focus without adding JS state. */
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover),
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) {
+  flex: 0 0 54px;
+  justify-content: center;
+  gap: 0;
+  padding-inline: 0;
+  background: transparent;
+}
+
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover) .aethria-home__workspace-label,
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-label {
+  display: none;
+}
+
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:not(:hover) .aethria-home__workspace-circle,
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+}
+
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:hover) .aethria-home__workspace-card:hover,
+.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
+  flex-grow: 2;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  border-radius: 999px;
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card:hover .aethria-home__workspace-label,
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible .aethria-home__workspace-label {
+  color: var(--color-paper) !important;
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]::after {
+  content: attr(data-nav-label);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 20;
+  pointer-events: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition: opacity 180ms var(--motion-ease), transform 260ms var(--motion-ease);
+}
+
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:hover::after,
+.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aethria-home .desk-home__workspaces .aethria-home__workspace-card {
+    transition: none;
+  }
+}
+
+/* Keep the Dispatch command input's underline visible over the flat-surface reset. */
+.aethria-dispatch-command [aria-label='Pipeline dispatch'] {
+  border-bottom-color: rgba(var(--color-oxford-rgb), 0.12) !important;
+}
+
+.aethria-dispatch-command [aria-label='Pipeline dispatch']:focus-within {
+  border-bottom-color: rgba(var(--color-oxford-rgb), 0.45) !important;
 }

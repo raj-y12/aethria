@@ -123,13 +123,13 @@ describe('MemoDecisionBrief', () => {
     render(
       <MemoDecisionBrief
         brief={{ ...brief, status: 'unavailable', lean: 'none', leanProvenance: 'missing' }}
-        stateMessage="The canonical evaluation could not be loaded."
+        stateMessage="The decision record could not be loaded."
       />,
     );
 
     const region = screen.getByRole('region', { name: 'Evidence coverage' });
     expect(within(region).getByText('Decision data unavailable')).toBeInTheDocument();
-    expect(within(region).getByText('The canonical evaluation could not be loaded.')).toBeInTheDocument();
+    expect(within(region).getByText('The decision record could not be loaded.')).toBeInTheDocument();
     expect(region).not.toHaveTextContent(/invest|pass|monitor/i);
   });
 

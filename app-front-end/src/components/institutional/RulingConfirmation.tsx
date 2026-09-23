@@ -118,7 +118,7 @@ export default function RulingConfirmation({
             <motion.h1
               id="ruling-confirmation-title"
               {...step(0.14)}
-              className="type-display m-0 max-w-[18ch] text-center text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford"
+              className="font-sans m-0 max-w-[18ch] text-center text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.04em] text-oxford"
             >
               {recorded
                 ? `${DECISION_LABEL[decision]} on ${subject}.`
@@ -136,7 +136,7 @@ export default function RulingConfirmation({
 
             <motion.dl
               {...step(0.32)}
-              className="focus-frame mt-phi-7 w-full min-w-0 max-w-2xl bg-paper"
+              className="mt-phi-7 w-full min-w-0 max-w-2xl bg-paper"
             >
               <div className="grid grid-cols-1 gap-y-phi-2 border-b border-oxford/[0.06] px-phi-5 py-phi-4 md:grid-cols-[minmax(9rem,26%)_minmax(0,1fr)] md:gap-x-phi-5 md:gap-y-0">
                 <dt className="type-label-section text-oxford/65">Your call</dt>

@@ -657,12 +657,12 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
         </summary>
         <div className="flex flex-col pb-phi-2">
         <p className="type-body text-oxford/65 leading-relaxed px-phi-4 pt-phi-3 max-w-2xl">
-          You can ignore this unless the correction cycle has produced <span className="text-oxford/75">pending prompt drafts</span> and you want to test or turn them on.
-          Day-to-day deal work and your Invest / Pass / Monitor confirmations do not depend on anything here—the product runs on built-in prompts until you explicitly promote a draft.
+          You can ignore this unless the correction cycle has produced <span className="text-oxford/75">pending prompt drafts</span> and you want to test them.
+          Current investment analysis uses its built-in Reviewer prompt. Scout drafts can still be promoted here.
         </p>
       <TabSection title="Bench list" label="For Evaluate only">
         <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">
-          Paste internal startup IDs from your pipeline (one per line, up to {metaEvalSet.max}). When you press <span className="text-oxford/65">Evaluate</span> on a pending <em>reviewer</em> prompt, the system re-runs that reviewer on these deals with the proposed instructions and compares to saved scores—cheap guardrail before going live. Each ID is one extra model call.
+          Paste internal startup IDs from your pipeline (one per line, up to {metaEvalSet.max}). <span className="text-oxford/65">Evaluate</span> previews a pending Reviewer draft against saved current analyses. This is a comparison only; legacy persona drafts cannot be activated for the current Reviewer. Each ID is one extra model call.
         </p>
         <textarea
           value={evalDraft}
@@ -702,15 +702,14 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
       <TabSection title="Prompt drafts" label="Active vs pending">
         <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">
           The meta cycle can propose new instructions for scouts/reviewers. <span className="text-oxford/65">Active</span> is what runs today (empty = product defaults).
-          <span className="text-oxford/65"> Pending</span> is queued proposals—use <span className="text-oxford/65">Promote</span> to make one live, or <span className="text-oxford/65">Reset</span> to drop back to defaults.
-          Your org may require a passing <span className="text-oxford/65">Evaluate</span> before Promote for reviewers.
+          <span className="text-oxford/65"> Pending</span> is queued proposals. Scout drafts can be promoted or reset; Reviewer persona drafts remain preview-only.
         </p>
         {promptState.restart_note && (
           <p className="type-note mb-phi-3 max-w-2xl text-oxford/65">{promptState.restart_note}</p>
         )}
         <div className="flex flex-col gap-phi-4">
           <div>
-            <span className="type-status mb-phi-2 block">Active (live)</span>
+            <span className="type-status mb-phi-2 block">Saved promotions</span>
             {Object.keys(promptState.active).length === 0 ? (
               <p className="type-meta text-oxford/65">None—using built-in prompts.</p>
             ) : (
@@ -720,6 +719,9 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                     <div className="min-w-0">
                       <span className="type-meta text-oxford/70">{agent}</span>
                       <p className="type-meta text-oxford/65 truncate max-w-xl" title={libKey}>{libKey}</p>
+                      {REVIEWER_EVAL_AGENTS.has(agent) && (
+                        <p className="type-note text-oxford/65">Historical persona setting · current Reviewer uses its built-in prompt</p>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -790,7 +792,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                             {evalBusy === p.library_key ? '…' : 'Evaluate'}
                           </button>
                         )}
-                        <button
+                        {!canEval && <button
                           type="button"
                           disabled={promptBusy !== null || evalBusy !== null}
                           onClick={async () => {
@@ -807,7 +809,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                           className="type-action border border-oxford/15 px-phi-3 py-phi-2 hover:text-oxford hover:border-oxford/40 btn-interaction"
                         >
                           {promptBusy === p.library_key ? '…' : 'Promote'}
-                        </button>
+                        </button>}
                       </div>
                     </div>
                   );
@@ -831,7 +833,7 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                   {' · '}
                   {evalResult.summary.pass_reason}
                   {' · '}
-                  regressions {evalResult.summary.regression_count} / {evalResult.summary.n_compared} compared
+                  support regressions {evalResult.summary.regression_count} / {evalResult.summary.n_compared} compared
                   {' · '}
                   mean |Δscore| {evalResult.summary.mean_abs_score_delta}
                 </p>
@@ -847,9 +849,9 @@ export function MetaCommandTab({ reports, weights, calibration, promptState, met
                   {evalResult.rows.map((row) => (
                     <li key={row.startup_id}>
                       {row.startup_id.slice(0, 8)}… {row.status}
-                      {row.baseline_verdict != null && row.candidate_verdict != null
-                        ? ` ${row.baseline_verdict} → ${row.candidate_verdict}${row.regression ? ' (regression)' : ''}`
-                        : ''}
+                      {row.lost_support_dimensions?.length
+                        ? ` · lost support: ${row.lost_support_dimensions.join(', ')}`
+                        : row.mean_abs_delta != null ? ` · mean |Δscore| ${row.mean_abs_delta}` : ''}
                     </li>
                   ))}
                 </ul>

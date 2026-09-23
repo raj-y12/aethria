@@ -1,7 +1,6 @@
 import { forwardRef } from 'react';
 import { motion } from 'framer-motion';
-import { usePrefersReducedMotion, useCopyToClipboard } from '../../hooks';
-import { productInteraction } from '../../design-system/productSystem';
+import { usePrefersReducedMotion } from '../../hooks';
 import type { VerdictBadgeConfig } from '../../lib/fundConfiguration';
 import QueueVerdictLine from './QueueVerdictLine';
 import QueueAttentionBadge from './QueueAttentionBadge';
@@ -35,7 +34,6 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
-  const { copied, copy } = useCopyToClipboard();
   const {
     startup,
     decisionVariant,
@@ -78,12 +76,12 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`group relative w-full min-w-0 cursor-pointer px-phi-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+      className={`aethria-docket-row group relative w-full min-w-0 cursor-pointer px-phi-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
         isSelected ? 'bg-surface-selected' : 'hover:bg-oxford/[0.04]'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
     >
-      <div className="min-w-0">
+      <div className="aethria-docket-row__body min-w-0">
         {/* Selected rows stack like a mini masthead — the title owns the full
             column width so it never fights the verdict chip for space. Ambient
             rows keep the one-line name + quiet status ledger layout. */}
@@ -108,26 +106,13 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               animate={{ opacity: 1 }}
               className={`min-w-0 break-words ${
                 isSelected
-                  ? 'text-balance font-display text-[clamp(28px,2.6vw,36px)] font-medium leading-[1.1] tracking-[-0.02em] text-oxford'
+                  ? 'text-balance font-sans text-[clamp(28px,2.6vw,36px)] font-semibold leading-[1.05] tracking-[-0.035em] text-oxford'
                   : 'font-sans text-[clamp(16px,1.3vw,19px)] font-medium leading-[1.2] tracking-[-0.01em] text-oxford/[0.72] transition-colors group-hover:text-oxford'
               }`}
               transition={selectTransition}
             >
               {startup.scout.name}
             </motion.h2>
-            {isSelected && startup.scout.name ? (
-              <button
-                type="button"
-                className={`${productInteraction.panelActionInline} mt-1 text-oxford/50`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  copy(startup.scout.name);
-                }}
-                aria-label={`Copy company name: ${startup.scout.name}`}
-              >
-                {copied ? 'Copied' : 'Copy name'}
-              </button>
-            ) : null}
           </div>
           <div className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}>
             <QueueVerdictLine

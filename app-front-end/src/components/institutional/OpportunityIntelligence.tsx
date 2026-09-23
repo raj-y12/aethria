@@ -62,11 +62,13 @@ export default function OpportunityIntelligence({
   companyName = null,
   onRulingRecorded,
   readOnly = false,
+  mode = 'full',
 }: {
   startupId: string;
   companyName?: string | null;
   onRulingRecorded?: () => void;
   readOnly?: boolean;
+  mode?: 'full' | 'ruling';
 }) {
   const {
     opportunity,
@@ -82,8 +84,8 @@ export default function OpportunityIntelligence({
   } = useMemoDecisionBrief(startupId);
 
   return (
-    <MemoDecisionBrief brief={brief} stateMessage={stateMessage}>
-      {hasClaims ? (
+    <MemoDecisionBrief brief={brief} stateMessage={stateMessage} mode={mode}>
+      {mode === 'full' && hasClaims ? (
         <details className="memoDecisionDisclosure">
           <summary>Review supporting evidence</summary>
           <div className="memoDecisionDisclosureBody">

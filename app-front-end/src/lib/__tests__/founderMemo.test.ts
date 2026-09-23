@@ -171,7 +171,7 @@ describe('memo founder section rendering', () => {
   it('renders the founder section unconditionally', () => {
     // Regression: the section used to be wrapped in a truthiness guard, so a
     // company with no founder data showed no Founder heading at all.
-    const heading = '<MemoSectionTitle number="02" id="memo-founder">Founder</MemoSectionTitle>';
+    const heading = "<MemoSectionTitle id={memoAnchor('founder')}>Founder</MemoSectionTitle>";
     const idx = memoSource.indexOf(heading);
     expect(idx).toBeGreaterThan(-1);
     const preceding = memoSource.slice(Math.max(0, idx - 400), idx);

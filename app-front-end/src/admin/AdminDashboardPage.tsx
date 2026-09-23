@@ -38,7 +38,7 @@ function matchesQuery(row: AdminUserRow, query: string): boolean {
 
 function StatCard({ label, value, hint }: { label: string; value: number | string; hint: string }) {
   return (
-    <div className="border border-oxford/[0.08] bg-paper/70 p-5">
+    <div className="aethria-admin__stat">
       <p className="type-label-section">{label}</p>
       <p className="type-data mt-3 text-[34px] leading-none text-oxford">{value}</p>
       <p className="type-meta mt-2">{hint}</p>
@@ -49,11 +49,7 @@ function StatCard({ label, value, hint }: { label: string; value: number | strin
 function StatusPill({ active, label }: { active: boolean; label: string }) {
   return (
     <span
-      className={`type-status inline-flex items-center border px-2 py-1 ${
-        active
-          ? 'border-oxford/20 bg-oxford text-paper'
-          : 'border-oxford/[0.08] bg-transparent text-oxford/65'
-      }`}
+      className={`aethria-admin__status type-status inline-flex items-center ${active ? 'is-active' : ''}`}
     >
       {label}
     </span>
@@ -108,11 +104,11 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] bg-paper text-oxford px-5 py-6 lg:px-12 lg:py-10">
+    <main className="aethria-admin min-h-[100dvh] bg-paper text-oxford px-5 py-6 lg:px-12 lg:py-10">
       <header className="flex flex-col gap-6 border-b border-oxford/[0.08] pb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="type-label-section">Aethria Admin</p>
-          <h1 className="mt-3 font-display text-[44px] leading-none text-oxford lg:text-[58px]">
+          <h1 className="mt-3 font-sans text-[44px] font-semibold leading-none tracking-[-0.04em] text-oxford lg:text-[58px]">
             Master Log
           </h1>
           <p className="mt-4 max-w-[720px] type-body text-oxford/65">
@@ -155,7 +151,7 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          <div className="flex flex-col gap-4 border border-oxford/[0.08] p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="aethria-admin__filters flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -168,10 +164,11 @@ export default function AdminDashboardPage() {
                   key={option}
                   type="button"
                   onClick={() => setFilter(option)}
-                  className={`type-action border px-3 py-2 transition-colors ${
-                    filter === option
-                      ? 'border-oxford bg-oxford text-paper'
-                      : 'border-oxford/[0.08] text-oxford/65 hover:text-oxford'
+                  aria-pressed={filter === option}
+                    className={`type-action border-0 border-b-2 px-0 py-2 mr-phi-3 transition-colors ${
+                      filter === option
+                      ? 'border-oxford font-semibold text-oxford'
+                      : 'border-transparent text-oxford/65 hover:border-oxford/30 hover:text-oxford'
                   }`}
                 >
                   {option}
@@ -181,14 +178,14 @@ export default function AdminDashboardPage() {
           </div>
 
           {error && (
-            <div className="border border-accent/30 bg-accent/[0.03] px-4 py-3 type-meta text-accent">
+            <div className="border-l-2 border-accent/50 px-4 py-3 type-meta text-accent">
               {error}
             </div>
           )}
 
-          <div className="overflow-x-auto border border-oxford/[0.08]">
+          <div className="aethria-admin__table overflow-x-auto">
             <table className="min-w-[1080px] w-full border-collapse">
-              <thead className="bg-oxford/[0.03]">
+              <thead>
                 <tr className="type-label-section">
                   <th className="px-4 py-3 text-left font-normal">User</th>
                   <th className="px-4 py-3 text-left font-normal">Session</th>

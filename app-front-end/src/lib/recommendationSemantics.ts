@@ -5,6 +5,9 @@ import { DECISION_LABELS } from '../design-system/semantics';
 
 export function partnerRecommendationLabel(partner?: Partner | null): string | null {
   if (!partner) return null;
+  if (partner.operational_action) {
+    return { ADVANCE: 'Advance', PASS: 'Pass', MONITOR: 'Monitor', MORE_DILIGENCE: 'More diligence' }[partner.operational_action];
+  }
   const canonical = partner.provenance?.canonical_recommendation;
   if (['PARTNER_ANALYSIS', 'PARTNER_CANONICAL_MAPPING'].includes(partner.provenance?.recommendation_origin ?? '') && canonical) {
     if (canonical === 'insufficient_evidence') return 'More diligence';

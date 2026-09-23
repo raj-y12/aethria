@@ -144,14 +144,14 @@ export default function DecisionQueueHeader({
 
   return (
     <div
-      className="sticky top-0 z-10 bg-surface-canvas"
+      className="aethria-queue-header sticky top-0 z-10 bg-surface-canvas"
       title={`${config.thresholds.staleAfterHours}h stale · ${config.risk.sensitivity} risk`}
     >
       {/* Two clusters that wrap independently: views stay on their own line
           when there's room, and refinement (search/sort/filters) drops to a
           second line rather than truncating or overflowing when it isn't --
           nothing in this row is ever invisible, only ever reflowed. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 border-b border-oxford/[0.14] pb-phi-3">
+      <div className="aethria-queue-header__toolbar flex flex-wrap items-center justify-between gap-x-phi-4 gap-y-phi-2 border-b border-oxford/[0.14] pb-phi-3">
         <div className="min-w-0 flex-1">{viewsSlot}</div>
 
         <div className="flex flex-wrap items-center gap-x-phi-4 gap-y-phi-2">
@@ -230,7 +230,7 @@ export default function DecisionQueueHeader({
             transition={{ duration: reduceMotion ? 0 : 0.22, ease: tokens.motion.ease }}
             role="region"
             aria-label="Advanced queue filters"
-            className="overflow-hidden"
+            className="aethria-queue-header__filters overflow-hidden"
           >
             <div className="mt-phi-2 pt-phi-2">
             <div role="group" aria-label="Deal source" className="mb-phi-3 flex min-w-0 flex-col gap-phi-1">

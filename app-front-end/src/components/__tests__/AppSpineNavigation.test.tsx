@@ -5,7 +5,11 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { SPINE_WIDTH, SPINE_WORKSPACES } from '../AppSpine';
+import {
+  SPINE_WIDTH,
+  SPINE_WORKSPACES,
+  resolveSpinePathname,
+} from '../AppSpine';
 
 declare const process: { cwd(): string };
 
@@ -19,6 +23,15 @@ describe('AppSpine navigation', () => {
     ]);
   });
 
+  it('freezes the outgoing active route during the dock exit', () => {
+    expect(resolveSpinePathname('/v1', false, '/v1/portfolio')).toBe(
+      '/v1/portfolio',
+    );
+    expect(resolveSpinePathname('/v1/portfolio', true, '/v1')).toBe(
+      '/v1/portfolio',
+    );
+  });
+
   // The spine and the Settings paper rail read one width. Asserting the literal
   // here would only prove this file still says it, so check both halves: the
   // spine defers to the shared token, and the token still resolves to the
@@ -27,5 +40,13 @@ describe('AppSpine navigation', () => {
     expect(SPINE_WIDTH).toBe('var(--spine-width)');
     const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
     expect(css).toContain('--spine-width: clamp(204px, 15vw, 248px);');
+  });
+
+  it('does not propagate the dock exit into duplicate workspace nav layers', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/components/AppSpine.tsx'),
+      'utf8',
+    );
+    expect(source).toMatch(/<AnimatePresence initial=\{false\}>\s*<motion\.nav/);
   });
 });

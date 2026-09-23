@@ -27,9 +27,9 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
 
   return (
     <main className="min-h-[100dvh] bg-paper text-oxford flex items-center justify-center px-6">
-      <section className="w-full max-w-[460px] border border-oxford/[0.08] bg-paper/80 px-8 py-10">
+      <section className="aethria-admin-login w-full max-w-[460px] px-8 py-10">
         <p className="type-label-section">Aethria Admin</p>
-        <h1 className="mt-4 font-display text-[40px] leading-none text-oxford">Master Access</h1>
+        <h1 className="mt-4 font-sans text-[40px] font-semibold leading-none tracking-[-0.04em] text-oxford">Master Access</h1>
         <p className="mt-5 type-body text-oxford/65">
           Enter the backend admin secret to view global user, session, and agent telemetry.
         </p>
@@ -49,7 +49,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
           </label>
 
           {error && (
-            <div className="border border-accent/30 bg-accent/[0.03] px-4 py-3 type-meta text-accent">
+            <div className="border-l-2 border-accent/50 px-4 py-3 type-meta text-accent">
               {error}
             </div>
           )}
@@ -57,7 +57,7 @@ export default function AdminLoginPage({ onAuthenticated }: AdminLoginPageProps)
           <button
             type="submit"
             disabled={!secret.trim() || submitting}
-            className="type-action mt-2 border border-oxford bg-oxford px-5 py-3 text-paper disabled:opacity-35 disabled:cursor-not-allowed transition-opacity"
+            className="type-action mt-2 w-fit border-0 border-b border-oxford/25 bg-transparent px-0 py-3 text-oxford transition-colors hover:border-oxford disabled:cursor-not-allowed disabled:opacity-35"
           >
             {submitting ? 'Verifying' : 'Enter Dashboard'}
           </button>

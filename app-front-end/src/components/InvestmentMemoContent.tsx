@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { fetchMemo, type MemoPartialPayload } from '../api/startups';
 import { motion } from 'framer-motion';
 import './InvestmentMemoContent.css';
@@ -12,6 +12,7 @@ import { usePrefersReducedMotion } from '../hooks';
 import AssessmentScorecard from './scoring/AssessmentScorecard';
 import ReviewerPanel from './scoring/ReviewerPanel';
 import MemoMasthead from './memo/MemoMasthead';
+import MemoDecisionLead from './memo/MemoDecisionLead';
 import PipelineProvenanceInspector from './memo/PipelineProvenanceInspector';
 import MemoPrecedentStrip from './memo/MemoPrecedentStrip';
 import MemoPortfolioContext from './memo/MemoPortfolioContext';
@@ -29,6 +30,7 @@ import {
 import { formatDate } from '../lib/dates';
 import { safeHref } from '../lib/memoReferenceHref';
 import OpportunityIntelligence from './institutional/OpportunityIntelligence';
+import ClaimEvidenceLedger from './institutional/ClaimEvidenceLedger';
 import { useMemoDecisionBrief } from '../hooks/useMemoDecisionBrief';
 import { getTriageGateStatus } from '../lib/triageGate';
 import TriageGateCard from './TriageGateCard';
@@ -51,7 +53,6 @@ import {
   reviewHasThesisAlignment,
   normalizeListItemText,
   renderWithMonoNumbers,
-  toJudgmentReasoning,
   firstNonEmpty,
   memoHeaderThesisLine,
   pipelineReplayOneLiner,
@@ -200,6 +201,10 @@ function InvestmentMemoContent(
 ) {
   const config = fundConfiguration ?? createDefaultFundConfiguration();
   const reduceMotion = usePrefersReducedMotion();
+  const memoInstanceId = useId().replace(/:/g, '');
+  const memoAnchor = (name: string) => `memo-${memoInstanceId}-${name}`;
+  const rulingSectionId = memoAnchor('ruling');
+  const supportingDetailsId = memoAnchor('supporting-details');
   const wrapperCls = embedded ? 'memoPanel memoPanel--embedded' : 'memoPanel';
   const [memoPartial, setMemoPartial] = useState<MemoPartialPayload | null>(null);
   const [memoPipeline, setMemoPipeline] = useState<'idle' | 'generating' | 'ready' | 'failed'>('idle');
@@ -221,7 +226,12 @@ function InvestmentMemoContent(
   // Shared with OpportunityIntelligence below — same React Query keys, so this
   // is one fetch, not two, and the masthead verdict can never drift from the
   // decision workspace's canonical state.
-  const { brief: mastheadBrief, evaluation: canonicalEvaluation, evidence: canonicalEvidence } = useMemoDecisionBrief(displayStartup?.id ?? '');
+  const {
+    brief: mastheadBrief,
+    stateMessage: memoDecisionStateMessage,
+    evaluation: canonicalEvaluation,
+    evidence: canonicalEvidence,
+  } = useMemoDecisionBrief(displayStartup?.id ?? '');
 
   const contentKey = displayStartup?.id ?? startup?.id ?? 'empty';
 
@@ -295,10 +305,6 @@ function InvestmentMemoContent(
 
   const showJudgment = !!displayStartup?.partner?.recommendation;
   const headerThesisLine = displayStartup ? memoHeaderThesisLine(displayStartup) : '';
-  const reasoningParagraphs = useMemo(
-    () => (displayStartup && showJudgment ? toJudgmentReasoning(displayStartup) : []),
-    [displayStartup, showJudgment]
-  );
   const memoSources = useMemo(
     () => (displayStartup ? memoSourceRows(displayStartup) : []),
     [displayStartup]
@@ -472,6 +478,28 @@ function InvestmentMemoContent(
     reviewerConsensusRows,
     displayStartup?.review?.reviewer_disagreement,
   ]);
+  const keyRisks = useMemo(
+    () => [...mastheadBrief.risks]
+      .sort((a, b) => (a.severity === 'high' ? -1 : 1) - (b.severity === 'high' ? -1 : 1))
+      .slice(0, 4),
+    [mastheadBrief.risks],
+  );
+  const nextSteps = useMemo(
+    () => {
+      const dimensionKeys = new Set(SCORING_DIMENSIONS.map((dimension) => dimension.key));
+      const planned = (canonicalEvidence?.plans ?? []).flatMap((plan) => [
+        ...(plan.search_questions ?? []),
+        ...(plan.missing_evidence ?? []),
+      ])
+        .map((item) => String(item).trim())
+        .filter((item) => item && !dimensionKeys.has(item as ScoringDimensionKey));
+      const fallback = mastheadBrief.risks
+        .filter((risk) => risk.kind === 'gap')
+        .map((risk) => risk.text);
+      return Array.from(new Set([...planned, ...fallback])).slice(0, 4);
+    },
+    [canonicalEvidence?.plans, mastheadBrief.risks],
+  );
   // The house upward reveal (see Reveal.tsx), fired as each document section scrolls
   // into view. Shared by every numbered section so the motion stays uniform.
   const sectionReveal = {
@@ -505,20 +533,12 @@ function InvestmentMemoContent(
             onAddContext={onAddContext}
             onClose={onClose}
             onJumpToRuling={() =>
-              document.getElementById('memo-ruling')?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+              document.getElementById(rulingSectionId)?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
             }
             readOnly={readOnly}
           />
 
-          {import.meta.env.DEV && (
-            <PipelineProvenanceInspector
-              startup={displayStartup}
-              evaluation={canonicalEvaluation}
-              evidence={canonicalEvidence}
-              brief={mastheadBrief}
-              scorecardEnabled={config.memo.includeScoreReasoning}
-            />
-          )}
+          <MemoDecisionLead brief={mastheadBrief} stateMessage={memoDecisionStateMessage} />
 
           {memoPipeline === 'failed' && (
             <div className="memoGateStrip memoGateStrip--error">
@@ -559,153 +579,38 @@ function InvestmentMemoContent(
 
             <div className="memoSupportingAnalysis">
               <div className="memoSupportingAnalysisBody">
-            {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
-              <div className="memoDossierContext">
-                {showJudgment && precedentCandidates.length > 0 ? (
-                  <MemoPrecedentStrip
-                    candidates={precedentCandidates}
-                    renderWithMonoNumbers={renderWithMonoNumbers}
-                  />
-                ) : null}
-                <MemoPortfolioContext startupId={displayStartup.id} signals={portfolioSignals} />
-              </div>
-            ) : null}
-
-            {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
-            {(snapshotRows.length > 0 || hasVitals) && (
-              <motion.section {...sectionReveal} className="memoDocSection memoSnapshotSection" aria-labelledby="memo-snapshot">
-                <MemoSectionTitle number="01" id="memo-snapshot">Snapshot</MemoSectionTitle>
-                <dl className="memoSnapshot">
-                  {[
-                    ...vitalsStrip.map((v) => ({ label: v.label, text: v.value })),
-                    ...(fundingLine ? [{ label: 'Funding', text: fundingLine }] : []),
-                    ...(tractionLine ? [{ label: 'Traction', text: tractionLine }] : []),
-                    ...(modelLine ? [{ label: 'Model', text: modelLine }] : []),
-                    ...(ipLine ? [{ label: 'IP', text: ipLine }] : []),
-                    ...snapshotRows,
-                  ].map((row) => (
-                    <div key={row.label} className="memoSnapshotRow">
-                      <dt className="memoSnapshotLabel">{row.label}</dt>
-                      <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
+            {/* ── Editorial spread ── */}
+            {(investmentCasePoints.length > 0 || snapshotRows.length > 0 || hasVitals) && (
+              <div className="memoEditorialSpread">
+                {investmentCasePoints.length > 0 && (
+                  <motion.section {...sectionReveal} className="memoDocSection memoCaseSection" aria-labelledby={memoAnchor('case')}>
+                    <MemoSectionTitle id={memoAnchor('case')}>The investment case</MemoSectionTitle>
+                    <div className="memoCaseList">
+                      {investmentCasePoints.map((point, i) => (
+                        <p key={i} className="memoCasePoint">{renderWithMonoNumbers(point)}</p>
+                      ))}
                     </div>
-                  ))}
-                </dl>
-              </motion.section>
-            )}
-
-            {/* ── Founder ──
-                Always rendered. A memo that silently omits the founder section
-                reads as "no team risk" when it actually means "we did not look"
-                or "we could not find them" — so the empty state is explicit. */}
-            <motion.section {...sectionReveal} className="memoDocSection memoFounderSection" aria-labelledby="memo-founder">
-                <MemoSectionTitle number="02" id="memo-founder">Founder</MemoSectionTitle>
-                {founderCandidates.length > 0 ? (
-                  <ul className="memoFounderList">
-                    {founderCandidates.map((f, i) => (
-                      <li key={`${f.name}-${i}`} className="memoFounderItem">
-                        <p className="memoDocSubhead">
-                          {f.name}
-                          {f.role ? <span className="memoFounderRole">{f.role}</span> : null}
-                        </p>
-                        {formatFounderBackground(f) ? (
-                          <p className="memoDocProse memoFounderBackground">
-                            {formatFounderBackground(f)}
-                          </p>
-                        ) : null}
-                        {(f.linkedin_url || f.x_url || f.github_url) ? (
-                          <p className="memoFounderLinks">
-                            {f.linkedin_url ? (
-                              <a href={safeHref(f.linkedin_url)} target="_blank" rel="noopener noreferrer">LinkedIn</a>
-                            ) : null}
-                            {f.x_url ? (
-                              <a href={safeHref(f.x_url)} target="_blank" rel="noopener noreferrer">X</a>
-                            ) : null}
-                            {f.github_url ? (
-                              <a href={safeHref(f.github_url)} target="_blank" rel="noopener noreferrer">GitHub</a>
-                            ) : null}
-                          </p>
-                        ) : null}
-                        {f.conflicts?.length ? (
-                          <p className="memoFounderConflict">
-                            Sources disagree on {f.conflicts.map((c) => c.field).join(', ')} — verify before relying on this.
-                          </p>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                ) : founderNames.length > 0 ? (
-                  // Names with no resolved candidate used to render as a mono
-                  // caption, so the founders read as a field label rather than
-                  // as people. They are the section's subject; set them as such.
-                  <p className="memoFounderBareNames">{founderNames.join(', ')}</p>
-                ) : (
-                  <p className="memoDocProse memoFounderEmpty">{founderEmptyMessage}</p>
+                  </motion.section>
                 )}
-                {founderNames.length > 0 && founderMissing.length > 0 ? (
-                  <p className="memoDocProse memoFounderEmpty">
-                    {founderMissing.includes('previous_employment')
-                      ? 'No founder history was retrieved. Team execution is therefore unevidenced rather than judged weak, and no founder read could be produced. '
-                      : ''}
-                    Not confirmed: {formatMissingFounderFields(founderMissing)}.
-                  </p>
-                ) : null}
-                {founderSignal ? (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">The read</p>
-                    <p className="memoDocProse">{renderWithMonoNumbers(founderSignal)}</p>
-                  </div>
-                ) : null}
-                {founderQuote ? (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">In their words</p>
-                    <p className="memoDocProse">{'“'}{founderQuote}{'”'}</p>
-                  </div>
-                ) : null}
-                {founderFluency.length > 0 ? (
-                  <div className="memoDocSubsection memoFluency">
-                    <p className="memoDocSubhead">Fluency</p>
-                    {founderFluency.map((f, i) => (
-                      <div key={`${f.founder}-${i}`} className="memoFluencyEntry">
-                        <p className="memoDocProse">
-                          <span className="memoFluencyName">{f.founder}</span>
-                          {' — '}{renderWithMonoNumbers(f.prior_domain)}
-                          {f.fluent_in?.length ? ` Fluent in ${f.fluent_in.join('; ')}.` : ''}
-                          {f.unlocks?.length ? ` Unlocks ${f.unlocks.join('; ')}.` : ''}
-                        </p>
-                        <p className="memoFluencyEvidence">{f.evidence}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-                {founderTeamItems.length > 0 ? (
-                  <div className="memoDocSubsection">
-                    <p className="memoDocSubhead">Team assessment</p>
-                    <ExpandableList
-                      items={founderTeamItems}
-                      cap={3}
-                      renderItem={(item, i) => (
-                        <li key={i} className="memoListItem">
-                          <span className="memoBullet" aria-hidden>·</span>
-                          <span>{renderWithMonoNumbers(normalizeListItemText(item))}</span>
-                        </li>
-                      )}
-                    />
-                  </div>
-                ) : null}
-            </motion.section>
-
-            {/* ── Investment case ── */}
-            {investmentCasePoints.length > 0 && (
-              <motion.section {...sectionReveal} className="memoDocSection memoCaseSection" aria-labelledby="memo-case">
-                <MemoSectionTitle number="03" id="memo-case">Why Now</MemoSectionTitle>
-                <ol className="memoCaseList">
-                  {investmentCasePoints.map((point, i) => (
-                    <li key={i} className={`memoCasePoint${i === 0 ? ' memoCasePoint--lead' : ''}`}>
-                      {renderWithMonoNumbers(point)}
-                    </li>
-                  ))}
-                </ol>
-              </motion.section>
+                {(snapshotRows.length > 0 || hasVitals) && (
+                  <aside className="memoOverviewColumn" aria-label="Company overview">
+                    <h2 className="memoOverviewHeading">At a glance</h2>
+                    <dl className="memoSnapshot memoSnapshot--overview">
+                      {[
+                        ...vitalsStrip.map((v) => ({ label: v.label, text: v.value })),
+                        ...(fundingLine ? [{ label: 'Funding', text: fundingLine }] : []),
+                        ...(tractionLine ? [{ label: 'Traction', text: tractionLine }] : []),
+                        ...(ipLine ? [{ label: 'IP', text: ipLine }] : []),
+                      ].map((row) => (
+                        <div key={row.label} className="memoSnapshotRow">
+                          <dt className="memoSnapshotLabel">{row.label}</dt>
+                          <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </aside>
+                )}
+              </div>
             )}
 
             {/* ── Assessment ── */}
@@ -726,8 +631,8 @@ function InvestmentMemoContent(
                 return null;
               }
               return (
-                <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby="memo-scoring">
-                  <MemoSectionTitle number="04" id="memo-scoring">Assessment</MemoSectionTitle>
+                <motion.section {...sectionReveal} className="memoDocSection memoScoringSection" aria-labelledby={memoAnchor('scoring')}>
+                  <MemoSectionTitle id={memoAnchor('scoring')}>Assessment</MemoSectionTitle>
                   {hasScorecard ? (
                     <div className="memoDocScoreScope">
                       <AssessmentScorecard
@@ -770,27 +675,151 @@ function InvestmentMemoContent(
                         ))}
                     </div>
                   )}
-                  {mastheadBrief.drivers.length > 0 && (
-                    <div className="memoDocSubsection memoAssessmentDrivers">
-                      <p className="memoDocSubhead">Why the system leans this way</p>
-                      <ul className="memoList">
-                        {mastheadBrief.drivers.map((driver) => (
-                          <li key={driver} className="memoListItem">
-                            <span className="memoBullet" aria-hidden>·</span>
-                            <span>{renderWithMonoNumbers(driver)}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </motion.section>
               );
             })()}
 
+            {(keyRisks.length > 0 || nextSteps.length > 0) && (
+              <div className="memoDiligenceSpread">
+                {keyRisks.length > 0 && (
+                  <motion.section {...sectionReveal} className="memoDocSection memoRisksSection" aria-labelledby={memoAnchor('risks')}>
+                    <MemoSectionTitle id={memoAnchor('risks')}>Risks to weigh</MemoSectionTitle>
+                    <ul className="memoPlainList">
+                      {keyRisks.map((risk) => (
+                        <li key={risk.key}>
+                          <span className="memoRiskMarker" aria-hidden>▪</span>
+                          <span>{renderWithMonoNumbers(risk.text)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {mastheadBrief.risks.length > keyRisks.length ? (
+                      <details className="memoQuietDetails">
+                        <summary>View all recorded risks and gaps</summary>
+                        <ul className="memoPlainList memoPlainList--detail">
+                          {mastheadBrief.risks.map((risk) => <li key={risk.key}>{renderWithMonoNumbers(risk.text)}</li>)}
+                        </ul>
+                      </details>
+                    ) : null}
+                  </motion.section>
+                )}
+
+                {nextSteps.length > 0 && (
+                  <motion.section {...sectionReveal} className="memoDocSection memoNextStepsSection" aria-labelledby={memoAnchor('next-steps')}>
+                    <MemoSectionTitle id={memoAnchor('next-steps')}>Questions for diligence</MemoSectionTitle>
+                    <ul className="memoPlainList">
+                      {nextSteps.map((step) => <li key={step}><span className="memoRiskMarker" aria-hidden>▪</span><span>{renderWithMonoNumbers(step)}</span></li>)}
+                    </ul>
+                    {(canonicalEvidence?.plans.length ?? 0) > nextSteps.length ? (
+                      <p className="memoQuietNote">Additional diligence priorities are available in supporting details.</p>
+                    ) : null}
+                  </motion.section>
+                )}
+              </div>
+            )}
+
+            <details className="memoAppendix" key={`${contentKey}-appendix`}>
+              <summary>Sources &amp; review history <span aria-hidden>↗</span></summary>
+              <div className="memoAppendixContent">
+            {/* ── Company snapshot — one definition grid: verified vitals first, then narrative rows ── */}
+            <MemoDisclosureSection
+              id={`${contentKey}-company-details`}
+              title="Company details"
+              summary="Facts, team and thesis context"
+              initialOpen={false}
+            >
+            {(snapshotRows.length > 0 || hasVitals) && (
+              <motion.section {...sectionReveal} className="memoDocSection memoSnapshotSection" aria-labelledby={memoAnchor('snapshot')}>
+                <MemoSectionTitle id={memoAnchor('snapshot')}>Snapshot</MemoSectionTitle>
+                <dl className="memoSnapshot">
+                  {[
+                    ...vitalsStrip.map((v) => ({ label: v.label, text: v.value })),
+                    ...(fundingLine ? [{ label: 'Funding', text: fundingLine }] : []),
+                    ...(tractionLine ? [{ label: 'Traction', text: tractionLine }] : []),
+                    ...(modelLine ? [{ label: 'Model', text: modelLine }] : []),
+                    ...(ipLine ? [{ label: 'IP', text: ipLine }] : []),
+                    ...snapshotRows,
+                  ].map((row) => (
+                    <div key={row.label} className="memoSnapshotRow">
+                      <dt className="memoSnapshotLabel">{row.label}</dt>
+                      <dd className="memoSnapshotText">{renderWithMonoNumbers(row.text)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </motion.section>
+            )}
+
+            {/* ── Founder ──
+                Always rendered. A memo that silently omits the founder section
+                reads as "no team risk" when it actually means "we did not look"
+                or "we could not find them" — so the empty state is explicit. */}
+            <motion.section {...sectionReveal} className="memoDocSection memoFounderSection" aria-labelledby={memoAnchor('founder')}>
+                <MemoSectionTitle id={memoAnchor('founder')}>Founder</MemoSectionTitle>
+                {founderCandidates.length > 0 ? (
+                  <ul className="memoFounderList">
+                    {founderCandidates.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="memoFounderItem">
+                        <p className="memoDocSubhead">
+                          {f.name}
+                          {f.role ? <span className="memoFounderRole">{f.role}</span> : null}
+                        </p>
+                        {formatFounderBackground(f) ? (
+                          <p className="memoDocProse memoFounderBackground">{formatFounderBackground(f)}</p>
+                        ) : null}
+                        {(f.linkedin_url || f.x_url || f.github_url) ? (
+                          <p className="memoFounderLinks">
+                            {f.linkedin_url ? <a href={safeHref(f.linkedin_url)} target="_blank" rel="noopener noreferrer">LinkedIn</a> : null}
+                            {f.x_url ? <a href={safeHref(f.x_url)} target="_blank" rel="noopener noreferrer">X</a> : null}
+                            {f.github_url ? <a href={safeHref(f.github_url)} target="_blank" rel="noopener noreferrer">GitHub</a> : null}
+                          </p>
+                        ) : null}
+                        {f.conflicts?.length ? (
+                          <p className="memoFounderConflict">Sources disagree on {f.conflicts.map((c) => c.field).join(', ')} — verify before relying on this.</p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : founderNames.length > 0 ? (
+                  <p className="memoFounderBareNames">{founderNames.join(', ')}</p>
+                ) : (
+                  <p className="memoDocProse memoFounderEmpty">{founderEmptyMessage}</p>
+                )}
+                {founderNames.length > 0 && founderMissing.length > 0 ? (
+                  <p className="memoDocProse memoFounderEmpty">
+                    {founderMissing.includes('previous_employment') ? 'No founder history was retrieved. Team execution is therefore unevidenced rather than judged weak, and no founder read could be produced. ' : ''}
+                    Not confirmed: {formatMissingFounderFields(founderMissing)}.
+                  </p>
+                ) : null}
+                {founderSignal ? (
+                  <div className="memoDocSubsection"><p className="memoDocSubhead">The read</p><p className="memoDocProse">{renderWithMonoNumbers(founderSignal)}</p></div>
+                ) : null}
+                {founderQuote ? (
+                  <div className="memoDocSubsection"><p className="memoDocSubhead">In their words</p><p className="memoDocProse">{'“'}{founderQuote}{'”'}</p></div>
+                ) : null}
+                {founderFluency.length > 0 ? (
+                  <div className="memoDocSubsection memoFluency">
+                    <p className="memoDocSubhead">Fluency</p>
+                    {founderFluency.map((f, i) => (
+                      <div key={`${f.founder}-${i}`} className="memoFluencyEntry">
+                        <p className="memoDocProse"><span className="memoFluencyName">{f.founder}</span>{' — '}{renderWithMonoNumbers(f.prior_domain)}{f.fluent_in?.length ? ` Fluent in ${f.fluent_in.join('; ')}.` : ''}{f.unlocks?.length ? ` Unlocks ${f.unlocks.join('; ')}.` : ''}</p>
+                        <p className="memoFluencyEvidence">{f.evidence}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {founderTeamItems.length > 0 ? (
+                  <div className="memoDocSubsection">
+                    <p className="memoDocSubhead">Team assessment</p>
+                    <ExpandableList items={founderTeamItems} cap={3} renderItem={(item, i) => (
+                      <li key={i} className="memoListItem"><span className="memoBullet" aria-hidden>·</span><span>{renderWithMonoNumbers(normalizeListItemText(item))}</span></li>
+                    )} />
+                  </div>
+                ) : null}
+            </motion.section>
+
             {/* ── Fund thesis alignment ── */}
             {thesisSection.visible && (
-              <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby="memo-thesis-alignment">
-                <MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment</MemoSectionTitle>
+              <motion.section {...sectionReveal} className="memoDocSection memoThesisSection" aria-labelledby={memoAnchor('thesis-alignment')}>
+                <MemoSectionTitle id={memoAnchor('thesis-alignment')}>Thesis alignment</MemoSectionTitle>
                 <div className="memoThesisBody">
                   {mastheadBrief.mandate === 'conflicted' && (
                     <p className="memoThesisMandateConflict" role="alert">Mandate conflict — this opportunity falls outside the fund's stated mandate.</p>
@@ -835,35 +864,54 @@ function InvestmentMemoContent(
                 </div>
               </motion.section>
             )}
+            </MemoDisclosureSection>
 
             {/* ── Before you rule: evidence coverage, deduplicated risks, and the ruling itself ── */}
-            <div id="memo-ruling">
-              <OpportunityIntelligence
-                startupId={displayStartup.id}
-                companyName={displayStartup.scout.name}
-                onRulingRecorded={onClose}
-                readOnly={readOnly}
-              />
-            </div>
 
             {/* ── Appendix ── */}
             <div className="memoDiscGroup">
+            <section className="memoSupportingDetails" id={supportingDetailsId} aria-labelledby={`${supportingDetailsId}-title`}>
+              <p className="memoAppendixLabel" id={`${supportingDetailsId}-title`}>Supporting details</p>
+              {(showJudgment && precedentCandidates.length > 0) || portfolioSignals.length > 0 ? (
+                <div className="memoDossierContext">
+                  {showJudgment && precedentCandidates.length > 0 ? (
+                    <MemoPrecedentStrip
+                      candidates={precedentCandidates}
+                      renderWithMonoNumbers={renderWithMonoNumbers}
+                    />
+                  ) : null}
+                  <MemoPortfolioContext startupId={displayStartup.id} signals={portfolioSignals} />
+                </div>
+              ) : null}
+              {canonicalEvidence && (canonicalEvidence.claims.length > 0 || canonicalEvidence.plans.length > 0) ? (
+                <MemoDisclosureSection
+                  id={`${contentKey}-evidence`}
+                  title="Supporting evidence"
+                  summary={`${canonicalEvidence.claims.length} claim${canonicalEvidence.claims.length === 1 ? '' : 's'}`}
+                  initialOpen={false}
+                >
+                  <ClaimEvidenceLedger ledger={canonicalEvidence} readOnly={readOnly} />
+                </MemoDisclosureSection>
+              ) : null}
+              {import.meta.env.DEV && (
+                <MemoDisclosureSection
+                  id={`${contentKey}-provenance`}
+                  title="Development provenance"
+                  summary="Developer diagnostics"
+                  initialOpen={false}
+                >
+                  <PipelineProvenanceInspector
+                    startup={displayStartup}
+                    evaluation={canonicalEvaluation}
+                    evidence={canonicalEvidence}
+                    brief={mastheadBrief}
+                    scorecardEnabled={config.memo.includeScoreReasoning}
+                  />
+                </MemoDisclosureSection>
+              )}
+            </section>
             {/* Hidden via :only-child when every disclosure fails its render condition. */}
             <p className="memoAppendixLabel" aria-hidden>Appendix</p>
-            {/* ── Partner rationale ── */}
-            {showJudgment && reasoningParagraphs.length > 0 && (
-              <MemoDisclosureSection
-                id={`${contentKey}-rationale`}
-                title="Partner rationale"
-                summary={`${reasoningParagraphs.length} note${reasoningParagraphs.length === 1 ? '' : 's'}`}
-                initialOpen={!config.memo.deepDiveCollapsed}
-              >
-                {reasoningParagraphs.map((p, i) => (
-                  <p key={i} className="memoDocProse">{renderWithMonoNumbers(p)}</p>
-                ))}
-              </MemoDisclosureSection>
-            )}
-
             {showJudgment && (convictionHistory.length > 0 || precedentCandidates.length > 0) && (
               <MemoDisclosureSection
                 id={`${contentKey}-ledger`}
@@ -1116,6 +1164,17 @@ function InvestmentMemoContent(
                 </ol>
               </MemoDisclosureSection>
             )}
+            </div>
+              </div>
+            </details>
+            <div id={rulingSectionId}>
+              <OpportunityIntelligence
+                startupId={displayStartup.id}
+                companyName={displayStartup.scout.name}
+                onRulingRecorded={onClose}
+                readOnly={readOnly}
+                mode="ruling"
+              />
             </div>
               </div>
             </div>

@@ -2,20 +2,11 @@ import type { Startup } from '../../types/startup';
 import { useCopyToClipboard } from '../../hooks';
 import MemoTags from './MemoTags';
 import { renderWithMonoNumbers } from './memoContentHelpers';
-import {
-  MEMO_LEAN_LABELS,
-  MEMO_STATUS_LABELS,
-  memoVerdictVariant,
-  type MemoDecisionBrief,
-} from '../../lib/memoDecisionBrief';
-import { DECISION_BADGE_CLASS, VERDICT_CHIP_CLASS } from '../../design-system/verdictBadgeTokens';
 
 interface MemoMastheadProps {
   startup: Startup;
-  /** Canonical decision brief — verdict badge and top reason read from here,
-   * never from the legacy `startup.partner.recommendation` field, so the
-   * masthead can't assert a decision the evidence doesn't support. */
-  brief?: MemoDecisionBrief;
+  /** Kept for call-site compatibility; recommendation is rendered once below the masthead. */
+  brief?: unknown;
   onAddContext?: () => void;
   onDownloadPDF?: () => void;
   onClose?: () => void;
@@ -23,23 +14,6 @@ interface MemoMastheadProps {
   onJumpToRuling?: () => void;
   /** Share link / co-GP view: hides Add context. */
   readOnly?: boolean;
-}
-
-function MemoVerdictBadge({ brief }: { brief: MemoDecisionBrief }) {
-  if (brief.status === 'loading' || brief.status === 'unavailable') return null;
-  const variant = memoVerdictVariant(brief);
-  const label = brief.leanProvenance === 'partner-judgment' && brief.lean === 'more_diligence' && brief.status !== 'recorded'
-    ? 'Partner: More diligence'
-    : brief.status === 'blocked' || brief.status === 'recorded'
-    ? MEMO_STATUS_LABELS[brief.status]
-    : MEMO_LEAN_LABELS[brief.lean];
-  const reason = brief.drivers[0];
-  return (
-    <div className="memoMastheadVerdict">
-      <span className={`${VERDICT_CHIP_CLASS} ${DECISION_BADGE_CLASS[variant]}`}>{label}</span>
-      {reason ? <p className="memoMastheadVerdictReason">{reason}</p> : null}
-    </div>
-  );
 }
 
 /**
@@ -50,7 +24,6 @@ function MemoVerdictBadge({ brief }: { brief: MemoDecisionBrief }) {
  */
 export default function MemoMasthead({
   startup,
-  brief,
   onAddContext,
   onDownloadPDF,
   onClose,
@@ -126,7 +99,6 @@ export default function MemoMasthead({
           {location ? (
             <p className="memoMeta memoMastheadLocation">{renderWithMonoNumbers(location)}</p>
           ) : null}
-          {brief ? <MemoVerdictBadge brief={brief} /> : null}
         </div>
       </div>
       <MemoTags startup={startup} />

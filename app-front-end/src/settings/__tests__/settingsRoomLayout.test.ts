@@ -140,11 +140,9 @@ function renderUnavailablePage() {
 }
 
 describe('Settings focused-mode layout contract', () => {
-  it('dissolves the app spine like the front door (bare chrome)', () => {
-    // The chrome decision must NOT force Settings to 'full'; it joins the
-    // bare/takeover surfaces alongside the front door.
-    expect(appSource).toContain("chrome={!isPortfolioRoute && !isFundRoute && !isFlowRoute ? 'bare' : 'full'}");
-    expect(appSource).not.toContain("!isSettingsRoute && !isPortfolioRoute");
+  it('keeps the shared workspace dock present on Settings', () => {
+    // Settings changes its content navigation, not the app's persistent dock.
+    expect(appSource).toContain('chrome="full"');
   });
 
   it('is a top bar + compact area nav over one scrolling reading column', () => {
@@ -414,6 +412,59 @@ describe('Settings safe draft actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }));
     expect(screen.getByLabelText('Fund name')).toHaveValue('Last Live Fund');
     expect(mocks.navigate).toHaveBeenCalledWith('/v1');
+  });
+
+  describe('dock back request (embedded)', () => {
+    function renderEmbedded(onClose: () => void, initialBackSignal = 0) {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      });
+      queryClient.setQueryData(['settings'], settings);
+      const page = (backSignal: number) => createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(SettingsPage, { embedded: true, embeddedGroup: 'thesis', onClose, backSignal }),
+      );
+      const view = render(page(initialBackSignal));
+      return { bumpBack: () => view.rerender(page(initialBackSignal + 1)) };
+    }
+
+    it('ignores a back count left over from an earlier panel when it mounts', async () => {
+      const onClose = vi.fn();
+      renderEmbedded(onClose, 3);
+      fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Unsaved Fund' } });
+
+      // Even with an undeployed draft, opening a panel must not ask to leave it.
+      expect(screen.queryByRole('dialog', { name: 'Leave settings?' })).not.toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('closes at once when nothing is undeployed', async () => {
+      const onClose = vi.fn();
+      const { bumpBack } = renderEmbedded(onClose);
+      await screen.findByLabelText('Fund name');
+      // The dock's cog is the only back control; the panel draws none of its own.
+      expect(screen.queryByRole('button', { name: /back|menu|aethria/i })).toBeNull();
+
+      bumpBack();
+
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('asks before leaving an undeployed draft, then keeps or discards it', async () => {
+      const onClose = vi.fn();
+      const { bumpBack } = renderEmbedded(onClose);
+      fireEvent.change(await screen.findByLabelText('Fund name'), { target: { value: 'Unsaved Fund' } });
+
+      bumpBack();
+
+      expect(onClose).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog', { name: 'Leave settings?' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Leave settings?' })).not.toBeInTheDocument());
+      expect(onClose).not.toHaveBeenCalled();
+    });
   });
 
   it('navigates immediately when no deployable policy changes exist', async () => {

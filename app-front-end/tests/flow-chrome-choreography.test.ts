@@ -23,7 +23,7 @@ describe('Home to Flow entrance choreography', () => {
     expect(flowPageSource).toContain('entranceReady={workspaceChromeReady}');
     expect(workGridSource).toContain('entranceReady?: boolean;');
     expect(workGridSource).toContain("animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}");
-    expect(workGridSource).toContain('staggerChildren: 0.026');
+    expect(workGridSource).toContain('staggerChildren: 0.04');
     expect(workGridSource).not.toContain('autoSelectReady');
   });
 
@@ -31,8 +31,8 @@ describe('Home to Flow entrance choreography', () => {
     expect(flowPageSource).not.toContain('page-transition-enter');
     expect(flowPageSource).toContain('entranceReady={workspaceChromeReady}');
     expect(workGridSource).toContain("animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}");
-    expect(workGridSource).toContain('staggerChildren: 0.026');
-    expect(workGridSource).toContain("translateY(3px)");
+    expect(workGridSource).toContain('staggerChildren: 0.04');
+    expect(workGridSource).toContain("translateY(6px)");
   });
 
   /* The memo is an overlay on every viewport, so Flow opens on the docket with
@@ -59,7 +59,7 @@ describe('Home to Flow entrance choreography', () => {
     expect(flowPageSource).not.toContain('aethria-flow-grid');
     expect(flowPageSource).toContain('const splitOpen = isDesktop && Boolean(selectedStartup);');
     expect(flowPageSource).toContain('const useModal = Boolean(selectedStartup) && !isDesktop;');
-    expect(flowPageSource).toContain("animate={{ flexBasis: splitOpen ? '38%' : '100%' }}");
+    expect(flowPageSource).toContain("animate={{ flexBasis: splitOpen ? '42%' : '100%' }}");
     expect(flowPageSource).toContain('<InvestmentMemoContent');
     expect(flowPageSource).toContain('<InvestmentMemo');
   });

@@ -490,7 +490,13 @@ export interface PartnerProvenance {
   human_review_required?: boolean | null;
 }
 
+export type AnalysisAction = 'ADVANCE' | 'PASS' | 'MONITOR' | 'MORE_DILIGENCE';
+
 export interface Partner {
+  /** Immutable Partner judgement before operational constraints. */
+  judgment_action?: AnalysisAction;
+  operational_action?: AnalysisAction;
+  constraints?: string[];
   provenance?: PartnerProvenance | null;
   recommendation: 'INVEST' | 'PASS' | 'MONITOR';
   confidence?: number;            // 0.0–1.0
@@ -565,6 +571,17 @@ export interface Financials {
 }
 
 export interface Startup {
+  current_analysis?: {
+    evaluation_id: string;
+    opportunity_id: string;
+    reviewer_summary: string | null;
+    partner: {
+      judgment: { action: AnalysisAction; rationale: string[]; confidence: number; investment_case: string; principal_risks: string[]; next_steps: string[] };
+      operational_action: AnalysisAction;
+      constraints: string[];
+      human_review_required: boolean;
+    };
+  } | null;
   id: string;
   /** Internal audit values, separate from analyst-facing scores. */
   projection_provenance?: {
@@ -786,11 +803,12 @@ export interface MetaEvalSet {
 export interface PromptEvaluateRow {
   startup_id: string;
   status: string;
-  baseline_verdict?: string;
-  candidate_verdict?: string;
-  verdict_match?: boolean;
+  baseline_evaluation_id?: string;
+  lost_support_dimensions?: string[];
+  support_match?: boolean;
+  n_scored_dimensions?: number;
   regression?: boolean;
-  mean_abs_delta?: number;
+  mean_abs_delta?: number | null;
   error?: string;
 }
 
@@ -798,7 +816,7 @@ export interface PromptEvaluateSummary {
   n_requested: number;
   n_compared: number;
   regression_count: number;
-  verdict_agreements: number;
+  support_agreements: number;
   mean_abs_score_delta: number;
   passed: boolean;
   pass_reason: string;

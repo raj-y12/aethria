@@ -171,7 +171,7 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
   return (
     <div className="fixed inset-0 z-40" role="presentation">
       <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-oxford/15" aria-label="Close evidence inspector" onClick={onClose} />
-      <aside ref={dialogRef} className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col overflow-y-auto border-l border-oxford/15 bg-paper shadow-[-13px_0_34px_rgba(10,22,41,0.08)]" role="dialog" aria-modal="true" aria-labelledby="fund-inspector-title">
+      <aside ref={dialogRef} className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col overflow-y-auto bg-paper" role="dialog" aria-modal="true" aria-labelledby="fund-inspector-title">
         <header className="flex items-start justify-between gap-phi-4 border-b border-oxford/10 px-phi-5 py-phi-5">
           <div>
             <p className="type-label-section">{isHypothesis ? 'Hypothesis basis' : 'Observation evidence'}</p>

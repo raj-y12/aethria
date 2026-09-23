@@ -113,14 +113,13 @@ function Demo() {
   const isFund = pathname.startsWith('/v1/fund');
   const isPortfolio = pathname.startsWith('/v1/portfolio');
   const isFlow = pathname.startsWith('/v1/flow');
-  const bare = !isFund && !isPortfolio && !isFlow;
 
   return (
     <div className="min-h-[100dvh]">
       <a className="demo-exit" href="https://aethria.co/" aria-label="Exit demo">
         Exit demo <span aria-hidden="true">↗</span>
       </a>
-      <AppFrame data={MOCK_SYSTEM_DATA} startupsError={null} chrome={bare ? 'bare' : 'full'}>
+      <AppFrame data={MOCK_SYSTEM_DATA} startupsError={null} chrome="full">
         {isPortfolio ? (
           <PortfolioPage data={MOCK_SYSTEM_DATA} />
         ) : isFund ? (

@@ -11,7 +11,7 @@ export default function SettingsMobileNav({
 }) {
   return (
     <nav
-      className="sticky top-0 z-20 border-b border-oxford/[0.16] bg-paper px-phi-5 py-phi-2 lg:hidden"
+      className="sticky top-0 z-20 bg-paper px-phi-5 py-phi-2 lg:hidden"
       aria-label="Settings navigation"
     >
       <label htmlFor="settings-mobile-section" className="sr-only">Settings section</label>
@@ -19,7 +19,7 @@ export default function SettingsMobileNav({
         id="settings-mobile-section"
         value={activeSection}
         onChange={(event) => onSelect(event.target.value as SectionId)}
-        className="min-h-11 w-full cursor-pointer border border-oxford/[0.12] bg-paper px-phi-3 type-body-sm text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+        className="min-h-11 w-full cursor-pointer border-0 border-b border-oxford/20 bg-transparent px-0 type-body-sm text-oxford focus:outline-none focus:border-oxford/55 focus-visible:ring-2 focus-visible:ring-oxford/30"
       >
         {SETTINGS_GROUPS.map((group) => (
           <optgroup

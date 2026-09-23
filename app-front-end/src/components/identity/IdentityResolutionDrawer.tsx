@@ -91,7 +91,7 @@ export default function IdentityResolutionDrawer({
       <header className="flex items-start justify-between gap-phi-5 border-b border-oxford/10 px-phi-6 py-phi-5">
         <div>
           <p className="type-label-section">Identity review</p>
-          <h2 className="mt-phi-2 font-display text-3xl font-medium leading-tight text-oxford">
+          <h2 className="mt-phi-2 font-sans text-3xl font-semibold leading-tight tracking-[-0.035em] text-oxford">
             {observation?.observed_name || 'Observed company'}
           </h2>
           <p className="type-body mt-phi-2 text-oxford/65">
@@ -118,7 +118,7 @@ export default function IdentityResolutionDrawer({
               role="tab"
               aria-selected={mode === value}
               onClick={() => setMode(value)}
-              className={`type-action border px-3 py-2 ${mode === value ? 'border-oxford bg-oxford text-paper' : 'border-oxford/15 text-oxford'}`}
+              className={`type-action border-0 border-b-2 px-0 py-2 mr-phi-3 ${mode === value ? 'border-oxford font-semibold text-oxford' : 'border-transparent text-oxford/65 hover:border-oxford/30 hover:text-oxford'}`}
             >
               {label}
             </button>
@@ -132,8 +132,8 @@ export default function IdentityResolutionDrawer({
               {identityCase.candidates.map((candidate) => (
                 <label
                   key={candidate.company_id}
-                  className={`block cursor-pointer border p-phi-4 transition-colors ${
-                    selectedCompanyId === candidate.company_id ? 'border-oxford bg-oxford/[0.04]' : 'border-oxford/10 hover:border-oxford/25'
+                  className={`block cursor-pointer border-b p-phi-4 transition-colors ${
+                    selectedCompanyId === candidate.company_id ? 'border-oxford text-oxford' : 'border-oxford/[0.1] text-oxford/80 hover:border-oxford/30'
                   }`}
                 >
                   <div className="flex items-start gap-phi-3">
@@ -227,7 +227,7 @@ export default function IdentityResolutionDrawer({
             rows={3}
             maxLength={1000}
             placeholder="Evidence used, remaining uncertainty, or reason for disposition."
-            className="mt-phi-2 w-full resize-none border border-oxford/15 bg-transparent p-3 text-sm leading-relaxed text-oxford outline-none focus:border-oxford"
+            className="mt-phi-2 w-full resize-none border-0 border-b border-oxford/20 bg-transparent px-0 py-3 text-sm leading-relaxed text-oxford outline-none focus:border-oxford"
           />
         </div>
 
@@ -260,7 +260,7 @@ export default function IdentityResolutionDrawer({
             type="button"
             onClick={() => submitDisposition(mode)}
             disabled={resolution.isPending}
-            className="type-action w-full border border-oxford/20 px-4 py-3 text-oxford disabled:opacity-35"
+            className="type-action w-full border-0 border-b border-oxford/20 px-0 py-3 text-oxford hover:border-oxford/60 disabled:opacity-35"
           >
             Confirm {mode === 'defer' ? 'deferral' : 'rejection'}
           </button>
@@ -269,7 +269,7 @@ export default function IdentityResolutionDrawer({
           <button
             type="button"
             onClick={() => onRetryJob(linkedJobId)}
-            className="type-action mt-phi-2 w-full border border-oxford/20 px-4 py-3 text-oxford"
+            className="type-action mt-phi-2 w-full border-0 border-b border-oxford/20 px-0 py-3 text-oxford hover:border-oxford/60"
           >
             Retry blocked lookup
           </button>

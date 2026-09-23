@@ -53,7 +53,7 @@ export default function DecisionBadge({
 
   return (
     <span
-      className={`${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]} ${className}`}
+      className={`aethria-verdict ${variant === 'escalation' ? '' : 'aethria-verdict--flat'} ${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]} ${className}`}
       style={style}
       aria-label={text}
     >

@@ -38,7 +38,7 @@ export default function LookupReadyNotice({ name, recommendation, recommendation
             <span className="h-1.5 w-1.5 shrink-0 bg-oxford signal-dot-breathe" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="type-label-section">Dispatch complete</p>
-              <p className="mt-phi-1 truncate font-display text-[15px] leading-tight text-oxford">
+              <p className="mt-phi-1 truncate font-sans text-[15px] font-semibold leading-tight tracking-[-0.02em] text-oxford">
                 <span className="sr-only">Memo ready: </span>
                 {name}
               </p>

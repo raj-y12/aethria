@@ -75,14 +75,14 @@ function ViewKey({
       onClick={onClick}
       aria-pressed={active}
       className={`type-action group relative min-h-[32px] shrink-0 cursor-pointer px-phi-4 py-phi-1 btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-        active ? 'bg-surface-selected text-oxford' : idle
+        active ? 'text-oxford' : idle
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
     >
       {active ? (
         <motion.span
           layoutId="docket-view-active"
-          className="absolute inset-0 bg-surface-selected"
+          className="absolute inset-x-phi-4 bottom-0 h-px bg-oxford"
           transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: tokens.motion.easeInOut }}
           aria-hidden
         />
@@ -236,7 +236,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
   }, [watchlistAnalytics]);
 
   return (
-    <div className="paper-dot-grid flex h-full min-h-0 flex-1 overflow-hidden">
+    <div className="aethria-flow paper-dot-grid flex h-full min-h-0 flex-1 overflow-hidden">
       {/* The room measure — the same shell (--room-max) the workspace has always
           used, so Flow lines up with Portfolio and Fund. The split happens inside
           it rather than across the whole viewport. */}
@@ -272,14 +272,15 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
         </motion.div>
 
-        <div className="flex min-h-0 flex-1 gap-phi-5">
+        <div className="aethria-flow__workspace flex min-h-0 flex-1 gap-phi-5">
         {/* The docket column. Closed, it takes the room, centred on a 920px
-            measure. Open, it yields to 38 / 62 — the workspace's original φ split
-            (38.2 : 61.8) — and settles left while the memo rises beside it. One
+            measure. Open, it yields to 42 / 58 so the queue's right edge meets
+            the memo rail while preserving room for the memo body, and settles
+            left while the memo rises beside it. One
             motion, driven by flex-basis so the type never scales. */}
         <motion.div
           initial={false}
-          animate={{ flexBasis: splitOpen ? '38%' : '100%' }}
+          animate={{ flexBasis: splitOpen ? '42%' : '100%' }}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: tokens.motion.ease }}
           className="flex min-h-0 min-w-0 shrink-0 grow-0 flex-col overflow-hidden px-phi-6"
         >
@@ -319,7 +320,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
           /* ── The docket, framed in both states. The frame is fixed to the
                 column and the matters scroll inside it, so the brackets stay
                 put and the headline and tally never leave the screen. ── */
-          <div className="focus-frame focus-frame--docket mt-phi-5 mb-phi-5 flex min-h-0 flex-1 flex-col">
+          <div className="aethria-docket focus-frame focus-frame--docket mt-phi-5 mb-phi-5 flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <WorkGrid
                 startups={startups}
@@ -333,7 +334,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
                 entranceReady={workspaceChromeReady}
                 viewsSlot={
                   <>
-                    {/* Never wraps: at the docket's 38% basis a wrapping row breaks
+                    {/* Never wraps: at the docket's 42% basis a wrapping row breaks
                         onto three lines and shoves the list down. It scrolls
                         sideways instead, like the fund facets. */}
                     <nav

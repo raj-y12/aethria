@@ -19,10 +19,10 @@ interface EmptyStateProps {
 
 export default function EmptyState({ label, body, icon }: EmptyStateProps) {
   return (
-    <div className="flex w-full flex-col items-start justify-center px-phi-6 py-phi-7 text-left sm:px-phi-7 empty-state-enter">
-      <div className="mb-phi-4 flex shrink-0 items-center">{icon ?? <DefaultMark />}</div>
-      <p className={`${productText.mutedLabel} mb-phi-3 max-w-xs`}>{label}</p>
-      <div className={`${productText.body} max-w-[28rem]`}>{body}</div>
+    <div className="aethria-empty-state flex w-full flex-col items-start justify-center px-phi-6 py-phi-7 text-left sm:px-phi-7 empty-state-enter">
+      <div className="aethria-empty-state__mark mb-phi-4 flex shrink-0 items-center">{icon ?? <DefaultMark />}</div>
+      <p className={`aethria-empty-state__label ${productText.mutedLabel} mb-phi-3 max-w-xs`}>{label}</p>
+      <div className={`aethria-empty-state__body ${productText.body} max-w-[28rem]`}>{body}</div>
     </div>
   );
 }

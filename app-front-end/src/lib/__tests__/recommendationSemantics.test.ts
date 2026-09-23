@@ -43,3 +43,8 @@ describe('institutional recommendation semantics', () => {
     );
   });
 });
+
+it('uses actual operational actions ahead of lossy compatibility recommendations', () => {
+  expect(partnerRecommendationLabel({ recommendation: 'INVEST', judgment_action: 'ADVANCE', operational_action: 'ADVANCE' })).toBe('Advance');
+  expect(partnerRecommendationLabel({ recommendation: 'MONITOR', judgment_action: 'ADVANCE', operational_action: 'MORE_DILIGENCE' })).toBe('More diligence');
+});

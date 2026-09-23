@@ -135,7 +135,7 @@ export default function HumanRulingComposer({
         {disagreesWithSystem ? (
           <label className="type-action mt-phi-4 block border-t border-oxford/10 pt-phi-3">
             You're going against Aethria's lean — why?
-            <select aria-label="Override attribution" value={overrideType ?? UNANSWERED} onChange={(event) => setOverrideType(event.target.value === UNANSWERED ? null : (event.target.value as OverrideType | ''))} className="mt-2 block min-h-[44px] w-full max-w-sm border border-oxford/15 bg-paper px-2 py-2">
+            <select aria-label="Override attribution" value={overrideType ?? UNANSWERED} onChange={(event) => setOverrideType(event.target.value === UNANSWERED ? null : (event.target.value as OverrideType | ''))} className="mt-2 block min-h-[44px] w-full max-w-sm border-0 border-b border-oxford/20 bg-transparent px-0 py-2">
               <option value={UNANSWERED} disabled>Choose a reason…</option>
               {OVERRIDE_OPTIONS.map(({ value, label }) => (
                 <option key={value} value={value}>{label}</option>

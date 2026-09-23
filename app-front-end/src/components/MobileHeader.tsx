@@ -24,7 +24,7 @@ export default function MobileHeader({
 }: MobileHeaderProps) {
   return (
     <header
-      className="flex items-center justify-between px-phi-4 pt-[max(var(--space-3),env(safe-area-inset-top))] pb-phi-3 border-b border-hairline bg-oxford"
+      className="aethria-mobile-header flex items-center justify-between px-phi-4 pt-[max(var(--space-3),env(safe-area-inset-top))] pb-phi-3 border-b border-hairline bg-oxford"
       aria-label="Navigation"
     >
       <Link
@@ -49,12 +49,16 @@ export default function MobileHeader({
       <button
         type="button"
         onClick={onMenuToggle}
-        className="type-label-tab text-white/70 hover:text-white btn-interaction min-h-[44px] min-w-[44px] flex items-center justify-center"
+        className="aethria-mobile-menu-button type-label-tab text-white/70 hover:text-white btn-interaction min-h-[44px] min-w-[44px] flex items-center justify-center"
         aria-controls="mobile-menu"
         aria-expanded={isOpen}
         id="mobile-menu-button"
+        aria-label="Menu"
       >
-        Menu
+        <span className="aethria-mobile-menu-glyph" aria-hidden="true">
+          <span />
+          <span />
+        </span>
       </button>
       </div>
     </header>

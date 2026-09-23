@@ -19,6 +19,7 @@ export function mergeMemoPartial(base: Startup, partial: MemoPartialPayload | nu
   if (!partial) return base;
   return {
     ...base,
+    current_analysis: partial.current_analysis ?? base.current_analysis,
     scout: partial.scout ?? base.scout,
     review: partial.review ?? base.review,
     partner: partial.partner ?? base.partner,

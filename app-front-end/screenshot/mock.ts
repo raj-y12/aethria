@@ -665,6 +665,110 @@ export function installMockApi() {
     if (url.includes('/api/activity/seen')) return json({});
     if (url.includes('/api/escalations')) return json(MOCK_SYSTEM_DATA.escalations);
     if (/\/api\/startups\/[^/]+\/memo/.test(url)) return json({ status: 'ready' });
+    const legacyOpportunity = url.match(/\/api\/startups\/([^/?]+)\/opportunity$/);
+    if (legacyOpportunity) {
+      const legacyId = decodeURIComponent(legacyOpportunity[1]);
+      const fixture = STARTUPS.find((item) => item.id === legacyId);
+      return json({
+        opportunity_id: `opp-${legacyId}`,
+        company_id: `company-${legacyId}`,
+        context_key: 'default',
+        decision_state: fixture?.partner ? 'needs_ruling' : 'awaiting_review',
+        service_level: 1,
+        legacy_startup_id: legacyId,
+        current_evaluation_id: `eval-${legacyId}`,
+        current_recommendation_id: `rec-${legacyId}`,
+        created_at: hoursAgo(48),
+        updated_at: hoursAgo(2),
+      });
+    }
+    const evaluationMatch = url.match(/\/api\/opportunities\/([^/?]+)\/evaluation(?:\?|$)/);
+    if (evaluationMatch) {
+      const opportunityId = decodeURIComponent(evaluationMatch[1]);
+      const legacyId = opportunityId.replace(/^opp-/, '');
+      const fixture = STARTUPS.find((item) => item.id === legacyId);
+      const recommendation = String(fixture?.partner?.recommendation ?? 'monitor').toLowerCase();
+      return json({
+        evaluation: {
+          evaluation_id: `eval-${legacyId}`,
+          evidence_snapshot_hash: 'fixture-snapshot',
+          rubric_version: 'fixture-rubric-v1',
+          status: 'completed',
+          created_at: hoursAgo(3),
+        },
+        criteria: [
+          {
+            criterion_assessment_id: `criterion-${legacyId}`,
+            criterion: 'thesis_alignment',
+            score: 7,
+            confidence: 0.78,
+            evidence_sufficiency: 'sufficient',
+            reasoning: 'Fixture evidence supports the current recommendation.',
+            supporting_claim_ids: [`claim-${legacyId}`],
+            contradicting_claim_ids: [],
+            missing_evidence: [],
+            quality_flags: [],
+          },
+        ],
+        recommendation: {
+          recommendation_id: `rec-${legacyId}`,
+          recommended_state: recommendation === 'pass' || recommendation === 'advance' ? recommendation : 'monitor',
+          attention_priority: 2,
+          confidence: 0.72,
+          decision_drivers: [fixture?.partner?.decision_rationale ?? 'Review the current evidence before advancing.'],
+          principal_risks: ['Fixture risk remains subject to diligence.'],
+          mandate_conflicts: [],
+          missing_information: [],
+          change_conditions: [],
+          human_review_required: true,
+        },
+        provenance: { recommendation_origin: 'PARTNER_ANALYSIS' },
+      });
+    }
+    const evidenceMatch = url.match(/\/api\/opportunities\/([^/?]+)\/evidence/);
+    if (evidenceMatch) {
+      const opportunityId = decodeURIComponent(evidenceMatch[1]);
+      const legacyId = opportunityId.replace(/^opp-/, '');
+      return json({
+        artifacts: [{
+          artifact_id: `artifact-${legacyId}`,
+          artifact_type: 'company_website',
+          source_uri: 'https://example.com/fixture-source',
+          title: 'Fixture source',
+          trust_class: 'public',
+          access_class: 'public',
+        }],
+        evidence_items: [{
+          evidence_item_id: `item-${legacyId}`,
+          artifact_id: `artifact-${legacyId}`,
+          item_type: 'web_excerpt',
+          display_excerpt: 'Fixture source excerpt.',
+          verification_state: 'verified',
+          source_quality: 0.8,
+          extraction_confidence: 0.9,
+        }],
+        claims: [{
+          claim_id: `claim-${legacyId}`,
+          company_id: `company-${legacyId}`,
+          claim_type: 'company_fact',
+          display_text: 'Fixture evidence supports the company overview.',
+          assertion_class: 'externally_verified',
+          confidence: 0.8,
+          material: true,
+          status: 'current',
+        }],
+        claim_evidence_links: [{
+          link_id: `link-${legacyId}`,
+          claim_id: `claim-${legacyId}`,
+          evidence_item_id: `item-${legacyId}`,
+          relationship: 'supports',
+          support_strength: 0.8,
+          rationale: 'Fixture source support.',
+        }],
+        evidence_plans: [],
+      });
+    }
+    if (/\/api\/opportunities\/[^/?]+\/rulings/.test(url)) return json({ rulings: [] });
     const detail = url.match(/\/api\/startups\/([^/?]+)$/);
     if (detail) {
       const found = STARTUPS.find((s) => s.id === decodeURIComponent(detail[1]));

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 import { useNavigate, useLocation } from 'react-router';
@@ -15,12 +16,14 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { LookupResultSnapshot } from '@aethria/product-chrome';
 import AppSpine, {
   SPINE_WORKSPACES,
+  SettingsDock,
   isSpineRouteActive,
   type SpineMandate,
   type SpineOverride,
   type SpinePipelineState,
   type SpineTelemetry,
 } from './AppSpine';
+import { WorkspaceGlyph } from './SystemBar';
 import MobileHeader from './MobileHeader';
 import { partnerRecommendationLabel } from '../lib/recommendationSemantics';
 import AgentLogoutModal from './AgentLogoutModal';
@@ -146,6 +149,43 @@ export function deriveWorkspaceChromeReady({
 }): boolean {
   const enteringFullChrome = previousChrome === 'bare' && chrome === 'full';
   return reduceMotion || (!enteringFullChrome && chromeEntranceComplete);
+}
+
+export function createWorkspaceDockMotion(reduceMotion: boolean) {
+  if (reduceMotion) {
+    return {
+      initial: { opacity: 1, '--workspace-chrome-y': '0px' },
+      animate: { opacity: 1, '--workspace-chrome-y': '0px' },
+      exit: { opacity: 0, '--workspace-chrome-y': '0px' },
+      transition: { duration: 0 },
+    };
+  }
+
+  return {
+    // Animate an inherited custom property instead of the wrapper's transform.
+    // AppSpine contains fixed-position surfaces; a transformed wrapper would
+    // become their containing block and make the dock jump horizontally.
+    initial: { '--workspace-chrome-y': '64px' },
+    animate: { '--workspace-chrome-y': '0px' },
+    exit: {
+      '--workspace-chrome-y': '64px',
+      transition: {
+        duration: tokens.motion.duration.long,
+        ease: tokens.motion.easeInOut,
+      },
+    },
+    transition: {
+      duration: tokens.motion.duration.long,
+      ease: tokens.motion.easeDrawer,
+    },
+  };
+}
+
+export function createWorkspaceChromePresence(surface: 'dock' | 'mobile') {
+  return {
+    initial: true,
+    key: `workspace-${surface}`,
+  } as const;
 }
 
 export default function AppFrame({ data, startupsError, chrome = 'full', children }: AppFrameProps) {
@@ -420,19 +460,32 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
   });
 
   /** Dispatch is a front-door surface — hide workspace chrome while it is open. */
+  const isHomeRoute = isSpineRouteActive('/v1', pathname);
+  const isSettingsRoute = pathname.startsWith('/v1/settings');
   const showSpine = !bareChrome && !dispatch.commandBarOpen;
   const showMobileChrome = !isDesktop && !bareChrome && !dispatch.commandBarOpen;
+  const workspaceTransition = transitionOrReduced(reduceMotion, {
+    duration: tokens.motion.duration.short,
+    ease: tokens.motion.ease,
+    layout: { duration: tokens.motion.duration.long, ease: tokens.motion.ease },
+  });
+  const showWorkspaceSpine = showSpine && !isHomeRoute && !isSettingsRoute;
+  const showWorkspaceMobileChrome = showMobileChrome && !isHomeRoute && !isSettingsRoute;
+  const workspaceDockMotion = createWorkspaceDockMotion(reduceMotion);
+  const workspaceDockPresence = createWorkspaceChromePresence('dock');
+  const workspaceMobilePresence = createWorkspaceChromePresence('mobile');
 
   return (
     <AppFrameContext.Provider value={contextValue}>
-      <div className="flex h-[100dvh] flex-col overflow-hidden bg-paper">
+      <div className={`aethria-frame ${isHomeRoute ? 'aethria-frame--home' : ''} ${isSettingsRoute ? 'aethria-frame--settings' : ''} flex h-[100dvh] flex-col overflow-hidden bg-paper`}>
         <div className="grain" aria-hidden />
         <IdentityReviewCenter />
+        {isHomeRoute ? <SettingsDock /> : null}
         {/* Mobile / tablet top nav — desktop carries identity in the spine */}
-        <AnimatePresence initial={false}>
-          {showMobileChrome ? (
+        <AnimatePresence initial={workspaceMobilePresence.initial} mode="wait">
+          {showWorkspaceMobileChrome ? (
             <motion.div
-              key="mobile-chrome"
+              key={workspaceMobilePresence.key}
               initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -10 }}
@@ -460,7 +513,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                       duration: tokens.motion.duration.micro,
                       ease: tokens.motion.ease,
                     })}
-                    className="border-b border-white/[0.08] bg-oxford px-phi-4 py-phi-3"
+                    className="aethria-mobile-menu border-b border-white/[0.08] bg-oxford px-phi-4 py-phi-3"
                     aria-label="Workspaces"
                   >
                     <div className="flex flex-col items-stretch gap-phi-1">
@@ -472,8 +525,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                           setMobileMenuOpen(false);
                           dispatch.openCommandBar();
                         }}
-                        className="type-label-tab flex min-h-[44px] items-center border-b border-white/[0.07] px-1 text-white hover:text-white btn-interaction"
+                        className="type-label-tab flex min-h-[44px] items-center gap-phi-3 border-b border-white/[0.07] px-1 text-white hover:text-white btn-interaction"
                       >
+                        <WorkspaceGlyph label="Dispatch" />
                         Dispatch a lookup
                       </button>
                       {SPINE_WORKSPACES.map((item) => (
@@ -484,8 +538,10 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                             navigate(item.href);
                             setMobileMenuOpen(false);
                           }}
-                          className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
+                          className={`type-label-tab flex min-h-[44px] items-center gap-phi-3 px-1 text-white/60 hover:text-white btn-interaction ${isSpineRouteActive(item.href, pathname) ? 'text-white' : ''}`}
+                          aria-current={isSpineRouteActive(item.href, pathname) ? 'page' : undefined}
                         >
+                          <WorkspaceGlyph label={item.label} />
                           {item.label}
                         </button>
                       ))}
@@ -495,8 +551,9 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                           navigate('/v1/settings');
                           setMobileMenuOpen(false);
                         }}
-                        className="type-label-tab flex min-h-[44px] items-center px-1 text-white/60 hover:text-white btn-interaction"
+                        className="type-label-tab flex min-h-[44px] items-center gap-phi-3 px-1 text-white/60 hover:text-white btn-interaction"
                       >
+                        <WorkspaceGlyph label="Settings" />
                         Settings
                       </button>
                       <button
@@ -523,7 +580,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
           <div
             role="status"
             title={startupsError}
-            className="flex flex-none items-center justify-between gap-phi-4 border-b border-oxford/25 bg-warning px-6 py-2 type-label-tab text-oxford"
+            className="flex flex-none items-center justify-between gap-phi-4 border-l-2 border-warning px-6 py-2 type-label-tab text-oxford"
           >
             <span>Can't reach the Aethria service — the deal flow shown may be out of date.</span>
             <button
@@ -538,17 +595,19 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
 
         <LayoutGroup id="app-frame">
           <div className="flex min-h-0 flex-1 overflow-hidden">
-            <AnimatePresence initial={false} mode="popLayout">
-              {showSpine ? (
+            <AnimatePresence initial={workspaceDockPresence.initial} mode="wait" propagate>
+              {showWorkspaceSpine ? (
                 <motion.div
-                  key="spine"
-                  layout
-                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, x: -28 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: -28 }}
-                  transition={chromeTransition}
+                  key={workspaceDockPresence.key}
+                  initial={workspaceDockMotion.initial}
+                  animate={workspaceDockMotion.animate}
+                  exit={workspaceDockMotion.exit}
+                  transition={workspaceDockMotion.transition}
                   onAnimationComplete={completeWorkspaceChromeEntrance}
-                  className="hidden lg:flex flex-none overflow-hidden"
+                  style={{
+                    '--workspace-chrome-y': reduceMotion ? '0px' : '64px',
+                  } as CSSProperties}
+                  className="hidden lg:flex flex-none overflow-visible"
                 >
                   <AppSpine
                     telemetry={telemetry}
@@ -556,15 +615,21 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                     dispatchActive={dispatch.lookupWorking}
                     onDispatch={dispatch.openCommandBar}
                     override={spineOverride}
+                    suppressFixedChrome={isHomeRoute}
                   />
                 </motion.div>
               ) : null}
             </AnimatePresence>
-            <motion.main
-              layout="position"
-              transition={chromeTransition}
-              className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
-            >
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.main
+                key={pathname}
+                layout="position"
+                  initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -8 }}
+                  transition={workspaceTransition}
+                className="aethria-main relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-paper"
+              >
               <LookupReadyNotice
                 name={dispatch.lookupReady?.scout?.name ?? null}
                 recommendation={dispatch.lookupReady?.partner?.recommendation ?? null}
@@ -633,7 +698,8 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                   </motion.div>
                 ) : null}
               </AnimatePresence>
-            </motion.main>
+              </motion.main>
+            </AnimatePresence>
           </div>
         </LayoutGroup>
       </div>

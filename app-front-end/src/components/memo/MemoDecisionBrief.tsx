@@ -40,12 +40,30 @@ export default function MemoDecisionBrief({
   brief,
   stateMessage,
   children,
+  mode = 'full',
 }: {
   brief: MemoDecisionBriefModel;
   stateMessage?: string;
   children?: ReactNode;
+  mode?: 'full' | 'ruling';
 }) {
   const pending = brief.status === 'loading' || brief.status === 'unavailable';
+  if (mode === 'ruling') {
+    return (
+      <section
+        className={`memoDocSection memoRulingControls memoDecisionWorkspace memoDecisionBrief memoDecisionBrief--ruling memoDecisionBrief--${brief.status}`}
+        aria-labelledby="memo-ruling-title"
+      >
+        <div className="memoDecisionBriefHead">
+          <div>
+            <h2 className="memoDocSectionHead" id="memo-ruling-title">Your ruling</h2>
+          </div>
+        </div>
+        {stateMessage ? <p className="memoDecisionStateMessage">{stateMessage}</p> : null}
+        {children}
+      </section>
+    );
+  }
   return (
     <section
       className={`memoDocSection memoRulingControls memoDecisionWorkspace memoDecisionBrief memoDecisionBrief--${brief.status}`}

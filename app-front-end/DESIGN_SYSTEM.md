@@ -330,3 +330,16 @@ These are migration debt, not precedent for new code.
 - No new `shadow-*` classes.
 - New typography utilities should map to canonical scale or include a comment explaining exception intent.
 - `escalation` red stays reserved for human-attention states only.
+
+
+## Investment memo reading surface
+
+The memo uses an editorial, line-free layout: Playfair Display titles, regular
+sans-serif analysis, and compact company facts. Recommendation reasons remain
+visible. At wider memo container widths, the investment case, assessments, and
+risk/diligence sections use reading columns; narrow containers return to one
+column. Sources, detailed company records, and review history share one appendix
+entry. The ruling remains the final section. Decorative rules and framed panels
+are omitted; form boundaries and keyboard focus indicators remain functional.
+Scores, recommendation provenance, and ruling permissions are unchanged by this
+presentation.

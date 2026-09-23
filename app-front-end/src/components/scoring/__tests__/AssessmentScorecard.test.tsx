@@ -209,11 +209,11 @@ describe('AssessmentScorecard accessibility and robustness', () => {
       />
     );
 
-    expect(screen.getByText('Not scored')).toBeInTheDocument();
-    expect(screen.getByText(/Decision blocked by evidence/)).toBeInTheDocument();
-    expect(screen.getByText(/Incomplete evidence/)).toBeInTheDocument();
+    expect(screen.queryByText('Not scored')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Decision blocked by evidence/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Incomplete evidence/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Strong evidence/)).not.toBeInTheDocument();
-    expect(screen.getByText(/No headline score is shown because required evidence is missing/)).toBeInTheDocument();
+    expect(screen.getByText(/Overall unavailable: required evidence is missing or contradictory/)).toBeInTheDocument();
   });
 
   it('explains historical scoring without exposing internal rubric identifiers', () => {
@@ -258,7 +258,8 @@ describe('AssessmentScorecard persona-divergence flag', () => {
       />
     );
 
-    expect(screen.getByText('personas diverged')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Market/ }));
+    expect(screen.getByText(/Reviewers read this dimension differently/)).toBeInTheDocument();
   });
 
   it('does not flag a dimension where personas agreed', () => {
@@ -284,7 +285,7 @@ describe('AssessmentScorecard persona-divergence flag', () => {
   });
 
   it('flags divergence even when the legacy presentation overlay is active', () => {
-    // Regression: live-verified against Manna Air Delivery, whose canonical evaluation was
+    // Regression: live-verified against Manna Air Delivery, whose decision record was
     // unavailable so the legacy `scoring_presentation` overlay renders instead. The overlay's
     // generic "constrained by insufficient evidence" text must not swallow the persona flag.
     const structured = scoring({
@@ -334,7 +335,8 @@ describe('AssessmentScorecard persona-divergence flag', () => {
       />
     );
 
-    expect(screen.getByText('personas diverged')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Technical/ }));
+    expect(screen.getByText(/Reviewers read this dimension differently/)).toBeInTheDocument();
   });
 });
 

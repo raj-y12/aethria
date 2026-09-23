@@ -82,11 +82,11 @@ export function useMemoDecisionBrief(startupId: string): UseMemoDecisionBriefRes
     unavailable: decisionUnavailable,
   });
   const stateMessage = decisionLoading
-    ? 'Loading the canonical evaluation and evidence ledger.'
+    ? 'Loading the decision record and evidence.'
     : opportunity.isError || (!opportunity.isLoading && !opportunity.data)
       ? 'The opportunity-to-decision record link is unavailable.'
       : evaluation.isError || !evaluation.data
-        ? 'The canonical evaluation could not be loaded.'
+        ? 'The decision record could not be loaded.'
         : evidence.isError || !evidence.data
           ? 'The evidence ledger could not be loaded.'
           : rulings.isError
@@ -94,9 +94,9 @@ export function useMemoDecisionBrief(startupId: string): UseMemoDecisionBriefRes
             : evaluation.data.dependencies && evaluation.data.dependencies.state !== 'current'
               ? evaluation.data.dependencies.message
             : brief.coverage === 'missing'
-              ? 'The canonical evaluation is blocked by missing evidence.'
+              ? 'Decision blocked because required evidence is missing.'
               : brief.coverage === 'contradictory'
-                ? 'The canonical evaluation is blocked by contradictory evidence.'
+                ? 'Decision blocked because the evidence conflicts.'
                 : undefined;
   const canCompose = Boolean(opportunity.data) && !decisionLoading && !decisionUnavailable;
 

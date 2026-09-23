@@ -49,31 +49,55 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     return (
       <div
         role="alert"
-        className="flex min-h-[60dvh] w-full items-center justify-center px-phi-4 py-phi-6"
+        aria-live="assertive"
+        className="aethria-error-boundary page-transition-enter flex min-h-[100dvh] w-full items-center justify-center px-phi-4 py-phi-6 lg:px-phi-7"
       >
-        <div className="max-w-md text-center">
-          <p className="type-meta text-oxford/65">Something went wrong</p>
-          <h2 className="mt-phi-2 font-display text-[1.4rem] text-oxford">
-            This view hit an unexpected error.
-          </h2>
-          <p className="mt-phi-3 type-meta text-oxford/65">
-            The rest of the app is still running. Try again, or reload if it persists.
-          </p>
-          <div className="mt-phi-5 flex items-center justify-center gap-phi-3">
+        <div className="focus-frame w-full max-w-4xl px-phi-5 py-phi-6 text-oxford sm:px-phi-7 sm:py-phi-7">
+          <div className="flex flex-wrap items-center justify-between gap-phi-3 border-b border-oxford/[0.12] pb-phi-3">
+            <div className="flex items-center gap-phi-2">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-escalation" aria-hidden />
+              <p className="type-label-section m-0 text-oxford/65">System interruption</p>
+            </div>
+            <p className="type-meta m-0 text-oxford/45">
+              {this.props.label ? this.props.label.toUpperCase() : 'WORKSPACE'} · RECOVERY AVAILABLE
+            </p>
+          </div>
+
+          <div className="grid gap-phi-7 py-phi-7 lg:grid-cols-[minmax(0,1fr)_minmax(210px,0.42fr)] lg:items-end">
+            <div>
+              <p className="type-meta m-0 text-oxford/45">Unexpected render state / 01</p>
+              <h2 className="mt-phi-3 max-w-[18ch] font-sans text-[clamp(2rem,4vw,3.6rem)] font-semibold leading-[0.98] tracking-[-0.055em] text-oxford">
+                This view hit an unexpected error.
+              </h2>
+              <p className="mt-phi-4 max-w-[48ch] type-body-sm leading-relaxed text-oxford/65">
+                The rest of the app is still running. Try the view again, or reload the session if the interruption persists.
+              </p>
+            </div>
+
+            <div className="border-t border-oxford/[0.12] pt-phi-4 lg:border-l lg:border-t-0 lg:pl-phi-5 lg:pt-0">
+              <p className="type-label-section m-0 text-oxford/45">Recovery options</p>
+              <div className="mt-phi-3 flex flex-wrap items-center gap-phi-3 lg:flex-col lg:items-stretch">
             <button
               type="button"
               onClick={this.reset}
-              className="min-h-[36px] border border-oxford/[0.22] px-phi-4 type-meta text-oxford/70 hover:border-oxford/45 hover:text-oxford transition-colors btn-interaction"
+              className="btn-aethria-solid min-h-[38px] px-phi-4 type-meta"
             >
               Try again
             </button>
             <button
               type="button"
               onClick={this.reload}
-              className="min-h-[36px] type-meta text-oxford/65 hover:text-oxford/70 bg-transparent border-0 p-0 cursor-pointer transition-colors btn-interaction"
+              className="min-h-[38px] border-0 border-b border-oxford/25 bg-transparent px-0 pb-0.5 text-left type-meta text-oxford/65 transition-colors hover:border-oxford/60 hover:text-oxford btn-interaction"
             >
               Reload
             </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-phi-3 border-t border-oxford/[0.12] pt-phi-3">
+            <p className="type-meta m-0 text-oxford/45">The surrounding shell remains active.</p>
+            <p className="type-meta m-0 tabular-nums text-oxford/45">STATUS / DEGRADED</p>
           </div>
         </div>
       </div>

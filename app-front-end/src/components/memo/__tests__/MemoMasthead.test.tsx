@@ -90,21 +90,21 @@ describe('MemoMasthead', () => {
     expect(screen.getByText('INDUSTRIAL AI')).toBeInTheDocument();
   });
 
-  it('shows the honest blocked status, never a bare Pass, when evidence is missing', () => {
+  it('keeps recommendation presentation out of the masthead', () => {
     render(
       <MemoMasthead
         startup={startup}
         brief={brief({ status: 'blocked', lean: 'pass', coverage: 'missing', drivers: ['Missing traction evidence'] })}
       />,
     );
-    expect(screen.getByText('Blocked by evidence')).toBeInTheDocument();
+    expect(screen.queryByText('Blocked by evidence')).not.toBeInTheDocument();
     expect(screen.queryByText('Pass')).not.toBeInTheDocument();
-    expect(screen.getByText('Missing traction evidence')).toBeInTheDocument();
+    expect(screen.queryByText('Missing traction evidence')).not.toBeInTheDocument();
   });
 
-  it('shows the system lean when ready for ruling, with no reason line if no driver was recorded', () => {
+  it('keeps system lean presentation out of the masthead', () => {
     render(<MemoMasthead startup={startup} brief={brief({ status: 'ready_for_ruling', lean: 'monitor' })} />);
-    expect(screen.getByText('Monitor')).toBeInTheDocument();
+    expect(screen.queryByText('Monitor')).not.toBeInTheDocument();
   });
 
   it('renders nothing while decision data is loading or unavailable', () => {

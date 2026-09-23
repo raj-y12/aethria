@@ -80,7 +80,7 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.14 }}
-              className="type-display m-0 max-w-[15ch] text-center text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford"
+              className="font-sans m-0 max-w-[15ch] text-center text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.04em] text-oxford"
             >
               Confirm policy changes
             </motion.h1>
@@ -99,7 +99,7 @@ export default function FundThesisConfirmationModal({
               initial={{ opacity: 0, transform: 'translateY(10px)' }}
               animate={{ opacity: 1, transform: 'translateY(0)' }}
               transition={{ duration: reduceMotion ? 0 : 0.5, ease: EASE_OUT, delay: reduceMotion ? 0 : 0.32 }}
-              className="focus-frame mt-phi-7 min-w-0 w-full max-w-3xl bg-paper"
+              className="mt-phi-7 min-w-0 w-full max-w-3xl bg-paper"
             >
               <div
                 data-testid="desktop-comparison-headings"

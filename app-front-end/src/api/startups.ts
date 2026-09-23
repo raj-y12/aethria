@@ -191,6 +191,7 @@ export async function triageOverride(startupId: string, stage: TriageOverrideSta
 }
 
 export type MemoPartialPayload = {
+  current_analysis?: Startup['current_analysis'];
   scout: Startup['scout'];
   review: Startup['review'] | null;
   partner: Startup['partner'] | null;
@@ -213,6 +214,7 @@ function parseMemoPartial(data: unknown): MemoPartialPayload | null {
   const scout = o.scout;
   if (!scout || typeof scout !== 'object') return null;
   return {
+    current_analysis: (o.current_analysis as Startup['current_analysis']) ?? null,
     scout: scout as Startup['scout'],
     review: (o.review as Startup['review'] | null) ?? null,
     partner: (o.partner as Startup['partner'] | null) ?? null,

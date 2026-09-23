@@ -119,9 +119,11 @@ function ThresholdHandle({
 function ThresholdBar({
   boundaries,
   onChange,
+  compact,
 }: {
   boundaries: DecisionThresholdBoundaries;
   onChange: (patch: Partial<DecisionThresholdBoundaries>) => void;
+  compact: boolean;
 }) {
   const barRef = useRef<HTMLDivElement>(null);
   const passMax = boundaries.passMonitorBoundary - 1;
@@ -151,7 +153,7 @@ function ThresholdBar({
 
   return (
     <div className="pt-6">
-      <div ref={barRef} className="relative h-24 w-full border-y border-oxford/[0.08] lg:h-28">
+      <div ref={barRef} className={`relative w-full border-y border-oxford/[0.08] ${compact ? 'h-10' : 'h-24 lg:h-28'}`}>
         <div
           data-testid="threshold-dot-grid"
           data-dragging={drag != null}
@@ -213,7 +215,7 @@ function ThresholdBar({
           onDrag={onDrag}
         />
       </div>
-      <div className="mt-7 flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70">
+      <div className={`${compact ? 'mt-6' : 'mt-7'} flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70`}>
         <span className="inline-flex items-center gap-phi-2">
           <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: bandColors.pass }} aria-hidden />
           Pass 0–{passMax}
@@ -345,7 +347,10 @@ export default function DecisionThresholdsPanel({
   draft,
   updateDraft,
   updateThreshold,
+  compact = false,
 }: {
+  /** Slimmer bar and tighter gaps, for the two-page dock panel. */
+  compact?: boolean;
   draft: FundConfiguration;
   updateDraft: (updater: (current: FundConfiguration) => FundConfiguration) => void;
   updateThreshold: <K extends keyof FundConfiguration['thresholds']>(
@@ -361,9 +366,9 @@ export default function DecisionThresholdsPanel({
   };
 
   return (
-    <div className="flex flex-col gap-phi-6">
+    <div className={`flex flex-col ${compact ? 'gap-phi-3' : 'gap-phi-6'}`}>
       {!validation.valid && (
-        <div className="border border-escalation/25 bg-escalation/[0.035] px-phi-4 py-phi-3">
+        <div className="border-l-2 border-escalation/45 px-phi-4 py-phi-3">
           {validation.errors.map((error) => (
             <p key={error} className="type-body-sm text-escalation/75">{error}</p>
           ))}
@@ -371,13 +376,15 @@ export default function DecisionThresholdsPanel({
       )}
 
       <p className="type-note text-oxford/70">
-        Drag a marker, use arrow keys, or enter an exact score. Auto-pass skips further review below its threshold.
+        {compact
+          ? 'Below the auto-pass threshold, deals skip further review.'
+          : 'Drag a marker, use arrow keys, or enter an exact score. Auto-pass skips further review below its threshold.'}
       </p>
 
-      <ThresholdBar boundaries={boundaries} onChange={applyBounds} />
+      <ThresholdBar boundaries={boundaries} onChange={applyBounds} compact={compact} />
 
       {/* Column order matches the markers left-to-right on the bar. */}
-      <div className="grid gap-phi-5 sm:grid-cols-3">
+      <div className={`grid sm:grid-cols-3 ${compact ? 'gap-phi-4' : 'gap-phi-5'}`}>
         <ScoreInput
           id="auto-pass-below"
           label="Auto-pass threshold"
@@ -404,7 +411,7 @@ export default function DecisionThresholdsPanel({
         />
       </div>
 
-      <div className="grid gap-phi-7 pt-phi-5 sm:grid-cols-2">
+      <div className={`grid sm:grid-cols-2 ${compact ? 'gap-phi-4' : 'gap-phi-7 pt-phi-5'}`}>
         <ScoreInput
           id="stale-after"
           label="Stale after (hours)"

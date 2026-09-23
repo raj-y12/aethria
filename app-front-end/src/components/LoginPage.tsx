@@ -462,7 +462,7 @@ export default function LoginPage() {
               initial={false}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, transition: { duration: 0.36, ease: EASE } }}
-              className="focus-frame w-full flex flex-col items-center"
+              className="focus-frame focus-frame--auth w-full flex flex-col items-center"
             >
               <motion.p
                 initial={reduceMotion ? false : { opacity: 0, y: 10 }}
@@ -502,10 +502,10 @@ export default function LoginPage() {
                 transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
                 className="w-full"
               >
-                <div className="bg-surface-selected p-[clamp(1.25rem,3vw,2rem)]">
+                <div className="w-full p-0">
                   <div
                     ref={formShakeRef}
-                    className="relative border border-dashed border-oxford/[0.26] p-5 sm:p-6"
+                    className="relative p-0"
                   >
                     <form
                       onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
@@ -554,7 +554,7 @@ export default function LoginPage() {
                         disabled={loading}
                         whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
                         transition={{ duration: 0.1 }}
-                        className="group w-full btn-aethria-solid !bg-[var(--color-oxford)] !text-[var(--color-paper)] hover:!bg-[var(--color-charcoal)] disabled:opacity-40"
+                        className="group w-full btn-aethria-solid auth-enter-button !bg-[var(--color-oxford)] !text-[var(--color-paper)] hover:!bg-[var(--color-charcoal)] disabled:opacity-40"
                       >
                         <span className="flex items-center justify-center">
                           {loading ? (

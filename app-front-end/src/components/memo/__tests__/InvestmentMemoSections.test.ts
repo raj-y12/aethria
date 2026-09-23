@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import memoSource from '../../InvestmentMemoContent.tsx?raw';
 
 const memoStyles = readFileSync(new URL('../../InvestmentMemoContent.css', import.meta.url), 'utf8');
+const decisionLeadSource = readFileSync(new URL('../MemoDecisionLead.tsx', import.meta.url), 'utf8');
 
 function cssRuleBody(selector: string): string {
   const start = memoStyles.indexOf(`${selector} {`);
@@ -28,31 +29,53 @@ describe('Investment memo section order', () => {
     expect(memoSource.match(/<div className="memoSupportingAnalysis">/g)).toHaveLength(1);
     expect(memoSource).not.toContain('<details className="memoSupportingAnalysis"');
     expect(memoSource).not.toContain('<summary>Supporting analysis</summary>');
-    expect(memoSource).toMatch(
-      /<MemoSectionTitle number="02" id="memo-founder">Founder<\/MemoSectionTitle>/,
-    );
-    expect(memoSource).toMatch(
-      /<MemoSectionTitle number="04" id="memo-scoring">Assessment<\/MemoSectionTitle>/,
-    );
-    expect(memoSource).toMatch(
-      /<MemoSectionTitle number="05" id="memo-thesis-alignment">Thesis alignment<\/MemoSectionTitle>/,
-    );
+    expect(memoSource).toContain("memoAnchor('founder')");
+    expect(memoSource).toContain("memoAnchor('scoring')");
+    expect(memoSource).toContain("memoAnchor('thesis-alignment')");
     expect(memoSource).not.toContain('id="memo-risk-register"');
   });
 
-  it('reads the narrative first, then the canonical decision workspace, then the ruling — never a bare verdict up front', () => {
+  it('reads the analyst memo first and places the ruling at the end', () => {
     expect(memoSource).not.toContain('resolveEscalation');
     expect(memoSource).not.toContain('<MemoRulingSection');
-    const thesisAlignment = memoSource.indexOf('id="memo-thesis-alignment"');
-    const decisionWorkspace = memoSource.indexOf('<OpportunityIntelligence');
-    const appendix = memoSource.indexOf('{/* ── Appendix ── */}');
-    expect(thesisAlignment).toBeGreaterThan(-1);
-    expect(decisionWorkspace).toBeGreaterThan(thesisAlignment);
-    expect(decisionWorkspace).toBeLessThan(appendix);
+    expect(memoSource).toContain("memoAnchor('case')");
+    expect(memoSource).toContain("memoAnchor('ruling')");
+    expect(memoSource).toContain('Risks to weigh');
+    expect(memoSource).toContain('Questions for diligence');
+    expect(memoSource.indexOf('mode="ruling"')).toBeGreaterThan(memoSource.indexOf('{/* ── Appendix ── */}'));
     expect(memoSource).not.toContain('<MemoDossierOpening');
     expect(memoSource).not.toContain('id="memo-read"');
     expect(memoSource).not.toContain('id="memo-killers"');
-    expect(memoSource).not.toContain('Make your ruling <span aria-hidden>↓</span>');
+    expect(memoSource).not.toContain('memoAnchorNav');
+  });
+
+  it('puts the canonical partner recommendation and rationale before the narrative', () => {
+    const lead = memoSource.indexOf('<MemoDecisionLead');
+    const masthead = memoSource.indexOf('<MemoMasthead');
+    const provenance = memoSource.indexOf('<PipelineProvenanceInspector');
+    const supportingDetails = memoSource.indexOf('supportingDetailsId');
+
+    expect(lead).toBeGreaterThan(masthead);
+    expect(provenance).toBeGreaterThan(supportingDetails);
+    expect(decisionLeadSource).toContain('Partner’s view');
+    expect(memoSource).not.toContain('memoAnchorNav');
+  });
+
+  it('renders the accessible section order in the same sequence as the visual memo', () => {
+    const investmentCase = memoSource.indexOf('className="memoDocSection memoCaseSection"');
+    const assessment = memoSource.indexOf('className="memoDocSection memoScoringSection"');
+    const risks = memoSource.indexOf('className="memoDocSection memoRisksSection"');
+    const nextSteps = memoSource.indexOf('className="memoDocSection memoNextStepsSection"');
+    const details = memoSource.indexOf('title="Company details"');
+    const ruling = memoSource.indexOf('mode="ruling"');
+
+    expect(investmentCase).toBeGreaterThan(-1);
+    expect(investmentCase).toBeLessThan(assessment);
+    expect(assessment).toBeLessThan(risks);
+    expect(risks).toBeLessThan(nextSteps);
+    expect(nextSteps).toBeLessThan(details);
+    expect(details).toBeLessThan(ruling);
+    expect(memoStyles).not.toContain('memoSupportingAnalysisBody > .memoCaseSection { order:');
   });
 
   it('does not expose the legacy categorical IC pack export from the redesigned memo', () => {

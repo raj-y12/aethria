@@ -49,7 +49,7 @@ export default function IdentityReviewCenter() {
             animate={{ x: 0 }}
             exit={{ x: 32 }}
             transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
-            className="h-full w-full max-w-2xl overflow-y-auto border-l border-oxford/10 bg-paper shadow-2xl"
+            className="h-full w-full max-w-2xl overflow-y-auto bg-paper"
             ref={panelRef}
           >
             <IdentityReviewQueue onClose={() => setOpen(false)} linkedJobId={linkedJobId} />
@@ -59,4 +59,3 @@ export default function IdentityReviewCenter() {
     </AnimatePresence>
   );
 }
-

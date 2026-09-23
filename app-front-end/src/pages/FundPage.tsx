@@ -79,7 +79,7 @@ export default function FundPage({ data }: { data: SystemData }) {
   const stats = runtime?.alignment_stats;
 
   return (
-    <div className="paper-dot-grid page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="aethria-fund paper-dot-grid page-transition-enter flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="flex-none bg-surface-canvas/95">
         <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop}`}>
           <RoomHeader

@@ -125,7 +125,7 @@ export default function SettingsActionDialog({
             initial={reduceMotion ? false : { opacity: 0, transform: 'translateY(12px)' }}
             animate={{ opacity: 1, transform: 'translateY(0px)' }}
             transition={{ duration: 0.5, ease: EASE, delay: 0.1 }}
-            className="m-0 max-w-[18ch] text-center type-display text-[clamp(28px,4vw,52px)] font-medium leading-[1.1] text-oxford"
+            className="m-0 max-w-[18ch] text-center font-sans text-[clamp(28px,4vw,52px)] font-semibold leading-[1.05] tracking-[-0.04em] text-oxford"
           >
             {title}
           </motion.h1>

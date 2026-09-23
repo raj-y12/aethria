@@ -24,6 +24,19 @@ function rulingToRecommendation(decision: 'MAYBE' | 'NO'): 'MONITOR' | 'PASS' {
   return decision === 'NO' ? 'PASS' : 'MONITOR';
 }
 
+const portfolioRowVariants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: (index: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: tokens.motion.duration.short,
+      delay: Math.min(index, 8) * 0.03,
+      ease: tokens.motion.ease,
+    },
+  }),
+};
+
 /** Instrument readout — a number with its label, no box. Counts up on arrival.
  * `value: null` means "unknown" (loading or failed source) — it renders an
  * em dash rather than fabricating a number. */
@@ -179,7 +192,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
     : 'The record of conviction.';
 
   return (
-    <div className="paper-dot-grid page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <div className="aethria-portfolio paper-dot-grid page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} min-h-full`}>
         <header className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}>
           <p className="type-label-section type-label-section--eyebrow">Portfolio</p>
@@ -224,8 +237,17 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 </QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col">
-                  {rows.map((row) => (
-                    <li key={row.position.position_id} data-testid="position-row" className="group border-b border-oxford/[0.06]">
+                  {rows.map((row, index) => (
+                    <motion.li
+                      key={row.position.position_id}
+                      data-testid="position-row"
+                      custom={index}
+                      variants={portfolioRowVariants}
+                      initial={reduceMotion ? false : 'hidden'}
+                      animate="visible"
+                      layout="position"
+                      className="group border-b border-oxford/[0.06]"
+                    >
                       <div className="-mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-4 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] lg:grid-cols-[minmax(0,1.15fr)_minmax(126px,0.65fr)_minmax(0,1.5fr)] lg:items-baseline">
                         <span className="min-w-0 font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{row.name}</span>
                         <span className="flex min-w-0 flex-col items-start gap-phi-1">
@@ -240,7 +262,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                       </div>
                       {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
                       <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               )}
@@ -255,8 +277,16 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                 <QuietEmpty>No monitoring or passed decisions yet.</QuietEmpty>
               ) : (
                 <ul className="mt-phi-4 flex flex-col">
-                  {decisionHistory.map((item) => (
-                    <li key={item.startup.id} className="border-b border-oxford/[0.06]">
+                  {decisionHistory.map((item, index) => (
+                    <motion.li
+                      key={item.startup.id}
+                      custom={index}
+                      variants={portfolioRowVariants}
+                      initial={reduceMotion ? false : 'hidden'}
+                      animate="visible"
+                      layout="position"
+                      className="border-b border-oxford/[0.06]"
+                    >
                       <button
                         type="button"
                         onClick={() => openDeal(item.startup.id)}
@@ -281,7 +311,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                         </span>
                         <span className="min-w-0 type-body-sm leading-relaxed text-oxford/70">{item.notes || '—'}</span>
                       </button>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               )}
@@ -333,7 +363,15 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
               ) : (
                 <ul className="mt-phi-2 flex flex-col">
                   {watchlistEntries.slice(0, 20).map((e, i) => (
-                    <li key={e.startup_id ?? i} className="border-b border-oxford/[0.06]">
+                    <motion.li
+                      key={e.startup_id ?? i}
+                      custom={i}
+                      variants={portfolioRowVariants}
+                      initial={reduceMotion ? false : 'hidden'}
+                      animate="visible"
+                      layout="position"
+                      className="border-b border-oxford/[0.06]"
+                    >
                       <button
                         type="button"
                         onClick={() => e.startup_id && openDeal(e.startup_id)}
@@ -351,7 +389,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
                           {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
                         </span>
                       </button>
-                    </li>
+                    </motion.li>
                   ))}
                 </ul>
               )}

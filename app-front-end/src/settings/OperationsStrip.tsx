@@ -8,8 +8,8 @@ interface OperationsStripProps {
   settings: Settings;
   storageUnavailable: boolean;
   onSettingsChange: (settings: Settings) => void;
-  /** 'bar' = horizontal (mobile top); 'rail' = vertical (desktop rail foot). */
-  variant?: 'bar' | 'rail';
+  /** 'bar' = horizontal (mobile top); 'rail' = vertical (desktop rail foot); 'menu' = dock menu rows. */
+  variant?: 'bar' | 'rail' | 'menu';
 }
 
 const controls: Array<{
@@ -131,11 +131,41 @@ export default function OperationsStrip({
     }
   };
 
+  if (variant === 'menu') {
+    return (
+      <section className="aethria-settings-dock__pipeline" aria-label="Pipeline controls">
+        <p className="aethria-settings-dock__pipeline-title">Pipeline</p>
+        {controls.map((control) => {
+          const checked = isEnabled(optimistic, control.key);
+          const isPending = pending.has(control.key);
+          return (
+            <div key={control.key} className="aethria-settings-dock__pipeline-row">
+              <span aria-hidden>{control.label}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-label={control.label}
+                aria-checked={checked}
+                aria-busy={isPending}
+                data-operation-status={isPending ? control.key : undefined}
+                disabled={storageUnavailable || isPending}
+                onClick={() => void save(control.key, !checked)}
+                className="compact-switch"
+              />
+            </div>
+          );
+        })}
+        {storageUnavailable && <p className="aethria-settings-dock__pipeline-note" role="status">Storage unavailable.</p>}
+        {error && <p className="aethria-settings-dock__pipeline-note" role="alert">{error}</p>}
+      </section>
+    );
+  }
+
   return (
     <section
       className={isRail
         ? 'bg-paper px-phi-4 py-phi-5'
-        : 'border-b border-oxford/[0.16] bg-paper px-phi-5 py-phi-4 lg:px-phi-6'}
+        : 'bg-paper px-phi-5 py-phi-4 lg:px-phi-6'}
       aria-labelledby="operations-strip-title"
       aria-label="Pipeline controls"
     >

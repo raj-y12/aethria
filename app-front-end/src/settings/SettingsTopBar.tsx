@@ -54,7 +54,7 @@ export default function SettingsTopBar({
          breakpoint the oxford spine uses, so the rail appears and disappears in
          step with it. At md it turned on 256px earlier than the main nav, which
          left Settings with a side rail on viewports where nothing else had one. */
-      className="flex-none border-b border-oxford/[0.16] bg-paper lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-[var(--spine-width)] lg:flex-col lg:justify-between lg:border-b-0"
+      className="aethria-settings-topbar flex-none border-b border-oxford/[0.16] bg-paper lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-[var(--spine-width)] lg:flex-col lg:justify-between lg:border-b-0"
       initial={reduceMotion ? false : { opacity: 0, y: -8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: EASE, delay: 0.04 }}

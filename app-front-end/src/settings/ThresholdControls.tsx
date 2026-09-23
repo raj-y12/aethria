@@ -92,7 +92,7 @@ export default function ThresholdControls({
 
   return (
     <section
-      className="border-b border-oxford/[0.16] bg-paper px-phi-5 py-phi-4 lg:px-phi-6"
+      className="bg-paper px-phi-5 py-phi-4 lg:px-phi-6"
       aria-labelledby="threshold-controls-title"
     >
       <p id="threshold-controls-title" className="type-label-section text-xs text-oxford">
@@ -124,7 +124,7 @@ export default function ThresholdControls({
                     void save(control.key, percent);
                   }}
                   aria-busy={isPending}
-                  className="w-20 border border-solid border-oxford/15 bg-transparent px-phi-2 py-1.5 type-data text-oxford focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 disabled:cursor-not-allowed disabled:opacity-45"
+                  className="w-20 border-0 border-b border-solid border-oxford/20 bg-transparent px-0 py-1.5 type-data text-oxford focus:outline-none focus:border-oxford/55 focus-visible:ring-2 focus-visible:ring-oxford/35 disabled:cursor-not-allowed disabled:opacity-45"
                 />
                 <span className="type-body-sm text-oxford/65">%</span>
                 {isPending ? <span className="type-status text-xs text-oxford/70">Saving</span> : null}

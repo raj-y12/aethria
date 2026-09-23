@@ -278,7 +278,7 @@ const WorkGrid = ({
       ? undefined
       : {
           hidden: {},
-          visible: { transition: { staggerChildren: 0.026, delayChildren: 0.02 } },
+          visible: { transition: { staggerChildren: 0.04, delayChildren: 0.03 } },
         },
     [reduceMotion]
   );
@@ -287,11 +287,11 @@ const WorkGrid = ({
     reduceMotion
       ? undefined
       : {
-          hidden: { opacity: 0, transform: 'translateY(3px)' },
+          hidden: { opacity: 0, transform: 'translateY(6px)' },
           visible: {
             opacity: 1,
             transform: 'translateY(0px)',
-            transition: { duration: 0.18, ease: tokens.motion.ease },
+            transition: { duration: tokens.motion.duration.short, ease: tokens.motion.ease },
           },
         },
     [reduceMotion]
@@ -539,6 +539,10 @@ const WorkGrid = ({
             animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
           >
+            <div className="aethria-queue-columns type-meta" aria-hidden="true">
+              <span>Company</span>
+              <span>State</span>
+            </div>
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;
               const keyDown = (e: React.KeyboardEvent) => {

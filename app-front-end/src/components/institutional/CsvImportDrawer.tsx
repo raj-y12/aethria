@@ -142,13 +142,13 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
             animate={{ x: 0 }}
             exit={{ x: 32 }}
             transition={transitionOrReduced(reduceMotion, { duration: 0.18 })}
-            className="flex h-full w-full max-w-3xl flex-col border-l border-oxford/10 bg-paper shadow-2xl"
+            className="flex h-full w-full max-w-3xl flex-col bg-paper"
             ref={panelRef}
           >
             <header className="flex items-start justify-between gap-phi-5 border-b border-oxford/10 px-phi-6 py-phi-5">
               <div>
                 <p className="type-label-section">Cross-channel intake</p>
-                <h2 className="mt-phi-2 font-display text-3xl font-medium text-oxford">Import observed companies</h2>
+                <h2 className="mt-phi-2 font-sans text-3xl font-semibold tracking-[-0.035em] text-oxford">Import observed companies</h2>
                 <p className="type-body mt-phi-2 max-w-xl text-oxford/65">Preview a bounded batch before it enters canonical identity resolution. Raw unmapped fields are not retained.</p>
               </div>
               <button type="button" onClick={onClose} className="type-action border-b border-oxford/15">Close</button>
@@ -157,30 +157,30 @@ export default function CsvImportDrawer({ open, onClose }: { open: boolean; onCl
             <div className="min-h-0 flex-1 overflow-y-auto px-phi-6 py-phi-5">
               <div className="grid gap-phi-4 sm:grid-cols-2">
                 <label className="type-action">Channel
-                  <select aria-label="Import channel" value={source} onChange={(event) => { setSource(event.target.value as ImportSource); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-paper px-3 py-2">
+                  <select aria-label="Import channel" value={source} onChange={(event) => { setSource(event.target.value as ImportSource); setPreview(null); }} className="mt-phi-2 block w-full border-0 border-b border-oxford/20 bg-transparent px-0 py-2">
                     <option value="csv">General CSV</option><option value="crm_csv">CRM export</option><option value="event_csv">Event list</option><option value="referral_csv">Referral list</option>
                   </select>
                 </label>
                 <label className="type-action">Company-name field
-                  <input aria-label="Company-name field" value={nameField} onChange={(event) => { setNameField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-transparent px-3 py-2" />
+                  <input aria-label="Company-name field" value={nameField} onChange={(event) => { setNameField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border-0 border-b border-oxford/20 bg-transparent px-0 py-2" />
                 </label>
                 <label className="type-action">Domain field
-                  <input aria-label="Domain field" value={domainField} onChange={(event) => { setDomainField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-transparent px-3 py-2" />
+                  <input aria-label="Domain field" value={domainField} onChange={(event) => { setDomainField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border-0 border-b border-oxford/20 bg-transparent px-0 py-2" />
                 </label>
                 <label className="type-action">External ID field <span className="text-oxford/65">optional</span>
-                  <input aria-label="External ID field" value={externalIdField} onChange={(event) => { setExternalIdField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border border-oxford/15 bg-transparent px-3 py-2" />
+                  <input aria-label="External ID field" value={externalIdField} onChange={(event) => { setExternalIdField(event.target.value); setPreview(null); }} className="mt-phi-2 block w-full border-0 border-b border-oxford/20 bg-transparent px-0 py-2" />
                 </label>
               </div>
               <label className="type-action mt-phi-4 flex items-center gap-phi-2"><input type="checkbox" checked={verifyDomains} onChange={(event) => { setVerifyDomains(event.target.checked); setPreview(null); }} className="accent-oxford" />Verify domains during identity admission</label>
               <label htmlFor="csv-import-data" className="type-action mt-phi-5 block">CSV data</label>
-              <textarea id="csv-import-data" aria-label="CSV data" value={csvText} onChange={(event) => { setCsvText(event.target.value); setPreview(null); setIdempotencyKey(null); commit.reset(); }} rows={10} spellCheck={false} placeholder="company_name,website&#10;Acme,acme.com" className="mt-phi-2 w-full resize-y border border-oxford/15 bg-transparent p-3 font-mono text-xs leading-relaxed text-oxford" />
+              <textarea id="csv-import-data" aria-label="CSV data" value={csvText} onChange={(event) => { setCsvText(event.target.value); setPreview(null); setIdempotencyKey(null); commit.reset(); }} rows={10} spellCheck={false} placeholder="company_name,website&#10;Acme,acme.com" className="mt-phi-2 w-full resize-y border-0 border-b border-oxford/20 bg-transparent px-0 py-3 font-mono text-xs leading-relaxed text-oxford" />
 
-              <button type="button" onClick={runPreview} className="type-action mt-phi-3 border border-oxford/15 px-4 py-3 text-oxford">Preview import</button>
+              <button type="button" onClick={runPreview} className="type-action mt-phi-3 border-0 border-b border-oxford/20 px-0 py-2 text-oxford hover:border-oxford/60">Preview import</button>
               {previewError ? <p role="alert" className="type-body mt-phi-3 text-escalation">{previewError}</p> : null}
 
               {preview ? (
                 <section className="mt-phi-6 border-y border-oxford/10 py-phi-4" aria-label="Import preview">
-                  <div className="flex flex-wrap items-baseline justify-between gap-phi-3"><h3 className="font-display text-xl font-medium text-oxford">{preview.rows.length} rows ready for bounded import</h3><span className="type-meta">Maximum {MAX_IMPORT_ROWS}</span></div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-phi-3"><h3 className="font-sans text-xl font-semibold tracking-[-0.03em] text-oxford">{preview.rows.length} rows ready for bounded import</h3><span className="type-meta">Maximum {MAX_IMPORT_ROWS}</span></div>
                   <div className="mt-phi-3 overflow-x-auto"><table className="w-full min-w-[32rem] border-collapse text-left"><thead><tr>{preview.headers.map((header) => <th key={header} className="border-b border-oxford/15 py-2 pr-4 type-label-section">{header}</th>)}</tr></thead><tbody>{preview.rows.slice(0, 5).map((row, rowIndex) => <tr key={`${rowIndex}-${row[0]}`}>{row.map((field, fieldIndex) => <td key={`${rowIndex}-${fieldIndex}`} className="border-b border-oxford/[0.06] py-2 pr-4 type-body-sm text-oxford/65">{field || '—'}</td>)}</tr>)}</tbody></table></div>
                   {preview.rows.length > 5 ? <p className="type-meta mt-phi-2">First 5 rows shown.</p> : null}
                   <button type="button" onClick={() => commit.mutate()} disabled={!idempotencyKey || commit.isPending || commit.isSuccess} className="type-action mt-phi-4 bg-oxford px-4 py-3 text-paper disabled:opacity-35">{commit.isPending ? 'Importing…' : 'Commit import'}</button>

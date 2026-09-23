@@ -30,6 +30,24 @@ function shortcutKeyToRomanNumeral(shortcut: string): string {
   return romans[n] ?? shortcut.trim();
 }
 
+export function WorkspaceGlyph({ label }: { label: string }) {
+  const kind = label.toLowerCase();
+  return (
+    <svg className="aethria-nav-glyph" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      {kind === 'home' ? <path d="M3 8.2 9 3l6 5.2v6.3H3V8.2Z M6.5 14.5v-3.7h5v3.7" /> : null}
+      {kind === 'flow' ? <path d="M3 4.5h12M3 9h8M3 13.5h12" /> : null}
+      {kind === 'portfolio' ? <path d="M3 5.5h12v9H3zM6 5.5V3.8h6v1.7M6.5 9h5" /> : null}
+      {kind === 'fund' ? <path d="M3 14.5V8m4 6.5V4m4 10.5v-8m4 8V2.5" /> : null}
+      {kind === 'dispatch' ? <path d="m3 9 12-5-3.8 10-2.2-4-4-1Zm6 1 3.2-3.2" /> : null}
+      {kind === 'logout' ? <path d="M7 3.5H4.5v11H7M9 9h5.5M12 6.5 14.5 9 12 11.5" /> : null}
+      {kind === 'settings' ? <path d="m9 2.7 1 .5.3 1.2 1 .6 1.2-.2.8.8-.2 1.2.6 1 .9.7v1.1l-.9.7-.6 1 .2 1.2-.8.8-1.2-.2-1 .6-.3 1.2-1 .5-1-.5-.3-1.2-1-.6-1.2.2-.8-.8.2-1.2-.6-1-.9-.7V8.5l.9-.7.6-1-.2-1.2.8-.8 1.2.2 1-.6.3-1.2 1-.5Z M9 7a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" /> : null}
+      {kind !== 'home' && kind !== 'flow' && kind !== 'portfolio' && kind !== 'fund' && kind !== 'dispatch' && kind !== 'logout' && kind !== 'settings' ? (
+        <circle cx="9" cy="9" r="5.5" />
+      ) : null}
+    </svg>
+  );
+}
+
 /** Thin horizontal rule — only used in fixed (full-height) variant. */
 function SpineRule() {
   return (
@@ -50,6 +68,8 @@ export function SpineNavButton({
   surface = 'oxford',
   running = false,
   indicatorId,
+  className = '',
+  motionIndex,
 }: {
   label: string;
   active: boolean;
@@ -60,11 +80,13 @@ export function SpineNavButton({
   surface?: 'oxford' | 'paper';
   /** Shows a breathing dot before the label (e.g. a lookup running in the background). */
   running?: boolean;
+  className?: string;
+  motionIndex?: number;
   /**
    * Shared layout id for a sliding active background. Buttons in the same nav
    * that pass the same id hand the highlight between them with a glide instead
    * of a blink. Omit to keep the static background.
-   */
+  */
   indicatorId?: string;
 }) {
   const reduceMotion = usePrefersReducedMotion();
@@ -82,35 +104,69 @@ export function SpineNavButton({
   const shortcutIdle = onPaper
     ? 'text-oxford/65 group-hover:text-oxford'
     : 'text-white/60 group-hover:text-white';
+  const entryDelay = motionIndex == null ? 0 : motionIndex * 0.04;
+  const navVariants = {
+    hidden: reduceMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 5 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: transitionOrReduced(reduceMotion, {
+        duration: tokens.motion.duration.short,
+        ease: tokens.motion.ease,
+        delay: entryDelay,
+      }),
+    },
+    exit: reduceMotion
+      ? { opacity: 1, y: 0 }
+      : {
+          opacity: 0,
+          y: 5,
+          transition: {
+            duration: tokens.motion.duration.micro,
+            ease: tokens.motion.ease,
+          },
+        },
+  };
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`type-action ${onPaper ? '' : 'type-action-inverse '}group relative w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
+      data-nav-label={label}
+      className={`aethria-spine-nav-button type-action ${onPaper ? '' : 'type-action-inverse '}group relative w-full flex items-center justify-between gap-phi-3 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 ${ring} ${
         active ? `${textActive} ${indicatorId ? '' : bgActive}` : `${textIdle} ${bgHover}`
-      } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'}`}
+      } ${compact ? 'min-h-[32px] px-phi-4 py-phi-1' : 'min-h-[44px] px-2 py-1'} ${className}`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
       aria-pressed={ariaPressed}
       aria-current={active ? 'page' : undefined}
+      variants={navVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      whileTap={reduceMotion ? undefined : { scale: 0.97 }}
+      transition={transitionOrReduced(reduceMotion, {
+        duration: tokens.motion.duration.micro,
+        ease: tokens.motion.ease,
+      })}
     >
       {active && indicatorId ? (
         <motion.span
           layoutId={indicatorId}
-          className={`absolute inset-0 ${bgActive}`}
+          className={`absolute inset-0 rounded-[inherit] ${bgActive}`}
           transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: tokens.motion.easeInOut }}
           aria-hidden
         />
       ) : null}
       <span className="relative inline-flex min-w-0 items-center gap-phi-2">
+        <WorkspaceGlyph label={label} />
         {running ? (
           <span
             className={`h-1.5 w-1.5 shrink-0 rounded-none signal-dot-breathe ${onPaper ? 'bg-oxford' : 'bg-white'}`}
             aria-hidden
           />
         ) : null}
-        <span className="truncate">{label}</span>
+        <span className="aethria-nav-label truncate">{label}</span>
       </span>
       {shortcut ? (
         <span
@@ -120,7 +176,7 @@ export function SpineNavButton({
           {shortcutKeyToRomanNumeral(shortcut)}
         </span>
       ) : null}
-    </button>
+    </motion.button>
   );
 }
 

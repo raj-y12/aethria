@@ -167,7 +167,7 @@ function ExecutionStatusCard({
   const retryable = execution.status === 'failed' || execution.status === 'dead_letter' || execution.status === 'blocked';
   const nextAttemptTime = formatExecutionTime(execution.nextAttemptAt);
   return (
-    <section className="w-full max-w-md border-y border-oxford/10 py-phi-3" aria-label="Execution status">
+    <section className="w-full max-w-md py-phi-3" aria-label="Execution status">
       <div className="flex items-start justify-between gap-phi-4">
         <div>
           <p className="type-label-section">
@@ -203,7 +203,7 @@ function ExecutionStatusCard({
             <button
               type="button"
               onClick={onOpenIdentityReview}
-              className="type-action border border-oxford/15 bg-oxford px-3 py-2 text-paper"
+                className="type-action border-0 border-b border-oxford/30 bg-transparent px-0 py-2 text-oxford hover:border-oxford/70"
             >
               Review identity
             </button>
@@ -213,7 +213,7 @@ function ExecutionStatusCard({
               type="button"
               onClick={onRetry}
               disabled={identityBlocked}
-              className="type-action border border-oxford/15 px-3 py-2 text-oxford disabled:cursor-not-allowed disabled:opacity-35"
+              className="type-action border-0 border-b border-oxford/20 px-0 py-2 text-oxford hover:border-oxford/60 disabled:cursor-not-allowed disabled:opacity-35"
             >
               Retry job
             </button>
@@ -406,7 +406,7 @@ export default function DispatchCommandBar({
   return (
     <div
       ref={containerRef}
-      className="paper-dot-grid absolute inset-0 z-20 flex min-h-0 flex-col overflow-y-auto overscroll-contain bg-paper"
+      className="aethria-dispatch-command paper-dot-grid absolute inset-0 z-20 flex min-h-0 flex-col overflow-y-auto overscroll-contain bg-paper"
       role="dialog"
       aria-modal="true"
       aria-label="Look up a company"
@@ -415,7 +415,7 @@ export default function DispatchCommandBar({
       <div className="relative z-10 flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7">
         {showChips ? (
           <Reveal delay={0.02} y={-6} className="mb-phi-7 w-full max-w-3xl">
-            <section aria-label="Active dispatches" className="border-y border-oxford/[0.1] py-phi-3">
+            <section aria-label="Active dispatches" className="py-phi-3">
               <div className="mb-phi-2 flex items-center justify-between gap-phi-3">
                 <p className="type-label-section">Active dispatches</p>
                 <p className="type-meta text-oxford/65">{chips.filter((chip) => chip.status !== 'decided').length} active</p>
@@ -431,10 +431,10 @@ export default function DispatchCommandBar({
                     }}
                     aria-label={c.active ? `Resume active analysis for ${c.label}` : `Open analysis for ${c.label}`}
                     aria-pressed={c.active}
-                    className={`group inline-flex min-h-10 min-w-[150px] shrink-0 items-center justify-between gap-phi-3 border px-phi-3 py-phi-2 text-left transition-colors btn-interaction ${
+                    className={`group inline-flex min-h-10 min-w-[150px] shrink-0 items-center justify-between gap-phi-3 border-0 border-b-2 px-0 py-phi-2 text-left transition-colors btn-interaction ${
                       c.active
-                        ? 'border-oxford/30 bg-oxford/[0.06] text-oxford'
-                        : 'border-oxford/[0.12] text-oxford/65 hover:border-oxford/25 hover:text-oxford/80'
+                        ? 'border-oxford text-oxford'
+                        : 'border-transparent text-oxford/65 hover:border-oxford/30 hover:text-oxford/80'
                     }`}
                   >
                     <span className="flex min-w-0 items-center gap-phi-2">
@@ -508,7 +508,7 @@ export default function DispatchCommandBar({
                     type="button"
                     onClick={handleSubmitRerun}
                   disabled={isBusy || !rerunContext.trim()}
-                  className="type-action border border-solid border-oxford/12 bg-oxford px-phi-5 py-2.5 text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
+                  className="type-action border-0 border-b border-oxford/25 bg-transparent px-0 py-2.5 text-oxford transition-colors hover:border-oxford disabled:cursor-not-allowed disabled:opacity-30"
                 >
                     Review again →
                   </button>
@@ -529,7 +529,7 @@ export default function DispatchCommandBar({
           ) : view === 'failure' ? (
             <Reveal delay={0.24} className="mt-phi-6 flex w-full max-w-md flex-col items-center gap-phi-5">
               <article
-                className="w-full border border-solid border-oxford/10 bg-paper px-phi-5 py-phi-5"
+                className="w-full border-l-2 border-oxford/25 bg-transparent px-phi-5 py-phi-5"
                 aria-label={`Lookup could not resolve ${failure!.query}`}
               >
                 <div className="mb-phi-3 flex items-baseline justify-between gap-phi-3">
@@ -547,7 +547,7 @@ export default function DispatchCommandBar({
                 <button
                   type="button"
                   onClick={handleRetry}
-                  className="type-action mt-phi-4 w-full border border-solid border-oxford/12 bg-oxford px-4 py-2.5 text-paper transition-opacity hover:opacity-90"
+                  className="type-action mt-phi-4 border-0 border-b border-oxford/25 bg-transparent px-0 py-2.5 text-oxford transition-colors hover:border-oxford/70"
                 >
                   Try another lookup
                 </button>

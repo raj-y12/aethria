@@ -206,6 +206,6 @@ describe('OpportunityIntelligence', () => {
     expect(screen.getByText('Verified market demand')).toBeInTheDocument();
     expect(screen.getByText('Resolve missing evidence: market.')).toBeInTheDocument();
     expect(screen.queryByText('Review supporting evidence')).not.toBeInTheDocument();
-    expect(screen.getByText(/canonical evaluation is blocked by missing evidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/decision blocked because required evidence is missing/i)).toBeInTheDocument();
   });
 });

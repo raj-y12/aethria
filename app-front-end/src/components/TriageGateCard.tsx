@@ -31,7 +31,7 @@ export default function TriageGateCard({ startup, status, onClose, onOverridden 
     <div className="memoEmpty">
       <div className="memoEmptyInner flex flex-col items-center gap-phi-4">
         <p className={productText.mutedLabel}>Held by triage funnel</p>
-        <h3 className="pc-font-display text-xl font-medium leading-tight tracking-[-0.02em] text-oxford sm:text-2xl">
+        <h3 className="font-sans text-xl font-semibold leading-tight tracking-[-0.03em] text-oxford sm:text-2xl">
           {startup.scout.name}
         </h3>
         <p className={productText.body}>{kicker}</p>

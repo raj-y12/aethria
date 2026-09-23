@@ -32,7 +32,7 @@ describe('ErrorBoundary', () => {
         <Boom explode />
       </ErrorBoundary>,
     );
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveClass('min-h-[100dvh]');
     expect(screen.getByText(/unexpected error/i)).toBeInTheDocument();
     expect(console.error).toHaveBeenCalled();
   });
