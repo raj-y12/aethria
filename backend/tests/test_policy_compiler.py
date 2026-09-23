@@ -62,14 +62,8 @@ def test_compiled_policy_contains_complete_hash_bound_scoring_runtime():
     assert policy["scoring_runtime_hash"]
 
 
-def test_default_runtime_and_policy_hash_do_not_follow_environment_toggle(monkeypatch):
-    monkeypatch.setenv("SCORING_EVIDENCE_CALIBRATION_ENABLED", "false")
-    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "false")
-    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "false")
+def test_default_runtime_and_policy_hash_are_stable():
     first = compile_policy_from_fund_config({})
-    monkeypatch.setenv("SCORING_EVIDENCE_CALIBRATION_ENABLED", "true")
-    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_EVIDENCE", "true")
-    monkeypatch.setenv("REVIEWER_SIGNALS_STRICT_CLEAR", "true")
     second = compile_policy_from_fund_config({})
 
     assert first["scoring_runtime"] == second["scoring_runtime"]

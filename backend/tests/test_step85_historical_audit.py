@@ -10,6 +10,6 @@ def test_evaluation_runs_have_immutable_judgment_audit_column():
 
 def test_judgment_audit_is_an_optional_evaluation_repository_input():
     from inspect import signature
-    from evaluation_v2.repository import EvaluationRepository
+    from investment_analysis.repository import InvestmentAnalysisRepository
 
-    assert "judgment_audit" in signature(EvaluationRepository.evaluate).parameters
+    assert "judgment_audit" in signature(InvestmentAnalysisRepository._publish).parameters

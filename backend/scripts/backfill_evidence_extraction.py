@@ -26,7 +26,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
-from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
+from investment_analysis.repository import InvestmentAnalysisRepository
 from evidence.factual import retain_verified_source_statements
 from evidence.planning import compute_missing_evidence
 from evidence.repository import EvidenceRepository
@@ -98,7 +98,7 @@ async def _backfill_opportunity(
             **extraction_result,
         }
 
-    await EvaluationRepository(pool).evaluate(
+    await InvestmentAnalysisRepository(pool).evaluate(
         user_id=user_id,
         opportunity_id=opportunity_id,
         actor_id=user_id,

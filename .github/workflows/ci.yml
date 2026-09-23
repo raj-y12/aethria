@@ -266,6 +266,7 @@ jobs:
             supabase/migrations/20260715270000_fund_intelligence.sql \
             supabase/migrations/20260715280000_channels_outcomes.sql \
             supabase/migrations/20260716090000_review_fixes.sql \
+            supabase/migrations/20260720120000_materiality_digests.sql \
             supabase/migrations/20260721150000_lookup_job_outcomes_rls.sql \
             supabase/migrations/20260722090000_authority_control.sql \
             supabase/migrations/20260725120000_canonical_portfolio_positions.sql \
@@ -289,7 +290,6 @@ jobs:
         run: >-
           python -m pytest
           tests/evaluation_v2/test_phase0_provenance_postgres.py
-          tests/pipeline_contracts/test_postgres.py
           tests/investment_analysis/test_repository_postgres.py
           tests/jobs/test_job_repository_postgres.py
           tests/identity/test_identity_repository_postgres.py

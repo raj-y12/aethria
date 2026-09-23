@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import pytest
 
 from context import ContextAssembler, derive_competition_claims, derive_scout_claims
-from reviewer.engine import ReviewerEngine
 
 
 def test_competitors_are_extracted_only_from_explicit_source_language():
@@ -69,23 +68,6 @@ def test_stale_competition_claim_is_unknown_and_conflicting_evidence_is_visible(
 def test_competition_claims_never_turn_into_a_no_competitors_judgment():
     claims = derive_competition_claims({"source_evidence": [{"url": "https://x.example", "snippet": "Acme competes with Stripe."}]})
     assert all("no competition" not in claim["display_text"].lower() for claim in claims)
-
-
-@pytest.mark.asyncio
-async def test_reviewer_uses_competition_packet_only_when_canonical_coverage_exists():
-    engine = ReviewerEngine.__new__(ReviewerEngine)
-    engine.tenant_user_id = "fund-a"
-
-    async def loader(user_id, startup_id):
-        assert (user_id, startup_id) == ("fund-a", "startup-1")
-        return {"contexts": {
-            "competition": {"has_canonical_coverage": True, "text": "CANONICAL CONTEXT [competition]"},
-            "business_model": {"has_canonical_coverage": False, "text": "legacy"},
-        }}
-
-    engine.canonical_context_loader = loader
-    loaded = await engine._load_canonical_context({"id": "startup-1"})
-    assert list(loaded["contexts"]) == ["competition"]
 
 
 def test_scout_bridge_includes_competition_claims_only_when_source_backed():

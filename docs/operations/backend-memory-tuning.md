@@ -202,34 +202,7 @@ Estimated memory reduction:
 
 Medium.
 
-### 7. Reviewer cycle holds multiple large LLM outputs per startup
-
-Affected files/functions:
-
-- `backend/reviewer/engine.py::run_cycle`
-- `backend/reviewer/engine.py::run_startup`
-
-Why it matters:
-
-Each reviewed startup runs Default, Skeptical, and Opportunist reviewers concurrently, then stores `successful_results`, `review_output`, `single_reviews`, structured scoring, and gap-enriched scout context before persistence. This is expected product behavior, but it creates predictable memory spikes.
-
-Estimated memory impact:
-
-Medium per reviewed startup; high if `REVIEWER_RAMP_BATCH_MAX` or `REVIEWER_BATCH_SIZE` is raised.
-
-Recommended fix:
-
-Keep `REVIEWER_BATCH_SIZE` and `REVIEWER_RAMP_BATCH_MAX` low on small Render instances. Later, persist or discard per-persona intermediate objects sooner without changing stored output.
-
-Implementation difficulty:
-
-Medium.
-
-Estimated memory reduction:
-
-Medium.
-
-### 8. Activity summary can read all historical activity on first visit
+### 7. Activity summary can read all historical activity on first visit
 
 Affected files/functions:
 
@@ -257,7 +230,7 @@ Low to medium.
 
 ## Low Impact
 
-### 9. DealMemory repeatedly reads/writes the full memory document
+### 8. DealMemory repeatedly reads/writes the full memory document
 
 Affected files/functions:
 
@@ -286,7 +259,7 @@ Estimated memory reduction:
 
 Low.
 
-### 10. Local JSON fallback storage is intentionally read-all/write-all
+### 9. Local JSON fallback storage is intentionally read-all/write-all
 
 Affected files/functions:
 

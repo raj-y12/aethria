@@ -2,7 +2,6 @@ from types import SimpleNamespace
 
 import metrics
 import pipeline_runner
-from models import EvaluationManifestIdentity
 
 
 def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
@@ -20,8 +19,6 @@ def test_pipeline_engine_bundle_always_has_usage_controller(monkeypatch):
     monkeypatch.setattr(pipeline_runner, "CostController", Controller)
     monkeypatch.setattr(pipeline_runner, "DealMemory", lambda user_id: SimpleNamespace())
     monkeypatch.setattr(pipeline_runner, "ScoutEngine", Engine)
-    monkeypatch.setattr(pipeline_runner, "ReviewerEngine", Engine)
-    monkeypatch.setattr(pipeline_runner, "PartnerEngine", Engine)
     monkeypatch.setattr(pipeline_runner, "PortfolioStore", Engine)
 
     engines = pipeline_runner._build_pipeline_engines(
@@ -62,31 +59,6 @@ def test_pipeline_captures_models_and_context_without_claiming_persona_execution
                 )
             ]
 
-    class ReviewerEngine:
-        def __init__(self, **kwargs):
-            self.model = kwargs["model"]
-            self.use_structured_scoring = True
-            self.reviewer = SimpleNamespace(SYSTEM_PROMPT="default prompt")
-            self.skeptical_reviewer = SimpleNamespace(
-                SYSTEM_PROMPT="skeptical prompt"
-            )
-            self.opportunist_reviewer = SimpleNamespace(
-                SYSTEM_PROMPT="opportunist prompt"
-            )
-
-    class PartnerEngine:
-        def __init__(self, **kwargs):
-            self.received = kwargs
-            self.decision_engine = SimpleNamespace(
-                provider_id="openai",
-                model=kwargs["model"],
-                prompt_template_version="partner-template-hash",
-            )
-            self.bound_identity = None
-
-        def set_evaluation_manifest_identity(self, identity):
-            self.bound_identity = identity
-
     dependency_identity = {
         "user_id": "manifest-user",
         "thesis_id": "thesis-1",
@@ -116,8 +88,6 @@ def test_pipeline_captures_models_and_context_without_claiming_persona_execution
         pipeline_runner, "DealMemory", lambda user_id: SimpleNamespace()
     )
     monkeypatch.setattr(pipeline_runner, "ScoutEngine", ScoutEngine)
-    monkeypatch.setattr(pipeline_runner, "ReviewerEngine", ReviewerEngine)
-    monkeypatch.setattr(pipeline_runner, "PartnerEngine", PartnerEngine)
     monkeypatch.setattr(
         pipeline_runner,
         "PortfolioStore",
@@ -134,7 +104,6 @@ def test_pipeline_captures_models_and_context_without_claiming_persona_execution
     )
     # The shared core records execution identities with the completed analysis,
     # not a construction-time manifest claiming three persona invocations.
-    assert engines.evaluation_manifest_identity is None
     assert engines.reviewer_engine.analysis_contract_version == "investment-analysis-v1"
     assert engines.partner_engine.analysis_contract_version == "investment-analysis-v1"
     captured = dict(engines.model_metadata)

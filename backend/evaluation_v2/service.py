@@ -1,4 +1,4 @@
-"""Pure deterministic evaluation over immutable claim snapshot values."""
+"""Snapshot, evidence-eligibility and safety helpers for current analysis."""
 
 from __future__ import annotations
 
@@ -8,10 +8,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Sequence, Tuple
 
 from evaluation_v2.models import (
-    CriterionResult,
-    EvidenceEligibilityPolicy,
     EvaluationPolicy,
-    EvaluationResult,
     RecommendationResult,
     RecommendationState,
     ScoreEligibility,
@@ -142,23 +139,6 @@ def _iso_or_none(value: Any) -> str | None:
     return parsed.isoformat() if parsed else None
 
 
-def _snapshot_clock(
-    snapshot: Sequence[Dict[str, Any]], evaluation_at: datetime | None
-) -> datetime:
-    embedded = {
-        str(claim.get("evaluation_at_snapshot") or "").strip()
-        for claim in snapshot
-        if claim.get("evaluation_at_snapshot")
-    }
-    if len(embedded) > 1:
-        raise ValueError("immutable snapshot contains multiple evaluation timestamps")
-    embedded_clock = _parse_timestamp(next(iter(embedded))) if embedded else None
-    requested_clock = _utc(evaluation_at) if evaluation_at is not None else None
-    if embedded_clock and requested_clock and embedded_clock != requested_clock:
-        raise ValueError("evaluation timestamp does not match immutable snapshot")
-    return embedded_clock or requested_clock or _utc(datetime.now(timezone.utc))
-
-
 def evaluate_claim_score_eligibility(
     claim: Dict[str, Any],
     *,
@@ -287,73 +267,6 @@ def evaluate_claim_score_eligibility(
     )
 
 
-def _score(claim: Dict[str, Any]) -> float | None:
-    value = (claim.get("normalized_value") or {}).get("criterion_score")
-    try:
-        return max(0.0, min(10.0, float(value)))
-    except (TypeError, ValueError):
-        return None
-
-
-def _claim_score_note(
-    claim: Dict[str, Any],
-    value: float,
-    eligibility: ScoreEligibility | None = None,
-) -> str:
-    """One claim's contribution: evidence, confidence, and -- when extraction
-    supplied it -- which rubric band it met and why the score isn't higher/lower.
-
-    A claim's normalized_value carries score_band/score_justification only when
-    extracted by evidence/extraction.py's current prompt; older claims degrade to
-    the evidence text alone rather than a missing-field error.
-    """
-    text = str(claim.get("display_text") or claim.get("claim_type") or "").strip()
-    confidence = claim["confidence_at_snapshot"]
-    normalized = claim.get("normalized_value") or {}
-    justification = str(normalized.get("score_justification") or "").strip()
-    band = str(normalized.get("score_band") or "").strip()
-    note = f'"{text}" (scored {value:.1f}, {confidence:.0%} confidence'
-    if band:
-        note += f", {band} band"
-    note += ")"
-    if justification:
-        note += f" — {justification}"
-    original = _score(claim)
-    if (
-        eligibility is not None
-        and original is not None
-        and value < original
-    ):
-        cap_reasons = set(eligibility.reason_codes)
-        if "source_quality_below_full" in cap_reasons:
-            note += f" Source-quality policy cap applied: {original:.2f} → {value:.2f}."
-        elif "evidence_stale" in cap_reasons:
-            note += f" Freshness policy cap applied: {original:.2f} → {value:.2f}."
-        else:
-            note += f" Evidence policy cap applied: {original:.2f} → {value:.2f}."
-    return note
-
-
-def _criterion_reasoning(scored: list[tuple[Dict[str, Any], float, ScoreEligibility]]) -> str:
-    """Deterministic, claim-specific audit trail for a criterion's score.
-
-    Replaces a static placeholder that gave no way to trace an 8 vs a 2 back to
-    the evidence behind it -- every scored criterion cited the identical string
-    regardless of company or claim.
-    """
-    if len(scored) == 1:
-        claim, value, eligibility = scored[0]
-        return f"Scored from one claim: {_claim_score_note(claim, value, eligibility)}"
-    notes = [
-        _claim_score_note(claim, value, eligibility)
-        for claim, value, eligibility in scored
-    ]
-    return (
-        f"Conservative minimum of {len(scored)} eligible policy anchors: "
-        + "; ".join(notes)
-    )
-
-
 def decisive_policy_outcome(
     snapshot: Sequence[Dict[str, Any]],
     policy: EvaluationPolicy,
@@ -404,219 +317,6 @@ def decisive_policy_outcome(
     if conflicts or risks:
         return RecommendationState.PASS, risks, conflicts, uncertainties, contradictions
     return None, risks, conflicts, uncertainties, contradictions
-
-
-def evaluate_snapshot(
-    snapshot: Sequence[Dict[str, Any]],
-    policy: EvaluationPolicy,
-    *,
-    evaluation_at: datetime | None = None,
-) -> EvaluationResult:
-    evaluation_clock = _snapshot_clock(snapshot, evaluation_at)
-    canonical = json.dumps(list(snapshot), sort_keys=True, separators=(",", ":"))
-    digest = hashlib.sha256(canonical.encode()).hexdigest()
-    criteria: List[CriterionResult] = []
-    scored_weight = 0.0
-    weighted_total = 0.0
-    total_weight = sum(rule.weight for rule in policy.criteria)
-    missing = []
-    required_missing = []
-    conflicts = []
-    for rule in policy.criteria:
-        criterion_claims = [
-            claim
-            for claim in snapshot
-            if claim["claim_type"] in rule.claim_types
-            and claim["status_at_snapshot"] in {"current", "contradicted"}
-        ]
-        eligibility_results = [
-            (
-                claim,
-                evaluate_claim_score_eligibility(
-                    claim, policy=policy, evaluation_at=evaluation_clock
-                ),
-            )
-            for claim in criterion_claims
-        ]
-        eligible = [
-            claim for claim, eligibility in eligibility_results if eligibility.eligible
-        ]
-        eligibility_flags = sorted(
-            {
-                reason
-                for _, eligibility in eligibility_results
-                for reason in eligibility.reason_codes
-            }
-        )
-        scored = [
-            (claim, _score(claim), eligibility)
-            for claim, eligibility in eligibility_results
-            if eligibility.eligible
-        ]
-        scored = [
-            (claim, min(score, eligibility.score_cap), eligibility)
-            for claim, score, eligibility in scored
-            if score is not None
-        ]
-        fact_claim_types = {
-            fact_rule.claim_type
-            for fact_rule in policy.fact_rules
-            if fact_rule.dimension == rule.criterion
-        }
-        fact_scored = [
-            item for item in scored if item[0]["claim_type"] in fact_claim_types
-        ]
-        if fact_scored:
-            # A typed fact's published band is the score authority for its
-            # dimension. Historical generic claims remain in the snapshot for
-            # contradiction and provenance checks, but cannot reintroduce a
-            # retired model-selected decimal such as traction=6.0.
-            scored = fact_scored
-        contradicted = [
-            claim["claim_id"]
-            for claim in criterion_claims
-            if claim["status_at_snapshot"] == "contradicted"
-            or claim["contradicting_evidence_ids"]
-        ]
-        if not scored:
-            missing.append(rule.criterion)
-            if rule.required:
-                required_missing.append(rule.criterion)
-            criteria.append(
-                CriterionResult(
-                    criterion=rule.criterion,
-                    score=None,
-                    evidence_sufficiency="insufficient",
-                    reasoning="No eligible scored claim was present in the immutable snapshot.",
-                    missing_evidence=[rule.criterion],
-                    contradicting_claim_ids=contradicted,
-                    quality_flags=eligibility_flags,
-                )
-            )
-            continue
-        effective_confidences = [
-            min(claim["confidence_at_snapshot"], eligibility.confidence_cap)
-            for claim, _, eligibility in scored
-        ]
-        if not any(effective_confidences):
-            # A configured zero confidence cap means the evidence is explicitly
-            # unusable for a decision, even though a numeric anchor exists.
-            missing.append(rule.criterion)
-            if rule.required:
-                required_missing.append(rule.criterion)
-            criteria.append(
-                CriterionResult(
-                    criterion=rule.criterion,
-                    score=None,
-                    evidence_sufficiency="insufficient",
-                    reasoning="Every eligible claim's confidence was capped to zero by policy.",
-                    missing_evidence=[rule.criterion],
-                    contradicting_claim_ids=contradicted,
-                    quality_flags=sorted(set(eligibility_flags) | {"confidence_cap_zero"}),
-                )
-            )
-            continue
-        # Claim confidence gates eligibility and communicates uncertainty; it
-        # cannot interpolate a score between rubric anchors. A weighted average
-        # made the model's confidence a hidden numeric decision input (e.g. a
-        # 3 and 8 becoming 6.4). Conservative aggregation preserves the lowest
-        # eligible policy-owned anchor until the adverse fact is disproven.
-        score = min(value for _, value, _ in scored)
-        confidence = min(
-            1.0,
-            sum(claim["confidence_at_snapshot"] for claim, _, _ in scored)
-            / len(scored),
-            min(eligibility.confidence_cap for _, _, eligibility in scored),
-        )
-        if contradicted:
-            confidence *= 0.6
-            conflicts.append(rule.criterion)
-        scored_weight += rule.weight
-        weighted_total += score * rule.weight
-        criteria.append(
-            CriterionResult(
-                criterion=rule.criterion,
-                score=round(score, 4),
-                confidence=round(confidence, 4),
-                evidence_sufficiency="partial" if contradicted else "sufficient",
-                reasoning=_criterion_reasoning(scored),
-                supporting_claim_ids=[claim["claim_id"] for claim, _, _ in scored],
-                contradicting_claim_ids=contradicted,
-                quality_flags=sorted(
-                    set(eligibility_flags)
-                    | ({"contradiction_present"} if contradicted else set())
-                ),
-                deterministic_adjustments={
-                    "aggregation": (
-                        "typed_fact_claim_precedence"
-                        if fact_scored
-                        else "lowest_eligible_claim_score"
-                    ),
-                    "eligible_anchor_scores": sorted(
-                        {value for _, value, _ in scored}
-                    ),
-                },
-            )
-        )
-
-    (
-        decisive_state,
-        decisive_risks,
-        mandate_conflicts,
-        decisive_uncertainties,
-        decisive_contradictions,
-    ) = decisive_policy_outcome(snapshot, policy, evaluation_at=evaluation_clock)
-    missing = list(dict.fromkeys(missing + decisive_uncertainties))
-    coverage = scored_weight / total_weight if total_weight else 0
-    average = weighted_total / scored_weight if scored_weight else 0
-    if (
-        required_missing
-        or conflicts
-        or decisive_uncertainties
-        or decisive_contradictions
-        or coverage < policy.minimum_scored_weight
-    ):
-        state = RecommendationState.INSUFFICIENT_EVIDENCE
-    elif decisive_state is not None:
-        state = decisive_state
-    elif average >= policy.advance_threshold:
-        state = RecommendationState.ADVANCE
-    elif average < policy.pass_threshold:
-        state = RecommendationState.PASS
-    else:
-        state = RecommendationState.MONITOR
-    confidence_values = [item.confidence for item in criteria if item.score is not None]
-    confidence = (sum(confidence_values) / len(confidence_values)) if confidence_values else 0
-    confidence *= coverage
-    recommendation = RecommendationResult(
-        state=state,
-        attention_priority=max(0, min(100, round(average * 10 * coverage))),
-        confidence=round(confidence, 4),
-        decision_drivers=[
-            item.criterion for item in sorted(
-                [item for item in criteria if item.score is not None],
-                key=lambda item: item.score or 0,
-                reverse=True,
-            )[:3]
-        ],
-        principal_risks=list(dict.fromkeys(conflicts + decisive_risks)),
-        mandate_conflicts=sorted(set(mandate_conflicts)),
-        missing_information=missing,
-        change_conditions=(
-            [f"Resolve missing evidence: {name}" for name in missing]
-            + [
-                f"Resolve contradictory evidence: {name}"
-                for name in dict.fromkeys(conflicts + decisive_contradictions)
-            ]
-        ),
-        human_review_required=bool(
-            decisive_state
-            or conflicts
-            or missing
-            or state is RecommendationState.INSUFFICIENT_EVIDENCE
-        ),
-    )
-    return EvaluationResult(snapshot_hash=digest, criteria=criteria, recommendation=recommendation)
 
 
 def explain_recommendation_change(

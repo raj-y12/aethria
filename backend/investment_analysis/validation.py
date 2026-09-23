@@ -1,17 +1,51 @@
 """Constrain Reviewer proposals using existing evidence policy; never invent scores."""
 from datetime import datetime
+import re
 from uuid import uuid4
 
 from evaluation_v2.models import CriterionResult, EvaluationPolicy
 from evaluation_v2.service import evaluate_claim_score_eligibility
 from evaluation_v2.provenance import ScoreOrigin
-from pipeline_contracts.adapters import DIMENSIONS
 from pipeline_contracts.models import (
-    AssessmentValidationResult, ValidatedAssessment, ReviewerOutput,
+    AnalysisSectionType, AssessmentValidationResult, ValidatedAssessment, ReviewerOutput,
     ValidationStatus, SupportStatus, ContradictionStatus, References, ReasoningType,
 )
 from tenant_context import require_user_id
 from .grounding import financial_assertions_supported
+
+DIMENSIONS = {
+    "market": AnalysisSectionType.MARKET,
+    "product": AnalysisSectionType.PRODUCT,
+    "technical": AnalysisSectionType.TECHNOLOGY,
+    "execution": AnalysisSectionType.EXECUTION,
+    "defensibility": AnalysisSectionType.DEFENSIBILITY,
+}
+
+_DIMENSION_SCORE = re.compile(
+    r"\b(market|product|tech(?:nical|nology)?|execution|defensibility)\s*"
+    r"(?:\(\s*(\d{1,2}(?:\.\d+)?)\s*\)|:\s*(\d{1,2}(?:\.\d+)?)(?:\s*/\s*10)?)",
+    re.IGNORECASE,
+)
+
+
+def validated_rationale(rationale: list[str], assessments: list[ValidatedAssessment] | list[dict]) -> list[str]:
+    """Omit Partner score claims contradicted by the immutable validation result."""
+    scores = {
+        str(item.dimension.value if isinstance(item, ValidatedAssessment) else item.get("dimension", "")).upper():
+        item.validated_score if isinstance(item, ValidatedAssessment) else item.get("validated_score")
+        for item in assessments
+    }
+    if not scores:
+        return rationale
+
+    def supported(match: re.Match) -> bool:
+        dimension = match.group(1).upper()
+        if dimension.startswith("TECH"):
+            dimension = "TECHNOLOGY"
+        score = scores.get(dimension)
+        return score is not None and float(score) == float(match.group(2) or match.group(3))
+
+    return [line for line in rationale if all(supported(match) for match in _DIMENSION_SCORE.finditer(line))]
 
 _CAP_EXPLANATIONS = {
     "claim_confidence_below_full": "The factual claims are not yet established with high confidence.",
@@ -62,12 +96,19 @@ def validate_assessments(*, user_id: str, review: ReviewerOutput, snapshot: list
         ) if assessment else False
         if assessment and not financial_support:
             missing.append("Material financial assertion is not supported with the cited metric and value.")
+        effective_confidence = min(
+            [assessment.confidence if assessment and assessment.confidence is not None else 0.0]
+            + [result.confidence_cap for result in eligibility.values()]
+        )
+        if assessment and effective_confidence <= 0:
+            missing.append("Effective assessment confidence is zero.")
         can_score = (assessment is not None and assessment.proposed_score is not None and bool(references)
-                     and len(supported) == len(references) and financial_support)
+                     and len(supported) == len(references) and financial_support
+                     and effective_confidence > 0)
         cap = min((result.score_cap for result in eligibility.values()), default=None)
         score = min(assessment.proposed_score, cap) if can_score else None
         status = ValidationStatus.BLOCKED if not can_score else ValidationStatus.CAPPED if score < assessment.proposed_score else ValidationStatus.VALIDATED
-        confidence = min([assessment.confidence if assessment and assessment.confidence is not None else 0.0] + [result.confidence_cap for result in eligibility.values()]) if can_score else 0.0
+        confidence = effective_confidence if can_score else 0.0
         evidence_ids = sorted({evidence_id for key in supported for evidence_id in claims[key].get("supporting_evidence_ids") or []})
         source_ids = sorted({str(link["artifact_id"]) for key in supported
                              for link in claims[key].get("evidence_relationships") or []

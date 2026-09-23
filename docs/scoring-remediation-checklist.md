@@ -1,7 +1,11 @@
 # Scoring Remediation — Checklist & Tracker
 
+Historical decision log. The three-persona Reviewer, deterministic scorer, and
+snapshot script cited below were retired in September 2026; their paths are
+preserved here as references to the implementation assessed at the time.
+
 **Companion to:** [`scoring-assessment-audit.md`](./scoring-assessment-audit.md)
-**Purpose:** A living, incremental tracker. Do **not** ship these as one change.
+**Purpose:** An incremental record of the former scoring architecture. Do **not** ship these as one change.
 Work one task at a time, tick it only when its **Validation gate** passes.
 
 ---

@@ -50,8 +50,7 @@ async def _cleanup(pool, user_id: str):
 async def test_reingesting_the_same_artifact_and_item_does_not_duplicate_evidence_items():
     # Audit HIGH-B5: evidence_items had no content-based dedup, so running the
     # same evidence plan twice (a real, checked scenario -- the backfill
-    # script overlapping a live dispatch) created duplicate current claims,
-    # since evaluate_snapshot averages every current claim of a type.
+    # script overlapping a live dispatch) duplicated the stored evidence.
     import asyncpg
 
     from evidence.models import (

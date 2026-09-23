@@ -26,7 +26,7 @@ from pipeline_contracts.models import (
 )
 from .models import ReviewerDraft, PartnerDraft, PartnerAction, PartnerDecision, AnalysisResult
 from .prompts import REVIEWER_PROMPT, PARTNER_PROMPT, REVIEWER_PROMPT_VERSION, PARTNER_PROMPT_VERSION
-from .validation import validate_assessments
+from .validation import validate_assessments, validated_rationale
 from .model_gateway import AnalysisBlocked
 from .mandate import check_sector_exclusions
 from .grounding import ground_financial_text, reviewer_evidence
@@ -142,6 +142,46 @@ def _bind_review(draft: ReviewerDraft, *, lineage: Lineage, identity: Identity,
     )
 
 
+async def generate_review(*, user_id: str, lineage: Lineage, identity: Identity,
+                          snapshot: list[dict], policy: EvaluationPolicy, context: dict,
+                          generate: Generate, reviewer_model: str | None = None,
+                          prompt: str = REVIEWER_PROMPT, research_attempted: bool = False):
+    """Generate and bind the current Reviewer contract, without publishing a judgment."""
+    uid = require_user_id(user_id, context="generate_investment_review")
+    if lineage.user_id != uid:
+        raise ValueError("review tenant mismatch")
+    for claim in snapshot:
+        if claim.get("user_id") not in (None, uid):
+            raise ValueError("claim tenant mismatch")
+        for field in ("company_id", "opportunity_id"):
+            if claim.get(field) is not None and str(claim[field]) != str(getattr(lineage, field)):
+                raise ValueError(f"claim {field} mismatch")
+    reviewer_context = deepcopy(context)
+    reviewer_context.pop("prior_decision", None)
+    configuration = reviewer_context.get("fund_configuration")
+    if isinstance(configuration, dict):
+        configuration.pop("thresholds", None)
+        configuration.pop("scoreBands", None)
+    packet, selected, aliases = reviewer_evidence(factual_packet(snapshot), company_name=identity.name or "",
+                                                  company_website=identity.website)
+    draft = ReviewerDraft.model_validate(await generate("reviewer", prompt, {
+        "company": identity.model_dump(mode="json"), "factual_evidence": packet,
+        "fund_context": reviewer_context, "research_attempted": research_attempted,
+        "rubric": {
+            "version": policy.rubric_version,
+            "criteria": [{"dimension": reviewer_dimension_name(rule.criterion), "weight": rule.weight, "required": rule.required}
+                         for rule in policy.criteria],
+            "analytical_guidance": context.get("analytical_rubric"),
+        },
+    }, ReviewerDraft))
+    versions = PolicyVersions(policy_version=policy.policy_version_id, policy_hash=policy.policy_hash,
+                              rubric_version=policy.rubric_version, partner_rules_version=policy.partner_rules_version,
+                              thesis_version_id=context.get("thesis_version_id"))
+    review = _bind_review(draft, lineage=lineage, identity=identity, policy=versions,
+                         snapshot=selected, model=reviewer_model, claim_aliases=aliases)
+    return draft, review, selected, aliases
+
+
 async def analyze(*, user_id: str, lineage: Lineage, identity: Identity,
                   snapshot: list[dict], policy: EvaluationPolicy, context: dict,
                   generate: Generate, evaluation_at: datetime,
@@ -195,30 +235,18 @@ async def analyze(*, user_id: str, lineage: Lineage, identity: Identity,
     if isinstance(configuration, dict):
         configuration.pop("thresholds", None)
         configuration.pop("scoreBands", None)
-    reviewer_context = deepcopy(model_context)
-    reviewer_context.pop("prior_decision", None)
-
     async def review_once(*, research_attempted=False):
         with track("reviewer"):
-            packet, selected, aliases = reviewer_evidence(factual_packet(snapshot), company_name=identity.name or "",
-                                                          company_website=identity.website)
+            draft, review, selected, aliases = await generate_review(
+                user_id=uid, lineage=lineage, identity=identity, snapshot=snapshot,
+                policy=policy, context=context, generate=generate,
+                reviewer_model=reviewer_model, research_attempted=research_attempted)
             selected_ids = {row["claim_id"] for row in selected}
             excluded_ids = [row["claim_id"] for row in snapshot if row["claim_id"] not in selected_ids]
             if excluded_ids:
                 packet_audit.update(claim_aliases=aliases, excluded_claim_ids=excluded_ids,
                                     reason="Duplicate, unrelated source, or unverified founder identity.")
-            draft = ReviewerDraft.model_validate(await generate("reviewer", REVIEWER_PROMPT, {
-                "company": identity.model_dump(mode="json"), "factual_evidence": packet,
-                "fund_context": reviewer_context, "research_attempted": research_attempted,
-                "rubric": {
-                    "version": policy.rubric_version,
-                    "criteria": [{"dimension": reviewer_dimension_name(rule.criterion), "weight": rule.weight, "required": rule.required}
-                                 for rule in policy.criteria],
-                    "analytical_guidance": context.get("analytical_rubric"),
-                },
-            }, ReviewerDraft))
-            return draft, _bind_review(draft, lineage=lineage, identity=identity, policy=versions,
-                                       snapshot=selected, model=reviewer_model, claim_aliases=aliases)
+            return draft, review
     if prior_review is not None:
         if (prior_review.lineage.user_id != uid
                 or prior_review.lineage.opportunity_id != lineage.opportunity_id
@@ -292,6 +320,9 @@ async def analyze(*, user_id: str, lineage: Lineage, identity: Identity,
         }, PartnerDraft))
         decision = decision.model_copy(update={"assessment_ids": [
             assessment_aliases.get(key, key) for key in decision.assessment_ids]})
+        decision = decision.model_copy(update={"rationale": validated_rationale(
+            decision.rationale, validation.assessments) or
+            ["Refer to the validated assessment and outstanding diligence before deciding."]})
         known_assessments = {item.assessment_id for item in review.assessments}
         if not set(decision.assessment_ids).issubset(known_assessments):
             raise ValueError("Partner cited an assessment outside this review")

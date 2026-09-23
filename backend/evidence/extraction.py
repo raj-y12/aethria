@@ -425,8 +425,7 @@ async def extract_claims_from_evidence(
             # (audit CRITICAL-3) re-attempted a claim_type whose only current
             # claim was too low-confidence to ever score -- supersede it now
             # so the new one doesn't just sit alongside it as a duplicate
-            # "current" claim (audit HIGH-B5: evaluate_snapshot averages
-            # every current claim of a type).
+            # "current" claim representing the same extraction attempt.
             await evidence_repository.supersede_current_claims(
                 user_id=user_id, opportunity_id=opportunity_id, claim_type=claim_type,
             )

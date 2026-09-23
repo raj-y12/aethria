@@ -40,7 +40,7 @@ environment registry, rule-based decisions, and fail-closed gates.
 | File | Contents |
 |---|---|
 | [scoring-assessment-audit.md](scoring-assessment-audit.md) | Scoring-engine assessment; referenced by test docstrings |
-| [scoring-remediation-checklist.md](scoring-remediation-checklist.md) | The scoring decision log; referenced from `backend/reviewer/engine.py`, `backend/config/scoring_config.py`, `backend/scripts/scoring_snapshot.py`, and several tests |
+| [scoring-remediation-checklist.md](scoring-remediation-checklist.md) | Historical scoring decision log; its former Reviewer/scorer implementation has been retired. |
 
 These two are cited by comments in backend source and tests. Keep the paths
 stable or update every citation in the same change.

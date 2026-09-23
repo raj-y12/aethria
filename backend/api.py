@@ -115,8 +115,8 @@ from meta.prompt_gating import (
     save_prompt_library,
 )
 from meta.evaluator import run_prompt_evaluation
-from reviewer.engine import ReviewerEngine
-from reviewer.aethria_view import polish_aethria_view_for_api
+from investment_analysis.projection import polish_aethria_view_for_api
+from scout.tools.financials_grounding import funding_history_for_stage
 from user_state.repository import UserStateRepository
 from settings_repository import SettingsRepository
 from batch1.context import reset_state, set_state
@@ -312,7 +312,7 @@ from authority.service import AuthorityService
 from identity.repository import IdentityRepository
 from identity.service import IdentityService
 from evidence.repository import EvidenceRepository
-from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
+from investment_analysis.repository import InvestmentAnalysisRepository
 from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
@@ -1183,7 +1183,7 @@ async def _start_durable_job_services(app: FastAPI) -> None:
         EvidenceRepository(_durable_job_pool) if _durable_job_pool is not None else None
     )
     app.state.evaluation_repository = (
-        EvaluationRepository(
+        InvestmentAnalysisRepository(
             _durable_job_pool, authority_service=app.state.authority_service
         )
         if _durable_job_pool is not None
@@ -1767,6 +1767,45 @@ def _partner_dict_for_frontend(partner: dict) -> dict:
     }
 
 
+def _apply_current_analysis(out: dict, raw: dict) -> None:
+    """Use the immutable current judgement; retain legacy keys for old clients."""
+    analysis = raw.get("current_analysis")
+    if not isinstance(analysis, dict):
+        return
+    partner = analysis.get("partner") or {}
+    judgment = partner.get("judgment") or {}
+    from investment_analysis.validation import validated_rationale
+    assessments = (analysis.get("validation") or {}).get("assessments") or []
+    rationale = validated_rationale(judgment.get("rationale") or [], assessments)
+    actions = {"ADVANCE", "PASS", "MONITOR", "MORE_DILIGENCE"}
+    if partner.get("operational_action") not in actions or judgment.get("action") not in actions:
+        return
+    out["current_analysis"] = analysis
+    out["canonical_opportunity_id"] = analysis.get("opportunity_id")
+    # The compatibility recommendation stays typed for existing API consumers.
+    # Current displays use the two explicit, non-lossy actions instead.
+    action = partner["operational_action"]
+    out["partner"] = {
+        **(out.get("partner") or {}),
+        "recommendation": {"ADVANCE": "INVEST", "MORE_DILIGENCE": "MONITOR"}.get(action, action),
+        "judgment_action": judgment["action"],
+        "operational_action": action,
+        "constraints": partner.get("constraints") or [],
+        "confidence": judgment.get("confidence"),
+        "decision_rationale": "\n".join(rationale + (partner.get("constraints") or [])),
+        "decision_drivers": rationale,
+        "thesis": judgment.get("investment_case"),
+        "risks": judgment.get("principal_risks") or [],
+        "next_action": "\n".join(judgment.get("next_steps") or []),
+        "human_review_required": partner.get("human_review_required", False),
+        "prompt_version": partner.get("prompt_version"),
+    }
+    if analysis.get("reviewer_summary"):
+        out["review"] = {**(out.get("review") or {}), "overall_summary": analysis["reviewer_summary"]}
+    if not _startup_has_human_ruling(raw):
+        out["queue_reason"] = "Human ruling required." if partner.get("human_review_required") else f"Partner recommends {action.lower().replace('_', ' ')}."
+
+
 def _enrich_review_for_api_payload(review: Dict[str, Any]) -> Dict[str, Any]:
     """Return qualitative Reviewer research without deriving a score on read."""
     return dict(review)
@@ -1803,6 +1842,13 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
     timestamps["first_seen_at"] = first_seen_at
     timestamps["last_seen_by_user_at"] = _to_iso(raw.get("last_seen_by_user_at"))
     timestamps["acknowledged_at"] = _to_iso(raw.get("acknowledged_at"))
+
+    financials = dict(raw.get("financials")) if isinstance(raw.get("financials"), dict) else None
+    if financials is not None:
+        funding_history = financials.get("funding_history")
+        if funding_history_for_stage(funding_history, scout.get("funding_stage")) is None and funding_history:
+            financials["funding_history"] = None
+            financials["funding_missing"] = True
 
     out = {
         "id": sid,
@@ -1849,7 +1895,7 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
         "timestamps": timestamps,
         "human_resolution": raw.get("human_resolution"),
         "conviction_state": raw.get("conviction_state"),
-        "financials": raw.get("financials") if isinstance(raw.get("financials"), dict) else None,
+        "financials": financials,
         "agent_trace": raw.get("agent_trace"),
         "projection_provenance": legacy_projection_provenance(raw),
         "unresolved_at": _to_iso(raw.get("unresolved_at")),
@@ -1969,14 +2015,15 @@ def _backend_to_frontend(raw: dict, *, last_seen_at: Optional[str] = None) -> di
     else:
         out["partner"] = None
 
+    _apply_current_analysis(out, raw)
     return out
 
 
-def _memo_partial_payload(startup: Startup) -> Dict[str, Any]:
+def _memo_partial_payload(startup: Startup, *, raw: dict | None = None) -> Dict[str, Any]:
     """Scout/review/partner slices for progressive memo UX (frontend Startup shape)."""
-    raw = startup.model_dump(mode="json")
-    fe = _backend_to_frontend(raw)
+    fe = _backend_to_frontend(raw if raw is not None else startup.model_dump(mode="json"))
     return {
+        "current_analysis": fe.get("current_analysis"),
         "scout": fe["scout"],
         "review": fe.get("review"),
         "partner": fe.get("partner"),
@@ -2070,6 +2117,7 @@ def _list_projection_to_frontend(
         out["queue_reason"] = _default_queue_reason(raw_for_reason)
     if not out["priority_reason"]:
         out["priority_reason"] = _default_priority_reason(raw_for_reason)
+    _apply_current_analysis(out, row)
     return out
 
 
@@ -2391,7 +2439,7 @@ async def get_startup_memo(request: Request, startup_id: str):
     pr_str = str(pr_from_row) if pr_from_row else None
 
     if state_status == "failed":
-        partial = _memo_partial_payload(startup)
+        partial = _memo_partial_payload(startup, raw=raw)
         return {
             "status": "failed",
             "memo": None,
@@ -2405,7 +2453,7 @@ async def get_startup_memo(request: Request, startup_id: str):
         return {
             "status": "generating",
             "memo": None,
-            "partial": _memo_partial_payload(startup) if startup.scout_info else None,
+            "partial": _memo_partial_payload(startup, raw=raw) if startup.scout_info else None,
             "pipeline_run_id": pr_str,
             "pipeline_status": state_status,
             "error": None,
@@ -2423,7 +2471,7 @@ async def get_startup_memo(request: Request, startup_id: str):
 
     # Partner decision exists or pipeline explicitly marked ready → no markdown needed
     if state_status == "ready" or startup.partner_info is not None:
-        partial = _memo_partial_payload(startup)
+        partial = _memo_partial_payload(startup, raw=raw)
         return {
             "status": "ready",
             "memo": None,
@@ -2436,7 +2484,7 @@ async def get_startup_memo(request: Request, startup_id: str):
     return {
         "status": "generating",
         "memo": None,
-        "partial": _memo_partial_payload(startup) if startup.scout_info else None,
+        "partial": _memo_partial_payload(startup, raw=raw) if startup.scout_info else None,
         "pipeline_run_id": pr_str,
         "pipeline_status": state_status,
         "error": None,

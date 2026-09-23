@@ -1,10 +1,6 @@
 """Shared helpers for applying Founder Resolver output to scout payloads.
 
-Used by two call sites so both persist identical shapes and provenance:
-- `ScoutEngine.run_named_lookup` — the founder stage that runs right after
-  company resolution on an on-demand lookup.
-- `SupabaseStorage.add_review` / `Storage` — reviewer gap enrichment, which
-  previously threw its retrieval pack away once the reviewer prompt was built.
+Used by Scout lookup and historical storage adapters to preserve founder provenance.
 
 Gap-fill only: an existing non-empty `founder_names` is never overwritten. The
 full structured resolution is always attached, so a weak founder result is
@@ -21,7 +17,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from resolver.founder_resolver import is_non_person_label
 
 logger = logging.getLogger(__name__)
@@ -114,128 +110,3 @@ def merge_founder_resolution_into_scout_info(scout_info: Any, resolution: Any) -
             getattr(resolution, "resolution_status", "?"),
         )
     return scout_info.model_copy(update=patches)
-
-
-def allow_reviewer_founder_fallback_retrieval() -> bool:
-    """Whether reviewer-side founder resolution may run extra searches.
-
-    Off by default: the reviewer path already performs blocking retrieval, and
-    reusing the gap pack must not silently add another round of provider calls.
-    """
-    return _truthy("REVIEWER_FOUNDER_FALLBACK_RETRIEVAL", "false")
-
-
-def founder_resolution_for_review(
-    scout_output: Dict[str, Any],
-    scout_for_llm: Dict[str, Any],
-    user_id: str,
-) -> Any:
-    """Founder resolution for a review, reusing the reviewer gap-retrieval pack.
-
-    Gap-fill only: returns None when the row already has founder names, so a
-    review never overwrites founders the Scout stage already grounded.
-    """
-    if not is_founder_resolution_enabled():
-        return None
-    if _has_names(scout_output.get("founder_names")):
-        return None
-    sources = scout_for_llm.get("_reviewer_gap_sources")
-    if not isinstance(sources, list) or not sources:
-        return None
-    pack = {
-        "sources": sources,
-        "provider": scout_for_llm.get("_reviewer_gap_provider"),
-    }
-    try:
-        return founder_resolution_from_gap_pack(
-            scout_output,
-            user_id=user_id,
-            pack=pack,
-            allow_fallback_retrieval=allow_reviewer_founder_fallback_retrieval(),
-        )
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("founder_enrichment: reviewer-side resolution failed: %s", exc)
-        return None
-
-
-def founder_resolution_from_gap_pack(
-    scout: Dict[str, Any],
-    *,
-    user_id: str,
-    pack: Optional[Dict[str, Any]] = None,
-    allow_fallback_retrieval: bool = True,
-) -> Any:
-    """Resolve founders for a scout row, reusing an already-fetched gap pack.
-
-    The reviewer gap retrieval pack is retrieval the pipeline has already paid
-    for; feeding it to the founder extractor avoids a second round of searches
-    when it already contains team/about pages. When the pack yields no founders
-    and `allow_fallback_retrieval` is set, a founder-specific retrieval runs.
-    """
-    from resolver.founder_resolver import (
-        FounderEvidence,
-        _classify_source,
-        build_resolution_from_evidence,
-        extract_founder_candidates,
-        resolve_founders,
-    )
-    from research.reference_verify import hostname_from_user_hint
-
-    company = str(scout.get("name") or "").strip()
-    if not company or not is_founder_resolution_enabled():
-        return None
-    website = str(scout.get("lookup_website") or "").strip() or None
-    # Fixed 2026-08-17 (audit HIGH-A3): source_type used to be left at its
-    # "other" default on this path, so the +0.2 official-site / +0.05
-    # crunchbase-or-news confidence bonuses in _candidate_confidence could
-    # never fire here, even when the reused evidence genuinely was the
-    # company's own team page -- silently under-scoring real founders below
-    # the keep threshold for missing plumbing, not weak evidence.
-    anchor_host = hostname_from_user_hint(website) if website else None
-
-    sources = [s for s in list((pack or {}).get("sources") or []) if isinstance(s, dict)]
-    if sources:
-        evidence = [
-            FounderEvidence(
-                url=str(s.get("url") or "").strip(),
-                title=str(s.get("title") or "").strip(),
-                snippet=str(s.get("snippet") or "").strip()[:12000],
-                source_type=_classify_source(str(s.get("url") or "").strip(), anchor_host=anchor_host),
-                supports="Founder or team evidence",
-                access_class=(
-                    str(s.get("access_class") or "public")
-                    if str(s.get("access_class") or "public")
-                    in {"public", "tenant_confidential", "restricted"}
-                    else "restricted"
-                ),
-            )
-            for s in sources
-            if str(s.get("url") or "").strip()
-        ]
-        candidates = extract_founder_candidates(evidence)
-        if candidates:
-            return build_resolution_from_evidence(
-                company,
-                candidates,
-                website=website,
-                retrieval_provider=str((pack or {}).get("provider") or "") or None,
-                stage="reviewer_gap_pack",
-                reason="Reused the reviewer gap-retrieval pack; no extra searches.",
-                sources_found=len(evidence),
-            )
-
-    # The gap pack named nobody — fall back to founder-specific retrieval only
-    # when the caller accepts the extra provider round-trips.
-    if not allow_fallback_retrieval:
-        return None
-    return resolve_founders(
-        company,
-        user_id=user_id,
-        website=website,
-        location=str(scout.get("location") or "").strip() or None,
-        known_founder_names=[
-            str(n).strip()
-            for n in (scout.get("founder_names") or [])
-            if str(n).strip()
-        ],
-    )

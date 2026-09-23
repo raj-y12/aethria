@@ -159,8 +159,6 @@ def _wire_common_engines(monkeypatch):
     monkeypatch.setattr("pipeline_runner.load_settings", lambda user_id: {"cost_budget": {"enabled": False}})
     monkeypatch.setattr("pipeline_runner.DealMemory", lambda user_id: SimpleNamespace())
     monkeypatch.setattr("pipeline_runner.ScoutEngine", _FakeScoutEngine)
-    monkeypatch.setattr("pipeline_runner.ReviewerEngine", _FakeReviewerEngine)
-    monkeypatch.setattr("pipeline_runner.PartnerEngine", _FakePartnerEngine)
     def projection_stage(**kwargs):
         # Exercise the same orchestration assertions through the new shared-core
         # callbacks; this suite deliberately stubs model/persistence work.

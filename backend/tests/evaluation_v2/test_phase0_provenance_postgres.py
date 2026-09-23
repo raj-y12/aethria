@@ -8,7 +8,7 @@ import pytest
 
 from agent_trace import build_scout_trace
 from evaluation_v2.provenance import PipelineBinding
-from evaluation_v2.repository import EvaluationRepository
+from investment_analysis.repository import InvestmentAnalysisRepository
 from evidence.models import EvidenceArtifactInput, EvidenceItemInput, ClaimInput, ClaimEvidenceLinkInput
 from evidence.repository import EvidenceRepository
 from tests.evaluation_v2.test_phase0_provenance_e2e import CLOCK, _policy
@@ -17,7 +17,7 @@ pytestmark = pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="TEST
 
 
 @pytest.mark.asyncio
-async def test_postgres_roundtrip_and_tenant_isolation():
+async def test_postgres_roundtrip_and_tenant_isolation(repository_factory=None):
     import asyncpg
     conn = await asyncpg.connect(os.environ["TEST_DATABASE_URL"])
     transaction = conn.transaction(isolation="repeatable_read")
@@ -28,14 +28,18 @@ async def test_postgres_roundtrip_and_tenant_isolation():
         async def acquire(self):
             yield conn
 
+        async def fetchrow(self, sql, *args):
+            return await conn.fetchrow(sql, *args)
+
     uid, other = f"phase0-{uuid4()}", f"phase0-{uuid4()}"
     company, observation, opportunity, startup = [str(uuid4()) for _ in range(4)]
     trace = build_scout_trace({"references": []}, pipeline_run_id="source-scout-run")
     try:
         await conn.execute("insert into companies(company_id,user_id,canonical_name) values($1,$2,'Synthetic Phase 0')", company, uid)
         await conn.execute("insert into source_observations(observation_id,user_id,channel,observed_name,company_id) values($1,$2,'manual_lookup','Synthetic Phase 0',$3)", observation, uid, company)
-        await conn.execute("insert into opportunities(opportunity_id,user_id,company_id,first_observation_id,latest_observation_id,legacy_startup_id) values($1,$2,$3,$4,$4,$5)", opportunity, uid, company, observation, startup)
+        await conn.execute("insert into opportunities(opportunity_id,user_id,company_id,first_observation_id,latest_observation_id,legacy_startup_id,workflow_state) values($1,$2,$3,$4,$4,$5,'admitted')", opportunity, uid, company, observation, startup)
         await conn.execute("insert into startups(startup_id,user_id,scout_info,financials,agent_trace) values($1,$2,'{}','{}',$3::jsonb)", startup, uid, json.dumps({"scout": trace}))
+        await conn.execute("update companies set canonical_domain='example.test' where user_id=$1 and company_id=$2", uid, company)
         evidence = EvidenceRepository(Pool())
         artifact, items = await evidence.ingest_artifact(
             EvidenceArtifactInput(user_id=uid, company_id=company, opportunity_id=opportunity,
@@ -51,10 +55,36 @@ async def test_postgres_roundtrip_and_tenant_isolation():
                                 display_text="Synthetic market evidence", assertion_class="externally_verified", confidence=0.9)
         link = ClaimEvidenceLinkInput(user_id=uid, evidence_item_id=items[0].evidence_item_id, relationship="supports", support_strength=0.9)
         claim = await evidence.create_claim(claim_input, links=[link], created_by=uid)
-        repository = EvaluationRepository(Pool(), clock=lambda: CLOCK)
+        if repository_factory is None:
+            from types import SimpleNamespace
+            from unittest.mock import AsyncMock
+            async def prerequisites(user_id):
+                return SimpleNamespace(require_tenant=lambda *a, **k: None, policy=_policy(),
+                    thesis_version_id=None, thesis_context={}, fund_config={})
+            # Obtain the same frozen model outputs used by publication unit tests.
+            async def generate(stage, prompt, payload, schema):
+                from investment_analysis.models import ReviewerDraft, PartnerDraft
+                if stage == "reviewer":
+                    market = next(row for row in payload["factual_evidence"] if row["assertion_class"] == "externally_verified")
+                    return ReviewerDraft(overall_assessment="Synthetic market review", assessments=[{
+                        "dimension": "MARKET", "conclusion": "Observed adoption", "proposed_score": 8,
+                        "score_rationale": "Observed adoption supports demand", "confidence": 0.9,
+                        "reasoning": [{"type": "INFERENCE", "text": "Observed adoption supports demand",
+                                       "references": {"claim_ids": [market["claim_id"]]}}]}])
+                return PartnerDraft(action="MONITOR", rationale=["Wait for execution evidence"], confidence=0.6,
+                    investment_case="Observed demand", assessment_ids=[item["assessment_id"] for item in payload["review"]["assessments"]])
+            repository = InvestmentAnalysisRepository(Pool(), clock=lambda: CLOCK, generate=generate,
+                prerequisites_loader=prerequisites,
+                evidence_preparer=AsyncMock(return_value={"status": "frozen_fixture", "claims_created": 0}))
+        else:
+            repository = await repository_factory(Pool(), user_id=uid, opportunity_id=opportunity, clock=lambda: CLOCK)
         result = await repository.evaluate(user_id=uid, opportunity_id=opportunity, actor_id=uid, trigger_type="rerun",
                                            policy=_policy(), pipeline_binding=PipelineBinding(user_id=uid, pipeline_run_id="rerun-a", pipeline_entry_type="rerun"))
         projected = await repository.get_current(user_id=uid, opportunity_id=opportunity)
+        dependencies = await repository.inspect_dependencies(user_id=uid, opportunity_id=opportunity, record=projected)
+        assert dependencies["state"] == "current"
+        with pytest.raises(ValueError, match="tenant/opportunity"):
+            await repository.inspect_dependencies(user_id=other, opportunity_id=opportunity, record=projected)
         assert projected["provenance"] == result["provenance"]
         assert projected["provenance"]["scout_run_id"] == trace["scout_run_id"]
         assert projected["provenance"]["source_scout_pipeline_run_id"] == "source-scout-run"
@@ -64,7 +94,7 @@ async def test_postgres_roundtrip_and_tenant_isolation():
         market = next(item for item in projected["provenance"]["criteria"] if item["criterion"] == "market")
         assert market["canonical_score"] == 8.0
         # Walk the bound canonical manual entry point too: real evidence writes,
-        # evaluator, EvidenceReviewer, DeterministicPartner and authenticated DTO.
+        # current analysis, compatibility projections and authenticated DTO.
         # Identity resolution is frozen to this already-persisted opportunity.
         from types import SimpleNamespace
         from unittest.mock import AsyncMock
@@ -91,7 +121,7 @@ async def test_postgres_roundtrip_and_tenant_isolation():
         assert walked.metadata["evidence_review"]["evaluation_id"] == str(api["evaluation"]["evaluation_id"])
         assert walked.metadata["partner_route"]["recommendation_id"] == str(api["recommendation"]["recommendation_id"])
         assert walked.metadata["partner_route"]["route"] == api["recommendation"]["recommended_state"]
-        assert any(event["stage"] == "deterministic_partner" and event["status"] == "DONE" for event in walked.pipeline_trace)
+        assert any(event["stage"] == "canonical_evaluation" and event["status"] == "DONE" for event in walked.pipeline_trace)
         assert next(item for item in api["criteria"] if item["criterion"] == "market")["score"] == 8.0
         assert set(walked.metadata["artifact_ids"]).issubset(api["provenance"]["evidence_artifact_ids"])
         assert await repository.get_current(user_id=other, opportunity_id=opportunity) is None

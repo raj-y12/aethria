@@ -1,9 +1,7 @@
-from types import SimpleNamespace
 from typing import Any, Dict, List
 
 import resolver.company_resolver as cr
 from models import ScoutInfo
-from reviewer.engine import ReviewerEngine
 from resolver.company_resolver import EvidenceSource, resolve_company
 from utils.adapters import scout_output_to_scout_info
 
@@ -76,7 +74,7 @@ def test_resolver_does_not_skip_founder_corroboration_when_identity_is_strong(mo
     assert result.founder_names == ["Jane Smith", "John Doe"]
 
 
-def test_founder_names_survive_scout_adapter_and_reviewer_payload():
+def test_founder_names_survive_scout_adapter():
     scout = scout_output_to_scout_info(
         {
             "id": "startup-1",
@@ -98,8 +96,3 @@ def test_founder_names_survive_scout_adapter_and_reviewer_payload():
     )
 
     assert scout.founder_names == ["Jane Smith", "John Doe"]
-
-    payload = ReviewerEngine._build_scout_output_payload(
-        SimpleNamespace(startup_id="startup-1", scout_info=scout)
-    )
-    assert payload["founder_names"] == ["Jane Smith", "John Doe"]

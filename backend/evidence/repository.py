@@ -110,8 +110,7 @@ class EvidenceRepository:
                     # Audit HIGH-B5: mirrors the artifact-level dedup above --
                     # re-ingesting byte-identical excerpt content under the
                     # same artifact used to insert an unconditional new row
-                    # every time, inflating current-claim counts that
-                    # evaluate_snapshot averages over (db/migrations/
+                    # every time, inflating evidence counts (db/migrations/
                     # 20260817000002_evidence_items_content_dedup.sql).
                     content_hash = hashlib.sha256(item.display_excerpt.encode("utf-8")).hexdigest()
                     item_row = await conn.fetchrow(
@@ -414,9 +413,7 @@ class EvidenceRepository:
         Companion to the min_confidence retry in list_current_claim_types
         above: retrying a low-confidence claim_type must not leave the old
         claim sitting alongside the new one, both status='current' --
-        evaluate_snapshot averages every current claim of a type, so an
-        un-superseded duplicate silently drifts the score based on how many
-        times extraction happened to run, not evidence quality. Called
+        retries must not present duplicate observations as independent support. Called
         immediately before create_claim for a claim_type that's being
         retried, so there is never more than one current claim per type at
         a time from this path.

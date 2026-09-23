@@ -33,7 +33,6 @@ from evidence.service import detect_prompt_injection
 from identity.models import IdentityAdmission, SourceObservationInput
 from tenant_context import require_user_id
 from triage.models import TriageDisposition
-from agents.canonical import DeterministicPartner, EvidenceReviewer
 from context import (
     assemble_regulatory_context,
     deduplicate_references,
@@ -54,6 +53,33 @@ class PipelineResult:
     metadata: Dict[str, Any] = field(default_factory=dict)
     pipeline_run_id: Optional[str] = None
     pipeline_trace: list[Dict[str, Any]] = field(default_factory=list)
+
+
+def _evaluation_response_metadata(evaluation: dict, regulatory_context: str = "") -> tuple[dict, dict]:
+    """Preserve manual-lookup response fields without executing extra agents."""
+    recommendation = evaluation.get("recommendation") or {}
+    missing = [str(value) for value in recommendation.get("missing_information") or [] if str(value).strip()]
+    scored = sum(item.get("score") is not None for item in evaluation.get("criteria") or [])
+    drivers = [str(value) for value in recommendation.get("decision_drivers") or []]
+    risks = [str(value) for value in recommendation.get("principal_risks") or []]
+    confidence = float(recommendation.get("confidence") or 0)
+    if not 0 <= confidence <= 1:
+        raise ValueError("invalid recommendation confidence")
+    review = {
+        "evaluation_id": str(evaluation.get("evaluation_id") or ""),
+        "recommendation_id": str(evaluation.get("recommendation_id") or ""),
+        "evidence_coverage": "sufficient" if scored and not missing else "insufficient",
+        "scored_criteria": scored, "missing_information": missing,
+        "principal_risks": risks, "decision_drivers": drivers,
+        "confidence": confidence, "regulatory_context": regulatory_context,
+    }
+    state = str(recommendation.get("state") or "insufficient_evidence")
+    route = state if state in {"advance", "monitor", "pass", "insufficient_evidence"} else "insufficient_evidence"
+    return review, {
+        "recommendation_id": review["recommendation_id"], "route": route,
+        "human_review_required": bool(recommendation.get("human_review_required", True)),
+        "rationale": (drivers + risks)[:20],
+    }
 
 
 class OpportunityPipeline:
@@ -309,16 +335,8 @@ class OpportunityPipeline:
             claims=persisted_claims,
             evidence=persisted_links,
         )
-        record("evidence_reviewer", "STARTED")
-        evidence_review = EvidenceReviewer().review(
-            evaluation, regulatory_context=regulatory_context
-        )
-        record("evidence_reviewer", "DONE", evaluation_run_id=evaluation.get("evaluation_id"))
-        record("deterministic_partner", "STARTED")
-        partner_route = DeterministicPartner().route(evaluation, evidence_review)
+        evidence_review, partner_route = _evaluation_response_metadata(evaluation, regulatory_context)
         analysis = (evaluation.get("judgment_audit") or {}).get("investment_analysis")
-        record("deterministic_partner", "DONE", projection_only=True,
-               recommendation_origin="PARTNER_ANALYSIS" if analysis else "CANONICAL_EVALUATION")
         return PipelineResult(
             pipeline_run_id=pipeline_run_id, pipeline_trace=trace,
             status="completed", code="opportunity_evaluated", user_id=uid,
@@ -326,8 +344,8 @@ class OpportunityPipeline:
             observation_id=admission.observation_id, evaluation=evaluation,
             metadata={
                 "artifact_ids": artifact_ids,
-                "evidence_review": evidence_review.model_dump(mode="json"),
-                "partner_route": partner_route.model_dump(mode="json"),
+                "evidence_review": evidence_review,
+                "partner_route": partner_route,
                 "regulatory_context": regulatory_context,
                 "legacy_compatibility": True,
                 "investment_analysis_trace": (analysis or {}).get("trace", []),

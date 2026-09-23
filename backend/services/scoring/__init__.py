@@ -1,3 +1,1 @@
-from services.scoring.scoring_engine import DeterministicScoringEngine
-
-__all__ = ["DeterministicScoringEngine"]
+"""Published fund-policy compilation and storage."""

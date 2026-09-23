@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from tests.evaluation_v2.test_phase0_golden_pipeline import GOLDEN
+from tests.evaluation_v2.historical_fixtures import GOLDEN
 from tests.investment_analysis.test_authority import run_case
 
 

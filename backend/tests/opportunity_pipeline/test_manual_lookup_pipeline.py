@@ -90,8 +90,6 @@ async def test_manual_lookup_ingests_evidence_then_evaluates():
         ("prerequisites", "STARTED"), ("prerequisites", "DONE"),
         ("evidence", "STARTED"), ("evidence", "DONE"),
         ("canonical_evaluation", "STARTED"), ("canonical_evaluation", "DONE"),
-        ("evidence_reviewer", "STARTED"), ("evidence_reviewer", "DONE"),
-        ("deterministic_partner", "STARTED"), ("deterministic_partner", "DONE"),
     ]
 
 

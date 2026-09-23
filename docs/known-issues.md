@@ -4,6 +4,7 @@ Reproducible, diagnosed defects. Broader architectural debt is in
 [../ROADMAP.md](../ROADMAP.md); this file is for specific defects. Entries stay
 after resolution as a record of root cause and fix — see each **Fixed by** line
 for the change that closed it.
+Paths in resolved entries may refer to retired historical executors.
 
 ---
 

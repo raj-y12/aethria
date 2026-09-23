@@ -22,7 +22,14 @@ from config.scoring_config import (
     SECTOR_TAM_THRESHOLDS,
     THRESHOLDS,
 )
-from services.scoring.extraction_layer import EXPECTED_COMPONENTS
+# Persisted component identifiers belong to the policy contract, not an engine.
+EXPECTED_COMPONENTS = {
+    "market": ["tam", "growth_rate", "urgency", "timing", "competition"],
+    "execution": ["traction", "growth_velocity", "gtm_effectiveness", "team_execution", "operational_velocity"],
+    "product": ["value_prop", "pain_alignment", "differentiation", "ux", "retention"],
+    "technical": ["complexity", "engineering_quality", "scalability", "data_advantage", "architecture"],
+    "defensibility": ["network_effects", "switching_costs", "proprietary_data", "barriers", "brand"],
+}
 
 
 PRODUCTION_DIMENSIONS = ("market", "product", "technical", "execution", "defensibility")

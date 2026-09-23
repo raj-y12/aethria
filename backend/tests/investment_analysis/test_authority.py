@@ -6,7 +6,7 @@ from evaluation_v2.service import snapshot_claims
 from pipeline_contracts.models import Identity, Lineage
 from investment_analysis.models import ReviewerDraft, PartnerDraft
 from investment_analysis.service import analyze, factual_packet
-from tests.evaluation_v2.test_phase0_golden_pipeline import _inputs, CLOCK
+from tests.evaluation_v2.historical_fixtures import _inputs, CLOCK
 from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
 from investment_analysis.model_gateway import AnalysisBlocked
 
@@ -230,6 +230,36 @@ async def test_compatibility_provenance_preserves_more_diligence_action():
     result, _ = await run_case(action="MORE_DILIGENCE")
     _, partner, _ = legacy_stage_projection(user_id="tenant", analysis=result)
     assert partner["provenance"]["canonical_recommendation"] == "insufficient_evidence"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("case,action,display,canonical", [
+    ("A_strong_verified", "ADVANCE", "INVEST", "advance"),
+    ("A_strong_verified", "PASS", "PASS", "pass"),
+    ("A_strong_verified", "MONITOR", "MONITOR", "monitor"),
+    ("D_missing_dimension", "ADVANCE", "MONITOR", "insufficient_evidence"),
+])
+async def test_current_partner_projection_preserves_judgment_and_provenance(case, action, display, canonical):
+    from investment_analysis.projection import legacy_stage_projection
+    from models import PartnerInfo
+
+    result, _ = await run_case(case, action=action)
+    before = result.model_dump(mode="json")
+    _, projected, trace = legacy_stage_projection(user_id="tenant", analysis=result)
+    persisted = PartnerInfo.model_validate(projected)
+    assert persisted.recommendation == display
+    assert persisted.confidence == result.partner.judgment.confidence
+    assert persisted.provenance.canonical_recommendation == canonical
+    assert persisted.provenance.recommendation_origin == "PARTNER_ANALYSIS"
+    assert persisted.provenance.evidence_snapshot_hash == result.partner.lineage.evidence_snapshot_hash
+    assert persisted.provenance.partner_model == result.partner.model
+    assert persisted.provenance.policy_changed_recommendation is (case == "D_missing_dimension")
+    assert trace["partner"]["judgment_action"] == action
+    assert trace["partner"]["partner_prompt_version"] == result.partner.prompt_version
+    assert trace["partner"]["provenance"] == persisted.provenance.model_dump(mode="json")
+    assert result.model_dump(mode="json") == before
+    with pytest.raises(ValueError, match="tenant mismatch"):
+        legacy_stage_projection(user_id="foreign", analysis=result)
 
 
 @pytest.mark.asyncio

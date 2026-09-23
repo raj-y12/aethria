@@ -21,13 +21,3 @@ async def test_operator_override_uses_shared_analysis(monkeypatch, stage, scope)
     identity.get_opportunity_by_legacy_projection.assert_awaited_once_with(user_id="tenant", legacy_startup_id="startup")
     refresh.assert_awaited_once_with(request, "opportunity", scope=scope)
     assert result == {"success": True, "startup_id": "startup", "stage": stage}
-
-
-@pytest.mark.asyncio
-async def test_legacy_standalone_scoring_entrypoints_are_retired():
-    from reviewer.engine import main as reviewer_main
-    from partner.engine import main as partner_main
-
-    for main in (reviewer_main, partner_main):
-        with pytest.raises(RuntimeError, match="legacy_analysis_entrypoint_retired"):
-            await main()

@@ -5,7 +5,8 @@ financial figure, and asserts the deterministic gate drops it. A regression in a
 of these is a trust failure, so they are intentionally strict.
 """
 
-from scout.tools.financials_grounding import ground_financials, verify_proposal, _build_sources_by_url
+from scout.tools.financials_grounding import ground_financials, verify_proposal, _build_sources_by_url, funding_history_for_stage
+from utils.adapters import financials_from_scout_output
 
 
 def _pack(*sources):
@@ -19,6 +20,17 @@ SRC = {
     "url": "https://techcrunch.com/acme-raises",
     "snippet": "Acme raised a $5M Series A in 2024 led by Sequoia. The round valued Acme at $20M post-money.",
 }
+
+
+def test_later_stage_does_not_publish_obsolete_total_funding():
+    old_total = "$18M total raised (seed/Series A) led by Notion Capital"
+    assert funding_history_for_stage(old_total, "Series B") is None
+    assert funding_history_for_stage(old_total, "Series A") == old_total
+    assert funding_history_for_stage("$18M raised in seed and Series A rounds", "Series B") == "$18M raised in seed and Series A rounds"
+    assert funding_history_for_stage("$54M total raised after Series B", "Series B") == "$54M total raised after Series B"
+    projected = financials_from_scout_output({"funding_stage": "Series B", "financials_grounded": {"funding_history": old_total}})
+    assert projected.funding_history is None
+    assert projected.funding_missing
 
 
 # ─────────────────────────── grounded values are kept ───────────────────────────

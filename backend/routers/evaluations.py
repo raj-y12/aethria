@@ -7,7 +7,7 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisiteError,
     load_evaluation_prerequisites,
 )
-from evaluation_v2.repository import EvaluationLifecycleError
+from investment_analysis.repository import EvaluationLifecycleError
 from investment_analysis.model_gateway import AnalysisBlocked
 from routers.authority import (
     has_authority_control_plane,

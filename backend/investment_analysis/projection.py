@@ -1,7 +1,30 @@
 """One-way display projection of persisted analysis, never another authority."""
+import re
+
 from models import ReviewInfo, PartnerInfo, PartnerSnapshot, PartnerProvenance
 from tenant_context import require_user_id
 from .models import AnalysisResult, PartnerAction
+
+
+def polish_aethria_view_for_api(aethria_view: object, review: dict, company_name: str) -> dict | None:
+    """Keep historical review records readable without running their old evaluator."""
+    if not isinstance(aethria_view, dict):
+        return None
+    out = dict(aethria_view)
+    if "aethria view" in str(out.get("headline") or "").lower():
+        out["headline"] = f"{(company_name or '').strip() or 'Company'} — Evidence read."
+    thesis_line = str(out.get("thesis_fit_line") or "").strip()
+    summary = str(review.get("overall_summary") or "").strip()
+    if thesis_line and summary:
+        tokens = lambda value: set(re.findall(r"[a-z0-9]{3,}", value.lower()))
+        line_tokens, summary_tokens = tokens(thesis_line), tokens(summary)
+        overlap = len(line_tokens & summary_tokens) / len(line_tokens | summary_tokens) if line_tokens | summary_tokens else 0
+        normalized_line = " ".join(thesis_line.lower().split())
+        normalized_summary = " ".join(summary.lower().split())
+        if ((len(line_tokens) >= 4 and len(summary_tokens) >= 6 and overlap >= 0.55)
+                or (len(normalized_line) >= 40 and normalized_line in normalized_summary)):
+            out["thesis_fit_line"] = ""
+    return out
 
 
 def legacy_stage_projection(*, user_id: str, analysis: AnalysisResult) -> tuple[dict, dict, dict]:

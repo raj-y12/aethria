@@ -1,3 +1,4 @@
+from tests.investment_analysis.fixtures import publish_fixture
 from collections import deque
 from datetime import datetime, timezone
 import json
@@ -11,7 +12,7 @@ from evaluation_v2.models import (
     EvaluationPolicy,
     EvidenceEligibilityPolicy,
 )
-from evaluation_v2.repository import EvaluationLifecycleError, EvaluationRepository
+from investment_analysis.repository import EvaluationLifecycleError, InvestmentAnalysisRepository
 
 
 class _ProjectionRepository:
@@ -183,7 +184,7 @@ def _evaluation_policy():
 
 @pytest.mark.asyncio
 async def test_current_evaluation_decodes_asyncpg_json_strings_for_api_consumers():
-    repository = EvaluationRepository(_Pool(_Connection()))
+    repository = InvestmentAnalysisRepository(_Pool(_Connection()))
 
     result = await repository.get_current(
         user_id="user-a",
@@ -207,9 +208,9 @@ async def test_evaluation_link_projection_joins_grounding_metadata_tenant_safely
         clock_calls.append(True)
         return datetime(2026, 7, 20, 12, 0, tzinfo=timezone.utc)
 
-    repository = EvaluationRepository(_Pool(connection), clock=clock)
+    repository = InvestmentAnalysisRepository(_Pool(connection), clock=clock)
 
-    await repository.evaluate(
+    await publish_fixture(repository,
         user_id="user-a",
         opportunity_id="opportunity-1",
         actor_id="actor-a",
@@ -273,10 +274,10 @@ async def test_evaluate_refuses_to_silently_reopen_an_invested_opportunity():
     current_recommendation_id and flip workflow_state back to
     "ruling_pending", as if the investment decision never happened."""
     connection = _EvaluationConnection(decision_state="invested")
-    repository = EvaluationRepository(_Pool(connection))
+    repository = InvestmentAnalysisRepository(_Pool(connection))
 
     with pytest.raises(EvaluationLifecycleError, match="Invested opportunities"):
-        await repository.evaluate(
+        await publish_fixture(repository,
             user_id="user-a",
             opportunity_id="opportunity-1",
             actor_id="actor-a",
@@ -291,10 +292,10 @@ async def test_evaluate_refuses_to_silently_reopen_a_completed_workflow():
     (a separate column from decision_state) -- "completed" and "monitoring"
     are the workflow-layer's own terminal states."""
     connection = _EvaluationConnection(workflow_state="completed")
-    repository = EvaluationRepository(_Pool(connection))
+    repository = InvestmentAnalysisRepository(_Pool(connection))
 
     with pytest.raises(EvaluationLifecycleError, match="completed workflow"):
-        await repository.evaluate(
+        await publish_fixture(repository,
             user_id="user-a",
             opportunity_id="opportunity-1",
             actor_id="actor-a",
@@ -308,7 +309,7 @@ async def test_actual_evaluation_outbox_payload_projects_to_a_receipted_legacy_p
     from authority.projection import AuthorityProjectionConsumer
 
     connection = _EvaluationConnection()
-    await EvaluationRepository(_Pool(connection)).evaluate(
+    await publish_fixture(InvestmentAnalysisRepository(_Pool(connection)),
         user_id="user-a",
         opportunity_id="opportunity-1",
         actor_id="actor-a",
@@ -338,14 +339,14 @@ async def test_actual_evaluation_outbox_payload_projects_to_a_receipted_legacy_p
 @pytest.mark.asyncio
 async def test_evaluation_projection_preserves_unscored_criterion_as_null():
     connection = _EvaluationConnection()
-    repository = EvaluationRepository(_Pool(connection))
+    repository = InvestmentAnalysisRepository(_Pool(connection))
     policy = _evaluation_policy().model_copy(deep=True)
     policy.criteria.append(
         CriterionRule(criterion="execution", claim_types=["execution"], weight=0.5)
     )
     policy.criteria[0].weight = 0.5
 
-    result = await repository.evaluate(
+    result = await publish_fixture(repository,
         user_id="user-a",
         opportunity_id="opportunity-1",
         actor_id="actor-a",

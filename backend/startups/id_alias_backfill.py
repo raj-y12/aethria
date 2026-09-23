@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-ARTIFACT = Path(__file__).resolve().parents[1] / "db" / "reconciliation" / "portfolio_startup_aliases.json"
+ARTIFACT = Path(__file__).resolve().parents[2] / "db" / "reconciliation" / "portfolio_startup_aliases.json"
 EXPECTED_MAPPING_COUNT = 133
 
 

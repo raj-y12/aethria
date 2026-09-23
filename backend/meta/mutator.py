@@ -240,48 +240,19 @@ class PromptMutator:
                     "signal": perf,
                 })
 
-        # Reviewer prompt mutations
-        reviewer_health = self.signal.get("reviewer_health", {})
-        vd = reviewer_health.get("verdict_distribution", {})
-        total_verdicts = sum(vd.values())
-        calibration_warning = reviewer_health.get("calibration_warning")
-
-        if total_verdicts > 0:
-            weak_pct = vd.get("WEAK", 0) / total_verdicts
-            strong_pct = vd.get("STRONG", 0) / total_verdicts
-
-            if calibration_warning and weak_pct > 0.70:
-                if not cooldowns.get("SkepticalReviewer", False):
-                    targets.append({
-                        "agent_target": "SkepticalReviewer",
-                        "mutation_type": "reviewer_prompt",
-                        "trigger": f"Calibration warning + {weak_pct:.0%} WEAK verdicts",
-                        "signal": reviewer_health,
-                    })
-
-            if strong_pct > 0.60:
-                if not cooldowns.get("OpportunistReviewer", False):
-                    targets.append({
-                        "agent_target": "OpportunistReviewer",
-                        "mutation_type": "reviewer_prompt",
-                        "trigger": f"{strong_pct:.0%} STRONG verdicts — tighten optimism",
-                        "signal": reviewer_health,
-                    })
-
         return targets
 
     def apply(
         self,
         targets: List[Dict],
         scout_engine,
-        reviewer_engine,
     ) -> PromptMutationBatchResult:
         """Rewrite targets and return lossless typed terminal accounting."""
         outcomes: List[PromptMutationTargetOutcome] = []
         for target in targets:
             agent_target = str(target.get("agent_target") or "unknown_target")
             try:
-                mutation = self._apply_one(target, scout_engine, reviewer_engine)
+                mutation = self._apply_one(target, scout_engine)
                 if not isinstance(mutation, dict):
                     raise PromptMutationTargetError(
                         code="prompt_proposal_missing",
@@ -335,10 +306,9 @@ class PromptMutator:
         self,
         target: Dict,
         scout_engine,
-        reviewer_engine,
     ) -> Optional[Dict]:
         agent_name = target["agent_target"]
-        current_prompt = self._get_current_prompt(agent_name, scout_engine, reviewer_engine)
+        current_prompt = self._get_current_prompt(agent_name, scout_engine)
         if not current_prompt:
             self.logger.warning(f"[Mutator] Could not get prompt for {agent_name}")
             raise PromptMutationTargetError(
@@ -490,7 +460,7 @@ class PromptMutator:
 
         return mutation
 
-    def _get_current_prompt(self, agent_name: str, scout_engine, reviewer_engine) -> Optional[str]:
+    def _get_current_prompt(self, agent_name: str, scout_engine) -> Optional[str]:
         from meta.analyser import SCOUT_AGENT_NAMES
         # Scout agents
         if agent_name in SCOUT_AGENT_NAMES and scout_engine:
@@ -498,34 +468,7 @@ class PromptMutator:
             for scout in scout_engine.scouts:
                 if scout.scout_type == scout_type:
                     return scout.system_prompt
-        # Legacy persona mutation cannot rewrite the new evidence/authority contract.
-        if getattr(reviewer_engine, "analysis_contract_version", None):
-            return None
-        # Reviewer agents
-        if reviewer_engine:
-            if agent_name == "DefaultReviewer":
-                return reviewer_engine.reviewer.SYSTEM_PROMPT
-            elif agent_name == "SkepticalReviewer":
-                return reviewer_engine.skeptical_reviewer.SYSTEM_PROMPT
-            elif agent_name == "OpportunistReviewer":
-                return reviewer_engine.opportunist_reviewer.SYSTEM_PROMPT
         return None
-
-    def _set_agent_prompt(self, agent_name: str, new_prompt: str, scout_engine, reviewer_engine):
-        from meta.analyser import SCOUT_AGENT_NAMES
-        if agent_name in SCOUT_AGENT_NAMES and scout_engine:
-            scout_type = SCOUT_AGENT_NAMES[agent_name]
-            for scout in scout_engine.scouts:
-                if scout.scout_type == scout_type:
-                    scout.set_prompt(new_prompt)
-                    return
-        if reviewer_engine:
-            if agent_name == "DefaultReviewer":
-                reviewer_engine.reviewer.set_prompt(new_prompt)
-            elif agent_name == "SkepticalReviewer":
-                reviewer_engine.skeptical_reviewer.set_prompt(new_prompt)
-            elif agent_name == "OpportunistReviewer":
-                reviewer_engine.opportunist_reviewer.set_prompt(new_prompt)
 
     def _call_llm(self, user_prompt: str, *, agent_id: Optional[str] = None) -> tuple:
         """Call OpenAI to rewrite a prompt. Dependency errors propagate to the target."""

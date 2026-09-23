@@ -304,12 +304,35 @@ All fund-thesis routes require Supabase and return `503` when it is unavailable.
 | `GET` | `/api/meta/insights` | Latest what-changed / why summary |
 | `GET` | `/api/meta/prompt-library` | Prompt library document |
 | `GET` | `/api/meta/prompt-state` | Active vs candidate prompt state |
-| `POST` | `/api/meta/prompts/promote` | Promote a candidate prompt (may require a fresh eval pass) |
+| `POST` | `/api/meta/prompts/promote` | Promote a Scout candidate prompt; legacy Reviewer persona targets return 409 |
 | `POST` | `/api/meta/prompts/reset` | Reset to the baseline prompt |
 | `GET`/`PUT` | `/api/meta/eval-set` | The startup set used for prompt evaluation |
-| `POST` | `/api/meta/prompts/evaluate` | Run a prompt evaluation |
+| `POST` | `/api/meta/prompts/evaluate` | Shadow-evaluate a candidate using the current Reviewer and frozen analysis evidence |
 | `GET` | `/api/meta/weights` | Current scout weighting |
 | `GET` | `/api/meta/calibration` | Reviewer calibration state |
+
+Prompt evaluation accepts the existing reviewer target names as library aliases.
+Each startup must have a current `investment_analysis` baseline whose policy hash
+matches the active policy. The candidate uses the current `ReviewerDraft` schema,
+the baseline's frozen factual evidence, identity and fund context, and deterministic
+validation. It does not publish an analysis, run Partner, prepare new evidence, or
+change a live prompt. Only budget accounting and the evaluation summary are saved.
+Historical persona-only baselines require a current analysis before comparison.
+
+The response now compares validated scores and evidence support: rows contain
+`baseline_evaluation_id`, `lost_support_dimensions`, `support_match`,
+`n_scored_dimensions`, and nullable `mean_abs_delta`. The summary contains
+`support_agreements` instead of `verdict_agreements`; persona
+`baseline_verdict`, `candidate_verdict`, and `verdict_match` are retired.
+Losing a previously supported score is a regression. Missing, failed, unscored,
+or policy-mismatched comparisons prevent a passing evaluation; a score change
+beyond the configured delta limit also fails. This gate measures prompt stability,
+not whether a new investment judgment is correct.
+The old persona promotion state cannot control the current Reviewer. Reviewer
+persona promotion returns 409 without changing saved prompt state; existing
+persona promotions remain historical metadata. Scout prompt promotion remains
+available.
+
 
 ## Admin
 

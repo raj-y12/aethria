@@ -85,13 +85,13 @@ Each stage is `async` and tenant-scoped. Periodic work is gated on the active fu
 thesis. The shared analysis invokes both Reviewer and Partner and therefore
 requires both toggles; Scout-only cycles retain factual discoveries. The runner's
 Reviewer/Partner callbacks project the completed shared analysis. Historical
-engine implementations remain for compatibility while migration is in progress
+records remain readable through projections; their execution engines have been removed
 ([ADR-0016](docs/adr/0016-reviewer-assessment-and-partner-judgment.md)).
 
 | Stage | Module | Responsibility |
 |---|---|---|
 | **Scout** | `backend/scout/` | Discover *real* companies via the retrieval chain (Exa semantic search finds candidate companies, Firecrawl reads their pages) + OpenAI structuring. Four personas: `market_driven`, `builder_technical`, `pain_point`, `contrarian`. Persona selection is weighted by the MetaAgent; backpressure throttles discovery when the review backlog builds, and ramp waves accelerate it when the backlog drains. |
-| **Reviewer** | `backend/investment_analysis/` | One evidence-first review produces cited reasoning units, proposed dimension scores with rationale, risks, unknowns and diligence priorities. Historical Scout score/opinion fields are excluded from its factual packet. Evidence validation retains, caps or withholds each proposed score. The old three-persona implementation remains historical compatibility code. |
+| **Reviewer** | `backend/investment_analysis/` | One evidence-first review produces cited reasoning units, proposed dimension scores with rationale, risks, unknowns and diligence priorities. Historical Scout score/opinion fields are excluded from its factual packet. Evidence validation retains, caps or withholds each proposed score. |
 | **Partner** | `backend/investment_analysis/` | Reads completed review and validated assessments and chooses ADVANCE / PASS / MONITOR / MORE_DILIGENCE. Deterministic evidence constraints can change the operational action without erasing its original judgment. Legacy startup projections still map ADVANCE to INVEST and MORE_DILIGENCE to MONITOR; the full distinction is persisted in the evaluation audit. |
 | **Portfolio** | `backend/portfolio/` | Tracks accepted companies: execution checkpoints, external signals, feedback loops, and health checks, each on its own interval. Also owns rejection analysis and concentration clustering. |
 | **Meta** | `backend/meta/` | Self-optimisation. Analyses outcomes, then mutates scout prompts (`mutator.py`), reweights scout personas (`reweighter.py`), and proposes historical calibration updates (`calibrator.py`). Retired Reviewer threshold proposals do not gate the shared investment-analysis core. Runs on its own interval (`META_AGENT_INTERVAL_SECONDS`, default daily) — it self-gates and returns early when the interval has not elapsed. |
@@ -230,8 +230,8 @@ mode rather than swapped in at once.
 |---|---|---|
 | Identity | `backend/identity/` | Source observations → normalisation → canonical `companies` / `opportunities`; ambiguous matches become `identity_cases` for human resolution rather than silent merges. |
 | Evidence | `backend/evidence/` | Artifacts, claims, claim↔evidence links, trust/verification classes, access classes for confidential material, operator corrections, and prompt-injection detection on ingested text. |
-| Investment analysis | `backend/investment_analysis/` | Shared factual preparation, evidence-first Reviewer assessments, evidence/policy validation and a genuine Partner decision. Supports bounded targeted research and Partner-only refresh against unchanged review dependencies. |
-| Evaluation persistence | `backend/evaluation_v2/` | Immutable analysis, validated criteria, Partner recommendation and source snapshots. Its historical deterministic score/recommendation functions remain for replay; live entry points use the shared analysis repository. A machine recommendation is not a human ruling. |
+| Investment analysis | `backend/investment_analysis/` | Shared factual preparation, evidence-first Reviewer assessments, evidence/policy validation, Partner judgment and immutable publication. One concrete repository owns reads and atomic publication; no inherited alternate evaluator. The runner uses completed-analysis callbacks; the standalone legacy Partner engine is removed. Supports bounded targeted research and Partner-only refresh against unchanged review dependencies. |
+| Evaluation policy and provenance | `backend/evaluation_v2/` | Shared policy, source-snapshot, support-validation and provenance helpers. The historical score-to-action evaluator is removed; current analysis consumes the evidence and policy helpers directly. Frozen historical records remain readable without rerunning their original engine. Persistence belongs to `investment_analysis/` (ADR-0017). A machine recommendation is not a human ruling. |
 | Decisions | `backend/decisions/` | Authoritative human rulings, workflow actions, approvals, CRM export. An approval records intent; it does not itself perform an external write. |
 | Monitoring | `backend/monitoring/` | Service levels 0–5, refresh reservations with cost envelopes, material-change checks. |
 | Fund intelligence | `backend/fund_intelligence/` | Derives attributed policy proposals from outcomes; proposals are previewed, human-reviewed, and published as governed policy versions. |
@@ -250,13 +250,10 @@ golden-set runner and evaluation-manifest builder used to check the current
 pipeline against versioned invariants (see its own module docstring). It is
 not part of the canonical institutional layer above; `evaluation_v2/` is.
 
-**`backend/agents/`**: a small, deterministic (non-LLM) canonical
-evidence-review and routing adapter (`EvidenceReviewer`, `DeterministicPartner`
-in `agents/canonical.py`), used only by `opportunity_pipeline.py`. Despite the
-name, it is unrelated to the LLM-driven Scout/Reviewer/Partner personas in
-`scout/`, `reviewer/`, `partner/`, and `investment_analysis/` — it translates
-an already-immutable evaluation into an explainable review/route, and never
-calls a model.
+**Opportunity response metadata**: `opportunity_pipeline.py` derives
+`evidence_review` and `partner_route` fields from the immutable evaluation
+for existing API consumers. The former `backend/agents/` adapter package was
+removed because it did not perform a separate analysis or judgement.
 
 **Rollout modes** (`authority/models.py::RolloutMode`):
 `legacy → shadow → backfill → canonical_write → canonical_read`, with

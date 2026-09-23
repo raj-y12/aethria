@@ -1,1 +1,1 @@
-"""Internal target contracts; current engines retain their existing interfaces."""
+"""Shared analysis contracts, references and lineage; no conversion framework."""

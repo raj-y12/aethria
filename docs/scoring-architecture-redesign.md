@@ -29,14 +29,11 @@ not replayed as current conviction.
 
 ### Residual compatibility surfaces
 
-The old reviewer schemas, `services/scoring/scoring_engine.py`, numeric blend
-helpers, legacy Partner ladder, and frontend `reviewScoring.ts` remain because
-historical rows, migration adapters, and characterization tests still read
-those shapes. They are not runtime authorities: governed construction disables
-reviewer scoring, Partner exits through its canonical-evaluation branch, and
-the API/UI redact the numeric projections. Removing them is a separate cleanup
-after the historical-read contract is retired, not part of the authority
-cutover.
+The old Reviewer personas, deterministic scorer, numeric blend, and legacy
+Partner ladder have been removed. Historical rows remain readable through
+one-way projections; the API/UI do not promote their numeric fields to current
+assessment authority. Published policy data and its compiler remain because
+the live analysis still consumes versioned fund policy.
 
 One presentation fallback remains: `semantics.ts` contains the same four-band
 rubric mirror used when a legacy structured presentation has no policy payload.
