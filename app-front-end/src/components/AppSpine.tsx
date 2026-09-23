@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion, useIsPresent } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { SpineNavButton, WorkspaceGlyph } from "./SystemBar";
+import LookupReadyNotice, { type LookupReadyNoticeProps } from "./LookupReadyNotice";
 import AgentLogoutModal from "./AgentLogoutModal";
 import { useAgentLogoutFlow } from "../hooks/useAgentLogoutFlow";
 import { usePrefersReducedMotion } from "../hooks";
@@ -59,6 +60,7 @@ interface AppSpineProps {
   mandate: SpineMandate;
   /** True while a Dispatch lookup runs in the background. */
   dispatchActive: boolean;
+  dispatchReadyNotice: Omit<LookupReadyNoticeProps, 'placement' | 'className'>;
   onDispatch: () => void;
   override?: SpineOverride | null;
   /** Home owns the fixed settings/logout controls while this spine exits. */
@@ -354,6 +356,7 @@ export default function AppSpine({
   telemetry,
   mandate,
   dispatchActive,
+  dispatchReadyNotice,
   onDispatch,
   override,
   suppressFixedChrome = false,
@@ -614,17 +617,20 @@ export default function AppSpine({
           </div>
         </aside>
 
-        <SpineNavButton
-          label="Dispatch"
-          active={false}
-          ariaPressed={false}
-          onClick={onDispatch}
-          shortcut="⌘K"
-          compact
-          surface="oxford"
-          running={dispatchActive}
-          className="aethria-spine-dispatch-float"
-        />
+        <div className="aethria-spine-dispatch-anchor">
+          <SpineNavButton
+            label="Dispatch"
+            active={false}
+            ariaPressed={false}
+            onClick={onDispatch}
+            shortcut="⌘K"
+            compact
+            surface="oxford"
+            running={dispatchActive}
+            className="aethria-spine-dispatch-float"
+          />
+          <LookupReadyNotice {...dispatchReadyNotice} placement="dispatch" />
+        </div>
       </div>
 
       {hideFixedChrome ? null : (

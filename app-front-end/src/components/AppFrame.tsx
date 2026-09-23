@@ -613,6 +613,13 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                     telemetry={telemetry}
                     mandate={mandate}
                     dispatchActive={dispatch.lookupWorking}
+                    dispatchReadyNotice={{
+                      name: dispatch.lookupReady?.scout?.name ?? null,
+                      recommendation: dispatch.lookupReady?.partner?.recommendation ?? null,
+                      recommendationLabel: partnerRecommendationLabel(dispatch.lookupReady?.partner),
+                      onOpen: dispatch.openLookupMemo,
+                      onDismiss: dispatch.dismissReady,
+                    }}
                     onDispatch={dispatch.openCommandBar}
                     override={spineOverride}
                     suppressFixedChrome={isHomeRoute}
@@ -636,6 +643,7 @@ export default function AppFrame({ data, startupsError, chrome = 'full', childre
                 recommendationLabel={partnerRecommendationLabel(dispatch.lookupReady?.partner)}
                 onOpen={dispatch.openLookupMemo}
                 onDismiss={dispatch.dismissReady}
+                className={showWorkspaceSpine ? 'lg:hidden' : ''}
               />
               {children}
               <AnimatePresence initial={false}>

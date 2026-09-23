@@ -4825,3 +4825,26 @@ textarea {
     stroke-dashoffset: -44;
   }
 }
+
+/* The desktop completion notice grows from the same right edge as Dispatch's tooltip. */
+.aethria-spine-dispatch-anchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.lookup-ready-notice--dispatch {
+  position: absolute;
+  z-index: 60;
+  right: auto;
+  bottom: 0;
+  left: calc(100% + 10px);
+  width: min(390px, calc(100vw - 72px));
+  padding: 0;
+  pointer-events: auto;
+}
+
+.lookup-ready-notice--dispatch .lookup-ready-notice__plate {
+  max-width: none;
+  box-shadow: 0 10px 30px -12px rgba(10, 22, 41, 0.28);
+}
