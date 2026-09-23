@@ -21,7 +21,7 @@ def test_retrieve_source_pack_rejects_scraped_http_error_pages(monkeypatch):
             {
                 "title": "Inside Protex AI",
                 "url": "https://youtube.com/watch?v=example",
-                "snippet": "Error 401 (Bad Request)!!1 **401.** That's an error. The server cannot process the request because it is malformed. It should not be retried. Back Skip navigation Inside Protex AI",
+                "snippet": "Error 401 (Bad Request)!!1 **401.** That’s an error. The server cannot process the request because it is malformed. It should not be retried. Back Skip navigation Inside Protex AI",
             },
             {
                 "title": "Protex AI company profile",

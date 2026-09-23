@@ -30,7 +30,7 @@ provider response is normalised into before anything downstream sees it.
   (`retrieve_source_pack`), wiring providers to `retrieval_cache` and excluding
   scraped HTTP error pages before sources reach evidence consumers.
 - `reference_validation.py` / `reference_verify.py` / `source_corroboration.py`:
-  source quality — URL/domain validation, reachability probing, anchor and
+  source quality — URL/domain validation, scraped error-page rejection, reachability probing, anchor and
   corroboration checks. Consumed broadly (scout, identity, resolver) since
   evidence quality isn't any one agent's private concern.
 - `recency.py`: shared recency-window policy for prompts and queries.
