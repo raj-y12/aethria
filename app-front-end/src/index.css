@@ -4812,8 +4812,8 @@ textarea {
   position: absolute;
   z-index: 1;
   right: auto;
-  bottom: -6px;
-  left: -28px;
+  bottom: -2px;
+  left: -18px;
   width: min(310px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
@@ -4821,7 +4821,7 @@ textarea {
 
 .lookup-ready-notice--dispatch .lookup-ready-notice__plate {
   max-width: none;
-  height: calc(var(--dock-size) + 12px);
+  height: calc(var(--dock-size) + 4px);
   padding-left: calc(var(--dock-size) + 14px);
   padding-right: var(--space-3);
   padding-block: var(--space-1);
