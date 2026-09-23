@@ -4842,10 +4842,10 @@ textarea {
 
 .lookup-ready-notice--dispatch {
   position: absolute;
-  z-index: 60;
+  z-index: 1;
   right: auto;
   bottom: -6px;
-  left: -6px;
+  left: -12px;
   width: min(310px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
