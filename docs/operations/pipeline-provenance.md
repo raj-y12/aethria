@@ -112,9 +112,12 @@ service, endpoint, permission or database table is introduced.
 
 `backend/tests/evaluation_v2/phase0_golden_pipeline.json` freezes evidence and full
 criterion/recommendation outputs under pinned v4 Partner rules and v3 rubric.
-Tests never regenerate the fixture or contact external providers.
+Tests never regenerate the fixture or contact external providers. These are
+historical outputs, not the current authority. `historical_fixtures.py` retains
+the inputs; `tests/investment_analysis/test_baseline_comparison.py` checks current
+analysis against those companies. The historical evaluator is no longer executed.
 
-| Case | Current canonical output | Current Partner output |
+| Case | Historical canonical output | Historical Partner output |
 |---|---|---|
 | Strong verified | Dimensions 8, advance | INVEST |
 | Strong-looking, unverified | Null scores, insufficient evidence | MONITOR |
@@ -210,16 +213,16 @@ explicitly excluded pre-existing HomePage changes above.
 | `backend/compatibility_projection.py` | Describe stored legacy scores before normal suppression. |
 | `backend/evaluation_v2/provenance.py` (new) | Typed tenant-checked evaluation and evidence provenance. |
 | `backend/evaluation_v2/evidence_projection.py` | Include artifact/source references in the audit projection. |
-| `backend/evaluation_v2/repository.py` | Freeze pipeline/evidence bindings in existing manifests and return provenance. |
+| `backend/investment_analysis/repository.py` | Freeze pipeline/evidence bindings in existing manifests and return provenance. |
 | `backend/jobs/handlers.py` | Record checkpoint/retry lifecycle using existing pipeline logging. |
 | `backend/models.py` | Add optional typed Partner provenance. |
 | `backend/opportunity_pipeline.py` | Trace current stage order and bind evaluations to pipeline runs. |
-| `backend/partner/engine.py` | Record original, mapped, guarded and final recommendations without altering decisions. |
+| `backend/investment_analysis/projection.py` | Project current judgment/action provenance; the historical Partner engine has been removed. |
 | `backend/pipeline_runner.py` | Bind current runner/evaluation/stage lineage and checkpoints. |
 | `backend/pipeline_state.py` | Extend lifecycle logging states. |
 | `backend/tests/test_phase0_stage_provenance.py` (new) | Protect run identities, unchanged decisions and API suppression. |
 | `backend/tests/evaluation_v2/phase0_golden_pipeline.json` (new) | Freeze seven current evidence/score/decision cases. |
-| `backend/tests/evaluation_v2/test_phase0_golden_pipeline.py` (new) | Check golden outputs without providers. |
+| `backend/tests/evaluation_v2/historical_fixtures.py` | Preserve frozen inputs without historical execution. |
 | `backend/tests/evaluation_v2/test_phase0_provenance_e2e.py` (new) | Walk evaluator, frozen Reviewer, actual Partner and API; test tenant boundaries. |
 | `backend/tests/evaluation_v2/test_phase0_provenance_postgres.py` (new) | Verify real storage, pipeline, provenance round trips and tenant isolation. |
 | `backend/tests/identity/test_autonomous_identity_admission.py` | Assert added evaluation binding. |

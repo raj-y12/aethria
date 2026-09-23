@@ -11,14 +11,14 @@ def _source(relative: str) -> str:
 def test_normal_policy_paths_use_governed_repository_only():
     prerequisites = _source("evaluation_v2/prerequisites.py")
     outbox = _source("jobs/outbox.py")
-    reviewer = _source("reviewer/engine.py")
+    analysis = _source("investment_analysis/repository.py")
     policy_upgrade = _source("services/scoring/policy_upgrade.py")
 
     assert "get_active_published_policy" in prerequisites
     assert "fund_policy_versions" not in prerequisites
     assert "publish_policy" not in outbox
     assert "fund_policy_versions" not in outbox
-    assert "fund_policy_versions" not in reviewer
+    assert "fund_policy_versions" not in analysis
     assert 'rpc("upgrade_fund_policy"' not in policy_upgrade
 
 

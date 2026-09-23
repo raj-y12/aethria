@@ -11,6 +11,8 @@ Tunable via env:
 """
 from __future__ import annotations
 
+import json
+import re
 import logging
 import os
 from typing import Optional
@@ -65,3 +67,26 @@ def build_openai_client(
         "openai client built timeout=%.1fs max_retries=%d", eff_timeout, eff_retries
     )
     return OpenAI(api_key=api_key, timeout=eff_timeout, max_retries=eff_retries)
+
+
+def parse_llm_json_object(content: str) -> dict | None:
+    s = (content or "").strip()
+    if not s:
+        return None
+    if s.startswith("```"):
+        s = re.sub(r"^```(?:json)?\s*", "", s, flags=re.IGNORECASE).strip()
+        s = re.sub(r"\s*```\s*$", "", s).strip()
+    try:
+        out = json.loads(s)
+    except json.JSONDecodeError:
+        # Best-effort salvage when model wraps JSON in prose.
+        start = s.find("{")
+        end = s.rfind("}")
+        if start != -1 and end != -1 and end > start:
+            try:
+                out = json.loads(s[start : end + 1])
+            except json.JSONDecodeError:
+                return None
+        else:
+            return None
+    return out if isinstance(out, dict) else None

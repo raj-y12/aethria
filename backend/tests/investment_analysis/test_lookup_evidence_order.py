@@ -48,7 +48,7 @@ async def test_lookup_delegates_once_to_shared_core_and_stops_on_failure(monkeyp
             raise ValueError("Synthetic malformed model output")
         return {"evaluation_id": "evaluation-1", "criteria": [], "recommendation": {"state": "monitor"}}
 
-    monkeypatch.setattr(runner, "EvaluationRepository", lambda *a, **k: SimpleNamespace(evaluate=evaluate))
+    monkeypatch.setattr(runner, "InvestmentAnalysisRepository", lambda *a, **k: SimpleNamespace(evaluate=evaluate))
     prerequisites = SimpleNamespace(require_tenant=lambda *a, **k: None, thesis_context={},
                                     thesis_version_id="thesis-1", policy=_policy())
     result = await runner._run_on_demand_lookup_inner(

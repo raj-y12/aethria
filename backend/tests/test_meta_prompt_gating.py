@@ -62,16 +62,15 @@ def test_mutator_apply_one_skips_set_prompt_without_auto_apply(monkeypatch):
     new_prompt = "mutated scout text " * 40
 
     with patch.object(mutator, "_call_llm", return_value=(new_prompt, "test reasoning")):
-        with patch.object(mutator, "_set_agent_prompt") as set_prompt:
-            with patch("meta.mutator._append_to_json_list"):
-                with patch("meta.mutator._read_json_dict", return_value={}):
-                    with patch("meta.mutator._atomic_write"):
-                        out = mutator._apply_one(target, mock_engine, None)
+        with patch("meta.mutator._append_to_json_list"):
+            with patch("meta.mutator._read_json_dict", return_value={}):
+                with patch("meta.mutator._atomic_write"):
+                    out = mutator._apply_one(target, mock_engine)
     assert out is not None
     assert out.get("type") == "prompt_proposal"
     assert out.get("promoted") is False
     assert out.get("activation_status") == "pending_operator_promotion"
-    set_prompt.assert_not_called()
+    mock_scout.set_prompt.assert_not_called()
 
 
 def test_mutator_apply_one_ignores_auto_apply_environment_switch(monkeypatch):
@@ -96,11 +95,10 @@ def test_mutator_apply_one_ignores_auto_apply_environment_switch(monkeypatch):
     new_prompt = "mutated scout text " * 40
 
     with patch.object(mutator, "_call_llm", return_value=(new_prompt, "r")):
-        with patch.object(mutator, "_set_agent_prompt") as set_prompt:
-            with patch("meta.mutator._append_to_json_list"):
-                with patch("meta.mutator._read_json_dict", return_value={}):
-                    with patch("meta.mutator._atomic_write"):
-                        out = mutator._apply_one(target, mock_engine, None)
+        with patch("meta.mutator._append_to_json_list"):
+            with patch("meta.mutator._read_json_dict", return_value={}):
+                with patch("meta.mutator._atomic_write"):
+                    out = mutator._apply_one(target, mock_engine)
     assert out is not None
     assert out["activation_status"] == "pending_operator_promotion"
-    set_prompt.assert_not_called()
+    mock_scout.set_prompt.assert_not_called()

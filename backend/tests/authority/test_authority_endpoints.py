@@ -470,7 +470,7 @@ async def test_repository_write_paths_use_the_injected_authority_guard_before_da
     from decisions.models import HumanRulingInput
     from decisions.models import WorkflowActionType
     from decisions.repository import DecisionRepository
-    from evaluation_v2.repository import EvaluationRepository
+    from investment_analysis.repository import InvestmentAnalysisRepository
     from identity.repository import IdentityRepository
 
     class BlockingAuthority:
@@ -483,7 +483,7 @@ async def test_repository_write_paths_use_the_injected_authority_guard_before_da
 
     guard = BlockingAuthority()
     identity = IdentityRepository(None, authority_service=guard)
-    evaluation = EvaluationRepository(None, authority_service=guard)
+    evaluation = InvestmentAnalysisRepository(None, authority_service=guard)
     decisions = DecisionRepository(None, authority_service=guard)
 
     with pytest.raises(AuthorityBlocked):
@@ -526,7 +526,7 @@ async def test_repository_write_paths_use_the_injected_authority_guard_before_da
 
     assert guard.calls == [
         {"user_id": "tenant-a", "operation": "identity linkage"},
-        {"user_id": "tenant-a", "operation": "evaluation creation"},
+        {"user_id": "tenant-a", "operation": "investment analysis"},
         {"user_id": "tenant-a", "operation": "human ruling creation"},
         {"user_id": "tenant-a", "operation": "workflow action creation"},
         {"user_id": "tenant-a", "operation": "workflow action approval"},

@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from evaluation_v2.repository import EvaluationRepository
 from investment_analysis.repository import InvestmentAnalysisRepository
 from investment_analysis.models import ReviewerDraft, PartnerDraft
 from tests.evaluation_v2.test_phase0_provenance_postgres import test_postgres_roundtrip_and_tenant_isolation as walk_pipeline
@@ -13,40 +12,42 @@ from tests.evaluation_v2.test_phase0_provenance_postgres import test_postgres_ro
 @pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"), reason="TEST_DATABASE_URL required")
 @pytest.mark.asyncio
 async def test_new_authority_roundtrip_on_real_pipeline(monkeypatch):
-    original = EvaluationRepository.evaluate
+    original = InvestmentAnalysisRepository._publish
     calls = []
     preparation_calls = []
 
-    async def replace(self, **kwargs):
-        if kwargs.get("prepared_analysis") is not None:
-            analysis = kwargs["prepared_analysis"]
-            assert analysis.reviewer.lineage.reviewer_run_id
-            assert analysis.partner.lineage.partner_run_id
-            async with self.pool.acquire() as conn:
-                await conn.execute(
-                    """update startups s set investment_memo_markdown='Historical synthetic memo',
-                    agent_trace=coalesce(agent_trace,'{}'::jsonb) || '{"evaluation_manifest":{"legacy":true}}'::jsonb
-                    from opportunities o where o.user_id=$1 and o.opportunity_id=$2
-                    and s.user_id=o.user_id and s.startup_id=o.legacy_startup_id::text""",
-                    kwargs["user_id"], kwargs["opportunity_id"],
-                )
-            result = await original(self, **kwargs)
-            assert result["judgment_audit"]["investment_analysis"]["partner"]["judgment"]["action"] == "MONITOR"
-            history = result["judgment_audit"]["superseded_startup_projection"]
-            assert history["investment_memo_markdown"] == "Historical synthetic memo"
-            assert history["agent_trace"]["evaluation_manifest"] == {"legacy": True}
-            market = next(item for item in result["criteria"] if item["criterion"] == "market")
-            if len(calls) == 4:
-                change = market["deterministic_adjustments"]["change_from_prior_review"]
-                assert change["previous_score"] == 8
-                assert change["score_changed"] is False
-            else:
-                assert "change_from_prior_review" not in market["deterministic_adjustments"]
-            return result
+    async def observe_publication(self, **kwargs):
+        analysis = kwargs["prepared_analysis"]
+        assert analysis.reviewer.lineage.reviewer_run_id
+        assert analysis.partner.lineage.partner_run_id
+        async with self.pool.acquire() as conn:
+            await conn.execute(
+                """update startups s set investment_memo_markdown='Historical synthetic memo',
+                agent_trace=coalesce(agent_trace,'{}'::jsonb) || '{"evaluation_manifest":{"legacy":true}}'::jsonb
+                from opportunities o where o.user_id=$1 and o.opportunity_id=$2
+                and s.user_id=o.user_id and s.startup_id=o.legacy_startup_id::text""",
+                kwargs["user_id"], kwargs["opportunity_id"],
+            )
+        result = await original(self, **kwargs)
+        assert result["judgment_audit"]["investment_analysis"]["partner"]["judgment"]["action"] == "MONITOR"
+        history = result["judgment_audit"]["superseded_startup_projection"]
+        assert history["investment_memo_markdown"] == "Historical synthetic memo"
+        assert history["agent_trace"]["evaluation_manifest"] == {"legacy": True}
+        market = next(item for item in result["criteria"] if item["criterion"] == "market")
+        if len(calls) == 4:
+            change = market["deterministic_adjustments"]["change_from_prior_review"]
+            assert change["previous_score"] == 8
+            assert change["score_changed"] is False
+        else:
+            assert "change_from_prior_review" not in market["deterministic_adjustments"]
+        return result
 
+    async def factory(pool, *, user_id, opportunity_id, clock):
+        from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
+        kwargs = {"user_id": user_id, "opportunity_id": opportunity_id, "policy": _policy()}
         # This synthetic source belongs to the fixture company; make that
         # identity explicit rather than relying on "phase0" in its URL.
-        async with self.pool.acquire() as conn:
+        async with pool.acquire() as conn:
             await conn.execute("""update companies c set canonical_domain='example.test'
                 from opportunities o where o.user_id=$1 and o.opportunity_id=$2
                 and c.user_id=o.user_id and c.company_id=o.company_id""",
@@ -67,11 +68,11 @@ async def test_new_authority_roundtrip_on_real_pipeline(monkeypatch):
             finally:
                 await isolation.rollback()
 
-        class Pool:
+        class AnalysisPool:
             def acquire(inner):
-                return self.pool.acquire()
+                return pool.acquire()
             async def fetchrow(inner, sql, *args):
-                async with self.pool.acquire() as conn:
+                async with pool.acquire() as conn:
                     return await conn.fetchrow(sql, *args)
 
         async def prerequisites(uid):
@@ -86,7 +87,7 @@ async def test_new_authority_roundtrip_on_real_pipeline(monkeypatch):
                 assert payload["fund_context"]["evidence_preparation"]["status"] == "reused"
                 from evidence.factual import retain_verified_source_statements
                 from evidence.repository import EvidenceRepository
-                evidence_repository = EvidenceRepository(Pool())
+                evidence_repository = EvidenceRepository(AnalysisPool())
                 ledger = await evidence_repository.get_ledger(user_id=kwargs["user_id"], opportunity_id=kwargs["opportunity_id"])
                 verified_ids = [str(item["evidence_item_id"]) for item in ledger["evidence_items"]
                                 if item["verification_state"] == "verified"]
@@ -95,7 +96,7 @@ async def test_new_authority_roundtrip_on_real_pipeline(monkeypatch):
                                     evidence_item_ids=verified_ids, evidence_repository=evidence_repository)
                 # Verify factual persistence in a savepoint, then roll it back so
                 # this mutation cannot invalidate the in-flight analysis snapshot.
-                async with self.pool.acquire() as conn:
+                async with pool.acquire() as conn:
                     savepoint = conn.transaction()
                     await savepoint.start()
                     try:
@@ -121,16 +122,10 @@ async def test_new_authority_roundtrip_on_real_pipeline(monkeypatch):
             preparation_calls.append(result)
             return result
 
-        repo = InvestmentAnalysisRepository(Pool(), generate=generate, prerequisites_loader=prerequisites,
-                                            evidence_preparer=prepare, clock=self._clock)
-        result = await repo.evaluate(**kwargs)
-        record = await repo.get_current(user_id=kwargs["user_id"], opportunity_id=kwargs["opportunity_id"])
-        status = await repo.inspect_dependencies(user_id=kwargs["user_id"], opportunity_id=kwargs["opportunity_id"], record=record)
-        assert status["state"] == "current"
-        with pytest.raises(ValueError, match="tenant/opportunity"):
-            await repo.inspect_dependencies(user_id="another-fund", opportunity_id=kwargs["opportunity_id"], record=record)
-        return result
+        repo = InvestmentAnalysisRepository(AnalysisPool(), generate=generate, prerequisites_loader=prerequisites,
+                                            evidence_preparer=prepare, clock=clock)
+        return repo
 
-    monkeypatch.setattr(EvaluationRepository, "evaluate", replace)
-    await walk_pipeline()
+    monkeypatch.setattr(InvestmentAnalysisRepository, "_publish", observe_publication)
+    await walk_pipeline(repository_factory=factory)
     assert calls == ["reviewer", "partner", "reviewer", "partner"]

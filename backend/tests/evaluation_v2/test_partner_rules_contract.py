@@ -9,7 +9,6 @@ import pytest
 from evaluation_v2.partner_rules import PartnerRules
 from evaluation_v2.policy import evaluation_policy_from_compiled
 from evaluation_v2.prerequisites import EvaluationPrerequisites
-from partner.decision import PartnerDecisionEngine
 
 
 _RULES_PATH = (
@@ -58,6 +57,22 @@ async def test_live_partner_judgment_is_not_selected_by_legacy_score_thresholds(
     assert unsupported.partner.judgment.action == "ADVANCE"
     assert unsupported.partner.operational_action == "MORE_DILIGENCE"
     assert unsupported.partner.constraints
+
+
+@pytest.mark.asyncio
+async def test_zero_confidence_policy_cap_cannot_advance_a_scored_case():
+    from tests.investment_analysis.test_decision_safety import _analyze, _safety_policy, _snapshot_for
+
+    policy = _safety_policy()
+    policy.decision_safety = policy.decision_safety.model_copy(update={
+        "claim_confidence": policy.decision_safety.claim_confidence.model_copy(update={
+            "recommendation_confidence_cap_below_full_confidence": 0,
+        }),
+    })
+    result = await _analyze(_snapshot_for("minimum_claim_confidence_boundary"), policy=policy)
+    assert result.partner.judgment.action.value == "ADVANCE"
+    assert result.partner.operational_action.value == "MORE_DILIGENCE"
+    assert all(item.score is None for item in result.evaluation.criteria)
 
 
 def _rules() -> dict[str, Any]:
@@ -208,7 +223,7 @@ def test_verdict_rule_bodies_cannot_be_empty(verdict):
         evaluation_policy_from_compiled(_compiled_policy(), partner_rules=rules)
 
 
-def test_prerequisites_inject_one_typed_rules_object_consumed_by_partner():
+def test_prerequisites_preserve_typed_historical_rules():
     policy = evaluation_policy_from_compiled(
         _compiled_policy(), partner_rules=_rules()
     )
@@ -221,14 +236,8 @@ def test_prerequisites_inject_one_typed_rules_object_consumed_by_partner():
         fund_config={},
         policy=policy,
     )
-    engine = PartnerDecisionEngine(
-        tenant_user_id="user-a",
-        evaluation_prerequisites=prerequisites,
-        use_llm_fallback=False,
-    )
-
     assert isinstance(prerequisites.partner_rules, PartnerRules)
-    assert engine._get_rules() is prerequisites.partner_rules
+    assert prerequisites.policy == policy
 
 
 def test_compiled_policy_marks_each_configured_dimension_required_for_evaluation():
@@ -251,7 +260,7 @@ async def test_live_partner_judgment_retained_when_explicit_fund_exclusion_const
     from pipeline_contracts.models import Lineage, Identity
     from tests.investment_analysis.test_mandate import sector_snapshot
     from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
-    from tests.evaluation_v2.test_phase0_golden_pipeline import CLOCK
+    from tests.evaluation_v2.historical_fixtures import CLOCK
 
     async def generate(stage, prompt, payload, schema):
         if stage == "reviewer":
@@ -272,42 +281,3 @@ async def test_live_partner_judgment_retained_when_explicit_fund_exclusion_const
     assert any("sector" in item for item in (
         result.evaluation.recommendation.mandate_conflicts + result.evaluation.recommendation.missing_information
     ))
-
-
-def test_partner_consumes_validated_rule_values_without_behavioral_defaults():
-    rules = _rules()
-    rules["quality_labels"]["MEDIUM"] = "Custom policy label"
-    rules["llm_fallback_triggers"]["medium_borderline_edge_window"] = 0.2
-    rules["contradictory_scores"] = {
-        "min_gap": 6,
-        "high_threshold": 9,
-        "low_threshold": 2,
-    }
-    policy = evaluation_policy_from_compiled(
-        _compiled_policy(), partner_rules=rules
-    )
-    prerequisites = EvaluationPrerequisites(
-        user_id="user-a",
-        thesis_context={"version_id": "thesis-live"},
-        thesis_version_id="thesis-live",
-        compiled_scoring_policy=_compiled_policy(),
-        partner_rules=rules,
-        fund_config={},
-        policy=policy,
-    )
-    engine = PartnerDecisionEngine(
-        tenant_user_id="user-a",
-        evaluation_prerequisites=prerequisites,
-        use_llm_fallback=False,
-    )
-
-    assert engine._verdict_label("MEDIUM") == "Custom policy label"
-    assert not engine._is_medium_borderline_edge_case(
-        avg_score=6.7,
-        min_avg_borderline_low=6,
-        max_avg_borderline_high=7,
-        llm_triggers=prerequisites.partner_rules.llm_fallback_triggers,
-    )
-    assert not engine._has_contradictory_scores(
-        8, 3, 7, 7, prerequisites.partner_rules
-    )

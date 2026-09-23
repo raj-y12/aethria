@@ -4,7 +4,7 @@ import pytest
 
 from evaluation_v2.service import snapshot_claims
 from investment_analysis.mandate import check_sector_exclusions
-from tests.evaluation_v2.test_phase0_golden_pipeline import _inputs, CLOCK
+from tests.evaluation_v2.historical_fixtures import _inputs, CLOCK
 from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
 
 

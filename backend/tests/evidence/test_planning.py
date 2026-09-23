@@ -84,9 +84,7 @@ def test_fully_uncovered_policy_reports_every_criterion():
 
 
 def test_a_criterion_is_covered_by_any_matching_claim_type_not_just_the_first():
-    """evaluate_snapshot() itself checks claim_type membership with `in
-    rule.claim_types` (any position) — the gap check must match that, or a
-    plan would flag a criterion evaluate() already considers scored."""
+    """Planning considers every configured claim type, not only the first."""
     policy = _policy()
     current = {"competition"}  # third of three claim_types for "market"
 

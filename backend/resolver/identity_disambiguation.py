@@ -15,7 +15,7 @@ from typing import Any, List, Optional
 from pydantic import BaseModel
 
 from utils.openai_client import build_openai_client
-from partner.decision import _parse_llm_json_object
+from utils.openai_client import parse_llm_json_object
 from security.prompt_safety import isolate_untrusted_text, prompt_safety_instruction
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ def disambiguate_identity(
             "identity_disambiguation", user_id, tokens_used, model=effective_model
         )
 
-    parsed = _parse_llm_json_object(content or "")
+    parsed = parse_llm_json_object(content or "")
     if not parsed:
         return _safe_default("disambiguation unavailable: malformed model response")
 

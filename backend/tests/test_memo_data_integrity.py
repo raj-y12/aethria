@@ -9,10 +9,56 @@ import re
 
 import pytest
 
-from partner.rationale import compose_decision_rationale
 from resolver.founder_resolver import _is_person_name
 from utils.adapters import scout_output_to_scout_info
 from utils.traction_extraction import extract_traction_facts, render_traction_facts
+
+
+def test_memo_api_hides_stale_total_funding_but_keeps_other_financials():
+    from api import _backend_to_frontend
+
+    result = _backend_to_frontend({
+        "startup_id": "protex-test",
+        "scout_info": {"name": "Protex AI", "funding_stage": "Series B"},
+        "financials": {"funding_history": "$18M total raised (seed/Series A)", "traction_metrics": "64% fewer events"},
+    })
+    assert result["financials"]["funding_history"] is None
+    assert result["financials"]["funding_missing"] is True
+    assert result["financials"]["traction_metrics"] == "64% fewer events"
+
+
+def test_memo_drops_partner_score_claim_that_conflicts_with_validation():
+    from api import _backend_to_frontend
+
+    bad_line = "Validated assessments indicate Market(7), Execution(5), Product(7)."
+    result = _backend_to_frontend({
+        "startup_id": "openvolt-test",
+        "partner_info": {"decision_rationale": bad_line},
+        "current_analysis": {
+            "evaluation_id": "evaluation-current",
+            "opportunity_id": "opportunity-current",
+            "validation": {"assessments": [
+                {"dimension": "MARKET", "validated_score": 7},
+                {"dimension": "EXECUTION", "validated_score": None},
+                {"dimension": "PRODUCT", "validated_score": 7},
+            ]},
+            "partner": {"judgment": {"action": "MORE_DILIGENCE", "rationale": [bad_line, "Customer adoption needs verification."],
+                                     "confidence": 0.5, "investment_case": "An energy data platform."},
+                        "operational_action": "MORE_DILIGENCE", "constraints": [], "human_review_required": True},
+        },
+    })
+    assert "Execution(5)" not in result["partner"]["decision_rationale"]
+    assert result["partner"]["decision_rationale"] == "Customer adoption needs verification."
+
+
+def test_current_evaluation_read_drops_old_unsupported_partner_score_claim():
+    from investment_analysis.repository import _validated_recommendation_drivers
+
+    drivers = ["Openvolt has a credible product.", "Validated assessments indicate Execution(5)."]
+    audit = {"investment_analysis": {"validation": {"assessments": [
+        {"dimension": "EXECUTION", "validated_score": None},
+    ]}}}
+    assert _validated_recommendation_drivers(drivers, audit) == ["Openvolt has a credible product."]
 
 
 def test_company_facts_do_not_come_from_founder_education_or_other_employers():
@@ -148,45 +194,3 @@ def test_scout_info_carries_traction_facts_through_the_adapter():
 def test_render_is_empty_when_nothing_was_found():
     assert render_traction_facts(None) == ""
     assert "Employees: 100-150" in render_traction_facts({"employees": "100-150"})
-
-
-# --- one document must not disagree with itself ----------------------------
-
-
-def _rationale(**overrides):
-    kwargs = dict(
-        final_recommendation="PASS",
-        tags=frozenset(),
-        primary="risk",
-        label="MEDIUM",
-        avg_score=5.16,
-        market_score=5.68,
-        product_score=5.403333,
-        technical_score=4.76,
-        execution_score=4.8,
-        min_avg_pass=4.0,
-        min_avg_strong_yes=7.5,
-        min_avg_medium_maybe=6.0,
-        min_avg_borderline_low=5.0,
-        max_avg_borderline_high=6.5,
-        has_contradiction=False,
-        reviewer_disagreement=True,
-        sector_concentration_note=False,
-    )
-    kwargs.update(overrides)
-    return compose_decision_rationale(**kwargs)[0]
-
-
-def test_dimension_scores_are_rounded_not_truncated():
-    """int(4.8) printed "4/10" beside a table showing 4.8 — same doc, two answers."""
-    rationale = _rationale()
-
-    assert "Market 5.7/10" in rationale
-    assert "Execution 4.8/10" in rationale
-    assert "Technical 4.8/10" in rationale
-    assert "Market 5/10" not in rationale
-    assert "Execution 4/10" not in rationale
-
-
-def test_raw_float_never_reaches_the_rationale():
-    assert "5.403333" not in _rationale()

@@ -1,5 +1,9 @@
 # Scoring Assessment Audit — Investment Memos
 
+Historical audit. The Reviewer/scorer executors discussed below were retired
+in September 2026; the paths and findings describe the code as it existed
+when this audit was written.
+
 **Scope:** How startup scores are *produced* (the "who/how") and *presented* in
 investment memos, plus whether scores are *comparable across companies*.
 **Status:** Audit + remediation plan. No code changed by this document.

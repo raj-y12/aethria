@@ -1,8 +1,7 @@
 # investment_analysis
 
-The current, authoritative Reviewer + Partner runtime path (ARCHITECTURE.md
-§3.1, ADR-0016) — supersedes the legacy `reviewer/` / `partner/` packages for
-live traffic.
+The authoritative Reviewer + Partner runtime path (ARCHITECTURE.md §3.1,
+ADR-0016). The retired `reviewer/` and `partner/` executors have been removed.
 
 ## Architecture: why this isn't `reviewer/` + `partner/`
 
@@ -41,11 +40,8 @@ refactor. Don't do it to make the file tree match a generic three-agent
 template; propose an ADR amendment first if the coupling itself is ever
 wrong.
 
-`reviewer/` and `partner/` still exist alongside this package, but hold the
-**legacy/compatibility implementations**: retired standalone engines kept for
-historical replay and Phase-0 golden fixtures, still referenced by
-`pipeline_runner.py`/`api.py` as compatibility components, but not the
-authoritative decision path. See their own READMEs.
+Historical Reviewer and Partner records remain readable through one-way
+projections; no historical engine is needed to execute a new judgement.
 
 ## Purpose
 
@@ -69,7 +65,10 @@ Partner recommendation, and provenance — persisted via `repository.py`.
   validation → decision pipeline.
 - `grounding.py`: evidence/source-corroboration checks feeding the review.
 - `validation.py`: evidence/policy validation that retains, caps, or
-  withholds each proposed score.
+  withholds each proposed score. Zero effective confidence withholds the score
+  and blocks advancement. It also removes Partner rationale lines that
+  cite a dimension score contradicted by validation; current-result reads apply
+  the same check to historical saved prose without changing immutable records.
 - `model_gateway.py`: the model-call boundary for this stage (uses
   `utils.openai_client`, not a direct SDK call).
 - `mandate.py`: applies explicit fund exclusions to the tenant factual
@@ -83,11 +82,7 @@ Partner recommendation, and provenance — persisted via `repository.py`.
 - Does not run search/scrape (`research/`) or own the retrieval cache.
 - Does not decide canonical policy (`services/scoring/`, `evaluation_v2/`) —
   it consumes the published policy, never hardcodes a threshold.
-- Does not import legacy `reviewer/`/`partner/` internals (as of this pass,
-  the one real violation — `repository.py` borrowing
-  `DEFAULT_MAX_COMPLETION_TOKENS` from `reviewer/base.py` — was removed; this
-  package now defines its own copy), and legacy `reviewer/`/`partner/` do not
-  import this package's internals either.
+- Does not import retired Reviewer, Partner, or deterministic scorer internals.
 
 ## Dependencies
 
@@ -98,12 +93,11 @@ Partner recommendation, and provenance — persisted via `repository.py`.
 
 Import from `investment_analysis` directly for the small, deliberate public
 surface (`analyze`, `AnalysisBlocked`, `AnalysisResult`,
-`CompletedAnalysisStage`) — see `investment_analysis/__init__.py` for the
-full list and, importantly, why `InvestmentAnalysisRepository` is
-deliberately *not* in it (a pre-existing circular import with
-`evaluation_v2.repository` that eager re-export would trigger). Import
-`InvestmentAnalysisRepository` directly from `investment_analysis.repository`
-instead, as `pipeline_runner.py` and `api.py` already do.
+`CompletedAnalysisStage`). Import `InvestmentAnalysisRepository` directly from
+`investment_analysis.repository`, as the runtime entry points do. This concrete
+repository owns current-result reads, failed-refresh history and atomic
+publication. Its private publisher requires a completed `AnalysisResult` and a
+frozen evidence clock; it cannot execute a historical evaluator (ADR-0017).
 
 ## Testing
 

@@ -204,10 +204,10 @@ were updated for intentional product/version changes; historical goldens were no
 | `backend/evidence/factual.py` | Exact scoped source quotations and deduplication. |
 | `backend/scout/{base,engine,schema,scouts}.py` | Factual Scout contract/prompts and preserved discovery infrastructure. |
 | `backend/context/scout_claims.py` | Honest unverified status for snippet claims. |
-| `backend/evaluation_v2/{repository,service,evidence_projection,partner_rules}.py` | Immutable contracts/history, source snapshots and v5 parser. |
+| `backend/evaluation_v2/{service,evidence_projection,partner_rules}.py` | Immutable contracts/history, source snapshots and v5 parser. |
 | `backend/pipeline_runner.py`, `backend/api.py`, `backend/opportunity_pipeline.py` | Production entry-point convergence. |
 | `backend/routers/{evaluations,opportunities,meta}.py` | Scoped refresh, operator convergence and named blocks. |
-| `backend/reviewer/engine.py`, `backend/partner/engine.py`, `backend/meta/mutator.py` | Retired standalone authorities; historical preview/replay compatibility. |
+| `backend/meta/mutator.py` | Scout prompt proposals only. Historical Reviewer persona proposals remain readable but are no longer generated. |
 | `backend/scripts/backfill_evidence_extraction.py` | Backfill uses factual retention and shared analysis. |
 | `backend/models.py` | Additive compatibility metadata and absent legacy verdict support. |
 | `app-front-end/src/api/evaluations.ts`, `src/types/startup.ts` | Typed new provenance, support and dependency fields. |

@@ -83,7 +83,7 @@ async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch, f
     """Several Scout observations must not create competing evaluations."""
     calls = []
 
-    class EvaluationRepository:
+    class InvestmentAnalysisRepository:
         def __init__(self, pool, *, cost_controller=None):
             assert pool is pool_marker
             assert cost_controller is None
@@ -99,7 +99,7 @@ async def test_periodic_admissions_evaluate_each_opportunity_once(monkeypatch, f
         thesis_version_id = "thesis-v1"
 
     pool_marker = object()
-    monkeypatch.setattr(pipeline_runner, "EvaluationRepository", EvaluationRepository)
+    monkeypatch.setattr(pipeline_runner, "InvestmentAnalysisRepository", InvestmentAnalysisRepository)
 
     count = await pipeline_runner._evaluate_admitted_periodic_discoveries(
         user_id="fund-a",

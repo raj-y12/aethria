@@ -46,6 +46,25 @@ _FIGURE_RE = re.compile(
 )
 
 
+def funding_history_for_stage(history: Optional[str], stage: Optional[str]) -> Optional[str]:
+    """Withhold a claimed lifetime total that ends before the known funding stage.
+
+    A source can accurately report an old total and still be unsuitable as the
+    company's current total. Keep ordinary round histories; only an explicit
+    lifetime-total claim with named, older rounds is withheld.
+    """
+    if not history or "total raised" not in history.lower():
+        return history
+    current = {"pre-seed": 0, "seed": 1, "series a": 2, "series b": 3,
+               "series c": 4, "series c+": 4}.get((stage or "").strip().lower())
+    if current is None:
+        return history
+    rounds = re.findall(r"\bpre[- ]?seed\b|\bseed\b|\bseries\s+[abc]\b", history.lower())
+    ranks = {"pre-seed": 0, "pre seed": 0, "seed": 1, "series a": 2,
+             "series b": 3, "series c": 4}
+    return None if rounds and max(ranks[round_name] for round_name in rounds) < current else history
+
+
 def _norm(text: Any) -> str:
     """Lowercase, unify dashes, drop punctuation that varies between source and quote,
     and collapse whitespace — so substring checks are robust to cosmetic differences."""

@@ -158,19 +158,8 @@ REGISTRY: List[EnvVar] = [
            "Search snippets truncate these pages, which is why listed founders were missed."),
     EnvVar("FOUNDER_TEAM_PAGE_MAX", "int", "2", "Founder resolution",
            "Max company pages fetched per founder resolution (extract accepts at most 3)."),
-    EnvVar("REVIEWER_FOUNDER_FALLBACK_RETRIEVAL", "bool", "false", "Founder resolution",
-           "Allow reviewer-side founder resolution to run extra searches when the "
-           "reviewer gap-retrieval pack names nobody. Off by default so reviews add no retrieval."),
-
     # --- Reviewer ------------------------------------------------------------
-    EnvVar("REVIEWER_INTERVAL_SECONDS", "int", "60", "Reviewer", "Reviewer engine interval."),
     EnvVar("REVIEWER_BATCH_SIZE", "int", "3", "Reviewer", "Reviewer batch size per cycle."),
-    EnvVar("REVIEWER_BACKPRESSURE_THRESHOLD", "int", "10", "Reviewer", "Undecided backlog that throttles review."),
-    EnvVar("REVIEWER_RAMP_THRESHOLD", "int", "5", "Reviewer", "Backlog below which review ramps up."),
-    EnvVar("REVIEWER_RAMP_BATCH_MAX", "int", "5", "Reviewer", "Max batch size when ramped."),
-    EnvVar("REVIEWER_MAX_COMPLETION_TOKENS", "int", "", "Reviewer", "Override max completion tokens (empty=model default)."),
-    EnvVar("REVIEWER_GAP_MAX_PER_QUERY", "int", "6", "Reviewer", "Max gap-retrieval results per query."),
-    EnvVar("REVIEWER_GAP_MAX_SOURCES", "int", "12", "Reviewer", "Max gap-retrieval sources total."),
 
     # --- Partner -------------------------------------------------------------
     EnvVar("PARTNER_USE_LLM", "bool", "true", "Partner", "Allow LLM fallback for partner edge cases."),
@@ -342,11 +331,6 @@ REGISTRY: List[EnvVar] = [
            "Maximum per-tenant daily reserved plus settled evidence-refresh cost."),
 
     # --- Scoring / retrieval / misc -----------------------------------------
-    EnvVar("USE_STRUCTURED_SCORING", "bool", "true", "Scoring / misc", "Use the deterministic structured scoring engine."),
-    EnvVar("SCORING_EVIDENCE_CALIBRATION_ENABLED", "bool", "true", "Scoring / misc",
-           "Publish confidence-discounted, evidence-capped legacy display scores."),
-    EnvVar("SKIP_READ_ENRICH_SCORES", "bool", "", "Scoring / misc", "Skip score enrichment on read (perf)."),
-    EnvVar("DEBUG_SCORING", "bool", "false", "Scoring / misc", "Verbose scoring debug logs."),
     EnvVar("RETRIEVAL_SNIPPET_MAX_CHARS", "int", "2800", "Scoring / misc", "Max chars per retrieval snippet."),
     EnvVar("RECENCY_WINDOW_MONTHS", "int", "12", "Scoring / misc", "Recency window for breaking-news weighting."),
     EnvVar("LOOKUP_WEBSITE_FETCH_TIMEOUT", "float", "5.0", "Scoring / misc", "Timeout fetching a looked-up website."),

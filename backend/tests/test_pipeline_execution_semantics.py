@@ -238,29 +238,8 @@ async def test_reprocess_no_work_is_skipped_without_requiring_model_runtime(monk
     assert result.metadata == {"processed": 0, "skipped": 0, "failed": 0}
 
 
-class _StageStorage:
-    _client = None
-    _user_id = "user-a"
-
-    def __init__(self, startups=(), *, persist_review=True):
-        self.startups = list(startups)
-        self.persist_review = persist_review
-
-    def count_unreviewed(self):
-        return len(self.startups)
-
-    def get_unreviewed(self, *, limit):
-        return self.startups[:limit]
-
-    def add_review(self, *_args, **_kwargs):
-        return self.persist_review
 
 
-def _review_candidate(startup_id="startup-1"):
-    return SimpleNamespace(
-        startup_id=startup_id,
-        scout_info=SimpleNamespace(confidence_score=0.9),
-    )
 
 
 class _ScoutPersona:
@@ -399,235 +378,10 @@ async def test_scout_periodic_persistence_failure_is_not_a_success(monkeypatch):
     assert result.discoveries == []
 
 
-def _reviewer_for_stage(storage, *, cost_controller=None, persona_failure=False):
-    from reviewer.engine import ReviewerEngine
-
-    engine = ReviewerEngine.__new__(ReviewerEngine)
-    engine.tenant_user_id = "user-a"
-    engine.logger = __import__("logging").getLogger("test.reviewer-stage")
-    engine.storage = storage
-    engine.cost_controller = cost_controller
-    engine.last_cycle_stats = {}
-    engine.ramp_threshold = 5
-    engine.ramp_batch_max = 20
-    engine.batch_size = 5
-    engine.use_structured_scoring = False
-    engine.active_thesis = None
-    engine.deal_memory = None
-    engine.agent_id = "reviewer-test"
-    engine.settings = {"agent_config": {"reviewers_enabled": True}, "cost_budget": {"enabled": False}}
-    engine.model = "test-model"
-    engine._sync_thesis_to_reviewers = lambda: None
-    engine._build_scout_output_payload = lambda startup: {
-        "id": startup.startup_id,
-        "name": "Typed Stage Co",
-    }
-
-    class Persona:
-        _last_token_usage = 0
-
-        async def review(self, _payload):
-            if persona_failure:
-                raise RuntimeError("persona failed")
-            return {
-                "market_score": 7.25,
-                "product_score": 7.25,
-                "technical_score": 7.25,
-                "execution_score": 7.25,
-                "overall_summary": "Typed result fixture",
-                "key_risks": [],
-                "verdict": "MEDIUM",
-            }
-
-    engine.reviewer = Persona()
-    engine.skeptical_reviewer = Persona()
-    engine.opportunist_reviewer = Persona()
-    engine._blend_numeric_scores_into_primary = lambda *_args: None
-    engine._refresh_derived_after_dimension_changes = lambda *_args: None
-    engine._derive_verdict_from_scores = lambda *_args: None
-    engine._pick_primary_structured_signals = lambda *_args: None
-    engine._persist_scoring_trail = lambda *_args: None
-    engine._apply_rule_based_thesis_alignment = lambda *_args: None
-    engine._apply_resource_fund_thesis_alignment = lambda *_args: None
-    engine._compute_consensus = lambda *_args: {
-        "consensus_verdict": "MEDIUM",
-        "reviewer_disagreement": False,
-        "score_variance": 0.0,
-    }
-    engine._build_single_reviews = lambda *_args: []
-    return engine
 
 
-@pytest.mark.asyncio
-async def test_reviewer_periodic_result_reports_no_work_and_budget_block(monkeypatch):
-    import reviewer.engine as reviewer_module
-
-    no_work = await _reviewer_for_stage(_StageStorage()).run_cycle()
-
-    cost_controller = SimpleNamespace(
-        check_budget=lambda *_args, **_kwargs: (False, "monthly budget exhausted")
-    )
-    blocked = await _reviewer_for_stage(
-        _StageStorage([_review_candidate()]), cost_controller=cost_controller
-    ).run_cycle()
-
-    assert isinstance(no_work, StageExecutionResult)
-    assert no_work.state is StageExecutionState.SKIPPED
-    assert no_work.code == "reviewer_no_eligible_work"
-    assert blocked.state is StageExecutionState.BLOCKED
-    assert blocked.code == "reviewer_budget_blocked"
-    assert blocked.blocked == 1
-    assert blocked.recovery_action
 
 
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("persona_failure", "persist_review", "expected_state", "expected_succeeded"),
-    [
-        (True, True, StageExecutionState.FAILED, 0),
-        (False, False, StageExecutionState.FAILED, 0),
-        (False, True, StageExecutionState.COMPLETED, 1),
-    ],
-    ids=["all-personas-fail", "persistence-fails", "clean-success"],
-)
-async def test_reviewer_periodic_result_accounts_for_candidate_outcomes(
-    monkeypatch,
-    persona_failure,
-    persist_review,
-    expected_state,
-    expected_succeeded,
-):
-    import meta.calibrator as calibrator_module
-    import reviewer.engine as reviewer_module
-    import utils.adapters as adapters_module
-
-    monkeypatch.setattr(
-        reviewer_module, "enrich_scout_for_reviewer_llm", lambda payload, _uid: payload
-    )
-    monkeypatch.setattr(
-        reviewer_module,
-        "apply_resolution_to_primary",
-        lambda *_args: ([], "aligned"),
-    )
-    monkeypatch.setattr(
-        reviewer_module,
-        "build_aethria_view",
-        lambda **_kwargs: SimpleNamespace(model_dump=lambda **_kw: {}),
-    )
-    monkeypatch.setattr(calibrator_module, "load_calibration_state", lambda _uid: {})
-    monkeypatch.setattr(
-        adapters_module,
-        "reviewer_output_to_review_info",
-        lambda _output: SimpleNamespace(),
-    )
-    storage = _StageStorage(
-        [_review_candidate()], persist_review=persist_review
-    )
-
-    result = await _reviewer_for_stage(
-        storage, persona_failure=persona_failure
-    ).run_cycle()
-
-    assert result.state is expected_state
-    assert result.attempted == 1
-    assert result.succeeded == expected_succeeded
-    assert result.failed == 1 - expected_succeeded
-    if result.failed:
-        assert result.recovery_action
-
-
-def _partner_for_stage(entries, *, cost_controller=None, outcome=(True, None)):
-    from partner.engine import PartnerEngine
-
-    engine = PartnerEngine.__new__(PartnerEngine)
-    engine.tenant_user_id = "user-a"
-    engine.logger = __import__("logging").getLogger("test.partner-stage")
-    engine.storage = SimpleNamespace(count_undecided=lambda: len(entries))
-    engine.cost_controller = cost_controller
-    engine.batch_max = 20
-    engine.last_cycle_escalations = 0
-    engine.deal_memory = None
-    engine.settings = {"agent_config": {"partners_enabled": True}, "cost_budget": {"enabled": False}}
-    engine._get_undecided_entries = lambda *, limit=None: list(entries)[:limit]
-
-    async def load_canonical(_startup_id):
-        return {
-            "recommendation": {"recommended_state": "monitor", "confidence": 0.8},
-            "criteria": [
-                {"criterion": dimension, "score": 8.0, "evidence_sufficiency": "sufficient"}
-                for dimension in ("market", "product", "technical", "execution")
-            ],
-        }
-
-    engine.canonical_evaluation_loader = load_canonical
-
-    async def decide(*_args, **_kwargs):
-        if isinstance(outcome, Exception):
-            raise outcome
-        success, decision = outcome
-        return success, decision or {
-            "recommendation": "MONITOR",
-            "confidence": 0.6,
-            "human_review_required": False,
-        }
-
-    engine._decide_and_save = decide
-    return engine
-
-
-def _partner_entry(startup_id="startup-1"):
-    return {
-        "id": startup_id,
-        "scout": {"name": "Typed Stage Co", "primary_thesis": ""},
-        # Reviewer scores are deliberately irrelevant here: the fixture's
-        # canonical loader authorizes the decision path under test.
-        "review": {
-            "market_score": 8,
-            "product_score": 8,
-            "technical_score": 8,
-            "execution_score": 8,
-        },
-    }
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("entries", "cost_controller", "outcome", "expected_state"),
-    [
-        ([], None, (True, None), StageExecutionState.SKIPPED),
-        (
-            [_partner_entry()],
-            SimpleNamespace(check_budget=lambda *_args, **_kwargs: (False, "budget")),
-            (True, None),
-            StageExecutionState.BLOCKED,
-        ),
-        ([_partner_entry()], None, (False, None), StageExecutionState.FAILED),
-        (
-            [_partner_entry()],
-            None,
-            RuntimeError("decision failed"),
-            StageExecutionState.FAILED,
-        ),
-        ([_partner_entry()], None, (True, None), StageExecutionState.COMPLETED),
-    ],
-    ids=["no-work", "budget-block", "persistence-failure", "exception", "success"],
-)
-async def test_partner_periodic_result_accounts_for_every_candidate(
-    monkeypatch, entries, cost_controller, outcome, expected_state
-):
-    import partner.engine as partner_module
-
-
-    result = await _partner_for_stage(
-        entries, cost_controller=cost_controller, outcome=outcome
-    ).run_cycle()
-
-    assert isinstance(result, StageExecutionResult)
-    assert result.state is expected_state
-    if entries:
-        assert result.attempted == 1
-    if expected_state in {StageExecutionState.BLOCKED, StageExecutionState.FAILED}:
-        assert result.recovery_action
 
 
 async def _run_periodic_with_stage_results(
@@ -925,52 +679,26 @@ class _LoopLogger:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("engine_name", ["scout", "reviewer", "partner"])
-async def test_standalone_loops_consume_typed_results_without_type_errors(
-    monkeypatch, engine_name
+async def test_scout_loop_consumes_typed_results_without_type_errors(
+    monkeypatch,
 ):
     async def no_sleep(_seconds):
         return None
 
     logger = _LoopLogger()
-    completed = _stage_success(engine_name)
+    completed = _stage_success("scout")
+    import scout.engine as module
+    from scout.engine import ScoutEngine
 
-    if engine_name == "scout":
-        import scout.engine as module
-        from scout.engine import ScoutEngine
+    engine = ScoutEngine.__new__(ScoutEngine)
+    engine.scouts = []
 
-        engine = ScoutEngine.__new__(ScoutEngine)
-        engine.scouts = []
-
-        async def run_cycle(**_kwargs):
-            engine.running = False
-            return ScoutCycleResult(
-                outcome=completed,
-                discoveries=[{"scout_type": "market_driven", "name": "Co", "one_line": "One"}],
-            )
-
-    elif engine_name == "reviewer":
-        import reviewer.engine as module
-        from reviewer.engine import ReviewerEngine
-
-        engine = ReviewerEngine.__new__(ReviewerEngine)
-        engine.storage = SimpleNamespace(count_undecided=lambda: 0)
-        engine.backpressure_threshold = 10
-
-        async def run_cycle(**_kwargs):
-            engine.running = False
-            return completed
-
-    else:
-        import partner.engine as module
-        from partner.engine import PartnerEngine
-
-        engine = PartnerEngine.__new__(PartnerEngine)
-
-        async def run_cycle(**_kwargs):
-            engine.running = False
-            return completed
-
+    async def run_cycle(**_kwargs):
+        engine.running = False
+        return ScoutCycleResult(
+            outcome=completed,
+            discoveries=[{"scout_type": "market_driven", "name": "Co", "one_line": "One"}],
+        )
 
     engine.tenant_user_id = "user-a"
     engine.settings = {"agent_config": {"scouts_enabled": True, "reviewers_enabled": True, "partners_enabled": True}}

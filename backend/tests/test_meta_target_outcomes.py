@@ -42,6 +42,19 @@ def _proposal(name: str) -> dict:
     }
 
 
+def test_meta_does_not_propose_prompts_for_retired_reviewer_personas() -> None:
+    mutator = PromptMutator(
+        {"reviewer_health": {"verdict_distribution": {"STRONG": 9, "WEAK": 1},
+                             "calibration_warning": True}},
+        cycle_number=1,
+        user_id="meta-target-user",
+    )
+    try:
+        assert mutator.decide() == []
+    finally:
+        mutator.close()
+
+
 def test_prompt_mutator_returns_one_typed_outcome_per_target(monkeypatch) -> None:
     mutator = PromptMutator({}, cycle_number=1, user_id="meta-target-user")
     calls = iter([_proposal("MarketDrivenScout"), RuntimeError("LLM unavailable")])
@@ -55,7 +68,7 @@ def test_prompt_mutator_returns_one_typed_outcome_per_target(monkeypatch) -> Non
     monkeypatch.setattr(mutator, "_apply_one", apply_one)
 
     batch = mutator.apply(
-        [_target("MarketDrivenScout"), _target("ContrarianScout")], None, None
+        [_target("MarketDrivenScout"), _target("ContrarianScout")], None
     )
 
     assert isinstance(batch, PromptMutationBatchResult)
@@ -90,7 +103,7 @@ def test_prompt_mutator_reports_persistence_failure_as_failed_target(monkeypatch
         "meta.mutator._append_to_json_list",
         side_effect=RuntimeError("mutation store unavailable"),
     ):
-        batch = mutator.apply([_target("MarketDrivenScout")], None, None)
+        batch = mutator.apply([_target("MarketDrivenScout")], None)
 
     assert batch.attempted == 1
     assert batch.succeeded == 0
@@ -116,7 +129,7 @@ def test_prompt_mutator_reports_llm_failure_as_failed_target(monkeypatch) -> Non
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("LLM unavailable")),
     )
 
-    batch = mutator.apply([_target("MarketDrivenScout")], None, None)
+    batch = mutator.apply([_target("MarketDrivenScout")], None)
 
     assert batch.failed == 1
     assert batch.outcomes[0].state is PromptMutationTargetState.FAILED

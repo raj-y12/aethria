@@ -179,15 +179,3 @@ def test_scout_lookup_pack_keeps_corroboration(monkeypatch):
     assert _UNRELATED["url"] not in urls
     # The allowlist must grow with the retained sources, or citations to them get pruned.
     assert _NEWS["url"] in out["url_allowlist"]
-
-
-def test_reviewer_and_scout_paths_agree(monkeypatch):
-    from reviewer.gap_retrieval import _restrict_pack_to_lookup_website
-
-    pack = {"sources": [_HOME, _NEWS, _LINKEDIN, _UNRELATED], "url_allowlist": set()}
-    out = _restrict_pack_to_lookup_website(
-        pack, {"name": "Acme", "lookup_website": _ANCHOR}
-    )
-    urls = _urls(out["sources"])
-    assert _NEWS["url"] in urls and _LINKEDIN["url"] in urls
-    assert _UNRELATED["url"] not in urls

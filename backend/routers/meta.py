@@ -32,15 +32,14 @@ from meta.prompt_gating import (
 from meta.evaluator import run_prompt_evaluation
 from meta.reweighter import load_weights
 from meta.calibrator import load_calibration_state
-from reviewer.engine import ReviewerEngine
-from fund_thesis import (
-    FundThesisIncompleteError,
-    bootstrap_default_thesis_with_repository,
-    get_active_thesis_from_repository,
-)
+from investment_analysis.model_gateway import ModelGateway, AnalysisBlocked
+from investment_analysis.repository import DEFAULT_MAX_COMPLETION_TOKENS
+from evaluation_v2.prerequisites import load_evaluation_prerequisites, EvaluationPrerequisiteError
+from portfolio.cost_control import CostController
+from settings_repository import SettingsRepository
+from utils.settings_loader import DEFAULT_SETTINGS
 from batch1.context import reset_state, set_state
 from batch1.repository import Batch1Repository
-from startups import StartupReadStorageAdapter
 
 logger = logging.getLogger("api.meta")
 router = APIRouter()
@@ -219,7 +218,7 @@ async def get_meta_prompt_state(
         "active": active,
         "active_detail": active_detail,
         "pending": pending[:80],
-        "restart_note": "Promoted prompts apply after workers restart unless META_AGENT_PROMPT_AUTO_APPLY ran in-process.",
+        "restart_note": "Scout prompts apply after workers restart unless auto-applied. Existing legacy Reviewer persona promotions do not affect current investment analysis.",
     }
 
 
@@ -239,12 +238,16 @@ async def post_meta_prompt_promote(request: Request):
         raise HTTPException(status_code=400, detail="invalid agent_target")
     if not library_key.startswith(f"{agent_target}:"):
         raise HTTPException(status_code=400, detail="library_key does not match agent_target")
+    if agent_target in REVIEWER_EVAL_AGENT_TARGETS:
+        raise HTTPException(status_code=409, detail="Legacy Reviewer persona prompts cannot be activated for current investment analysis")
 
     # Snapshot reads/writes run off the event loop; PostgreSQL I/O is flushed at the boundary.
     return await _batch1_call(request, _promote_prompt_sync, uid, agent_target, library_key)
 
 
 def _promote_prompt_sync(uid: str, agent_target: str, library_key: str):
+    if agent_target in REVIEWER_EVAL_AGENT_TARGETS:
+        raise HTTPException(status_code=409, detail="Legacy Reviewer persona prompts cannot be activated for current investment analysis")
     library = load_prompt_library(uid)
     if not isinstance(library, dict) or library_key not in library:
         raise HTTPException(status_code=404, detail="library_key not found")
@@ -446,52 +449,51 @@ async def post_meta_prompt_evaluate(request: Request):
     if not api_key:
         raise HTTPException(status_code=503, detail="OPENAI_API_KEY required for evaluation")
 
-    startup_repository = _get_startup_repository(request)
-    storage = StartupReadStorageAdapter(None, await startup_repository.load_snapshot(uid))
     pool = getattr(request.app.state, "durable_job_pool", None)
-    repository = Batch1Repository(pool) if pool is not None else None
-    state = await repository.load_state(uid) if repository is not None else None
-    token = set_state(state) if state is not None else None
+    analysis_repository = getattr(request.app.state, "evaluation_repository", None)
+    identity = getattr(request.app.state, "identity_repository", None)
+    if pool is None or analysis_repository is None or identity is None:
+        raise HTTPException(status_code=503, detail="Current analysis repositories are unavailable")
+    repository = Batch1Repository(pool)
+    state = await repository.load_state(uid)
+    token = set_state(state)
+    gateway = None
     try:
-        intelligence = getattr(request.app.state, "fund_intelligence_repository", None)
-        thesis_repository = getattr(intelligence, "thesis_repository", None)
-        if thesis_repository is None:
-            raise HTTPException(status_code=503, detail="PostgreSQL thesis repository is unavailable")
-        thesis = await get_active_thesis_from_repository(thesis_repository, uid)
-        if thesis is None:
-            await bootstrap_default_thesis_with_repository(thesis_repository, uid)
-            thesis = await get_active_thesis_from_repository(thesis_repository, uid)
-        thesis_ctx = thesis.as_engine_context() if thesis else None
+        prerequisites = await load_evaluation_prerequisites(user_id=uid,
+            fund_intelligence_repository=getattr(request.app.state, "fund_intelligence_repository", None),
+            settings_repository=SettingsRepository(pool))
+        settings = await SettingsRepository(pool).get(uid) or DEFAULT_SETTINGS
         reviewer_model = os.getenv("REVIEWER_MODEL", "gpt-5-nano")
-        reviewer_engine = ReviewerEngine(
-            api_key=api_key,
-            storage=storage,
-            tenant_user_id=uid,
-            model=reviewer_model,
-            active_thesis=thesis_ctx,
-            startup_repository=startup_repository,
-        )
+        controller = CostController(user_id=uid, settings=settings,
+            enforce_limits=bool((settings.get("cost_budget") or {}).get("enabled", False)))
+        gateway = ModelGateway(user_id=uid, api_key=api_key, reviewer_model=reviewer_model,
+            partner_model=reviewer_model, cost_controller=controller,
+            max_completion_tokens=DEFAULT_MAX_COMPLETION_TOKENS)
+
+        async def load_baseline(startup_id):
+            opportunity = await identity.get_opportunity_by_legacy_projection(
+                user_id=uid, legacy_startup_id=startup_id)
+            if opportunity is None:
+                return None
+            return await analysis_repository.get_current(user_id=uid,
+                opportunity_id=str(opportunity["opportunity_id"]))
+
         override_ids = body.get("startup_ids")
-        sid_list: Optional[List[str]] = None
-        if isinstance(override_ids, list):
-            sid_list = [str(x).strip() for x in override_ids if str(x).strip()]
-        result = await run_prompt_evaluation(
-            user_id=uid,
-            agent_target=agent_target,
-            library_key=library_key,
-            storage=storage,
-            reviewer_engine=reviewer_engine,
-            startup_ids=sid_list,
-        )
-        return result
-    except FundThesisIncompleteError as e:
-        raise HTTPException(status_code=400, detail=str(e) or "fund thesis incomplete")
+        if override_ids is not None and not isinstance(override_ids, list):
+            raise HTTPException(status_code=400, detail="startup_ids must be a list")
+        return await run_prompt_evaluation(
+            user_id=uid, agent_target=agent_target, library_key=library_key,
+            load_baseline=load_baseline, policy=prerequisites.policy,
+            generate=gateway, reviewer_model=reviewer_model, startup_ids=override_ids)
+    except (AnalysisBlocked, EvaluationPrerequisiteError) as exc:
+        raise HTTPException(status_code=503, detail=exc.code) from exc
     finally:
-        if repository is not None and state is not None:
-            try:
-                await repository.persist_state(state)
-            finally:
-                reset_state(token)
+        try:
+            if gateway is not None:
+                gateway.close()
+            await repository.persist_state(state)
+        finally:
+            reset_state(token)
 
 
 @router.get("/api/meta/weights")

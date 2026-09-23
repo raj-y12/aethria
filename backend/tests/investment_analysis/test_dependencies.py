@@ -5,7 +5,7 @@ import pytest
 
 from investment_analysis.dependencies import inspect_analysis_dependencies
 from tests.investment_analysis.test_authority import run_case
-from tests.evaluation_v2.test_phase0_golden_pipeline import _inputs, CLOCK
+from tests.evaluation_v2.historical_fixtures import _inputs, CLOCK
 from tests.evaluation_v2.test_phase0_provenance_e2e import _policy
 from evaluation_v2.service import snapshot_claims
 

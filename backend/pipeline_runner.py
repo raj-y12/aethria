@@ -39,16 +39,11 @@ from evaluation_v2.prerequisites import (
     EvaluationPrerequisites,
     load_evaluation_prerequisites,
 )
-from evaluation_v2.repository import EvaluationLifecycleError
+from investment_analysis.repository import EvaluationLifecycleError
 from investment_analysis.model_gateway import AnalysisBlocked
-from investment_analysis.repository import InvestmentAnalysisRepository as EvaluationRepository
+from investment_analysis.repository import InvestmentAnalysisRepository
 from investment_analysis.stages import CompletedAnalysisStage
 from evaluation_v2.provenance import PipelineBinding
-from evaluation.manifest import (
-    build_model_identity,
-    capture_evaluation_manifest_identity,
-)
-from models import EvaluationManifestIdentity
 from pipeline_execution import (
     LookupExecutionStatus,
     MetaCycleResult,
@@ -62,11 +57,9 @@ from pipeline_concurrency import pipeline_execution_slot, lookup_execution_slot
 from utils.settings_loader import load_settings
 from pipeline_state import upsert_pipeline_state, pipeline_stage_log
 from scout.engine import ScoutEngine
-from reviewer.engine import ReviewerEngine
 from people.repository import PeopleRepository
 from evidence.repository import EvidenceRepository
 from identity.repository import IdentityConflictError, IdentityRepository
-from partner.engine import PartnerEngine
 from portfolio.store import PortfolioStore
 from portfolio.engine import PortfolioEngine
 from portfolio.cost_control import CostController
@@ -97,7 +90,6 @@ def get_service_client():
     return _get_service_client()
 from research.reference_validation import is_generic_reference
 from utils.prompt_version import hash_prompt
-from context import CanonicalContextProvider, CanonicalReviewerRegulatoryContextProvider
 from identity.repository import IdentityConflictError, IdentityRepository
 from evidence.repository import EvidenceRepository
 from batch1.context import reset_state, set_state
@@ -152,97 +144,11 @@ DEFAULT_REVIEWER_MODEL = "gpt-5-nano"
 @dataclass
 class _PipelineEngines:
     scout_engine: ScoutEngine
-    reviewer_engine: ReviewerEngine
-    partner_engine: PartnerEngine
+    reviewer_engine: CompletedAnalysisStage
+    partner_engine: CompletedAnalysisStage
     portfolio_store: PortfolioStore
     cost_controller: Optional[CostController] = None
     model_metadata: Dict[str, str] = field(default_factory=dict)
-    evaluation_manifest_identity: Optional[EvaluationManifestIdentity] = None
-
-
-def _capture_pipeline_manifest_identity(
-    *,
-    evaluation_prerequisites: EvaluationPrerequisites,
-    scout_engine: ScoutEngine,
-    reviewer_engine: ReviewerEngine,
-    partner_engine: PartnerEngine,
-    use_llm_fallback: bool,
-    include_deal_context_digest: bool,
-) -> EvaluationManifestIdentity:
-    """Snapshot exact engine dependencies after every constructor has completed."""
-    scout_prompts = {
-        f"scout.{scout.scout_type}": hash_prompt(
-            str(getattr(scout, "system_prompt", ""))
-        )
-        for scout in scout_engine.scouts
-    }
-    reviewer_prompts = {
-        "reviewer.DefaultReviewer": hash_prompt(
-            str(reviewer_engine.reviewer.SYSTEM_PROMPT)
-        ),
-        "reviewer.SkepticalReviewer": hash_prompt(
-            str(reviewer_engine.skeptical_reviewer.SYSTEM_PROMPT)
-        ),
-        "reviewer.OpportunistReviewer": hash_prompt(
-            str(reviewer_engine.opportunist_reviewer.SYSTEM_PROMPT)
-        ),
-    }
-    decision_engine = partner_engine.decision_engine
-    construction_prompts = {
-        **scout_prompts,
-        **reviewer_prompts,
-        "partner.template": str(decision_engine.prompt_template_version),
-    }
-    runtime_hash = evaluation_prerequisites.dependency_identity[
-        "scoring_runtime_hash"
-    ]
-    model_identities = {
-        "scout": build_model_identity(
-            provider_id="openai",
-            model_id=str(scout_engine.model),
-            configuration_id="aethria.scout.openai-chat.v1",
-            configuration={
-                "provider": "openai",
-                "model": str(scout_engine.model),
-                "personas": sorted(scout_prompts),
-            },
-        ),
-        "reviewer": build_model_identity(
-            provider_id="openai",
-            model_id=str(reviewer_engine.model),
-            configuration_id="aethria.reviewer.openai-chat.v1",
-            configuration={
-                "provider": "openai",
-                "model": str(reviewer_engine.model),
-                "personas": sorted(reviewer_prompts),
-                "structured_scoring": bool(
-                    reviewer_engine.use_structured_scoring
-                ),
-                "scoring_runtime_hash": runtime_hash,
-            },
-        ),
-        "partner": build_model_identity(
-            provider_id=str(decision_engine.provider_id),
-            model_id=str(decision_engine.model),
-            configuration_id="aethria.partner.openai-chat.v1",
-            configuration={
-                "provider": str(decision_engine.provider_id),
-                "model": str(decision_engine.model),
-                "use_llm_fallback": bool(use_llm_fallback),
-                "include_deal_context_digest": bool(
-                    include_deal_context_digest
-                ),
-                "prompt_template_version": str(
-                    decision_engine.prompt_template_version
-                ),
-            },
-        ),
-    }
-    return capture_evaluation_manifest_identity(
-        dependency_identity=evaluation_prerequisites.dependency_identity,
-        model_identities=model_identities,
-        construction_prompt_versions=construction_prompts,
-    )
 
 
 def _build_pipeline_engines(
@@ -288,10 +194,6 @@ def _build_pipeline_engines(
     model = os.getenv("SCOUT_MODEL", DEFAULT_SCOUT_MODEL)
     reviewer_model = os.getenv("REVIEWER_MODEL", DEFAULT_REVIEWER_MODEL)
     partner_model = os.getenv("PARTNER_MODEL", "gpt-5-nano")
-    use_llm_fallback = os.getenv("PARTNER_USE_LLM", "true").lower() == "true"
-    include_deal_context_digest = os.getenv(
-        "PARTNER_LLM_INCLUDE_DEAL_CONTEXT_DIGEST", ""
-    ).strip().lower() in ("1", "true", "yes")
     reviewer_batch_size = max(1, int(os.getenv("REVIEWER_BATCH_SIZE", "3")))
 
     scout_engine = ScoutEngine(
@@ -305,22 +207,6 @@ def _build_pipeline_engines(
         active_thesis=copy.deepcopy(thesis_ctx),
         settings=settings,
         startup_repository=startup_repository,
-    )
-    regulatory_context_loader = (
-        CanonicalReviewerRegulatoryContextProvider(
-            IdentityRepository(postgres_pool),
-            EvidenceRepository(postgres_pool),
-        )
-        if postgres_pool is not None
-        else None
-    )
-    canonical_context_loader = (
-        CanonicalContextProvider(
-            IdentityRepository(postgres_pool),
-            EvidenceRepository(postgres_pool),
-        )
-        if postgres_pool is not None
-        else None
     )
     founder_persister = (
         PeopleRepository(
@@ -357,7 +243,7 @@ def _build_pipeline_engines(
             return None
         if str(opportunity.opportunity_id) in failed_analysis_opportunities:
             raise AnalysisBlocked("analysis_failed_this_cycle", "This opportunity's analysis failed earlier in this cycle; retry in a new run.")
-        return await EvaluationRepository(postgres_pool).get_current(
+        return await InvestmentAnalysisRepository(postgres_pool).get_current(
             user_id=user_id,
             opportunity_id=opportunity.opportunity_id,
         )
@@ -374,7 +260,7 @@ def _build_pipeline_engines(
         trace = ((current.get("agent_trace") if isinstance(current, dict) else getattr(current, "agent_trace", None))
                  if current is not None else None) or {}
         scout_trace = trace.get("scout") or {}
-        return await EvaluationRepository(postgres_pool, cost_controller=cost_controller).evaluate(
+        return await InvestmentAnalysisRepository(postgres_pool, cost_controller=cost_controller).evaluate(
             user_id=user_id, opportunity_id=opportunity.opportunity_id, actor_id=user_id,
             trigger_type="analysis_refresh", policy=evaluation_prerequisites.policy,
             thesis_version_id=evaluation_prerequisites.thesis_version_id,
@@ -406,20 +292,6 @@ def _build_pipeline_engines(
             "partner": partner_model,
         },
     )
-    bind_manifest_identity = getattr(
-        partner_engine, "set_evaluation_manifest_identity", None
-    )
-    if evaluation_prerequisites is not None and callable(bind_manifest_identity):
-        manifest_identity = _capture_pipeline_manifest_identity(
-            evaluation_prerequisites=evaluation_prerequisites,
-            scout_engine=scout_engine,
-            reviewer_engine=reviewer_engine,
-            partner_engine=partner_engine,
-            use_llm_fallback=use_llm_fallback,
-            include_deal_context_digest=include_deal_context_digest,
-        )
-        bind_manifest_identity(manifest_identity)
-        engines.evaluation_manifest_identity = manifest_identity
     return engines
 
 
@@ -851,7 +723,7 @@ async def _evaluate_admitted_periodic_discoveries(
         return 0
     evaluated: set[str] = set()
     attempted: set[str] = set()
-    repository = EvaluationRepository(postgres_pool, cost_controller=cost_controller)
+    repository = InvestmentAnalysisRepository(postgres_pool, cost_controller=cost_controller)
     for admission in admissions:
         if getattr(admission, "blocks_evaluation", False):
             continue
@@ -1438,7 +1310,6 @@ async def _run_one_pipeline_cycle_inner_impl(
         )
         meta_agent = MetaAgent(
             scout_engine=scout_engine,
-            reviewer_engine=reviewer_engine,
             user_id=user_id,
             settings=settings,
             batch1_repository=Batch1Repository(
@@ -1703,7 +1574,7 @@ def _build_rerun_operator_context(additional_context: Optional[str]) -> str:
 def _qualitative_review_is_current(
     review_info: Any,
     prerequisites: EvaluationPrerequisites,
-    reviewer_engine: ReviewerEngine,
+    reviewer_engine: CompletedAnalysisStage,
 ) -> bool:
     """Return whether a saved qualitative review matches the active review contract.
 
@@ -2066,7 +1937,7 @@ async def _run_on_demand_lookup_inner(
             if evaluation_prerequisites is not None:
                 try:
                     pipeline_stage_log(lookup_run_id, startup_id=startup_id, user_id=user_id, stage="canonical_evaluation", phase="STARTED")
-                    canonical_evaluation = await EvaluationRepository(postgres_pool, cost_controller=engines.cost_controller).evaluate(
+                    canonical_evaluation = await InvestmentAnalysisRepository(postgres_pool, cost_controller=engines.cost_controller).evaluate(
                         user_id=user_id,
                         opportunity_id=canonical_admission.opportunity_id,
                         actor_id=user_id,

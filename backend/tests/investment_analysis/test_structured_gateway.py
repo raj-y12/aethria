@@ -73,3 +73,20 @@ async def test_gateway_names_provider_failure_and_accounts_usage(monkeypatch, fi
         gateway.close()
     assert failure.value.code == code
     budget.record_call.assert_called_once_with("reviewer", "investment-reviewer", tokens_used=150)
+
+
+@pytest.mark.parametrize("change", [
+    {"action": "YES"},
+    {"confidence": -0.1},
+    {"confidence": 1.1},
+    {"confidence": float("nan")},
+    {"rationale": []},
+    {"investment_case": ""},
+])
+def test_current_partner_contract_rejects_invalid_judgment(change):
+    from pydantic import ValidationError
+
+    payload = {"action": "MORE_DILIGENCE", "rationale": ["Verify clinical outcomes."],
+               "confidence": 0.5, "investment_case": "Clinical upside remains unverified."}
+    with pytest.raises(ValidationError):
+        PartnerDraft.model_validate({**payload, **change})

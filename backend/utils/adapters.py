@@ -1,7 +1,5 @@
 """
-Adapters to convert between old format and new Pydantic models.
-
-Maintains backward compatibility during migration.
+Convert Scout payloads into the persisted ScoutInfo shape.
 Timestamps are taken from stored data when available; fallback to utcnow().
 """
 from typing import Dict, Any, Optional
@@ -9,8 +7,9 @@ from datetime import datetime
 from utils.timeutil import utcnow
 
 from uuid import uuid4
-from models import ScoutInfo, ReviewInfo, PartnerInfo, PartnerSnapshot, Financials, AethriaView
+from models import ScoutInfo, Financials
 from utils.traction_extraction import extract_traction_facts
+from scout.tools.financials_grounding import funding_history_for_stage
 
 
 def financials_from_scout_output(scout_output: Dict[str, Any]) -> Financials:
@@ -24,13 +23,14 @@ def financials_from_scout_output(scout_output: Dict[str, Any]) -> Financials:
     grounded = scout_output.get("financials_grounded")
     if not isinstance(grounded, dict):
         return Financials()
+    funding_history = funding_history_for_stage(grounded.get("funding_history"), scout_output.get("funding_stage"))
     return Financials(
         traction_metrics=grounded.get("traction_metrics"),
-        funding_history=grounded.get("funding_history"),
+        funding_history=funding_history,
         valuation_est=grounded.get("valuation_est"),
         ip_status=grounded.get("ip_status"),
         revenue_missing=bool(grounded.get("revenue_missing", False)),
-        funding_missing=bool(grounded.get("funding_missing", False)),
+        funding_missing=bool(grounded.get("funding_missing", False) or (grounded.get("funding_history") and not funding_history)),
         valuation_missing=bool(grounded.get("valuation_missing", False)),
     )
 
@@ -116,172 +116,4 @@ def scout_output_to_scout_info(scout_output: Dict[str, Any]) -> ScoutInfo:
         ),
         discovered_at=discovered,
         prompt_version=scout_output.get("prompt_version"),
-    )
-
-
-def reviewer_output_to_review_info(reviewer_output: Dict[str, Any]) -> ReviewInfo:
-    """
-    Convert old ReviewerOutput to new ReviewInfo Pydantic model.
-    Preserves defensibility_score and diligence_red_flags.
-    Uses reviewed_at from input when available; otherwise utcnow().
-    
-    Args:
-        reviewer_output: Old ReviewerOutput dict (may include reviewed_at from storage)
-    
-    Returns:
-        ReviewInfo Pydantic model
-    """
-    reviewed = _parse_timestamp(reviewer_output.get("reviewed_at"))
-    if reviewed is None:
-        reviewed = utcnow()
-    # Reviewer output is qualitative research.  Never derive or persist a
-    # numerical assessment from it: canonical evaluation owns that contract.
-    enriched = reviewer_output
-    return ReviewInfo(
-        policy_version_id=enriched.get("policy_version_id"),
-        policy_hash=enriched.get("policy_hash"),
-        rubric_version=enriched.get("rubric_version"),
-        scoring_runtime_version=enriched.get("scoring_runtime_version"),
-        scoring_runtime_hash=enriched.get("scoring_runtime_hash"),
-        market_score=None,
-        product_score=None,
-        technical_score=None,
-        execution_score=None,
-        defensibility_score=None,
-        overall_summary=enriched.get("overall_summary", ""),
-        key_risks=enriched.get("key_risks", []),
-        verdict=enriched.get("verdict", "MEDIUM"),
-        derived_verdict=None,
-        diligence_red_flags=enriched.get("diligence_red_flags", []),
-        assumption_feedback=enriched.get("assumption_feedback") or [],
-        reviewer_agent_id=enriched.get("reviewer_agent_id"),
-        reviewed_at=reviewed,
-        team_analysis=enriched.get("team_analysis") or None,
-        competition_analysis=enriched.get("competition_analysis") or None,
-        business_model_analysis=enriched.get("business_model_analysis") or None,
-        investment_thesis=enriched.get("investment_thesis") or None,
-        risk_mitigation=enriched.get("risk_mitigation") or None,
-        founder_fluency=enriched.get("founder_fluency") or None,
-        capability_slope=enriched.get("capability_slope") or None,
-        reframe=enriched.get("reframe") or None,
-        evidence_coverage=enriched.get("evidence_coverage"),
-        score_reasoning=None,
-        score_source=None,
-        improvement_to_9=enriched.get("improvement_to_9") or None,
-        market_reasoning=enriched.get("market_reasoning") or None,
-        market_weaknesses=enriched.get("market_weaknesses") or None,
-        market_confidence=enriched.get("market_confidence"),
-        product_reasoning=enriched.get("product_reasoning") or None,
-        product_weaknesses=enriched.get("product_weaknesses") or None,
-        product_confidence=enriched.get("product_confidence"),
-        technical_reasoning=enriched.get("technical_reasoning") or None,
-        technical_weaknesses=enriched.get("technical_weaknesses") or None,
-        technical_confidence=enriched.get("technical_confidence"),
-        execution_reasoning=enriched.get("execution_reasoning") or None,
-        execution_weaknesses=enriched.get("execution_weaknesses") or None,
-        execution_confidence=enriched.get("execution_confidence"),
-        defensibility_reasoning=enriched.get("defensibility_reasoning") or None,
-        defensibility_weaknesses=enriched.get("defensibility_weaknesses") or None,
-        defensibility_confidence=enriched.get("defensibility_confidence"),
-        overall_score=None,
-        overall_label=None,
-        market_score_label=None,
-        product_score_label=None,
-        technical_score_label=None,
-        execution_score_label=None,
-        defensibility_score_label=None,
-        prompt_version=enriched.get("prompt_version"),
-        fund_thesis_version_id=enriched.get("fund_thesis_version_id"),
-        thesis_alignment_score=enriched.get("thesis_alignment_score"),
-        thesis_alignment_state=enriched.get("thesis_alignment_state"),
-        thesis_matches_fund=enriched.get("thesis_matches_fund"),
-        thesis_fit_points=enriched.get("thesis_fit_points") or None,
-        thesis_deviation_points=enriched.get("thesis_deviation_points") or None,
-        thesis_alignment_confidence=enriched.get("thesis_alignment_confidence"),
-        fund_thesis_alignment_score=enriched.get("fund_thesis_alignment_score"),
-        confidence_adjusted_score=None,
-        structured_scoring=None,
-        # A reviewer signal matrix was part of the retired secondary scoring
-        # path. Do not allow an old payload to re-enter persistence through an
-        # adapter call; canonical evidence claims own structured assessment.
-        structured_signals=None,
-        resolution_notes=enriched.get("resolution_notes") or None,
-        disagreement_summary=enriched.get("disagreement_summary"),
-        aethria_view=_coerce_aethria_view(enriched.get("aethria_view")),
-    )
-
-
-def _coerce_aethria_view(raw: Any) -> Optional[AethriaView]:
-    if raw is None:
-        return None
-    if isinstance(raw, AethriaView):
-        return raw
-    if isinstance(raw, dict):
-        try:
-            return AethriaView.model_validate(raw)
-        except Exception:
-            return None
-    return None
-
-
-def partner_output_to_partner_info(partner_output: Dict[str, Any]) -> PartnerInfo:
-    """
-    Convert PartnerOutput dict to PartnerInfo Pydantic model.
-    Maps new schema fields directly. Uses partnered_at from input when available.
-
-    Args:
-        partner_output: PartnerOutput dict from decision engine
-
-    Returns:
-        PartnerInfo Pydantic model
-    """
-    partnered = _parse_timestamp(partner_output.get("partnered_at"))
-    if partnered is None:
-        partnered = utcnow()
-
-    snap_raw = partner_output.get("snapshot") or {}
-    snapshot = PartnerSnapshot(
-        one_liner=str(snap_raw.get("one_liner") or ""),
-        stage=snap_raw.get("stage"),
-        key_signal=snap_raw.get("key_signal"),
-    )
-
-    recommendation = partner_output.get("recommendation", "PASS")
-    if recommendation not in ("INVEST", "PASS", "MONITOR"):
-        recommendation = "PASS"
-
-    try:
-        confidence = max(0.0, min(1.0, float(partner_output.get("confidence", 0.5) or 0.5)))
-    except (TypeError, ValueError):
-        confidence = 0.5
-
-    risks_raw = partner_output.get("risks")
-    risks = [str(r) for r in risks_raw if isinstance(r, str)] if isinstance(risks_raw, list) else []
-
-    return PartnerInfo(
-        thesis=str(partner_output.get("thesis") or ""),
-        why_this_matters=str(partner_output.get("why_this_matters") or ""),
-        snapshot=snapshot,
-        market_insight=str(partner_output.get("market_insight") or ""),
-        product_edge=str(partner_output.get("product_edge") or ""),
-        traction_signals=partner_output.get("traction_signals"),
-        risks=risks,
-        recommendation=recommendation,
-        decision_rationale=str(partner_output.get("decision_rationale") or ""),
-        confidence=confidence,
-        next_action=str(partner_output.get("next_action") or ""),
-        human_review_required=bool(partner_output.get("human_review_required", False)),
-        contradiction_guard=partner_output.get("contradiction_guard"),
-        partner_agent_id=partner_output.get("partner_agent_id"),
-        partnered_at=partnered,
-        llm_fallback_reason=partner_output.get("llm_fallback_reason"),
-        prompt_version=partner_output.get("prompt_version"),
-        decision_drivers=partner_output.get("decision_drivers"),
-        company_quality=partner_output.get("company_quality"),
-        fund_fit=partner_output.get("fund_fit"),
-        fund_fit_label=partner_output.get("fund_fit_label"),
-        fund_fit_confidence=partner_output.get("fund_fit_confidence"),
-        mandate_gate=partner_output.get("mandate_gate"),
-        mandate_override_required=partner_output.get("mandate_override_required"),
-        ownership_conflict=partner_output.get("ownership_conflict"),
     )

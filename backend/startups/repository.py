@@ -30,6 +30,28 @@ LIST_COLUMNS = (
 )
 
 
+# Correlated to a single, already paginated startup row. Historical records
+# without a current analysis remain readable; ambiguous opportunity links do
+# not select an arbitrary judgement. Every join includes the tenant boundary.
+CURRENT_ANALYSIS_COLUMN = """(
+    select case when count(*) = 1 then jsonb_agg(jsonb_build_object(
+        'evaluation_id', e.evaluation_id,
+        'opportunity_id', o.opportunity_id,
+        'reviewer_summary', e.judgment_audit #> '{investment_analysis,reviewer,overall_assessment}',
+        'validation', e.judgment_audit #> '{investment_analysis,validation}',
+        'partner', e.judgment_audit #> '{investment_analysis,partner}'
+    ))->0 end
+    from public.opportunities o
+    join public.evaluation_runs e on e.user_id=o.user_id
+        and e.evaluation_id=o.current_evaluation_id and e.opportunity_id=o.opportunity_id
+    where o.user_id=startups.user_id and o.legacy_startup_id::text=startups.startup_id
+        and e.status='completed'
+        and e.evaluation_id::text=startups.agent_trace #>> '{reviewer,evaluation_run_id}'
+        and e.evaluation_id::text=startups.agent_trace #>> '{partner,provenance,evaluation_run_id}'
+        and e.judgment_audit #> '{investment_analysis,partner}' is not null
+) as current_analysis"""
+
+
 def _decode(value: Any) -> Any:
     if isinstance(value, str):
         try:
@@ -77,6 +99,7 @@ def startup_dict(row: dict[str, Any]) -> dict[str, Any]:
     """Map a database row to the existing API/model startup shape."""
     return {
         "startup_id": row.get("startup_id"),
+        "current_analysis": _decode(row.get("current_analysis")),
         "scout_info": _decode(row.get("scout_info")) or {},
         "review_info": _decode(row.get("review_info")),
         "partner_info": _decode(row.get("partner_info")),
@@ -103,7 +126,7 @@ def _iso_row(row: Any) -> dict[str, Any]:
         value = result.get(key)
         if value is not None and hasattr(value, "isoformat"):
             result[key] = value.isoformat()
-    for key in ("scout_info", "review_info", "partner_info", "financials", "human_resolution", "conviction_state", "agent_trace"):
+    for key in ("scout_info", "review_info", "partner_info", "financials", "human_resolution", "conviction_state", "agent_trace", "current_analysis"):
         result[key] = _decode(result.get(key))
     return result
 
@@ -546,7 +569,7 @@ class StartupRepository:
         uid = require_user_id(user_id, context="StartupRepository.get_row")
         async with self.pool.acquire() as connection:
             row = await connection.fetchrow(
-                f"select {columns} from public.startups where user_id=$1 and startup_id=$2 limit 1",
+                f"select {columns}, {CURRENT_ANALYSIS_COLUMN} from public.startups where user_id=$1 and startup_id=$2 limit 1",
                 uid, str(startup_id),
             )
         return _iso_row(row) if row is not None else None
@@ -565,7 +588,7 @@ class StartupRepository:
         offset = max(0, int(offset))
         async with self.pool.acquire() as connection:
             rows = await connection.fetch(
-                f"""select {LIST_COLUMNS} from public.startups
+                f"""select {LIST_COLUMNS}, {CURRENT_ANALYSIS_COLUMN} from public.startups
                     where user_id=$1 order by updated_at desc, startup_id desc
                     limit $2 offset $3""", uid, limit, offset,
             )

@@ -1,13 +1,11 @@
-"""Configuration for deterministic structured scoring."""
+"""Versioned fund-policy defaults retained for published policy compatibility."""
 
 from __future__ import annotations
 
-import os
 from typing import Any, Dict
 
 
 DEFAULT_SCORE = 5.0
-DEBUG_SCORING = True
 
 # ── Evidence-confidence calibration (Issue 1: thin-evidence inflation) ────────────
 #
@@ -22,12 +20,6 @@ EVIDENCE_DISCOUNT: Dict[str, float] = {"floor_conf": 0.2, "full_conf": 0.8}
 # confidence (`min_avg_conf`). Stops a handful of weak signals from aggregating into a
 # "Strong" dimension score; the dimension is flagged `evidence_capped` for the memo.
 EVIDENCE_GATE: Dict[str, float] = {"min_completeness": 0.4, "min_avg_conf": 0.35, "cap": 6.0}
-
-# Master switch for the Issue-1 calibration. Safe by default during the migration
-# window; it can be explicitly disabled for a controlled rollback.
-EVIDENCE_CALIBRATION_ENABLED = os.getenv(
-    "SCORING_EVIDENCE_CALIBRATION_ENABLED", "true"
-).strip().lower() in {"1", "true", "yes"}
 
 DIMENSION_WEIGHTS: Dict[str, Dict[str, float]] = {
     "market": {

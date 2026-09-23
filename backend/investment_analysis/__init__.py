@@ -5,7 +5,7 @@ Deliberately small public surface — this package's internals (`service.py`,
 white-box tested directly by `tests/investment_analysis/` and are not meant
 to be imported piecemeal from outside. External callers should need only:
 
-- `analyze`: the one-transaction Reviewer -> validation -> Partner sequence,
+- `analyze`: the Reviewer -> validation -> Partner analysis sequence,
   for callers that inject their own evidence/persistence (tests, replay
   tooling) rather than going through the repository.
 - `AnalysisBlocked`: the exception every caller must be prepared to catch —
@@ -14,16 +14,9 @@ to be imported piecemeal from outside. External callers should need only:
 - `AnalysisResult`: the shape `analyze()` returns.
 - `CompletedAnalysisStage`: the pipeline_runner-facing stage wrapper.
 
-`InvestmentAnalysisRepository` (the live orchestration entrypoint
-`pipeline_runner.py`/`api.py` actually construct and call) is deliberately
-**not** re-exported here: `repository.py` imports `evaluation_v2.repository`,
-which itself imports `investment_analysis.models` for a type hint, and
-`evaluation_v2.repository` is commonly the first of the two to load during
-normal startup (e.g. via `pipeline_runner`). Re-exporting the repository
-eagerly here would make that pre-existing cross-package reference resolve
-before this package finishes initializing, breaking `import api` outright.
-Import it directly: `from investment_analysis.repository import
-InvestmentAnalysisRepository` (as every current caller already does).
+`InvestmentAnalysisRepository` owns snapshot loading, current/historical-record
+reads and immutable publication directly. Import it from
+`investment_analysis.repository`; it does not inherit an alternative evaluator.
 
 See `investment_analysis/README.md` for why Reviewer and Partner are phases
 of this one service rather than independent packages.

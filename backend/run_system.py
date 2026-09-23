@@ -44,8 +44,7 @@ class ColorFormatter(logging.Formatter):
 
     Examples:
     - scout.engine      → cyan
-    - reviewer.engine   → magenta
-    - partner.engine    → yellow
+    - investment_analysis → magenta
     - portfolio.engine  → green
     - storage           → blue
     - system / default  → dim white
@@ -54,8 +53,7 @@ class ColorFormatter(logging.Formatter):
     RESET = "\033[0m"
     COLORS = {
         "scout.engine": "\033[38;5;45m",      # bright cyan
-        "reviewer.engine": "\033[38;5;207m",  # magenta
-        "partner.engine": "\033[38;5;220m",   # yellow
+        "investment_analysis": "\033[38;5;207m",  # magenta
         "portfolio.engine": "\033[38;5;40m",  # green
         "storage": "\033[38;5;33m",           # blue
         "retrieval_grounding": "\033[38;5;208m",  # orange

@@ -1,11 +1,13 @@
 """
 Meta Agent Phase 2: shadow reviewer evaluation against a fixed startup set.
-Compares candidate prompt output to persisted per-persona SingleReview baselines.
+Compares the current Reviewer against frozen current-analysis baselines.
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import json
+from hashlib import sha256
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,55 +18,31 @@ from meta.prompt_gating import (
     load_prompt_library,
     save_last_eval_for_library_key,
 )
-from reviewer.engine import ReviewerEngine
+from tenant_context import require_user_id
+from investment_analysis.models import AnalysisResult
+from investment_analysis.service import generate_review
+from investment_analysis.validation import validate_assessments
 
 logger = logging.getLogger(__name__)
 
-VERDICT_RANK = {"WEAK": 0, "MEDIUM": 1, "STRONG": 2}
-
-_DIMS = ("market_score", "product_score", "technical_score", "execution_score", "defensibility_score")
-
-
-def verdict_downgraded(baseline_verdict: str, candidate_verdict: str) -> bool:
-    b = VERDICT_RANK.get(str(baseline_verdict or "").upper(), 1)
-    c = VERDICT_RANK.get(str(candidate_verdict or "").upper(), 1)
-    return c < b
-
-
-def mean_abs_score_delta(baseline: Dict[str, Any], candidate: Dict[str, Any]) -> float:
-    deltas: List[float] = []
-    for d in _DIMS:
-        bv = baseline.get(d)
-        cv = candidate.get(d)
-        if bv is None or cv is None:
-            continue
-        try:
-            deltas.append(abs(float(cv) - float(bv)))
-        except (TypeError, ValueError):
-            continue
-    if not deltas:
-        return 0.0
-    return round(sum(deltas) / len(deltas), 3)
-
-
-def extract_baseline_for_persona(startup, agent_target: str) -> Optional[Dict[str, Any]]:
-    ri = getattr(startup, "review_info", None)
-    if ri is None:
-        return None
-    reviews = getattr(ri, "reviews", None) or []
-    for sr in reviews:
-        if getattr(sr, "reviewer_type", None) == agent_target:
-            out: Dict[str, Any] = {
-                "verdict": sr.verdict,
-                "market_score": sr.market_score,
-                "product_score": sr.product_score,
-                "technical_score": sr.technical_score,
-                "execution_score": sr.execution_score,
-            }
-            if sr.defensibility_score is not None:
-                out["defensibility_score"] = sr.defensibility_score
-            return out
-    return None
+def compare_assessments(baseline, candidate) -> Dict[str, Any]:
+    """Compare validated support, never infer an investment verdict from scores."""
+    before = {item.dimension.value: item for item in baseline.assessments}
+    after = {item.dimension.value: item for item in candidate.assessments}
+    lost = [dimension for dimension, item in before.items()
+            if item.validated_score is not None
+            and (dimension not in after or after[dimension].validated_score is None)]
+    deltas = [abs(after[dimension].validated_score - item.validated_score)
+              for dimension, item in before.items()
+              if item.validated_score is not None and dimension in after
+              and after[dimension].validated_score is not None]
+    agreements = all(dimension in after and
+                     (item.support_status, item.contradiction_status, item.score_status)
+                     == (after[dimension].support_status, after[dimension].contradiction_status, after[dimension].score_status)
+                     for dimension, item in before.items()) and set(before) == set(after)
+    return {"regression": bool(lost), "lost_support_dimensions": lost,
+            "support_match": agreements, "n_scored_dimensions": len(deltas),
+            "mean_abs_delta": round(sum(deltas) / len(deltas), 3) if deltas else None}
 
 
 def evaluation_passes(
@@ -76,7 +54,7 @@ def evaluation_passes(
     if n_compared <= 0:
         return False, "no_comparisons"
     if regression_count > 0:
-        return False, "verdict_regression"
+        return False, "support_regression"
     try:
         max_delta = float(os.getenv("META_PROMPT_EVAL_MAX_MEAN_DELTA", "2.5"))
     except ValueError:
@@ -91,13 +69,16 @@ async def run_prompt_evaluation(
     user_id: str,
     agent_target: str,
     library_key: str,
-    storage,
-    reviewer_engine: ReviewerEngine,
+    load_baseline,
+    policy,
+    generate,
+    reviewer_model: str | None = None,
     startup_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Run shadow reviews for candidate prompt in library_key (reviewer agents only).
     """
+    user_id = require_user_id(user_id, context="prompt_evaluation")
     if agent_target not in REVIEWER_EVAL_AGENT_TARGETS:
         return {"ok": False, "error": "agent_target must be a reviewer persona", "rows": []}
 
@@ -106,9 +87,11 @@ async def run_prompt_evaluation(
     if not isinstance(ent, dict) or not str(ent.get("prompt") or "").strip():
         return {"ok": False, "error": "library_key not found or empty prompt", "rows": []}
 
+    if library_key.split(":", 1)[0] != agent_target:
+        return {"ok": False, "error": "library_key does not belong to agent_target", "rows": []}
     candidate_prompt = str(ent["prompt"])
 
-    ids = [str(x).strip() for x in (startup_ids or load_eval_startup_ids(user_id)) if str(x).strip()]
+    ids = [str(x).strip() for x in (startup_ids if startup_ids is not None else load_eval_startup_ids(user_id)) if str(x).strip()]
     try:
         max_n = int(os.getenv("META_PROMPT_EVAL_MAX_STARTUPS", "20"))
     except ValueError:
@@ -121,47 +104,62 @@ async def run_prompt_evaluation(
     if not ids:
         return {"ok": False, "error": "no startup_ids (configure eval set or pass startup_ids)", "rows": []}
 
-    reviewer_engine._sync_thesis_to_reviewers()
-
     sem = asyncio.Semaphore(max(1, int(os.getenv("META_PROMPT_EVAL_CONCURRENCY", "3"))))
 
     async def one(sid: str) -> Dict[str, Any]:
         row: Dict[str, Any] = {"startup_id": sid, "status": "ok"}
         async with sem:
             try:
-                startup = storage.get_startup(sid)
-                if startup is None:
-                    row["status"] = "missing_startup"
-                    return row
-                baseline = extract_baseline_for_persona(startup, agent_target)
-                if baseline is None:
+                record = await load_baseline(sid)
+                if record is None:
                     row["status"] = "no_baseline"
                     return row
-                scout_output = ReviewerEngine._build_scout_output_payload(startup)
-                cand = await reviewer_engine.preview_persona_review(
-                    agent_target, scout_output, candidate_prompt
-                )
-                if cand is None:
-                    row["status"] = "review_failed"
+                evaluation = record["evaluation"]
+                raw = (evaluation.get("judgment_audit") or {}).get("investment_analysis")
+                if not raw:
+                    row["status"] = "no_current_analysis_baseline"
                     return row
-                bv = str(baseline.get("verdict") or "")
-                cv = str(cand.get("verdict") or cand.get("derived_verdict") or "")
-                row["baseline_verdict"] = bv
-                row["candidate_verdict"] = cv
-                row["verdict_match"] = bv.upper() == cv.upper()
-                row["regression"] = verdict_downgraded(bv, cv)
-                row["mean_abs_delta"] = mean_abs_score_delta(baseline, cand)
+                baseline = AnalysisResult.model_validate(raw)
+                if baseline.reviewer.lineage.user_id != user_id:
+                    raise ValueError("baseline tenant mismatch")
+                versions = baseline.reviewer.policy_versions
+                if (versions.policy_hash != policy.policy_hash
+                        or versions.policy_version != policy.policy_version_id
+                        or versions.rubric_version != policy.rubric_version
+                        or versions.partner_rules_version != policy.partner_rules_version):
+                    row["status"] = "baseline_policy_changed"
+                    return row
+                snapshot = evaluation["claim_snapshot"]
+                digest = sha256(json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+                if digest != baseline.reviewer.lineage.evidence_snapshot_hash:
+                    raise ValueError("baseline snapshot mismatch")
+                clocks = {claim.get("evaluation_at_snapshot") for claim in snapshot}
+                if len(clocks) != 1 or None in clocks:
+                    row["status"] = "baseline_clock_unavailable"
+                    return row
+                evaluation_at = datetime.fromisoformat(str(clocks.pop()).replace("Z", "+00:00"))
+                _, review, admitted, _ = await generate_review(
+                    user_id=user_id, lineage=baseline.reviewer.lineage,
+                    identity=baseline.reviewer.identity, snapshot=snapshot, policy=policy,
+                    context=baseline.context_snapshot, generate=generate,
+                    reviewer_model=reviewer_model, prompt=candidate_prompt)
+                validated, _ = validate_assessments(user_id=user_id, review=review,
+                    snapshot=admitted, policy=policy, evaluation_at=evaluation_at)
+                row.update(compare_assessments(baseline.validation, validated))
+                row["baseline_evaluation_id"] = str(evaluation["evaluation_id"])
+                if not row["n_scored_dimensions"] and not row["regression"]:
+                    row["status"] = "no_scored_comparisons"
             except Exception as e:
-                logger.warning("eval row error %s: %s", sid, e)
+                logger.warning("eval row failed for %s: %s", sid, getattr(e, "code", type(e).__name__))
                 row["status"] = "error"
-                row["error"] = str(e)[:200]
+                row["error"] = getattr(e, "code", "review_failed")
         return row
 
     rows = await asyncio.gather(*[one(sid) for sid in ids])
 
     compared = [r for r in rows if r.get("status") == "ok"]
     regressions = sum(1 for r in compared if r.get("regression"))
-    agreements = sum(1 for r in compared if r.get("verdict_match"))
+    agreements = sum(1 for r in compared if r.get("support_match"))
     n_compared = len(compared)
     mean_delta = (
         round(sum(float(r.get("mean_abs_delta") or 0) for r in compared) / n_compared, 4)
@@ -174,6 +172,9 @@ async def run_prompt_evaluation(
         mean_abs_delta=mean_delta,
         n_compared=n_compared,
     )
+
+    if len(compared) != len(rows):
+        passed, pass_reason = False, "incomplete_comparisons"
 
     save_last_eval_for_library_key(
         user_id,
@@ -195,7 +196,7 @@ async def run_prompt_evaluation(
             "n_requested": len(ids),
             "n_compared": n_compared,
             "regression_count": regressions,
-            "verdict_agreements": agreements,
+            "support_agreements": agreements,
             "mean_abs_score_delta": mean_delta,
             "passed": passed,
             "pass_reason": pass_reason,

@@ -6,75 +6,14 @@ from uuid import uuid4
 
 import pytest
 
-from investment_analysis.model_gateway import ModelGateway, normalize_reviewer_payload
+from investment_analysis.model_gateway import ModelGateway
 from investment_analysis.service import reviewer_dimension_name
 from investment_analysis.models import ReviewerDraft
-
-
-def test_normalize_reviewer_payload_maps_legacy_dimension_and_reference_shapes():
-    payload = {
-        "overall_assessment": "Evidence-based analysis",
-        "assessments": [{
-            "dimension": "TECHNICAL",
-            "conclusion": "The product appears feasible.",
-            "score_rationale": "The evidence is early.",
-            "limititations": ["Scalability is not yet verified."],
-            "References": {"claim_ids": ["claim-1"]},
-        }],
-        "analysis_sections": [{
-            "name": "TECHNICAL",
-            "status": "PRESENT",
-            "limitations": ["Not enough engineering detail."],
-            "References": {"claim_ids": ["claim-1"]},
-        }],
-        "portfolio_scope": "input context",
-        "research_attempted": False,
-        "rubric": {"version": "4.0"},
-    }
-
-    normalized = normalize_reviewer_payload(payload)
-
-    assert normalized["assessments"][0]["dimension"] == "TECHNOLOGY"
-    assert normalized["assessments"][0]["limitations"] == ["Scalability is not yet verified."]
-    assert "References" not in normalized["assessments"][0]
-    assert normalized["analysis_sections"] == [{"name": "TECHNOLOGY", "status": "PRESENT"}]
-    assert "portfolio_scope" not in normalized
-    assert "research_attempted" not in normalized
-    assert "rubric" not in normalized
 
 
 def test_reviewer_dimension_name_uses_current_contract_enum():
     assert reviewer_dimension_name("technical") == "TECHNOLOGY"
     assert reviewer_dimension_name("market") == "MARKET"
-
-
-def test_normalize_reviewer_payload_maps_legacy_reasoning_categories_and_nested_fields():
-    normalized = normalize_reviewer_payload({
-        "overall_assessment": "Mixed evidence",
-        "risks": [{
-            "type": "EXECUTION_RISK",
-            "text": "Delivery risk remains material.",
-            "reasoning": [{"type": "FACT", "text": "The team is small."}],
-            "limitations": ["Hiring plan is unverified."],
-            "unknowns": ["Future hiring pace."],
-        }],
-        "diligence_priorities": [{"type": "RESEARCH", "text": "Verify retention."}],
-    })
-
-    assert normalized["risks"] == [{"type": "INFERENCE", "text": "Delivery risk remains material."}]
-    assert normalized["diligence_priorities"] == [{"type": "UNKNOWN", "text": "Verify retention."}]
-
-
-def test_normalize_reviewer_payload_merges_reference_lists():
-    normalized = normalize_reviewer_payload({
-        "overall_assessment": "Evidence-based analysis",
-        "risks": [{"type": "INFERENCE", "text": "Risk", "references": [
-            {"claim_ids": ["claim-1"]}, {"evidence_item_ids": ["evidence-1"]},
-        ]}],
-    })
-    assert normalized["risks"][0]["references"] == {
-        "claim_ids": ["claim-1"], "evidence_item_ids": ["evidence-1"], "source_ids": [],
-    }
 
 
 @pytest.mark.asyncio

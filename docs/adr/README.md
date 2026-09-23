@@ -40,3 +40,5 @@ codebase, not when the record was written.
 Copy the shape of an existing record: **Context · Decision · Consequences ·
 Alternatives considered**. Number sequentially. If a new ADR replaces an old one,
 mark the old one *Superseded by* in the same pull request.
+
+- [0017 — One investment-analysis publication boundary](0017-single-analysis-publication.md)
