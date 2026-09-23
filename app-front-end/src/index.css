@@ -4798,17 +4798,21 @@ textarea {
   height: 100%;
   overflow: visible;
   pointer-events: none;
-  color: inherit;
+  color: var(--color-brand-mark);
+}
+
+.aethria-dispatch-progress-ring--inverse {
+  color: var(--color-brand-mark-inverse);
 }
 
 .aethria-dispatch-progress-ring rect {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.5;
+  stroke-width: 2.75;
   stroke-linecap: round;
-  stroke-dasharray: 62 220;
+  stroke-dasharray: 68 214;
   animation: dispatch-progress-orbit 2.4s linear infinite;
-  opacity: 0.85;
+  opacity: 1;
 }
 
 @keyframes dispatch-progress-orbit {

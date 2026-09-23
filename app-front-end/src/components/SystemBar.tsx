@@ -160,7 +160,7 @@ export function SpineNavButton({
       ) : null}
       {running ? (
         <svg
-          className="aethria-dispatch-progress-ring"
+          className={`aethria-dispatch-progress-ring ${onPaper ? 'aethria-dispatch-progress-ring--paper' : 'aethria-dispatch-progress-ring--inverse'}`}
           viewBox="0 0 100 36"
           preserveAspectRatio="none"
           aria-hidden="true"
