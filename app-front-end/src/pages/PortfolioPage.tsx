@@ -11,6 +11,7 @@ import { buildPositionRows, sectorConcentration } from './portfolio/positionRows
 import OutcomePanel from '../components/institutional/OutcomePanel';
 import CrmExportAction from '../components/portfolio/CrmExportAction';
 import DecisionBadge from '../components/DecisionBadge';
+import SegmentedPill from '../components/SegmentedPill';
 import type { SystemData } from '../hooks/useSystemData';
 import type { Startup } from '../types/startup';
 import { formatDate } from '../lib/dates';
@@ -37,49 +38,37 @@ const portfolioRowVariants = {
   }),
 };
 
-/** Instrument readout — a number with its label, no box. Counts up on arrival.
- * `value: null` means "unknown" (loading or failed source) — it renders an
- * em dash rather than fabricating a number. */
-function Readout({ label, value, tone }: { label: string; value: number | null; tone?: 'escalation' }) {
+/** A header reading: mono caption beside its number, set as one quiet line
+ * rather than a giant numeral. `value: null` means "unknown" (loading or failed
+ * source) and renders an em dash rather than fabricating a number. */
+function Readout({ label, value }: { label: string; value: number | null }) {
   const shown = useCountUp(value ?? 0);
   return (
-    <div className="flex flex-col gap-phi-1">
-        {/* Deliberate escape from the φ type scale (hero tops at 37px) — this is
-            the one "big instrument number" moment on the page, sized for its own
-            emphasis rather than reused elsewhere. Not scale drift. */}
-        <span
-        className={`type-data !text-[clamp(32px,3.2vw,46px)] leading-none tabular-nums ${
-          tone === 'escalation' ? 'text-escalation' : 'text-oxford'
-        }`}
-      >
-        {value == null ? '—' : shown.toLocaleString()}
-      </span>
+    <div className="flex items-baseline gap-phi-2">
       <span className="type-label-section">{label}</span>
+      <span className="type-body-sm tabular-nums text-oxford">{value == null ? '—' : shown.toLocaleString()}</span>
     </div>
   );
 }
 
-/** Group header — mono kicker + draw-in top rule, with an optional quiet
- * ghost-numeral count in the plate-num voice beside the title. */
-function SectionHead({ title, detail, count }: { title: string; detail?: string; count?: number }) {
+/** A section caption — mono label with an optional right-hand detail. No rule. */
+function Caption({ title, detail }: { title: string; detail?: string }) {
   return (
-    <div className="relative flex items-baseline justify-between gap-phi-4 pt-phi-4">
-      <div className="rule-draw absolute inset-x-0 top-0 h-px bg-oxford/[0.075]" aria-hidden />
-      <span className="flex items-baseline gap-phi-2">
-        <h2 className="type-label-section text-oxford/[0.72]">{title}</h2>
-        {count != null ? (
-          <span className="plate-num" aria-hidden>
-            {count}
-          </span>
-        ) : null}
-      </span>
-      {detail ? <span className="type-meta tabular-nums">{detail}</span> : null}
+    <div className="flex items-baseline justify-between gap-phi-4">
+      <h2 className="type-label-section">{title}</h2>
+      {detail ? <span className="type-meta tabular-nums text-oxford/55">{detail}</span> : null}
     </div>
   );
 }
+
+const PORTFOLIO_VIEWS = [
+  { key: 'held', label: 'Holdings' },
+  { key: 'decided', label: 'Decided' },
+] as const;
+type PortfolioView = (typeof PORTFOLIO_VIEWS)[number]['key'];
 
 function QuietEmpty({ children }: { children: React.ReactNode }) {
-  return <p className="mt-phi-4 type-body-sm text-oxford/65">{children}</p>;
+  return <p className="mt-phi-4 type-body-sm text-oxford/55">{children}</p>;
 }
 
 /* Outcome recording is per-position and collapsed by default — the book stays
@@ -89,12 +78,12 @@ function QuietEmpty({ children }: { children: React.ReactNode }) {
 function PositionOutcomes({ startupId }: { startupId: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="mt-phi-2">
+    <div>
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="type-status text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+        className="type-action text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
       >
         {open ? 'Hide outcomes' : 'Record outcome'}
       </button>
@@ -118,6 +107,7 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const navigate = useNavigate();
   const reduceMotion = usePrefersReducedMotion();
   const openDeal = (id: string) => navigate(`/v1/flow?open=${id}`);
+  const [view, setView] = useState<PortfolioView>('held');
 
   const positionsQuery = useQuery({
     queryKey: ['portfolio-positions', 100],
@@ -186,7 +176,6 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   const concentration = useMemo(() => sectorConcentration(rows), [rows]);
 
   const watchlistEntries = data.watchlistAnalytics.entries ?? [];
-  const topPosition = concentration[0];
   const convictionHeadline = rows.length > 0
     ? `${rows.length} conviction${rows.length === 1 ? '' : 's'}. The record of what we chose.`
     : 'The record of conviction.';
@@ -194,229 +183,238 @@ export default function PortfolioPage({ data }: { data: SystemData }) {
   return (
     <div className="aethria-portfolio paper-dot-grid page-transition-enter min-h-0 flex-1 overflow-y-auto overscroll-contain">
       <div className={`${workspaceLayout.shell} ${workspaceLayout.pageTop} ${workspaceLayout.pageBottom} min-h-full`}>
-        <header className={`border-b border-oxford/[0.075] ${workspaceLayout.headerBottom}`}>
-          <p className="type-label-section type-label-section--eyebrow">Portfolio</p>
-          <h1 className="type-display mt-phi-3 max-w-[56rem] text-[clamp(30px,3vw,42px)] leading-[1.08] text-oxford">
+        {/* The masthead: eyebrow, the record's headline, and one quiet line of
+            readings. The Held/Decided switch sits top-right, as on Fund. */}
+        <header className={workspaceLayout.headerBottom}>
+          <div className="flex flex-wrap items-center justify-between gap-phi-4">
+            <p className="type-label-section type-label-section--eyebrow">Portfolio</p>
+            <SegmentedPill
+              options={PORTFOLIO_VIEWS}
+              value={view}
+              onChange={setView}
+              label="Portfolio view"
+              layoutId="portfolio-view-active"
+            />
+          </div>
+          <h1 className="type-display mt-phi-5 max-w-[22ch] text-[clamp(30px,3.2vw,44px)] font-medium leading-[1.06] text-oxford">
             {convictionHeadline}
           </h1>
-          <div className="mt-phi-6 flex flex-wrap items-end gap-x-phi-7 gap-y-phi-4">
+          <div className="mt-phi-5 flex flex-wrap items-baseline gap-x-phi-6 gap-y-phi-2">
             <Readout label="Held" value={heldUnavailable ? null : rows.length} />
             <Readout label="Watching" value={data.watchlistAnalytics.total} />
-            <Readout label="Top position" value={topPosition?.pct ?? null} />
             <Readout label="Rulings recorded" value={decisionHistory.length} />
           </div>
         </header>
 
-        <div className="grid grid-cols-1 gap-x-phi-8 gap-y-phi-8 pt-phi-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.8fr)]">
-          {/* ── Decision ledger (the record) ── */}
-          <div className="flex min-w-0 flex-col gap-phi-6">
-            <section aria-label="Decision ledger">
-              <SectionHead title="Positions" detail={`${rows.length} ${rows.length === 1 ? 'position' : 'positions'}`} />
+        {view === 'held' ? (
+          <div className="grid grid-cols-1 gap-phi-8 pt-phi-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,1fr)]">
+            {/* ── Positions: each holding is a soft panel, the record's hero ── */}
+            <div className="flex min-w-0 flex-col gap-phi-7">
+              <section aria-label="Decision ledger" className="flex flex-col gap-phi-4">
+                <Caption title="Positions" detail={`${rows.length} held`} />
 
-              {/* Pointer, not a worklist — ruling happens in Flow, the book only points there. */}
-              {decided.awaiting > 0 ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/v1/flow')}
-                  className="group mt-phi-3 inline-flex items-center gap-phi-2 type-body-sm text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                >
-                  <span className="type-data tabular-nums text-oxford">{decided.awaiting}</span>
-                  <span>awaiting your ruling — rule in Flow</span>
-                  <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-[2px]">→</span>
-                </button>
-              ) : null}
-
-              {positionsQuery.isLoading ? (
-                <QuietEmpty>Loading positions…</QuietEmpty>
-              ) : positionsQuery.isError ? (
-                <QuietEmpty>Positions unavailable right now. Nothing has been lost — retry shortly.</QuietEmpty>
-              ) : rows.length === 0 ? (
-                <QuietEmpty>
-                  No positions yet. A company becomes a position when you rule it INVEST — a
-                  recommendation alone does not.
-                </QuietEmpty>
-              ) : (
-                <ul className="mt-phi-4 flex flex-col">
-                  {rows.map((row, index) => (
-                    <motion.li
-                      key={row.position.position_id}
-                      data-testid="position-row"
-                      custom={index}
-                      variants={portfolioRowVariants}
-                      initial={reduceMotion ? false : 'hidden'}
-                      animate="visible"
-                      layout="position"
-                      className="group border-b border-oxford/[0.06]"
-                    >
-                      <div className="-mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-4 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] lg:grid-cols-[minmax(0,1.15fr)_minmax(126px,0.65fr)_minmax(0,1.5fr)] lg:items-baseline">
-                        <span className="min-w-0 font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{row.name}</span>
-                        <span className="flex min-w-0 flex-col items-start gap-phi-1">
-                          <span className="type-meta text-oxford/65">INVESTED · {row.stage ?? 'POSITION'}</span>
-                          <span className="type-meta text-oxford/65">
-                            <span>{row.sector ?? 'SECTOR UNKNOWN'}</span>
-                            <span aria-hidden> · </span>
-                            <span>{row.score == null ? 'SCORE —' : `SCORE ${row.score.toFixed(1)}`}</span>
-                          </span>
-                        </span>
-                        <p className="min-w-0 type-body-sm leading-relaxed text-oxford/70">{row.position.entry_rationale || 'No entry rationale recorded.'}</p>
-                      </div>
-                      {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
-                      <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
-                    </motion.li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section aria-label="Decision history">
-              <SectionHead
-                title="Decision history"
-                detail={`${decisionHistory.length} resolved`}
-              />
-              {decisionHistory.length === 0 ? (
-                <QuietEmpty>No monitoring or passed decisions yet.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-4 flex flex-col">
-                  {decisionHistory.map((item, index) => (
-                    <motion.li
-                      key={item.startup.id}
-                      custom={index}
-                      variants={portfolioRowVariants}
-                      initial={reduceMotion ? false : 'hidden'}
-                      animate="visible"
-                      layout="position"
-                      className="border-b border-oxford/[0.06]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => openDeal(item.startup.id)}
-                        className="group -mx-phi-3 grid w-[calc(100%+2*var(--space-3))] gap-x-phi-6 gap-y-phi-2 px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 btn-interaction btn-interaction--no-press lg:grid-cols-[minmax(0,1.15fr)_minmax(142px,0.55fr)_minmax(0,1.5fr)] lg:items-baseline"
+                {positionsQuery.isLoading ? (
+                  <QuietEmpty>Loading positions…</QuietEmpty>
+                ) : positionsQuery.isError ? (
+                  <QuietEmpty>Positions unavailable right now. Nothing has been lost — retry shortly.</QuietEmpty>
+                ) : rows.length === 0 ? (
+                  <QuietEmpty>
+                    No positions yet. A company becomes a position when you rule it INVEST — a
+                    recommendation alone does not.
+                  </QuietEmpty>
+                ) : (
+                  <ul className="flex flex-col gap-phi-4">
+                    {rows.map((row, index) => (
+                      <motion.li
+                        key={row.position.position_id}
+                        data-testid="position-row"
+                        custom={index}
+                        variants={portfolioRowVariants}
+                        initial={reduceMotion ? false : 'hidden'}
+                        animate="visible"
+                        layout="position"
+                        className="flex flex-col gap-phi-5 rounded-[18px] bg-oxford/[0.04] p-phi-5"
                       >
-                        <span className="flex min-w-0 flex-col items-start gap-phi-1">
-                          <span className="font-display text-[18px] font-medium leading-[1.15] tracking-[-0.01em] text-oxford">{item.name}</span>
-                          <span className="type-meta tabular-nums text-oxford/65">{formatDate(item.resolvedAt)}</span>
-                        </span>
-                        <span className="flex min-w-0 items-center gap-phi-2" aria-label="Aethria recommendation followed by your ruling">
-                          {recOf(item.startup) ? (
-                            <DecisionBadge
-                              variant={recOf(item.startup) as 'INVEST' | 'PASS' | 'MONITOR'}
-                              className="cursor-help"
-                            />
-                          ) : <span className="type-meta text-oxford/65">—</span>}
-                          <span className="type-meta text-oxford/65" aria-hidden>→</span>
-                          <DecisionBadge
-                            variant={rulingToRecommendation(item.decision)}
-                            className="cursor-help"
+                        <div className="flex flex-wrap items-baseline justify-between gap-phi-3">
+                          <span className="type-label-section">Held since {formatDate(row.position.entered_at)}</span>
+                          <span className="flex items-baseline gap-phi-2">
+                            <span className="type-label-section">{row.stage ?? 'Stage unknown'}</span>
+                            <span aria-hidden className="type-label-section">·</span>
+                            <span className="type-label-section">{row.sector ?? 'Sector unknown'}</span>
+                          </span>
+                        </div>
+                        <div className="flex items-end justify-between gap-phi-5">
+                          <span className="min-w-0 font-display text-[clamp(24px,2.2vw,30px)] font-medium leading-[1.05] tracking-[-0.03em] text-oxford">{row.name}</span>
+                          <span className="flex shrink-0 flex-col items-end gap-phi-1">
+                            <span className="type-display text-[clamp(28px,2.6vw,38px)] font-normal leading-none tabular-nums text-oxford">
+                              {Math.round(row.position.investor_confidence * 100)}%
+                            </span>
+                            <span className="type-label-section">Confidence</span>
+                          </span>
+                        </div>
+                        <p className="max-w-[46ch] type-body-sm leading-relaxed text-oxford/65">{row.position.entry_rationale || 'No entry rationale recorded.'}</p>
+                        <div className="flex flex-wrap items-start gap-x-phi-5 gap-y-phi-2">
+                          {row.startupId ? <PositionOutcomes startupId={row.startupId} /> : null}
+                          <CrmExportAction opportunityId={row.position.opportunity_id} companyName={row.name} />
+                        </div>
+                      </motion.li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Pointer, not a worklist — ruling happens in Flow, the book only points there. */}
+                {decided.awaiting > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/v1/flow')}
+                    className="group inline-flex w-fit items-baseline gap-phi-2 type-body-sm text-oxford/60 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+                  >
+                    <span className="tabular-nums text-oxford">{decided.awaiting}</span>
+                    <span>awaiting your ruling in Flow</span>
+                    <span aria-hidden className="transition-transform duration-200 group-hover:translate-x-[2px]">→</span>
+                  </button>
+                ) : null}
+              </section>
+
+              {/* ── Concentration — recomputed from the rows above, so it can never disagree with them ── */}
+              <section aria-label="Sector concentration" className="flex flex-col gap-phi-4">
+                <Caption title="Concentration" detail={concentration[0]?.sector} />
+                {concentration.length === 0 ? (
+                  <QuietEmpty>Appears once you hold a position.</QuietEmpty>
+                ) : (
+                  <ul className="flex flex-col gap-phi-3">
+                    {concentration.map((entry, i) => (
+                      <li
+                        key={entry.sector}
+                        data-testid={`concentration-row-${entry.sector}`}
+                        className="grid grid-cols-[minmax(90px,160px)_1fr_72px] items-center gap-phi-4"
+                      >
+                        <span className="type-body-sm truncate text-oxford">{entry.sector}</span>
+                        <span className="relative block h-[6px] overflow-hidden rounded-full bg-oxford/[0.08]">
+                          <motion.span
+                            className="absolute inset-y-0 left-0 origin-left rounded-full bg-oxford"
+                            style={{ width: `${Math.max(2, entry.pct)}%` }}
+                            initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
+                            animate={{ scaleX: 1 }}
+                            transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: tokens.motion.ease }}
                           />
                         </span>
-                        <span className="min-w-0 type-body-sm leading-relaxed text-oxford/70">{item.notes || '—'}</span>
-                      </button>
-                    </motion.li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                        <span className="type-meta text-right tabular-nums text-oxford/55">
+                          {entry.count} · {entry.pct}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
 
-            {/* ── Concentration — recomputed from the rows above, so it can never disagree with them ── */}
-            <section aria-label="Sector concentration">
-              <SectionHead title="Concentration" detail={concentration[0]?.sector} />
-              {concentration.length === 0 ? (
-                <QuietEmpty>Appears once you hold a position.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-4 flex flex-col gap-phi-3">
-                  {concentration.map((entry, i) => (
-                    <li
-                      key={entry.sector}
-                      data-testid={`concentration-row-${entry.sector}`}
-                      className="grid grid-cols-[minmax(90px,140px)_1fr_64px] items-center gap-phi-4"
-                    >
-                      <span className="type-label-section truncate">{entry.sector}</span>
-                      <span className="relative block h-px bg-oxford/10">
-                        <motion.span
-                          className="absolute inset-y-0 left-0 origin-left bg-oxford/45"
-                          style={{ width: `${Math.max(2, entry.pct)}%` }}
-                          initial={reduceMotion ? { scaleX: 1 } : { scaleX: 0 }}
-                          animate={{ scaleX: 1 }}
-                          transition={{ duration: 0.9, delay: reduceMotion ? 0 : 0.1 + i * 0.05, ease: tokens.motion.ease }}
-                        />
-                      </span>
-                      <span className="type-data text-right text-oxford/65">
-                        {entry.count} · {entry.pct}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
-
-          {/* ── Watchlist + signals ── */}
-          <div className="flex min-w-0 flex-col gap-phi-6">
-            <section aria-label="Watchlist">
-              <SectionHead
-                title="Watchlist"
-                detail={data.watchlistAnalytics.stale ? `${data.watchlistAnalytics.stale} stale` : undefined}
-                count={data.watchlistAnalytics.total}
-              />
-              {watchlistEntries.length === 0 ? (
-                <QuietEmpty>Nothing held under observation.</QuietEmpty>
-              ) : (
-                <ul className="mt-phi-2 flex flex-col">
-                  {watchlistEntries.slice(0, 20).map((e, i) => (
-                    <motion.li
-                      key={e.startup_id ?? i}
-                      custom={i}
-                      variants={portfolioRowVariants}
-                      initial={reduceMotion ? false : 'hidden'}
-                      animate="visible"
-                      layout="position"
-                      className="border-b border-oxford/[0.06]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => e.startup_id && openDeal(e.startup_id)}
-                        disabled={!e.startup_id}
-                        className="group -mx-phi-3 flex w-[calc(100%+2*var(--space-3))] items-center justify-between gap-phi-3 px-phi-3 py-phi-2 text-left transition-colors hover:bg-oxford/[0.05] disabled:cursor-default btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            {/* ── Watchlist + outcome coverage ── */}
+            <div className="flex min-w-0 flex-col gap-phi-7">
+              <section aria-label="Watchlist" className="flex flex-col gap-phi-3">
+                <Caption
+                  title={`Watching · ${data.watchlistAnalytics.total}`}
+                  detail={data.watchlistAnalytics.stale ? `${data.watchlistAnalytics.stale} stale` : undefined}
+                />
+                {watchlistEntries.length === 0 ? (
+                  <QuietEmpty>Nothing held under observation.</QuietEmpty>
+                ) : (
+                  <ul className="-mx-phi-3 flex flex-col">
+                    {watchlistEntries.slice(0, 20).map((e, i) => (
+                      <motion.li
+                        key={e.startup_id ?? i}
+                        custom={i}
+                        variants={portfolioRowVariants}
+                        initial={reduceMotion ? false : 'hidden'}
+                        animate="visible"
+                        layout="position"
                       >
-                        <span className="min-w-0 truncate type-body-sm text-oxford">
-                          {e.startup_name ?? (e.startup_id ? startupNameById.get(e.startup_id) : null) ?? 'Unknown'}
-                        </span>
-                        <span
-                          className={`type-data shrink-0 transition-colors ${
-                            e.stale_warning ? 'text-escalation' : 'text-oxford/65 group-hover:text-oxford'
-                          }`}
+                        <button
+                          type="button"
+                          onClick={() => e.startup_id && openDeal(e.startup_id)}
+                          disabled={!e.startup_id}
+                          className="group flex w-full items-center justify-between gap-phi-3 rounded-[12px] px-phi-3 py-phi-3 text-left transition-colors hover:bg-oxford/[0.04] disabled:cursor-default btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
                         >
-                          {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
-                        </span>
-                      </button>
-                    </motion.li>
-                  ))}
-                </ul>
-              )}
-            </section>
+                          <span className="min-w-0 truncate type-body-sm text-oxford">
+                            {e.startup_name ?? (e.startup_id ? startupNameById.get(e.startup_id) : null) ?? 'Unknown'}
+                          </span>
+                          <span className={`type-meta shrink-0 tabular-nums ${e.stale_warning ? 'text-escalation' : 'text-oxford/55'}`}>
+                            {e.days_on_watchlist != null ? `${e.days_on_watchlist}d` : '—'}
+                          </span>
+                        </button>
+                      </motion.li>
+                    ))}
+                  </ul>
+                )}
+              </section>
 
-            <section aria-label="Outcome coverage">
-              <SectionHead title="Outcome coverage" />
-              <div className="mt-phi-4 flex flex-col gap-phi-2">
-                <span className="type-data text-[clamp(22px,2vw,30px)] leading-none tabular-nums text-oxford">
+              <section aria-label="Outcome coverage" className="flex flex-col gap-phi-3 rounded-[18px] bg-oxford/[0.04] p-phi-5">
+                <span className="type-label-section">Outcome coverage</span>
+                <span className="type-display text-[clamp(36px,3.2vw,48px)] font-normal leading-none tabular-nums text-oxford">
                   {coverageUnavailable ? '—' : `${coveragePct}%`}
                 </span>
-                <span className={`type-body-sm ${coverageQuery.isError ? 'text-escalation' : 'text-oxford/65'}`}>
+                <span className={`type-body-sm ${coverageQuery.isError ? 'text-escalation' : 'text-oxford/55'}`}>
                   {coverageQuery.isError
                     ? 'Coverage is unavailable right now — unknown, not zero.'
                     : 'of eligible decisions have a recorded outcome.'}
                 </span>
-              </div>
-              {(coverageQuery.data?.limitations ?? []).length > 0 ? (
-                <ul className="mt-phi-3 flex flex-col gap-phi-1">
-                  {coverageQuery.data?.limitations?.map((limitation) => (
-                    <li key={limitation} className="type-meta text-oxford/65">{limitation}</li>
-                  ))}
-                </ul>
-              ) : null}
-            </section>
+                {(coverageQuery.data?.limitations ?? []).length > 0 ? (
+                  <ul className="flex flex-col gap-phi-1">
+                    {coverageQuery.data?.limitations?.map((limitation) => (
+                      <li key={limitation} className="type-meta text-oxford/45">{limitation}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            </div>
           </div>
-        </div>
+        ) : (
+          /* ── Decided: monitoring and passed rulings, newest first ── */
+          <section aria-label="Decision history" className="flex flex-col gap-phi-4 pt-phi-6">
+            <Caption title="Decision history" detail={`${decisionHistory.length} resolved`} />
+            {decisionHistory.length === 0 ? (
+              <QuietEmpty>No monitoring or passed decisions yet.</QuietEmpty>
+            ) : (
+              <ul className="-mx-phi-3 flex flex-col">
+                {decisionHistory.map((item, index) => (
+                  <motion.li
+                    key={item.startup.id}
+                    custom={index}
+                    variants={portfolioRowVariants}
+                    initial={reduceMotion ? false : 'hidden'}
+                    animate="visible"
+                    layout="position"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => openDeal(item.startup.id)}
+                      className="group grid w-full gap-x-phi-6 gap-y-phi-2 rounded-[14px] px-phi-3 py-phi-4 text-left transition-colors hover:bg-oxford/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30 btn-interaction btn-interaction--no-press lg:grid-cols-[minmax(0,1.1fr)_minmax(150px,0.55fr)_minmax(0,1.5fr)] lg:items-baseline"
+                    >
+                      <span className="flex min-w-0 flex-col items-start gap-phi-1">
+                        <span className="font-display text-[20px] font-medium leading-[1.1] tracking-[-0.02em] text-oxford">{item.name}</span>
+                        <span className="type-meta tabular-nums text-oxford/55">{formatDate(item.resolvedAt)}</span>
+                      </span>
+                      <span className="flex min-w-0 items-center gap-phi-2" aria-label="Aethria recommendation followed by your ruling">
+                        {recOf(item.startup) ? (
+                          <DecisionBadge
+                            variant={recOf(item.startup) as 'INVEST' | 'PASS' | 'MONITOR'}
+                            className="cursor-help"
+                          />
+                        ) : <span className="type-meta text-oxford/55">—</span>}
+                        <span className="type-meta text-oxford/55" aria-hidden>→</span>
+                        <DecisionBadge
+                          variant={rulingToRecommendation(item.decision)}
+                          className="cursor-help"
+                        />
+                      </span>
+                      <span className="min-w-0 type-body-sm leading-relaxed text-oxford/65">{item.notes || '—'}</span>
+                    </button>
+                  </motion.li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
     </div>
   );

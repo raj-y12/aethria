@@ -18,7 +18,7 @@ import type {
 import type { FundThesisRuntime } from '../../api/fundThesis';
 import { triggerMetaCycle, promoteMetaPrompt, resetMetaPrompt, saveMetaEvalSet, runPromptEvaluation } from '../../api/meta';
 import { transitionOrReduced } from '../../design-system/motion';
-import { usePrefersReducedMotion } from '../../hooks';
+import { useCountUp, usePrefersReducedMotion } from '../../hooks';
 import EmptyState from '../EmptyState';
 import { buildFundIntelligenceSnapshot } from '../../lib/institutionalConviction';
 import { formatDate, formatDateTime } from '../../lib/dates';
@@ -191,15 +191,53 @@ export function AnalyticsTab({ rejection }: {
 }
 
 /** One line of the mandate spec — mono label register, typographic value. No chips, no boxes. */
+/** One mandate term: a mono caption set above its value. Spacing, not rules. */
 export function MandateSpecRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="grid grid-cols-[clamp(110px,18%,160px)_minmax(0,1fr)] items-baseline gap-phi-4 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0">
+    <div className="flex min-w-0 flex-col gap-phi-2">
       <span className="type-label-section">{label}</span>
       {value ? (
-        <p className="type-body-sm leading-relaxed text-oxford/[0.78]">{value}</p>
+        <p className="type-body-sm leading-relaxed text-oxford">{value}</p>
       ) : (
-        <p className="type-body-sm text-oxford/65">Not specified</p>
+        <p className="type-body-sm text-oxford/45">Not specified</p>
       )}
+    </div>
+  );
+}
+
+function pctNum(v: number | null | undefined): number | null {
+  if (v == null || Number.isNaN(v)) return null;
+  return Math.round(v <= 1 ? v * 100 : v);
+}
+
+function signedDrift(v: number | null | undefined): string | null {
+  if (v == null || Number.isNaN(v)) return null;
+  const r = Math.round(v * 100) / 100;
+  return r > 0 ? `+${r.toFixed(2)}` : r.toFixed(2);
+}
+
+/**
+ * The fund's one headline reading, set large in a single tinted panel. The
+ * other alignment stats ride underneath as a sentence rather than a strip.
+ */
+function MandateMatchPanel({ stats }: { stats: NonNullable<FundThesisRuntime['alignment_stats']> }) {
+  const match = pctNum(stats.pct_matching_thesis);
+  const shown = useCountUp(match ?? 0);
+  const mean = pctNum(stats.avg_alignment_score);
+  const drift = signedDrift(stats.drift_vs_previous);
+  const detail = [
+    `${stats.reviewed_with_thesis_count.toLocaleString()} reviewed`,
+    mean != null ? `${mean}% mean alignment` : null,
+    drift != null ? `drift ${drift}` : null,
+  ].filter(Boolean).join(' · ');
+
+  return (
+    <div className="rounded-[18px] bg-oxford/[0.04] p-phi-5">
+      <span className="type-label-section">Mandate match</span>
+      <p className="type-display mt-phi-4 text-[clamp(40px,3.6vw,52px)] font-normal leading-none tabular-nums text-oxford">
+        {match == null ? '--' : `${shown}%`}
+      </p>
+      <p className="type-body-sm mt-phi-3 text-oxford/55">{detail}</p>
     </div>
   );
 }
@@ -270,31 +308,34 @@ export function InstitutionalMandateTab({
     : null;
   const notes = statement ? preferences.filter((p) => p !== statement) : [];
 
+  const versions = data.version_timeline ?? [];
+
   return (
-    /* Reading room: mandate prose holds its measure on the left; the record
-       (version history) fills the region beside it instead of dead paper. */
-    <div className="lg:grid lg:grid-cols-[minmax(0,61.8fr)_minmax(0,38.2fr)] lg:items-start lg:gap-x-phi-6">
-      <TabSection
-        title="The mandate"
-        label={`v${data.active_version_number ?? '01'} · ${mandateMode}`}
-      >
-        {/* The mandate document itself: statement in the house serif, then the
-            spec that gates the pipeline — set out, not boxed. */}
-        <p className="type-display max-w-[38rem] text-[clamp(18px,1.5vw,24px)] leading-[1.32] text-oxford">
+    /* The mandate as a spread: the statement is the page's headline, the terms
+       sit beneath as a caption grid, and the fund's one reading plus its record
+       share a single soft panel beside them. Whitespace does the structuring. */
+    <div className="flex flex-col gap-phi-7 px-phi-4 pb-phi-7 pt-phi-2">
+      <AnimatedTabBlock>
+        <span className="type-label-section">
+          v{data.active_version_number ?? '01'} · {mandateMode}
+        </span>
+        <p className="type-display mt-phi-4 max-w-[34ch] text-[clamp(24px,2.3vw,34px)] font-medium leading-[1.16] text-oxford">
           {statement ??
-            'No thesis statement on file. The spec below gates discovery until one is written.'}
+            'No thesis statement on file. The terms below gate discovery until one is written.'}
         </p>
         {notes.length > 0 ? (
-          <div className="mt-phi-3 flex max-w-[38rem] flex-col gap-phi-1">
+          <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-1">
             {notes.map((line) => (
-              <p key={line} className="type-body-sm leading-relaxed text-oxford/65">
+              <p key={line} className="type-body-sm leading-relaxed text-oxford/55">
                 {line}
               </p>
             ))}
           </div>
         ) : null}
+      </AnimatedTabBlock>
 
-        <div className="mt-phi-6 max-w-[44rem]">
+      <div className="grid gap-phi-7 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
+        <AnimatedTabBlock className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-5 sm:grid-cols-2">
           <MandateSpecRow label="Sectors" value={sectors.length ? sectors.join(', ') : null} />
           <MandateSpecRow label="Stages" value={stages.length ? stages.join(', ') : null} />
           <MandateSpecRow label="Geography" value={geographies.length ? geographies.join(', ') : null} />
@@ -302,29 +343,30 @@ export function InstitutionalMandateTab({
           <MandateSpecRow label="Ownership" value={ownership} />
           <MandateSpecRow label="Excluded" value={exclusions.length ? exclusions.join(', ') : null} />
           <MandateSpecRow label="Risk profile" value={riskProfile} />
-        </div>
-      </TabSection>
+        </AnimatedTabBlock>
 
-      {(data.version_timeline?.length ?? 0) > 0 && (
-        <TabSection title="Version history" className="lg:pt-phi-3">
-          <ul className="flex max-w-[44rem] flex-col">
-            {(data.version_timeline ?? []).slice(0, 10).map((v) => (
-              <li
-                key={v.id}
-                className="flex flex-wrap items-baseline justify-between gap-phi-3 border-t border-oxford/[0.06] py-phi-3 first:border-t-0 first:pt-0"
-              >
-                <span className={`type-meta ${v.is_active ? 'text-oxford/80' : 'text-oxford/65'}`}>
-                  v{v.version_number}
-                  {v.is_active ? ' · active' : ''}
-                </span>
-                <span className="type-meta tabular-nums text-oxford/65">
-                  {formatDate(v.created_at)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </TabSection>
-      )}
+        <AnimatedTabBlock className="flex flex-col gap-phi-6">
+          {data.alignment_stats ? <MandateMatchPanel stats={data.alignment_stats} /> : null}
+          {versions.length > 0 ? (
+            <div className="px-phi-2">
+              <span className="type-label-section">Version history</span>
+              <ul className="mt-phi-3 flex flex-col gap-phi-3">
+                {versions.slice(0, 10).map((v) => (
+                  <li key={v.id} className="flex items-baseline justify-between gap-phi-3">
+                    <span className={`type-body-sm ${v.is_active ? 'text-oxford' : 'text-oxford/55'}`}>
+                      v{v.version_number}
+                      {v.is_active ? ' · active' : ''}
+                    </span>
+                    <span className="type-meta tabular-nums text-oxford/55">
+                      {formatDate(v.created_at)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </AnimatedTabBlock>
+      </div>
     </div>
   );
 }

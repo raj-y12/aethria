@@ -1576,75 +1576,6 @@ textarea {
   max-width: 1240px;
 }
 
-.aethria-portfolio section,
-.aethria-fund section {
-  border-top: 1px solid var(--fey-rule);
-  padding-top: 15px;
-}
-
-.aethria-portfolio [data-testid='position-row'] > div,
-.aethria-portfolio ul button {
-  min-height: 54px;
-  padding-top: 11px;
-  padding-bottom: 11px;
-  border-left: 2px solid transparent;
-}
-
-.aethria-portfolio [data-testid='position-row'] > div:hover,
-.aethria-portfolio ul button:hover {
-  border-left-color: currentColor;
-}
-
-.aethria-portfolio [data-testid='position-row'] .font-display,
-.aethria-portfolio ul button .font-display {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-}
-
-.aethria-portfolio > div:first-child > header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 18px 36px;
-  padding-bottom: 16px;
-}
-
-.aethria-portfolio > div:first-child > header > p,
-.aethria-portfolio > div:first-child > header > h1 {
-  grid-column: 1;
-}
-
-.aethria-portfolio > div:first-child > header > p {
-  grid-row: 1;
-}
-
-.aethria-portfolio > div:first-child > header > h1 {
-  grid-row: 2;
-}
-
-.aethria-portfolio > div:first-child > header > div:last-child {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-}
-
-.aethria-portfolio > div:first-child > header h1 {
-  max-width: 32ch;
-  margin-top: 5px;
-  font-size: clamp(24px, 2.2vw, 30px);
-  line-height: 1.08;
-}
-
-.aethria-portfolio > div:first-child > header > div:last-child {
-  margin-top: 0;
-  gap: 26px;
-}
-
-.aethria-portfolio > div:first-child > .grid {
-  padding-top: 18px;
-}
-
 .aethria-fund > div:first-child header {
   align-items: end;
   gap: 18px 36px;
@@ -1779,6 +1710,18 @@ textarea {
 .aethria-main [role='tablist'] button[aria-selected='true'] {
   border-bottom-color: currentColor;
   background: transparent;
+}
+
+/* Segmented pill switches (SegmentedPill.tsx) are not underlined tab rows. */
+.aethria-main .segmented-pill {
+  border-bottom: 0;
+}
+
+.aethria-main .segmented-pill button {
+  min-height: 30px;
+  padding: 0 16px;
+  border-bottom: 0;
+  border-radius: 999px;
 }
 
 .aethria-dispatch-command {
@@ -3292,100 +3235,11 @@ textarea {
   scrollbar-gutter: stable;
 }
 
-/* Portfolio refinement: a single record surface. Sections separate by rhythm
-   and column structure; no ledger cards, row rails, or alternating fills. */
-.aethria-portfolio > div:first-child > header,
-.aethria-portfolio > div:first-child > header.border-b,
-.aethria-portfolio section,
-.aethria-portfolio [data-testid='position-row'],
-.aethria-portfolio li {
-  border-color: transparent;
-}
-
-.aethria-portfolio section {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.aethria-portfolio .rule-draw {
-  display: none;
-}
-
-.aethria-portfolio [data-testid='position-row'] > div,
-.aethria-portfolio ul button {
-  border-left-color: transparent;
-  background: transparent;
-}
-
-.aethria-portfolio [data-testid='position-row'] > div:hover,
-.aethria-portfolio ul button:hover {
-  border-left-color: transparent;
-  background: transparent;
-  opacity: 0.72;
-}
-
-.aethria-portfolio > div:first-child > .grid {
-  row-gap: 34px;
-}
-
-/* Portfolio page pass: make the record read as a dense operating view. The
-   hierarchy comes from a measured header and aligned rows, not containers. */
+/* Portfolio: layout and hierarchy live in PortfolioPage.tsx; only the page
+   measure is set here. */
 .aethria-portfolio > div:first-child {
   max-width: 1320px;
   padding-inline: clamp(20px, 3.5vw, 52px);
-}
-
-.aethria-portfolio > div:first-child > header {
-  grid-template-columns: minmax(0, 1fr) minmax(420px, 0.92fr);
-  column-gap: clamp(28px, 5vw, 72px);
-  align-items: end;
-}
-
-.aethria-portfolio > div:first-child > header > h1 {
-  max-width: 25ch;
-  margin-top: 0;
-}
-
-.aethria-portfolio > div:first-child > header > div:last-child {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  align-items: end;
-  gap: 18px;
-  min-width: 0;
-}
-
-.aethria-portfolio > div:first-child > header > div:last-child > div {
-  min-width: 0;
-}
-
-.aethria-portfolio > div:first-child > .grid {
-  grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.72fr);
-  column-gap: clamp(34px, 5vw, 72px);
-  padding-top: 28px;
-}
-
-.aethria-portfolio section {
-  min-width: 0;
-}
-
-.aethria-portfolio [data-testid='position-row'] > div,
-.aethria-portfolio ul button {
-  min-height: 60px;
-  padding-block: 13px;
-}
-
-.aethria-portfolio [aria-label='Watchlist'] ul button {
-  min-height: 44px;
-}
-
-@media (max-width: 900px) {
-  .aethria-portfolio > div:first-child > header {
-    display: block;
-  }
-
-  .aethria-portfolio > div:first-child > header > div:last-child {
-    margin-top: 24px;
-  }
 }
 
 .aethria-portfolio,

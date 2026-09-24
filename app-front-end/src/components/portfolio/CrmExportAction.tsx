@@ -36,12 +36,12 @@ export default function CrmExportAction({
   const row = action?.generated_content?.crm_row;
 
   return (
-    <div className="mt-phi-2">
+    <div>
       <button
         type="button"
         onClick={() => prepare.mutate()}
         disabled={prepare.isPending}
-        className="type-status text-oxford/65 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+        className="type-action text-oxford/55 transition-colors hover:text-oxford focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
       >
         {prepare.isPending ? 'Preparing…' : 'Prepare CRM export'}
       </button>

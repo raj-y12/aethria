@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import SegmentedPill from './SegmentedPill';
 import { motion, type Variants } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import type { FundThesisRuntime } from '../api/fundThesis';
@@ -28,49 +29,20 @@ export function FundFacetNav({
   activeTab,
   onTabChange,
   className = '',
-  showRule = true,
 }: {
   activeTab: FundFacetTab;
   onTabChange: (tab: FundFacetTab) => void;
   className?: string;
-  /** Full-width rule under the tab row (off when chrome sits flush above scroll body). */
-  showRule?: boolean;
 }) {
-  const reduceMotion = usePrefersReducedMotion();
-
   return (
-    <nav
-      role="tablist"
-      aria-label="Fund facets"
-      className={`flex items-center gap-0.5 overflow-x-auto no-scrollbar ${showRule ? 'border-b border-oxford/[0.08]' : ''} ${className}`.trim()}
-    >
-      {FUND_FACET_TABS.map((tab) => {
-        const isActive = activeTab === tab.key;
-        return (
-          <button
-            key={tab.key}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onTabChange(tab.key)}
-              className={`type-action group relative min-h-[32px] shrink-0 px-phi-4 py-phi-1 cursor-pointer btn-interaction btn-interaction--no-press transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive ? 'text-oxford' : 'text-oxford/65 hover:bg-oxford/[0.04] hover:text-oxford/80'
-              }`}
-            style={{ transitionTimingFunction: 'var(--motion-ease)' }}
-          >
-            {isActive ? (
-              <motion.span
-                layoutId="fund-facet-active"
-                className="absolute inset-x-phi-4 bottom-0 h-px bg-oxford"
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.3, ease: tokens.motion.easeInOut }}
-                aria-hidden
-              />
-            ) : null}
-            <span className="relative">{tab.label}</span>
-          </button>
-        );
-      })}
-    </nav>
+    <SegmentedPill
+      options={FUND_FACET_TABS}
+      value={activeTab}
+      onChange={onTabChange}
+      label="Fund facets"
+      layoutId="fund-facet-active"
+      className={className}
+    />
   );
 }
 
