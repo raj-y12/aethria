@@ -3041,8 +3041,8 @@ textarea {
 
 .aethria-home .aethria-home__workspace-circle {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: var(--dock-size, 52px);
+  height: var(--dock-size, 52px);
   place-items: center;
   border: 1px solid var(--color-oxford);
   border-radius: 999px;
@@ -4489,7 +4489,8 @@ textarea {
 .aethria-home .desk-home__workspaces .aethria-home__workspace-card {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 52px;
+  /* Same height as the nav dock (--dock-size, desktop only); 52px below that. */
+  min-height: var(--dock-size, 52px);
   border: 0;
   border-radius: 999px;
   background: var(--color-oxford);
@@ -4538,7 +4539,7 @@ textarea {
 .aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:not(:nth-child(2)),
 .aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:not(:nth-child(3)),
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) {
-  flex-basis: 54px;
+  flex-basis: var(--home-door-compact);
   justify-content: center;
   gap: 0;
   padding-inline: 0;
@@ -4605,9 +4606,11 @@ textarea {
 }
 
 /* Keep the row on a fixed three-cell flex track and animate each door's basis.
-   The equal base widths and 54px compact widths add up with the 4px gaps, so
-   the row's outside edges remain anchored throughout the slide. */
+   The equal base widths and compact widths (a circle as wide as the door is
+   tall) add up with the 4px gaps, so the row's outside edges remain anchored
+   throughout the slide. */
 .aethria-home .desk-home__workspaces [role='navigation'] {
+  --home-door-compact: var(--dock-size, 54px);
   display: flex;
   gap: 4px;
 }
@@ -4621,11 +4624,11 @@ textarea {
 .aethria-home .desk-home__workspaces [role='navigation'][data-active-index='0'] .aethria-home__workspace-card:nth-child(1),
 .aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:nth-child(2),
 .aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:nth-child(3) {
-  flex-basis: calc(100% - 116px);
+  flex-basis: calc(100% - (2 * var(--home-door-compact) + 8px));
 }
 
 .aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
-  flex-basis: calc(100% - 116px);
+  flex-basis: calc(100% - (2 * var(--home-door-compact) + 8px));
 }
 
 @media (prefers-reduced-motion: reduce) {
