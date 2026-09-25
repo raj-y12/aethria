@@ -122,34 +122,28 @@ describe('DecisionThresholdsPanel ladder', () => {
     );
   });
 
-  it('relaxes the drag lean back to zero once the pointer holds still', () => {
-    // jsdom has no PointerEvent capture implementation; stub the two methods
-    // the drag handlers call so pointerdown/pointermove don't throw.
+  it('pools the lens at the handle being worked and ends the drag on release', () => {
+    // jsdom has no PointerEvent capture implementation; stub the methods the
+    // drag handlers call so pointerdown/pointermove don't throw.
     HTMLElement.prototype.setPointerCapture = vi.fn();
     HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
-    vi.useFakeTimers();
-    try {
-      render(<ThresholdHarness />);
-      const monitor = screen.getByRole('slider', { name: 'Monitor starts' });
-      const grid = screen.getByTestId('threshold-dot-grid');
+    render(<ThresholdHarness />);
+    const monitor = screen.getByRole('slider', { name: 'Monitor starts' });
+    const grid = screen.getByTestId('threshold-dot-grid');
 
-      act(() => {
-        fireEvent.pointerDown(monitor, { pointerId: 1, clientX: 0 });
-        fireEvent.pointerMove(monitor, { pointerId: 1, clientX: 40 });
-      });
+    expect(grid).toHaveAttribute('data-focus', 'false');
 
-      expect(grid).toHaveAttribute('data-dragging', 'true');
-      expect(grid.style.getPropertyValue('--lean')).not.toBe('0deg');
+    act(() => {
+      fireEvent.pointerDown(monitor, { pointerId: 1, clientX: 0 });
+    });
+    expect(grid).toHaveAttribute('data-dragging', 'true');
+    expect(grid).toHaveAttribute('data-focus', 'true');
+    expect(grid.style.getPropertyValue('--focus-x')).toBe(`${monitor.getAttribute('aria-valuenow')}%`);
 
-      act(() => {
-        vi.advanceTimersByTime(150);
-      });
-
-      expect(grid).toHaveAttribute('data-dragging', 'true');
-      expect(grid.style.getPropertyValue('--lean')).toBe('0deg');
-    } finally {
-      vi.useRealTimers();
-    }
+    act(() => {
+      fireEvent.lostPointerCapture(monitor, { pointerId: 1 });
+    });
+    expect(grid).toHaveAttribute('data-dragging', 'false');
   });
 
   it('moves a boundary to its valid endpoint with Home and End', () => {

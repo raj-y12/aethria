@@ -1144,13 +1144,23 @@
 }
 
 /* Decision ladder matrix: one mask on the parent turns every child layer into a
-   lattice of rounded triangles — alternately pointing up and down, checkerboarded
-   across rows — so the bands are 4 flat divs clipped by clip-path instead of
-   ~2700 spans. clip-path animates natively, so moving a boundary tweens for free.
-   The tile is 2×2 cells (--dot-gap each): ▲▼ over ▼▲. */
+   lattice of soft-cornered triangles (a small core under a thick round-joined
+   stroke, like the empty-state mark) — alternately pointing up and down,
+   checkerboarded across rows — so the bands are 4 flat divs clipped by
+   clip-path instead of ~2700 spans. The tile is 2×2 cells (--dot-gap each).
+
+   Motion answers the operator and never idles: the lattice sweeps in once from
+   0 to 100, bands ease to a new boundary, and a lens pools ink into the
+   triangles around the handle being worked (DecisionThresholdsPanel). */
+@property --focus-x {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 50%;
+}
+
 .threshold-matrix {
   --dot-gap: 6px;
-  --tri-tile: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cg fill='black' stroke='black' stroke-width='1.1' stroke-linejoin='round'%3E%3Cpath d='M3 1.4 5 4.6H1Z'/%3E%3Cpath d='M7 1.4h4L9 4.6Z'/%3E%3Cpath d='M1 7.4h4L3 10.6Z'/%3E%3Cpath d='M9 7.4 11 10.6H7Z'/%3E%3C/g%3E%3C/svg%3E");
+  --tri-tile: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cg fill='black' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M3 2.2 4.1 4H1.9Z'/%3E%3Cpath d='M7.9 2h2.2L9 3.8Z'/%3E%3Cpath d='M1.9 8h2.2L3 9.8Z'/%3E%3Cpath d='M9 8.2 10.1 10H7.9Z'/%3E%3C/g%3E%3C/svg%3E");
   position: absolute;
   inset: 0;
   -webkit-mask-image:
@@ -1161,36 +1171,30 @@
     linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
   -webkit-mask-size: calc(var(--dot-gap) * 2) calc(var(--dot-gap) * 2), 100% 100%;
   mask-size: calc(var(--dot-gap) * 2) calc(var(--dot-gap) * 2), 100% 100%;
-  -webkit-mask-position: 0 0, 0 0;
-  mask-position: 0 0, 0 0;
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
-  /* Shift the lattice exactly one tile (two cells, so orientation never flips
-     mid-loop) and repeat — reads as a live ticker at the original speed. */
-  animation: threshold-drift 9s linear infinite;
+  animation: threshold-reveal 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* The lens glides between handles and across keyboard steps. */
+  transition: --focus-x 320ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes threshold-drift {
-  to {
-    -webkit-mask-position: calc(var(--dot-gap) * 2) 0, 0 0;
-    mask-position: calc(var(--dot-gap) * 2) 0, 0 0;
-  }
+/* Entrance: the scale fills left to right, once. */
+@keyframes threshold-reveal {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
 }
 
-/* The dots live on the parent mask, so skewing a band shears the colour through a
-   fixed lattice — the band visibly gets shoved rather than just resized. */
 .threshold-band {
   position: absolute;
   inset: 0;
   clip-path: inset(0 var(--band-right) 0 var(--band-left));
-  transform: skewX(var(--lean, 0deg));
-  transition: clip-path 300ms cubic-bezier(0.16, 1, 0.3, 1),
-    transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: clip-path 420ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Mid-drag the edge tracks the pointer exactly — the lean carries the motion instead. */
+/* Mid-drag, edges and lens track the pointer exactly — no lag behind the hand. */
+.threshold-matrix[data-dragging='true'],
 .threshold-matrix[data-dragging='true'] .threshold-band {
-  transition: clip-path 0ms linear, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  transition: none;
 }
 
 /* Below the auto-pass ceiling nothing reaches review — wash those dots back out. */
@@ -1198,13 +1202,23 @@
   background: rgba(var(--color-paper-rgb), 0.62);
 }
 
+/* The lens: ink pooled into the triangles around the active handle. Masked by
+   the same lattice, so it reads as the triangles themselves deepening. */
+.threshold-lens {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(84px 130% at var(--focus-x) 50%, rgba(var(--color-oxford-rgb), 0.46), rgba(var(--color-oxford-rgb), 0.12) 55%, transparent 78%);
+  opacity: 0;
+  transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.threshold-matrix[data-focus='true'] .threshold-lens {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .threshold-matrix { animation: none; }
-  .threshold-band,
-  .threshold-matrix[data-dragging='true'] .threshold-band {
-    transform: none;
-    transition: none;
-  }
+  .threshold-matrix { animation: none; transition: none; }
+  .threshold-band { transition: none; }
 }
 
 /* Dispatch result plate — the app counterpart to web-front-end's .framed plate. */
@@ -1753,8 +1767,10 @@ textarea {
   background: transparent;
 }
 
-.aethria-queue-surface .sticky button,
-.aethria-queue-surface .sticky select {
+/* Mono caps for the toolbar's small controls — except the sans ones (the view
+   switch, Priority, Filters), which match Settings' 12px segments. */
+.aethria-queue-surface .sticky button:not(.font-sans),
+.aethria-queue-surface .sticky select:not(.font-sans) {
   min-height: 28px;
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -2449,14 +2465,6 @@ textarea {
   border: 1px solid var(--fey-rule);
   align-items: center;
   justify-content: center;
-}
-
-.aethria-empty-state__mark::after {
-  position: absolute;
-  inset: 7px;
-  border: 1px solid currentColor;
-  content: '';
-  opacity: 0.32;
 }
 
 .aethria-empty-state__mark > * {
@@ -4319,13 +4327,6 @@ textarea {
   width: 18px;
   height: 18px;
   border: 0;
-}
-
-.aethria-empty-state__mark::after {
-  inset: 5px;
-  border: 0;
-  background: currentColor;
-  opacity: 0.24;
 }
 
 /* Dispatch is a focused command workspace: a single input line and type

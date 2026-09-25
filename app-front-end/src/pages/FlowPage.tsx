@@ -8,6 +8,7 @@ import type { QueueView } from '../components/queue/DecisionQueueHeader';
 import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent from '../components/InvestmentMemoContent';
 import AgentDispatch from '../components/AgentDispatch';
+import { EmptyMark } from '../components/EmptyState';
 import { useAppFrame } from '../components/AppFrame';
 import { productInteraction } from '../design-system/productSystem';
 import { workspaceLayout } from '../design-system/workspaceLayout';
@@ -301,7 +302,7 @@ export default function FlowPage({ data }: { data: SystemData }) {
 
         {startups.length === 0 ? (
           <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
-            <span className="block h-2 w-2 rounded-none bg-brand-mark" aria-hidden />
+            <EmptyMark />
             <h2 className="type-display mt-phi-5 text-[clamp(26px,3vw,40px)] leading-[1.1] text-oxford">
               The pipeline is filling.
             </h2>

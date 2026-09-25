@@ -38,7 +38,8 @@ function ThresholdHandle({
   variant,
   barRef,
   onChange,
-  onDrag,
+  onActive,
+  onDragging,
 }: {
   boundaryKey: BoundaryKey;
   label: string;
@@ -48,14 +49,14 @@ function ThresholdHandle({
   variant: 'tick' | 'divider';
   barRef: React.RefObject<HTMLDivElement | null>;
   onChange: (patch: Partial<DecisionThresholdBoundaries>) => void;
-  onDrag: (delta: number | null) => void;
+  /** The lens: which handle is being worked (hover, focus or drag), if any. */
+  onActive: (key: BoundaryKey | null) => void;
+  onDragging: (dragging: boolean) => void;
 }) {
   const setFromPointer = (event: PointerEvent<HTMLButtonElement>) => {
     const rect = barRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const next = scoreFromPointer(event.clientX, rect.left, rect.width);
-    onDrag(next - value);
-    onChange({ [boundaryKey]: next });
+    onChange({ [boundaryKey]: scoreFromPointer(event.clientX, rect.left, rect.width) });
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
@@ -79,16 +80,30 @@ function ThresholdHandle({
       aria-valuenow={value}
       aria-valuetext={`${value}, reviewer average ${formatReviewerAvg(value)}`}
       onKeyDown={handleKeyDown}
+      onPointerEnter={() => onActive(boundaryKey)}
+      onPointerLeave={(event) => {
+        if (!event.currentTarget.hasPointerCapture?.(event.pointerId)) onActive(null);
+      }}
+      // Keyboard focus only: a click also focuses the handle, and the lens must
+      // not linger on it after the pointer has let go.
+      onFocus={(event) => {
+        if (event.currentTarget.matches(':focus-visible')) onActive(boundaryKey);
+      }}
+      onBlur={() => onActive(null)}
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
-        onDrag(0);
+        onActive(boundaryKey);
+        onDragging(true);
         setFromPointer(event);
       }}
       onPointerMove={(event) => {
         if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
         setFromPointer(event);
       }}
-      onLostPointerCapture={() => onDrag(null)}
+      onLostPointerCapture={(event) => {
+        onDragging(false);
+        if (!event.currentTarget.matches(':hover')) onActive(null);
+      }}
       className="group absolute top-1/2 z-[2] flex h-full w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-oxford/55"
       style={{ left: `${value}%` }}
     >
@@ -105,7 +120,7 @@ function ThresholdHandle({
       {variant === 'divider' ? (
         <>
           <span className="absolute inset-y-1 w-[2px] bg-oxford" aria-hidden />
-          <span className="relative h-3 w-3 bg-oxford ring-2 ring-paper transition-transform duration-150 ease-out group-hover:scale-110 group-active:scale-[1.35] group-focus-visible:ring-2 group-focus-visible:ring-oxford/45" aria-hidden />
+          <span className="relative h-2 w-2 rounded-full bg-oxford ring-2 ring-paper transition-transform duration-150 ease-out group-hover:scale-125 group-active:scale-150 group-focus-visible:ring-2 group-focus-visible:ring-oxford/45" aria-hidden />
         </>
       ) : (
         <span className="flex h-5 w-3 items-end justify-center border-b-2 border-oxford/70" aria-hidden>
@@ -128,37 +143,23 @@ function ThresholdBar({
   const barRef = useRef<HTMLDivElement>(null);
   const passMax = boundaries.passMonitorBoundary - 1;
   const monitorMax = boundaries.monitorInvestBoundary - 1;
-  // null = not dragging. While dragging, the last pointer delta leans the bands
-  // in the direction of travel and relaxes to 0 the moment you hold still —
-  // pointer events alone can't detect "holding still", so an idle timer
-  // restarted on every move drives the relax.
-  const [drag, setDrag] = useState<number | null>(null);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clearIdleTimer = () => {
-    if (idleTimerRef.current != null) {
-      clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = null;
-    }
-  };
-  useEffect(() => clearIdleTimer, []);
-  const onDrag = (delta: number | null) => {
-    clearIdleTimer();
-    if (delta == null) {
-      setDrag(null);
-      return;
-    }
-    setDrag(Math.max(-10, Math.min(10, delta * 2.5)));
-    idleTimerRef.current = setTimeout(() => setDrag(0), 120);
-  };
+  // Motion answers the operator, never runs on its own: the lattice sweeps in
+  // once, then a lens pools ink into the triangles around whichever handle is
+  // being worked. It glides between handles and on keyboard steps, and tracks
+  // the pointer exactly mid-drag.
+  const [active, setActive] = useState<BoundaryKey | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const focusValue = active ? boundaries[active] : null;
 
   return (
     <div className="pt-6">
       <div ref={barRef} className={`relative w-full border-y border-oxford/[0.08] ${compact ? 'h-10' : 'h-24 lg:h-28'}`}>
         <div
           data-testid="threshold-dot-grid"
-          data-dragging={drag != null}
+          data-dragging={dragging}
+          data-focus={focusValue != null}
           className="threshold-matrix pointer-events-none overflow-hidden"
-          style={{ '--lean': `${drag ?? 0}deg` } as React.CSSProperties}
+          style={focusValue != null ? ({ '--focus-x': `${focusValue}%` } as React.CSSProperties) : undefined}
           aria-hidden
         >
           <div
@@ -180,6 +181,7 @@ function ThresholdBar({
             className="threshold-band threshold-autopass"
             style={bandClip(0, boundaries.autoPassCeiling)}
           />
+          <div className="threshold-lens" />
         </div>
         <ThresholdHandle
           boundaryKey="autoPassCeiling"
@@ -190,7 +192,8 @@ function ThresholdBar({
           variant="tick"
           barRef={barRef}
           onChange={onChange}
-          onDrag={onDrag}
+          onActive={setActive}
+          onDragging={setDragging}
         />
         <ThresholdHandle
           boundaryKey="passMonitorBoundary"
@@ -201,7 +204,8 @@ function ThresholdBar({
           variant="divider"
           barRef={barRef}
           onChange={onChange}
-          onDrag={onDrag}
+          onActive={setActive}
+          onDragging={setDragging}
         />
         <ThresholdHandle
           boundaryKey="monitorInvestBoundary"
@@ -212,7 +216,8 @@ function ThresholdBar({
           variant="divider"
           barRef={barRef}
           onChange={onChange}
-          onDrag={onDrag}
+          onActive={setActive}
+          onDragging={setDragging}
         />
       </div>
       <div className={`${compact ? 'mt-6' : 'mt-7'} flex flex-wrap items-center gap-x-phi-5 gap-y-phi-2 type-data text-oxford/70`}>
