@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import type {
   CounterfactualProposal,
   FundHypothesis,
@@ -156,6 +156,7 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
   const dialogRef = useRef<HTMLElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const replay = useFundReplayPreview(selection?.kind === 'hypothesis' ? selection.item.hypothesis_id : null);
+  const reduceMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     restoreRef.current = document.activeElement as HTMLElement | null;
@@ -175,15 +176,32 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
     if (selection) titleRef.current?.focus();
   }, [selection]);
 
-  if (!selection) return null;
+  // Both branches return an AnimatePresence at the same spot, so React keeps
+  // one instance and the drawer can slide out with its last content.
+  if (!selection) return <AnimatePresence>{null}</AnimatePresence>;
   const isHypothesis = selection.kind === 'hypothesis';
   const item = selection.item;
   const hypothesisItem = isHypothesis ? selection.item as FundHypothesis : null;
   const observationItem = !isHypothesis ? selection.item as FundObservation : null;
   return (
-    <div className="fixed inset-0 z-40" role="presentation">
+    <AnimatePresence>
+    <motion.div
+      key="fund-inspector"
+      className="fixed inset-0 z-40"
+      role="presentation"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: reduceMotion ? 0 : 0.24, ease: [0.16, 1, 0.3, 1] }}
+    >
       <button type="button" className="absolute inset-0 h-full w-full cursor-default bg-oxford/15" aria-label="Close evidence inspector" onClick={onClose} />
-      <aside ref={dialogRef} className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col overflow-y-auto bg-paper" role="dialog" aria-modal="true" aria-labelledby="fund-inspector-title">
+      <motion.aside
+        ref={dialogRef}
+        initial={reduceMotion ? false : { x: 48 }}
+        animate={{ x: 0 }}
+        exit={reduceMotion ? undefined : { x: 48 }}
+        transition={{ duration: reduceMotion ? 0 : 0.32, ease: [0.16, 1, 0.3, 1] }}
+        className="absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col overflow-y-auto bg-paper" role="dialog" aria-modal="true" aria-labelledby="fund-inspector-title">
         <header className="flex items-start justify-between gap-phi-4 border-b border-oxford/10 px-phi-5 py-phi-5">
           <div>
             <p className="type-label-section">{isHypothesis ? 'Hypothesis basis' : 'Observation evidence'}</p>
@@ -231,8 +249,9 @@ function Inspector({ selection, onClose, proposal }: { selection: InspectorSelec
             </div>
           ) : null}
         </div>
-      </aside>
-    </div>
+      </motion.aside>
+    </motion.div>
+    </AnimatePresence>
   );
 }
 

@@ -86,7 +86,13 @@ export default function MemoPrecedentStrip({
         </span>
       </button>
 
-      <div id="memo-precedent-body" className={open ? 'memoPrecedentBody' : 'hidden'}>
+      <div
+        id="memo-precedent-body"
+        className={`memoDisclosureReveal${open ? ' memoDisclosureReveal--open' : ''}`}
+        aria-hidden={!open}
+        inert={!open}
+      >
+      <div className="memoPrecedentBody min-h-0">
         <p className="memoPrecedentLead">
           {candidates.length === 1
             ? 'One deal you already decided that resembles this case.'
@@ -138,6 +144,7 @@ export default function MemoPrecedentStrip({
             );
           })}
         </ul>
+      </div>
       </div>
     </section>
   );

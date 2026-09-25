@@ -1,3 +1,4 @@
+import { AnimatePresence, motion } from 'framer-motion';
 import { useState, type ReactNode } from 'react';
 import type {
   FundConfiguration,
@@ -189,7 +190,16 @@ function NarrativeRow({ value, onChange }: { value: string; onChange: (value: st
           <span aria-hidden>{open ? '▴' : '▾'}</span>
         </button>
       </Row>
+      <AnimatePresence initial={false}>
       {open ? (
+        <motion.div
+          key="thesis-text"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          style={{ overflow: 'hidden' }}
+        >
         <textarea
           id="thesis-text"
           aria-label="Notes / thesis text"
@@ -198,7 +208,9 @@ function NarrativeRow({ value, onChange }: { value: string; onChange: (value: st
           onChange={(event) => onChange(event.target.value)}
           className="compact-field type-body-sm w-full resize-y !text-left leading-relaxed"
         />
+        </motion.div>
       ) : null}
+      </AnimatePresence>
     </div>
   );
 }

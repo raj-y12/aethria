@@ -71,13 +71,13 @@ export default function Popover({
       <span
         id={panelId}
         role="tooltip"
-        hidden={!open}
         className={[
           'absolute top-full z-30 mt-2 w-[min(22rem,78vw)] cursor-default',
           'border border-oxford/15 bg-paper px-3.5 py-3 text-left shadow-[0_10px_30px_-12px_rgba(10,22,41,0.35)]',
           align === 'end' ? 'right-0' : 'left-0',
-          reduceMotion ? '' : 'transition-opacity duration-150',
-          open ? 'opacity-100' : 'opacity-0',
+          // Visibility, not `hidden`: display:none cut the fade both ways.
+          reduceMotion ? '' : 'transition-[opacity,visibility] duration-150',
+          open ? 'visible opacity-100' : 'pointer-events-none invisible opacity-0',
           panelClassName,
         ].join(' ')}
       >

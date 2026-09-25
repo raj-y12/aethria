@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import { tokens } from '../design-system/tokens';
@@ -87,11 +87,22 @@ function PositionOutcomes({ startupId }: { startupId: string }) {
       >
         {open ? 'Hide outcomes' : 'Record outcome'}
       </button>
-      {open ? (
-        <div className="mt-phi-3">
-          <OutcomePanel startupId={startupId} />
-        </div>
-      ) : null}
+      <AnimatePresence initial={false}>
+        {open ? (
+          <motion.div
+            key="outcomes"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="pt-phi-3">
+              <OutcomePanel startupId={startupId} />
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
