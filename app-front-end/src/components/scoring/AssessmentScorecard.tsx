@@ -212,7 +212,8 @@ export default function AssessmentScorecard({
             </span>
           )}
         </button>
-        <p className="memoScoreTake">{renderNumbers(take)}</p>
+        {/* Closed rows show a two-line preview; the full rationale reads once opened. */}
+        <p className={isOpen ? 'memoScoreTake' : 'memoScoreTake memoScoreTake--preview'}>{renderNumbers(take)}</p>
 
         <AnimatePresence initial={false}>
           {isOpen && hasDetail && (

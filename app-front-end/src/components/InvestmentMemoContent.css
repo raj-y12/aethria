@@ -3362,3 +3362,24 @@
   font-weight: 600;
   letter-spacing: -0.035em;
 }
+
+/* Assessment rows: the rationale previews in two lines until the row is opened. */
+.memoScoreTake--preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Memo body text is justified; hyphenation keeps the narrow two-column
+   blocks free of wide word gaps. Single-line labels are unaffected. */
+.memoPanel p,
+.memoPanel li {
+  text-align: justify;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
+
+.memoPanel .memoEmpty p {
+  text-align: center;
+}

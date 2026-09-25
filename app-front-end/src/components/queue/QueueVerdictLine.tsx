@@ -114,6 +114,7 @@ export default function QueueVerdictLine({
             variant={displayVariant ?? recommendation}
             label={recommendationLabel?.toUpperCase()}
             queue
+            filled
             prominent={prominent}
           />
         )}
@@ -132,6 +133,7 @@ export default function QueueVerdictLine({
           variant={displayVariant ?? recommendation}
           label={recommendationLabel?.toUpperCase()}
           queue
+          filled
           prominent={prominent}
         />
         {convictionEl}

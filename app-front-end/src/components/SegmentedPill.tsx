@@ -16,7 +16,9 @@ export default function SegmentedPill<T extends string>({
   layoutId,
   className = '',
 }: {
-  options: readonly { key: T; label: string }[];
+  /** `count` sits after the label; `tone` marks an inactive option that wants
+   *  attention — escalation tints it burgundy, new adds a breathing dot. */
+  options: readonly { key: T; label: string; count?: string; tone?: 'escalation' | 'new' }[];
   value: T;
   onChange: (key: T) => void;
   label: string;
@@ -41,7 +43,11 @@ export default function SegmentedPill<T extends string>({
             aria-selected={isActive}
             onClick={() => onChange(option.key)}
             className={`type-action group relative min-h-[30px] shrink-0 rounded-full px-phi-4 cursor-pointer btn-interaction btn-interaction--no-press transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive ? 'text-paper' : 'text-oxford/55 hover:text-oxford'
+              isActive
+                ? 'text-paper'
+                : option.tone === 'escalation'
+                  ? 'text-escalation/80 hover:text-escalation'
+                  : 'text-oxford/70 hover:text-oxford'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
           >
@@ -53,7 +59,13 @@ export default function SegmentedPill<T extends string>({
                 aria-hidden
               />
             ) : null}
-            <span className="relative">{option.label}</span>
+            <span className="relative inline-flex items-center gap-phi-2 whitespace-nowrap">
+              {option.tone === 'new' && !isActive ? (
+                <span aria-hidden className="h-[6px] w-[6px] rounded-full bg-oxford signal-dot-breathe" />
+              ) : null}
+              {option.label}
+              {option.count != null ? <span className="tabular-nums opacity-70">{option.count}</span> : null}
+            </span>
           </button>
         );
       })}

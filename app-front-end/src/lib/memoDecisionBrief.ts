@@ -262,9 +262,9 @@ export function buildMemoDecisionBrief(input: MemoDecisionBriefInput): MemoDecis
       left.relationship.localeCompare(right.relationship) || left.claimId.localeCompare(right.claimId),
     )) {
       const claim = claimById.get(claimId);
-      if (!claim) continue;
+      if (!claim || claim.status !== 'current') continue;
       const sources = (sourcesByClaim.get(claimId) ?? [])
-        .filter((source) => source.link.relationship === relationship);
+        .filter((source) => source.link.relationship === relationship && source.item?.verification_state !== 'revoked');
       const memoSources = toMemoSources(sources);
       const existing = claims.find((item) => item.claimId === claimId && item.relationship === relationship);
       if (existing) {

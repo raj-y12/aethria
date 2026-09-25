@@ -36,6 +36,7 @@ export default function DecisionBadge({
   className = '',
   prominent: _prominent = false,
   queue: _queue = false,
+  filled = false,
 }: {
   variant: DecisionBadgeVariant;
   badges?: VerdictBadgeConfig[];
@@ -47,13 +48,16 @@ export default function DecisionBadge({
   prominent?: boolean;
   /** @deprecated Size unified — kept for call-site compatibility. */
   queue?: boolean;
+  /** Keep the verdict's colour fill where verdicts are otherwise flat
+   *  annotations (the docket, where the colour is the scan cue). */
+  filled?: boolean;
 }) {
   const text = label ?? DECISION_BADGE_LABEL[variant];
   const style = badgeBackground(variant, badges);
 
   return (
     <span
-      className={`aethria-verdict ${variant === 'escalation' ? '' : 'aethria-verdict--flat'} ${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]} ${className}`}
+      className={`aethria-verdict ${variant === 'escalation' || filled ? '' : 'aethria-verdict--flat'} ${VERDICT_CHIP_CLASS} rounded-none ${DECISION_BADGE_CLASS[variant]} ${className}`}
       style={style}
       aria-label={text}
     >

@@ -245,6 +245,46 @@ describe('buildMemoDecisionBrief', () => {
     }]);
   });
 
+  it('excludes non-current claims from the memo brief without changing evidence coverage', () => {
+    const result = buildMemoDecisionBrief({
+      evaluation: {
+        ...evaluation,
+        criteria: [{
+          ...evaluation.criteria[0],
+          supporting_claim_ids: ['claim-regulatory', 'claim-withdrawn', 'claim-superseded', 'claim-stale'],
+        }],
+      },
+      ledger: {
+        ...ledger,
+        claims: [
+          ...ledger.claims,
+          { ...ledger.claims[0], claim_id: 'claim-withdrawn', display_text: 'Withdrawn claim.', status: 'withdrawn' },
+          { ...ledger.claims[0], claim_id: 'claim-superseded', display_text: 'Superseded claim.', status: 'superseded' },
+          { ...ledger.claims[0], claim_id: 'claim-stale', display_text: 'Stale claim.', status: 'stale' },
+        ],
+      },
+    });
+
+    expect(result.claims.map(({ claimId }) => claimId)).toEqual(['claim-regulatory']);
+    expect(result.coverage).toBe('sufficient');
+  });
+
+  it('does not treat a revoked evidence item as a current source for a claim', () => {
+    const result = buildMemoDecisionBrief({
+      evaluation: {
+        ...evaluation,
+        criteria: [{ ...evaluation.criteria[0], supporting_claim_ids: ['claim-revoked-source'] }],
+      },
+      ledger: {
+        ...ledger,
+        claims: [{ ...ledger.claims[0], claim_id: 'claim-revoked-source' }],
+        evidence_items: [{ ...ledger.evidence_items![0], verification_state: 'revoked' }],
+      },
+    });
+
+    expect(result.claims).toMatchObject([{ claimId: 'claim-revoked-source', provenance: 'missing', sources: [] }]);
+  });
+
   it('does not use a contradicting link to verify a supporting claim entry', () => {
     const result = buildMemoDecisionBrief({
       evaluation,

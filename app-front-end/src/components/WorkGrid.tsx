@@ -539,10 +539,6 @@ const WorkGrid = ({
             animate={reduceMotion || entranceReady ? 'visible' : 'hidden'}
             variants={listContainerVariants}
           >
-            <div className="aethria-queue-columns type-meta" aria-hidden="true">
-              <span>Company</span>
-              <span>State</span>
-            </div>
             {orderedModels.map((model, idx) => {
               const isSelected = selectedId === model.startup.id;
               const keyDown = (e: React.KeyboardEvent) => {

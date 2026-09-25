@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import WorkGrid from '../components/WorkGrid';
+import SegmentedPill from '../components/SegmentedPill';
 import type { QueueView } from '../components/queue/DecisionQueueHeader';
 import InvestmentMemo from '../components/InvestmentMemo';
 import InvestmentMemoContent from '../components/InvestmentMemoContent';
@@ -337,44 +338,37 @@ export default function FlowPage({ data }: { data: SystemData }) {
                     {/* Never wraps: at the docket's 42% basis a wrapping row breaks
                         onto three lines and shoves the list down. It scrolls
                         sideways instead, like the fund facets. */}
-                    <nav
-                      className="no-scrollbar flex min-w-0 flex-nowrap items-center gap-x-phi-1 overflow-x-auto"
-                      aria-label="Queue views"
-                    >
-                      <ViewKey
-                        label="Open"
-                        count={openCount.toLocaleString()}
-                        active={queueView === 'PRIORITY'}
-                        onClick={() => selectView('PRIORITY')}
-                      />
-                      <ViewKey
-                        label="Need ruling"
-                        count={escalatedCount.toLocaleString()}
-                        tone={escalatedCount > 0 ? 'escalation' : undefined}
-                        active={queueView === 'ESCALATED'}
-                        onClick={() => selectView('ESCALATED')}
-                      />
-                      <ViewKey
-                        label="New"
-                        count={(viewCounts?.NEW ?? newCount).toLocaleString()}
-                        tone={(viewCounts?.NEW ?? newCount) > 0 ? 'new' : undefined}
-                        active={queueView === 'NEW'}
-                        onClick={() => selectView('NEW')}
-                      />
-                      <ViewKey
-                        label="Stale"
-                        count={staleCount.toLocaleString()}
-                        active={queueView === 'STALE'}
-                        onClick={() => selectView('STALE')}
-                      />
-                    </nav>
+                    <SegmentedPill
+                      label="Queue views"
+                      layoutId="flow-queue-view-active"
+                      value={queueView}
+                      onChange={selectView}
+                      className="max-w-full"
+                      options={[
+                        // Open counts the rows the Open view actually lists.
+                        { key: 'PRIORITY', label: 'Open', count: (viewCounts?.PRIORITY ?? openCount).toLocaleString() },
+                        {
+                          key: 'ESCALATED',
+                          label: 'Need ruling',
+                          count: escalatedCount.toLocaleString(),
+                          tone: escalatedCount > 0 ? 'escalation' : undefined,
+                        },
+                        {
+                          key: 'NEW',
+                          label: 'New',
+                          count: (viewCounts?.NEW ?? newCount).toLocaleString(),
+                          tone: (viewCounts?.NEW ?? newCount) > 0 ? 'new' : undefined,
+                        },
+                        { key: 'STALE', label: 'Stale', count: staleCount.toLocaleString() },
+                      ]}
+                    />
                   </>
                 }
               />
             </div>
 
             {restOpen > 0 || monitored > 0 ? (
-              <p className="type-meta mt-phi-4 flex-none border-t border-oxford/[0.08] pt-phi-4 text-oxford/[0.42]">
+              <p className="aethria-flow-footer type-meta mt-phi-4 flex-none pt-phi-4 text-oxford/[0.42]">
                 Everything else — {restOpen.toLocaleString()} open, {monitored.toLocaleString()} monitored — is
                 still moving on its own.
               </p>

@@ -1503,19 +1503,6 @@ textarea {
   padding-top: 0;
 }
 
-.aethria-queue-columns {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 28px;
-  padding: 0 10px;
-  border-bottom: 1px solid var(--fey-rule-soft);
-  color: rgba(var(--color-oxford-rgb), 0.5);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
 .aethria-queue-surface .aethria-queue-list > div {
   border-bottom: 1px solid var(--fey-rule-soft);
 }
@@ -1532,9 +1519,9 @@ textarea {
   background: rgba(var(--color-oxford-rgb), 0.045);
 }
 
+/* Size comes from DocketCaseRow: the selected name steps up to display size. */
 .aethria-queue-surface .aethria-queue-list [role='button'][aria-pressed='true'] h2 {
   font-family: var(--font-sans);
-  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -2159,19 +2146,11 @@ textarea {
   align-items: end;
 }
 
-.aethria-queue-header {
-  border-top: 1px solid var(--fey-rule);
-}
-
 .aethria-queue-header__toolbar {
   min-height: 44px;
   padding-top: 7px;
 }
 
-.aethria-queue-header__toolbar > div:last-child {
-  border-left: 1px solid var(--fey-rule-soft);
-  padding-left: 10px;
-}
 
 .aethria-queue-header__filters {
   border-bottom: 1px solid var(--fey-rule-soft);
@@ -2284,11 +2263,6 @@ textarea {
 
   .aethria-room-header__readouts {
     width: 100%;
-  }
-
-  .aethria-queue-header__toolbar > div:last-child {
-    border-left: 0;
-    padding-left: 0;
   }
 
   .aethria-queue-header__filters [role='group'] {
@@ -3097,7 +3071,8 @@ textarea {
 .aethria-flow .aethria-docket,
 .aethria-flow .aethria-queue-surface,
 .aethria-flow .aethria-queue-surface > .sticky {
-  background: transparent;
+  /* Opaque: the docket scrolls beneath this sticky toolbar. */
+  background: var(--color-paper);
 }
 
 .aethria-flow .aethria-flow__workspace > [class*='shrink-0'] {
@@ -3112,21 +3087,6 @@ textarea {
   border-bottom-color: transparent;
 }
 
-.aethria-flow nav[aria-label='Queue views'] button,
-.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'],
-.aethria-flow nav[aria-label='Queue views'] .new-arrival-pulse {
-  background: transparent !important;
-}
-
-.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'] {
-  font-weight: 600;
-}
-
-.aethria-flow nav[aria-label='Queue views'] button[aria-pressed='true'] > span.absolute {
-  background: transparent !important;
-}
-
-.aethria-flow .aethria-queue-columns,
 .aethria-flow .aethria-queue-surface .aethria-queue-list > div,
 .aethria-flow .aethria-docket-row {
   border-color: transparent;
@@ -4715,4 +4675,18 @@ textarea {
   padding-right: var(--space-3);
   padding-block: var(--space-1);
   box-shadow: 0 6px 18px -10px rgba(10, 22, 41, 0.24);
+}
+
+/* The docket footer ("Everything else…") clears the floating nav dock on
+   desktop, where the dock tokens exist; elsewhere it sits normally. */
+.aethria-flow-footer {
+  margin-bottom: calc(var(--dock-size, 0px) + var(--dock-bottom, 0px) + 12px);
+}
+
+/* Filled docket verdicts (Advance, Monitor, Pass, More diligence) get the same
+   chip as the "Needs ruling" marker beside them; the Flow rule above strips
+   padding for flat annotations only. */
+.aethria-flow .aethria-verdict:not(.aethria-verdict--flat) {
+  min-height: 22px;
+  padding: 4px 8px;
 }
