@@ -8,68 +8,11 @@
   background-image: none;
 }
 
-.aethria-home.grain-home::before,
-.aethria-home.grain-home::after {
-  position: absolute;
-  z-index: 0;
-  width: clamp(300px, 44vw, 680px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: rgba(var(--color-oxford-rgb), 0.22);
-  content: '';
-  filter: blur(90px);
-  pointer-events: none;
-  animation: home-atmosphere 18s ease-in-out infinite alternate;
-}
-
-.aethria-home.grain-home::before {
-  top: 3%;
-  right: 8%;
-}
-
-.aethria-home.grain-home::after {
-  bottom: -28%;
-  left: 6%;
-  width: clamp(260px, 35vw, 520px);
-  opacity: 0.58;
-  animation-delay: -9s;
-}
-
-.aethria-home.grain-home > .desk-home__inner {
-  position: relative;
-  z-index: 1;
-}
-
-.aethria-home.grain-home > .desk-home__inner::before,
-.aethria-home.grain-home > .desk-home__inner::after {
-  position: absolute;
-  z-index: 0;
-  width: clamp(220px, 28vw, 420px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: rgba(var(--color-oxford-rgb), 0.24);
-  content: '';
-  filter: blur(76px);
-  pointer-events: none;
-  animation: home-atmosphere 22s ease-in-out infinite alternate;
-}
-
+/* The drifting blurs are the shared .aethria-atmosphere (index.css), the
+   same set sign-in uses. */
 .aethria-home.grain-home > .desk-home__inner > * {
   position: relative;
   z-index: 1;
-}
-
-.aethria-home.grain-home > .desk-home__inner::before {
-  top: 14%;
-  left: 18%;
-  animation-delay: -5s;
-}
-
-.aethria-home.grain-home > .desk-home__inner::after {
-  right: 16%;
-  bottom: 13%;
-  opacity: 0.78;
-  animation-delay: -13s;
 }
 
 .aethria-home.grain-home > .grain {
@@ -80,10 +23,6 @@
   font-size: clamp(32px, 3.6vw, 50px) !important;
   letter-spacing: -0.035em !important;
   line-height: 1.08 !important;
-}
-
-.aethria-home.grain-home .desk-home__attention {
-  transition: background-color 180ms var(--motion-ease), color 180ms var(--motion-ease);
 }
 
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card {
@@ -142,47 +81,6 @@
   text-align: center;
 }
 
-.aethria-home.grain-home .desk-home__attention-frame {
-  display: inline-grid;
-  width: 184px;
-  height: 56px;
-  place-items: center;
-  border: 1px solid rgba(var(--color-oxford-rgb), 0.72);
-  border-radius: 999px;
-  transition: border-color 240ms ease;
-}
-
-.aethria-home.grain-home .desk-home__attention-frame:hover,
-.aethria-home.grain-home .desk-home__attention-frame:focus-within {
-  border-color: var(--color-oxford);
-}
-
-.aethria-home.grain-home .desk-home__attention {
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  background: var(--color-oxford) !important;
-  color: var(--color-paper) !important;
-  border-radius: 999px !important;
-  clip-path: inset(4px round 999px);
-  transition: clip-path 400ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, color 180ms ease;
-}
-
-.aethria-home.grain-home .desk-home__attention-frame:hover .desk-home__attention,
-.aethria-home.grain-home .desk-home__attention-frame:focus-within .desk-home__attention {
-  clip-path: inset(0 round 999px);
-}
-
-.aethria-home.grain-home .desk-home__attention > span:first-child {
-  display: block !important;
-  background: var(--color-oxford) !important;
-}
-
-.aethria-home.grain-home .desk-home__attention:hover {
-  background: var(--color-oxford) !important;
-  transform: none !important;
-}
-
 .aethria-home.grain-home .desk-home__flow-context {
   width: 100%;
 }
@@ -231,6 +129,23 @@
   color: var(--color-oxford) !important;
 }
 
+/* Keyboard focus: a solid oxford ring off the circle (the old 30% ring was
+   ~1.9:1, under the 3:1 non-text minimum). */
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible {
+  outline: 2px solid var(--color-oxford);
+  outline-offset: 3px;
+  box-shadow: none;
+}
+
+.aethria-home.grain-home .aethria-home__workspace-circle .aethria-nav-glyph {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* The hover tint span and the text label have no job on an icon circle. */
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card > span[aria-hidden],
 .aethria-home.grain-home .aethria-home__workspace-label {
@@ -249,6 +164,22 @@
 }
 
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]::after {
+  content: attr(data-nav-label);
+  position: absolute;
+  left: 50%;
+  z-index: 20;
+  pointer-events: none;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 180ms var(--motion-ease), transform 260ms var(--motion-ease);
   top: calc(100% + 8px);
   bottom: auto;
   /* Same surface and ink as the circle it labels. */
@@ -259,6 +190,7 @@
 
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:hover::after,
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:focus-visible::after {
+  opacity: 1;
   transform: translate(-50%, 0);
 }
 
@@ -282,16 +214,6 @@
 }
 
 @media (max-width: 760px) {
-  .aethria-home.grain-home > .desk-home__inner::before {
-    top: 18%;
-    left: -16%;
-  }
-
-  .aethria-home.grain-home > .desk-home__inner::after {
-    right: -20%;
-    bottom: 16%;
-  }
-
   .aethria-home.grain-home > .desk-home__inner {
     min-height: 100%;
     padding: 24px 18px 86px;
@@ -305,35 +227,7 @@
   }
 }
 
-@keyframes home-atmosphere {
-  from { transform: translate3d(-8px, 4px, 0) scale(0.96); }
-  to { transform: translate3d(10px, -8px, 0) scale(1.04); }
-}
-
-@media (max-width: 760px) {
-  .aethria-home.grain-home::before {
-    top: 0;
-    right: -35%;
-    width: 90vw;
-  }
-
-  .aethria-home.grain-home::after {
-    bottom: 0;
-    left: -35%;
-    width: 80vw;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .aethria-home.grain-home::before,
-  .aethria-home.grain-home::after,
-  .aethria-home.grain-home > .desk-home__inner::before,
-  .aethria-home.grain-home > .desk-home__inner::after {
-    animation: none;
-  }
-
-  .aethria-home.grain-home .desk-home__attention,
-  .aethria-home.grain-home .desk-home__attention-frame,
   .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card {
     transition: none;
   }

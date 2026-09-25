@@ -874,17 +874,19 @@
   transform: translate(-50%, -50%);
 }
 
-/* ── Entry (LoginPage) — the same set Home opens on, so sign-in, the
-   since-you-left report and Home read as one room. Values mirror Home's frame,
-   headline and Open Flow button in pages/HomePage.css; keep them in step. ── */
+/* ── Entry set — shared by sign-in, Home and the full-screen system states:
+   the drifting atmosphere, the entry headline and the oxford pill button.
+   Home's frame height lives in pages/HomePage.css. ── */
 .aethria-atmosphere {
   /* The host keeps its own positioning (relative page, fixed takeover). */
   isolation: isolate;
 }
 
 /* Content above the drifts: the pseudo-element blobs are positioned, so plain
-   children would otherwise paint beneath them. Grain layers stay fixed. */
-.aethria-atmosphere > :not(.grain) {
+   children would otherwise paint beneath them. Grain layers stay fixed, and
+   :where() keeps this at one class of weight so a child's own positioning
+   (e.g. Home's fixed logout button) still wins. */
+:where(.aethria-atmosphere) > :not(.grain) {
   position: relative;
   z-index: 1;
 }
@@ -949,6 +951,31 @@
   z-index: 1;
 }
 
+/* Phones: the drifts pull in toward the edges so the frame stays readable. */
+@media (max-width: 760px) {
+  .aethria-atmosphere::before {
+    top: 0;
+    right: -35%;
+    width: 90vw;
+  }
+
+  .aethria-atmosphere::after {
+    bottom: 0;
+    left: -35%;
+    width: 80vw;
+  }
+
+  .aethria-atmosphere__inner::before {
+    top: 18%;
+    left: -16%;
+  }
+
+  .aethria-atmosphere__inner::after {
+    right: -20%;
+    bottom: 16%;
+  }
+}
+
 /* Home stacks two grain layers (AppFrame's at .3 plus its own at .42); the
    sign-in page renders the same pair so the texture doesn't thicken on entry. */
 .aethria-atmosphere > .grain + .grain {
@@ -995,6 +1022,14 @@
   line-height: 1.08;
 }
 
+/* The welcome stays one line; on a phone it scales with the viewport so a
+   long login name fits instead of running off the edge. */
+@media (max-width: 640px) {
+  .aethria-entry-headline {
+    font-size: clamp(20px, 6.4vw, 32px);
+  }
+}
+
 /* The bordered pill button: an oxford capsule inset in a hairline ring that
    fills the ring on hover. */
 .aethria-cta-frame {
@@ -1033,6 +1068,12 @@
 
 .aethria-cta:focus-visible {
   outline: none;
+}
+
+/* Keyboard focus rings the whole pill, not just the fill change. */
+.aethria-cta-frame:has(.aethria-cta:focus-visible) {
+  outline: 2px solid var(--color-oxford);
+  outline-offset: 3px;
 }
 
 .aethria-cta:disabled {
@@ -1281,7 +1322,10 @@
   *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    /* Movement snaps, but plain fades and colour changes keep their timing —
+       they carry state change without motion, which is what reduced motion
+       asks for. Transform/size/clip transitions are dropped by omission. */
+    transition-property: opacity, color, background-color, border-color, visibility !important;
     scroll-behavior: auto !important;
   }
 
@@ -1498,8 +1542,7 @@
   padding-inline: 0;
 }
 
-.aethria-home .desk-home__briefing button[aria-label^='On the desk'],
-.aethria-home .desk-home__workspace-card {
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1528,18 +1571,8 @@
 }
 
 .aethria-home .desk-home__summary-row:hover,
-.aethria-home .desk-home__summary-action:hover,
-.aethria-home .desk-home__workspace-card:hover {
+.aethria-home .desk-home__summary-action:hover {
   background: transparent;
-}
-
-.aethria-home .desk-home__workspace-card {
-  padding-inline: 0;
-  transform: none;
-}
-
-.aethria-home .desk-home__workspace-card:hover {
-  color: rgba(var(--color-oxford-rgb), 0.68);
 }
 
 .aethria-home .desk-home__briefing [role='navigation'] {
@@ -1880,7 +1913,6 @@ textarea {
   border-bottom-color: currentColor;
   background: transparent;
 }
-
 
 .aethria-main .segmented-pill button {
   min-height: 26px;
@@ -2337,7 +2369,6 @@ textarea {
   padding-top: 7px;
 }
 
-
 .aethria-queue-header__filters {
   border-bottom: 1px solid var(--fey-rule-soft);
   padding-bottom: 10px;
@@ -2576,26 +2607,6 @@ textarea {
   margin-top: 22px;
 }
 
-.aethria-home .desk-home__workspace-card {
-  min-height: 68px;
-  align-items: flex-start;
-  justify-content: space-between;
-  border: 1px solid var(--fey-rule-soft);
-  border-radius: 11px;
-  background: rgba(var(--color-paper-rgb), 0.26);
-  padding: 15px 16px;
-  transition: border-color 150ms var(--motion-ease), background-color 150ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspace-card:hover {
-  border-color: var(--fey-rule);
-  background: rgba(var(--color-paper-rgb), 0.62);
-}
-
-.aethria-home .desk-home__workspace-card > span:last-child {
-  display: none;
-}
-
 .aethria-home .desk-home__summary {
   grid-column: 2;
   grid-row: 2;
@@ -2707,8 +2718,7 @@ textarea {
   padding-inline: 0;
 }
 
-.aethria-home .desk-home__briefing button[aria-label^='On the desk'],
-.aethria-home .desk-home__workspace-card {
+.aethria-home .desk-home__briefing button[aria-label^='On the desk'] {
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2735,19 +2745,9 @@ textarea {
 }
 
 .aethria-home .desk-home__summary-row:hover,
-.aethria-home .desk-home__summary-action:hover,
-.aethria-home .desk-home__workspace-card:hover {
+.aethria-home .desk-home__summary-action:hover {
   border-color: transparent;
   background: transparent;
-}
-
-.aethria-home .desk-home__workspace-card {
-  padding-inline: 0;
-  transition: opacity 150ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspace-card:hover {
-  opacity: 0.68;
 }
 
 .aethria-home .desk-home__briefing [role='navigation'] {
@@ -2831,11 +2831,6 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.aethria-home .desk-home__workspace-card {
-  min-height: 44px;
-  padding: 12px 0;
-}
-
 .aethria-home .desk-home__summary {
   align-self: start;
   min-height: 0;
@@ -2862,20 +2857,6 @@ textarea {
 
 .aethria-home .desk-home__attention:hover {
   background: #e6e4e1;
-}
-
-.aethria-home .desk-home__workspace-card,
-.aethria-home .aethria-home__workspace-card {
-  border-radius: 0;
-  background: var(--color-paper-bright);
-  padding-inline: 16px;
-  transition: background-color 160ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspace-card:hover,
-.aethria-home .aethria-home__workspace-card:hover {
-  background: #e6e4e1;
-  opacity: 1;
 }
 
 .aethria-home .desk-home__summary-row {
@@ -3048,11 +3029,6 @@ textarea {
     padding: 0;
   }
 
-  .aethria-home .desk-home__workspace-card,
-  .aethria-home .aethria-home__workspace-card {
-    padding-inline: 14px;
-  }
-
   .aethria-home .desk-home__footer {
     margin-top: 0;
   }
@@ -3061,38 +3037,19 @@ textarea {
 /* Keep the home surface unified: affordance comes from spacing and motion,
    not separate filled color blocks. */
 .aethria-home .desk-home__attention,
-.aethria-home .desk-home__workspace-card,
-.aethria-home .aethria-home__workspace-card,
 .aethria-home .desk-home__summary-row,
 .aethria-home .desk-home__summary-action {
   background: transparent;
 }
 
 .aethria-home .desk-home__attention:hover,
-.aethria-home .desk-home__workspace-card:hover,
-.aethria-home .aethria-home__workspace-card:hover,
 .aethria-home .desk-home__summary-row:hover,
 .aethria-home .desk-home__summary-action:hover {
   background: transparent;
 }
 
-.aethria-home .desk-home__attention > span:first-child,
-.aethria-home .desk-home__workspace-card > span:first-child,
-.aethria-home .aethria-home__workspace-card > span:first-child {
+.aethria-home .desk-home__attention > span:first-child {
   display: none;
-}
-
-.aethria-home .desk-home__workspace-card,
-.aethria-home .aethria-home__workspace-card {
-  min-height: 58px;
-  border-top: 1px solid rgba(var(--color-oxford-rgb), 0.16);
-  padding: 14px 0;
-  transition: border-color 160ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspace-card:hover,
-.aethria-home .aethria-home__workspace-card:hover {
-  border-color: rgba(var(--color-oxford-rgb), 0.42);
 }
 
 .aethria-home .desk-home__summary-action {
@@ -3173,44 +3130,8 @@ textarea {
   gap: 0;
 }
 
-.aethria-home .desk-home__workspace-card,
-.aethria-home .aethria-home__workspace-card {
-  min-height: 108px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  padding: 12px 0;
-  transform: none;
-}
-
 .aethria-home .desk-home__footer {
   margin-top: 16px;
-}
-
-.aethria-home .desk-home__workspace-card:hover,
-.aethria-home .aethria-home__workspace-card:hover {
-  border: 0;
-}
-
-.aethria-home .aethria-home__workspace-circle {
-  display: grid;
-  width: var(--dock-size, 52px);
-  height: var(--dock-size, 52px);
-  place-items: center;
-  border: 1px solid var(--color-oxford);
-  border-radius: 999px;
-  background: var(--color-oxford);
-  color: var(--color-paper);
-  transition: background-color 160ms var(--motion-ease), color 160ms var(--motion-ease);
-}
-
-.aethria-home .aethria-home__workspace-circle .aethria-nav-glyph {
-  width: 18px;
-  height: 18px;
-  stroke: currentColor;
-  stroke-width: 1.35;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .aethria-home {
@@ -3228,15 +3149,6 @@ textarea {
   .aethria-home > .desk-home__inner {
     justify-content: center;
   }
-}
-
-.aethria-home .desk-home__workspace-card,
-.aethria-home .aethria-home__workspace-card {
-  overflow: visible;
-}
-
-.aethria-home .aethria-home__workspace-label {
-  display: none;
 }
 
 /* Flow refinement: keep the docket open and continuous. State is carried by
@@ -4668,155 +4580,13 @@ textarea {
   background: transparent;
 }
 
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card {
-  flex: 1 1 0;
-  min-width: 0;
-  /* Same height as the nav dock (--dock-size, desktop only); 52px below that. */
-  min-height: var(--dock-size, 52px);
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-oxford);
-  color: var(--color-paper);
-  padding: 0 16px;
-  /* Animate flex-basis too: changing it instantly makes the quiet cards snap
-     into circles before the active card begins to expand. */
-  transition: flex 620ms cubic-bezier(0.22, 1, 0.36, 1), background-color 420ms var(--motion-ease), color 420ms var(--motion-ease), padding 420ms var(--motion-ease), border-radius 420ms var(--motion-ease);
+@media (prefers-reduced-motion: reduce) {
+
 }
 
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card:hover,
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible {
-  background: var(--color-oxford);
-  color: var(--color-paper);
-}
-
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card > span.relative {
-  flex-direction: row;
-  gap: 10px;
-}
-
-.aethria-home .desk-home__workspace-label,
-.aethria-home .aethria-home__workspace-label {
-  display: none;
-}
-
-.aethria-home .desk-home__workspace-card .aethria-home__workspace-circle {
-  width: 52px;
-  height: 52px;
-  flex: 0 0 52px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: currentColor;
-  transition: border-radius 520ms cubic-bezier(0.22, 1, 0.36, 1), background-color 420ms var(--motion-ease), color 420ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspace-card .aethria-home__workspace-circle .aethria-nav-glyph {
-  width: 16px;
-  height: 16px;
-}
-
-/* The parent records the hovered or focused door so every card receives a
-   concrete flex-basis change that the browser can interpolate. */
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='0'] .aethria-home__workspace-card:not(:nth-child(1)),
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:not(:nth-child(2)),
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:not(:nth-child(3)),
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) {
-  flex-basis: var(--home-door-compact);
-  justify-content: center;
-  gap: 0;
-  padding-inline: 0;
-  background: var(--color-oxford);
-}
-
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-label {
-  display: none;
-}
-
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:not(:focus-visible) .aethria-home__workspace-circle {
-  width: 52px;
-  height: 52px;
-  border-radius: 999px;
-  background: var(--color-oxford);
-  color: var(--color-paper);
-}
-
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
-  background: var(--color-oxford);
-  color: var(--color-paper);
-  border-radius: 999px;
-}
-
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card:hover .aethria-home__workspace-label,
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible .aethria-home__workspace-label {
-  color: var(--color-paper) !important;
-}
-
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]::after {
-  content: attr(data-nav-label);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  z-index: 20;
-  pointer-events: none;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-oxford);
-  color: var(--color-paper);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.08em;
-  line-height: 1;
-  text-transform: uppercase;
-  white-space: nowrap;
-  opacity: 0;
-  transform: translate(-50%, 4px);
-  transition: opacity 180ms var(--motion-ease), transform 260ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:hover::after,
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:focus-visible::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
 
 @media (prefers-reduced-motion: reduce) {
-  .aethria-home .desk-home__workspaces .aethria-home__workspace-card,
-  .aethria-home .desk-home__workspaces .aethria-home__workspace-circle {
-    transition: none;
-  }
-}
 
-/* Keep the row on a fixed three-cell flex track and animate each door's basis.
-   The equal base widths and compact widths (a circle as wide as the door is
-   tall) add up with the 4px gaps, so the row's outside edges remain anchored
-   throughout the slide. */
-.aethria-home .desk-home__workspaces [role='navigation'] {
-  --home-door-compact: var(--dock-size, 54px);
-  display: flex;
-  gap: 4px;
-}
-
-.aethria-home .desk-home__workspaces .aethria-home__workspace-card {
-  width: calc((100% - 8px) / 3);
-  flex: 0 0 calc((100% - 8px) / 3);
-  transition: flex-basis 680ms cubic-bezier(0.22, 1, 0.36, 1), padding 420ms var(--motion-ease);
-}
-
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='0'] .aethria-home__workspace-card:nth-child(1),
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='1'] .aethria-home__workspace-card:nth-child(2),
-.aethria-home .desk-home__workspaces [role='navigation'][data-active-index='2'] .aethria-home__workspace-card:nth-child(3) {
-  flex-basis: calc(100% - (2 * var(--home-door-compact) + 8px));
-}
-
-.aethria-home .desk-home__workspaces [role='navigation']:has(.aethria-home__workspace-card:focus-visible) .aethria-home__workspace-card:focus-visible {
-  flex-basis: calc(100% - (2 * var(--home-door-compact) + 8px));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .aethria-home .desk-home__workspaces .aethria-home__workspace-card {
-    transition: none;
-  }
 }
 
 /* Keep the Dispatch command input's underline visible over the flat-surface reset. */
@@ -4827,7 +4597,6 @@ textarea {
 .aethria-dispatch-command [aria-label='Pipeline dispatch']:focus-within {
   border-bottom-color: rgba(var(--color-oxford-rgb), 0.45) !important;
 }
-
 
 /* The Dispatch activity cue travels around the button edge while work runs. */
 .aethria-dispatch-progress-ring {
@@ -4927,4 +4696,23 @@ textarea {
     border-left: 1px solid var(--fey-rule);
     padding-left: var(--space-6, 2rem);
   }
+}
+
+/* Touch: the switches' 26px pills grow to a 40px row (44px with the track)
+   below desktop, where they are tapped rather than clicked. */
+@media (max-width: 1023px) {
+  .aethria-main .segmented-pill button {
+    min-height: 40px;
+  }
+}
+
+/* A full-screen system state leaving (ErrorBoundary "Try again"). */
+@keyframes aethria-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.aethria-leaving {
+  animation: aethria-fade-out 220ms var(--motion-ease) forwards;
+  pointer-events: none;
 }

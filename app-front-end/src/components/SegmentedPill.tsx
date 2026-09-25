@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { tokens } from '../design-system/tokens';
 import { usePrefersReducedMotion } from '../hooks';
@@ -28,21 +29,42 @@ export default function SegmentedPill<T extends string>({
   className?: string;
 }) {
   const reduceMotion = usePrefersReducedMotion();
+  const buttonsRef = useRef<Array<HTMLButtonElement | null>>([]);
+
+  // The tabs pattern the roles announce: arrows / Home / End move and select,
+  // and only the active option sits in the Tab order (roving tabindex).
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const current = options.findIndex((option) => option.key === value);
+    const last = options.length - 1;
+    const next =
+      event.key === 'ArrowRight' ? (current >= last ? 0 : current + 1)
+      : event.key === 'ArrowLeft' ? (current <= 0 ? last : current - 1)
+      : event.key === 'Home' ? 0
+      : event.key === 'End' ? last
+      : null;
+    if (next == null) return;
+    event.preventDefault();
+    onChange(options[next].key);
+    buttonsRef.current[next]?.focus();
+  };
 
   return (
     <nav
       role="tablist"
       aria-label={label}
+      onKeyDown={onKeyDown}
       className={`segmented-pill inline-flex items-center rounded-full p-[2px] overflow-x-auto no-scrollbar ${className}`.trim()}
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const isActive = value === option.key;
         return (
           <button
             key={option.key}
+            ref={(el) => { buttonsRef.current[index] = el; }}
             type="button"
             role="tab"
             aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(option.key)}
             // Colour and type match Settings' .compact-seg (12px sans),
             // oxford at 70% idle, full oxford on hover, paper on the capsule.

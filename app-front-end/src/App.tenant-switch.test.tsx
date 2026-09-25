@@ -71,6 +71,7 @@ vi.mock('./lib/loginEntryTransition', () => ({
 vi.mock('./lib/warmStart', () => ({ clearWarmStartSnapshots: vi.fn() }));
 vi.mock('framer-motion', () => ({
   motion: { div: ({ children }: { children: ReactNode }) => <div>{children}</div> },
+  AnimatePresence: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 import App from './App';

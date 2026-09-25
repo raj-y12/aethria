@@ -124,11 +124,11 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
   const showFundReadinessUnavailable = mandatePrompt === 'unavailable';
 
   return (
-    <div className="paper-dot-grid desk-home aethria-home grain-home relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
+    <div className="aethria-atmosphere desk-home aethria-home grain-home relative flex h-full min-h-0 flex-col overflow-y-auto overscroll-contain">
       <div className="grain" aria-hidden="true" />
       {/* Keep enough horizontal breathing room for the bracket frame at every
           desktop width while allowing the content to use the full viewport. */}
-      <div className="desk-home__inner flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
+      <div className="desk-home__inner aethria-atmosphere__inner flex min-h-full w-full flex-1 flex-col items-center justify-center px-phi-6 py-phi-7 sm:px-phi-7">
         {/* ── The framed briefing — the login page's bracket move ── */}
         <div className="desk-home__briefing focus-frame flex w-full max-w-[42rem] flex-col items-center">
         <Reveal delay={0.02} className="desk-home__brand">
@@ -213,16 +213,15 @@ export default function HomePage({ data, sinceAway: _sinceAway }: { data: System
         ) : null}
         {attention.length > 0 && !showFundReadinessUnavailable && !showFirstRun && !showPublishPrompt ? (
           <Reveal delay={0.34} className="desk-home__attention-section">
-            <span className="desk-home__attention-frame">
-            <button
-              type="button"
-              onClick={() => navigate('/v1/flow')}
-              aria-label={`Open Flow. ${headline}`}
-              className="desk-home__attention group relative inline-flex items-center justify-center overflow-hidden rounded-[8px] px-phi-5 py-phi-3 text-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-            >
-              <span aria-hidden className="pointer-events-none absolute inset-0 bg-oxford" />
-              <span className="type-action relative text-paper">Open Flow <span aria-hidden>→</span></span>
-            </button>
+            <span className="aethria-cta-frame">
+              <button
+                type="button"
+                onClick={() => navigate('/v1/flow')}
+                aria-label={`Open Flow. ${headline}`}
+                className="aethria-cta type-action"
+              >
+                Open Flow <span aria-hidden>→</span>
+              </button>
             </span>
           </Reveal>
         ) : null}

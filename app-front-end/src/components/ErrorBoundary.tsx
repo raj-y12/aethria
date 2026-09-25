@@ -10,6 +10,8 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   error: Error | null;
+  /** "Try again" fades the interruption out before the view is retried. */
+  leaving?: boolean;
 }
 
 /**
@@ -36,7 +38,20 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     );
   }
 
-  private reset = () => this.setState({ error: null });
+  private reset = () => this.setState({ error: null, leaving: false });
+
+  private leaveTimer: number | null = null;
+
+  private retry = () => {
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) return this.reset();
+    this.setState({ leaving: true });
+    this.leaveTimer = window.setTimeout(this.reset, 220); // matches aethria-fade-out
+  };
+
+  componentWillUnmount() {
+    if (this.leaveTimer !== null) window.clearTimeout(this.leaveTimer);
+  }
 
   private reload = () => window.location.reload();
 
@@ -50,7 +65,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       <div
         role="alert"
         aria-live="assertive"
-        className="aethria-error-boundary aethria-atmosphere page-transition-enter relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-paper px-phi-4 py-phi-6 lg:px-phi-7"
+        className={`${this.state.leaving ? 'aethria-leaving ' : ''}aethria-error-boundary aethria-atmosphere page-transition-enter relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-paper px-phi-4 py-phi-6 lg:px-phi-7`}
       >
         <div className="grain" aria-hidden />
         <div className="grain" aria-hidden />
@@ -80,7 +95,7 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
               <p className="type-label-section m-0 text-oxford/45">Recovery options</p>
               <div className="mt-phi-3 flex flex-wrap items-center gap-phi-3 lg:flex-col lg:items-stretch">
             <span className="aethria-cta-frame">
-              <button type="button" onClick={this.reset} className="aethria-cta type-action">
+              <button type="button" onClick={this.retry} className="aethria-cta type-action">
                 Try again
               </button>
             </span>

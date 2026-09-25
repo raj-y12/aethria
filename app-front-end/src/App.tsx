@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
@@ -240,20 +241,34 @@ function App() {
 
   // App routes: require sign-in, then wait for token before fetching
   if (isAppRoute || isSettingsRoute) {
-    if (!isLoaded) {
-      return <LoadingAnimation />;
-    }
-    if (!isSignedIn) {
+    if (isLoaded && !isSignedIn) {
       return <Navigate to="/sign-in" replace />;
     }
-    if (!tokenReady && !hasLoginEntryHandoff) {
-      return <LoadingAnimation />;
-    }
-    // Force a full unmount/remount of the tenant-bound shell on identity
-    // change — clearing the query cache alone leaves component state
-    // (Settings drafts, thesis/agent status, selected memo, dispatch state,
-    // the fund-configuration hook) alive across an account switch.
-    return <AppShell key={userId ?? 'anon'} />;
+    const booting = !isLoaded || (!tokenReady && !hasLoginEntryHandoff);
+    // The shell mounts beneath the loader, which fades out over it instead of
+    // cutting away in a single frame.
+    return (
+      <>
+        {/* Force a full unmount/remount of the tenant-bound shell on identity
+            change — clearing the query cache alone leaves component state
+            (Settings drafts, thesis/agent status, selected memo, dispatch state,
+            the fund-configuration hook) alive across an account switch. */}
+        {booting ? null : <AppShell key={userId ?? 'anon'} />}
+        <AnimatePresence>
+          {booting ? (
+            <motion.div
+              key="boot-loader"
+              initial={false}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-0 z-[200]"
+            >
+              <LoadingAnimation />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </>
+    );
   }
 
   // Root or unknown path → go to app (or sign-in if not signed in)
