@@ -251,6 +251,9 @@
 .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]::after {
   top: calc(100% + 8px);
   bottom: auto;
+  /* Same surface and ink as the circle it labels. */
+  background: var(--dock-surface);
+  color: var(--color-oxford);
   transform: translate(-50%, -4px);
 }
 

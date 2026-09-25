@@ -16,11 +16,18 @@ export default function LoadingAnimation({
   const reduceMotion = usePrefersReducedMotion();
 
   const containerClass = fullScreen
-    ? 'paper-dot-grid fixed inset-0 min-h-[100dvh] bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
+    ? 'aethria-atmosphere fixed inset-0 min-h-[100dvh] bg-paper z-[200] flex flex-col items-center justify-center overflow-hidden'
     : 'flex flex-col items-center justify-center min-h-[200px] py-12 overflow-hidden bg-paper';
 
   return (
     <div className={containerClass}>
+      {/* Full-screen system states share sign-in's and Home's atmosphere. */}
+      {fullScreen ? (
+        <>
+          <div className="grain" aria-hidden />
+          <div className="grain" aria-hidden />
+        </>
+      ) : null}
       <div className={`aethria-triangle-dot-grid${reduceMotion ? ' aethria-dot-grid--static' : ''}`}>
         {/* Row 1: 1 dot */}
         <div className="aethria-grid-row">

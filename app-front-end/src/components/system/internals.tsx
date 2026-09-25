@@ -20,6 +20,7 @@ import { triggerMetaCycle, promoteMetaPrompt, resetMetaPrompt, saveMetaEvalSet, 
 import { transitionOrReduced } from '../../design-system/motion';
 import { useCountUp, usePrefersReducedMotion } from '../../hooks';
 import EmptyState from '../EmptyState';
+import { openSettingsPanel } from '../../settings/settingsModel';
 import { buildFundIntelligenceSnapshot } from '../../lib/institutionalConviction';
 import { formatDate, formatDateTime } from '../../lib/dates';
 import { createDefaultFundConfiguration, type FundConfiguration } from '../../lib/fundConfiguration';
@@ -193,43 +194,29 @@ export function AnalyticsTab({ rejection }: {
 /** One line of the mandate spec — mono label register, typographic value. No chips, no boxes. */
 /** One mandate term: a mono caption set above its value. Spacing, not rules. */
 /**
- * One mandate term as a tile. Lists (sectors, stages…) read as hairline chips —
- * the same border as the segmented switches; a single value is set large.
+ * One mandate term as a ruled readout: hairline above, small label, then the
+ * value in plain sans. A list reads as items set apart by quiet middle dots.
  */
-function MandateTile({
-  label,
-  items,
-  value,
-  children,
-}: {
-  label: string;
-  items?: string[];
-  value?: string | null;
-  children?: React.ReactNode;
-}) {
-  const empty = !children && !value && !(items && items.length);
+function MandateTerm({ label, items, value }: { label: string; items?: string[]; value?: string | null }) {
+  const list = items?.filter(Boolean) ?? [];
+  const empty = list.length === 0 && !value;
   return (
-    <div className="flex min-h-0 min-w-0 flex-col gap-phi-3 rounded-[18px] bg-oxford/[0.04] p-phi-5">
+    <div className="aethria-mandate-term flex min-w-0 flex-col gap-phi-2">
       <span className="type-label-section">{label}</span>
-      {children ??
-        (empty ? (
-          <p className="type-body-sm text-oxford/45">Not specified</p>
-        ) : items && items.length ? (
-          <ul className="flex flex-wrap gap-phi-2">
-            {items.map((item) => (
-              <li
-                key={item}
-                className="rounded-full border border-oxford/[0.28] px-3 py-1 font-sans text-[12px] font-medium leading-tight text-oxford"
-              >
-                {item}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="font-sans text-[clamp(18px,1.5vw,22px)] font-medium leading-snug tracking-[-0.01em] text-oxford">
-            {value}
-          </p>
-        ))}
+      {empty ? (
+        <p className="font-sans text-[15px] text-oxford/40">Not specified</p>
+      ) : list.length > 0 ? (
+        <p className="font-sans text-[15px] font-medium leading-snug text-oxford">
+          {list.map((item, index) => (
+            <span key={item}>
+              {index > 0 ? <span className="mx-1.5 text-oxford/30" aria-hidden>·</span> : null}
+              {item}
+            </span>
+          ))}
+        </p>
+      ) : (
+        <p className="font-sans text-[15px] font-medium leading-snug tabular-nums text-oxford">{value}</p>
+      )}
     </div>
   );
 }
@@ -261,7 +248,7 @@ function MandateMatchPanel({ stats }: { stats: NonNullable<FundThesisRuntime['al
   ].filter(Boolean).join(' · ');
 
   return (
-    <div className="rounded-[18px] bg-oxford/[0.04] p-phi-5">
+    <div>
       <span className="type-label-section">Mandate match</span>
       <p className="type-display mt-phi-4 text-[clamp(40px,3.6vw,52px)] font-normal leading-none tabular-nums text-oxford">
         {match == null ? '--' : `${shown}%`}
@@ -340,55 +327,61 @@ export function InstitutionalMandateTab({
   const versions = data.version_timeline ?? [];
 
   return (
-    /* The mandate fills the viewport: the statement and the fund's one reading
-       across the top, the terms as a 4 × 2 grid of tiles taking the rest. */
-    <div className="flex flex-1 flex-col gap-phi-5 px-phi-4 pt-phi-2">
-      <div className="grid gap-phi-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-end">
-        <AnimatedTabBlock>
-          <div className="flex flex-wrap items-baseline gap-x-phi-4 gap-y-phi-1">
-            <span className="type-label-section">
-              v{data.active_version_number ?? '01'} · {mandateMode}
-            </span>
-            <Link
-              to="/v1/settings"
-              className="type-action text-oxford/55 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-            >
-              Edit mandate →
-            </Link>
+    /* The mandate as a two-column spread: the statement and, beneath it, the
+       terms as a ruled readout grid on the left; the fund's one reading and
+       its version record in a narrow ruled column on the right. */
+    <div className="grid flex-1 gap-phi-7 px-phi-4 pb-phi-5 pt-phi-2 lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)]">
+      <AnimatedTabBlock className="flex min-w-0 flex-col">
+        <div className="flex flex-wrap items-baseline gap-x-phi-4 gap-y-phi-1">
+          <span className="type-label-section">
+            v{data.active_version_number ?? '01'} · {mandateMode}
+          </span>
+          <button
+            type="button"
+            onClick={() => openSettingsPanel('thesis')}
+            className="type-action text-oxford/55 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+          >
+            Edit mandate →
+          </button>
+        </div>
+        <p className="type-display mt-phi-5 max-w-[24ch] text-[clamp(28px,2.9vw,44px)] font-medium leading-[1.12] text-oxford">
+          {statement ??
+            'No thesis statement on file. The terms below gate discovery until one is written.'}
+        </p>
+        {notes.length > 0 ? (
+          <div className="mt-phi-4 flex max-w-[40rem] flex-col gap-phi-1">
+            {notes.map((line) => (
+              <p key={line} className="type-body-sm leading-relaxed text-oxford/55">
+                {line}
+              </p>
+            ))}
           </div>
-          <p className="type-display mt-phi-4 max-w-[34ch] text-[clamp(24px,2.3vw,34px)] font-medium leading-[1.16] text-oxford">
-            {statement ??
-              'No thesis statement on file. The terms below gate discovery until one is written.'}
-          </p>
-          {notes.length > 0 ? (
-            <div className="mt-phi-3 flex max-w-[44rem] flex-col gap-phi-1">
-              {notes.map((line) => (
-                <p key={line} className="type-body-sm leading-relaxed text-oxford/55">
-                  {line}
-                </p>
-              ))}
-            </div>
-          ) : null}
-        </AnimatedTabBlock>
-
-        {data.alignment_stats ? (
-          <AnimatedTabBlock>
-            <MandateMatchPanel stats={data.alignment_stats} />
-          </AnimatedTabBlock>
         ) : null}
-      </div>
 
-      <AnimatedTabBlock className="grid flex-1 auto-rows-fr grid-cols-1 gap-phi-3 sm:grid-cols-2 lg:grid-cols-4">
-        <MandateTile label="Sectors" items={sectors} />
-        <MandateTile label="Stages" items={stages} />
-        <MandateTile label="Geography" items={geographies} />
-        <MandateTile label="Excluded" items={exclusions} />
-        <MandateTile label="Check size" value={checkSize ?? null} />
-        <MandateTile label="Ownership" value={ownership} />
-        <MandateTile label="Risk profile" value={riskProfile} />
-        <MandateTile label="Version history">
+        <div className="mt-auto grid grid-cols-1 gap-x-phi-6 gap-y-phi-5 pt-phi-7 sm:grid-cols-2 xl:grid-cols-3">
+          <MandateTerm label="Sectors" items={sectors} />
+          <MandateTerm label="Stages" items={stages} />
+          <MandateTerm label="Geography" items={geographies} />
+          <MandateTerm label="Check size" value={checkSize} />
+          <MandateTerm label="Ownership" value={ownership} />
+          <MandateTerm label="Risk profile" value={riskProfile} />
+          <MandateTerm label="Excluded" items={exclusions} />
+        </div>
+      </AnimatedTabBlock>
+
+      <AnimatedTabBlock className="aethria-mandate-rail flex min-w-0 flex-col gap-phi-6">
+        {data.alignment_stats ? (
+          <MandateMatchPanel stats={data.alignment_stats} />
+        ) : (
+          <div>
+            <span className="type-label-section">Mandate match</span>
+            <p className="type-body-sm mt-phi-3 text-oxford/45">No reviews against this mandate yet</p>
+          </div>
+        )}
+        <div className="mt-auto flex flex-col gap-phi-2">
+          <span className="type-label-section">Version history</span>
           {versions.length > 0 ? (
-            <ul className="flex flex-col gap-phi-2">
+            <ul className="flex flex-col gap-phi-1">
               {versions.slice(0, 4).map((v) => (
                 <li key={v.id} className="flex items-baseline justify-between gap-phi-3">
                   <span className={`type-body-sm ${v.is_active ? 'text-oxford' : 'text-oxford/55'}`}>
@@ -404,7 +397,7 @@ export function InstitutionalMandateTab({
           ) : (
             <p className="type-body-sm text-oxford/45">No versions recorded</p>
           )}
-        </MandateTile>
+        </div>
       </AnimatedTabBlock>
     </div>
   );

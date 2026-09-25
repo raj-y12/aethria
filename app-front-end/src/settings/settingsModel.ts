@@ -2,6 +2,12 @@ import type { FundConfiguration } from '../lib/fundConfiguration';
 
 export type SettingsPersistenceGroup = 'thesis' | 'policy' | 'runtime' | 'system';
 
+/** Opens the Settings pull-out (SettingsDock) on a group from anywhere in the app. */
+export const OPEN_SETTINGS_EVENT = 'aethria:open-settings';
+export function openSettingsPanel(group: SettingsPersistenceGroup): void {
+  window.dispatchEvent(new CustomEvent<SettingsPersistenceGroup>(OPEN_SETTINGS_EVENT, { detail: group }));
+}
+
 export type SectionId =
   | 'thesis'
   | 'version'

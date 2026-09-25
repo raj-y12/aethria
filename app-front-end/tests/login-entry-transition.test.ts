@@ -10,14 +10,13 @@ import {
 describe('login entry transition', () => {
   it('exposes the session key and motion timings', () => {
     assert.equal(LOGIN_ENTRY_SESSION_KEY, 'aethria_just_logged_in');
+    // Navigate only once the sign-in content has finished fading.
     assert.deepEqual(getLoginEntryTransition(false), {
       contentExitMs: 180,
-      appRevealMs: 300,
-      navigateDelayMs: 120,
+      navigateDelayMs: 180,
     });
     assert.deepEqual(getLoginEntryTransition(true), {
       contentExitMs: 0,
-      appRevealMs: 80,
       navigateDelayMs: 0,
     });
   });
@@ -33,6 +32,8 @@ describe('login entry transition', () => {
     const app = readFileSync(resolve(import.meta.dirname, '../src/App.tsx'), 'utf8');
     assert.equal(app.includes('hasLoginEntryHandoff'), true);
     assert.equal(app.includes('!tokenReady && !hasLoginEntryHandoff'), true);
-    assert.equal(app.includes('y: 16'), true);
+    // The atmosphere and bracket frame are already on screen at the hand-off;
+    // the shell must not fade or slide them (only Home's content reveals).
+    assert.equal(app.includes('y: 16'), false);
   });
 });

@@ -30,16 +30,16 @@ const INTRO_MS = 1150;
  * moving and resizing a 96px wordmark across the page.
  */
 const MORPH_EASE = [0.32, 0.72, 0, 1] as const;
-/** Both wordmarks share this so Framer morphs the plate mark into the sign-in mark. */
+/** Both marks share this so Framer morphs the plate mark into the sign-in mark. */
 const WORDMARK_LAYOUT_ID = 'aethria-wordmark';
 /**
- * The sign-in mark. The arrival plate and the sign-in frame must render it at
- * exactly this size: when the two differ, Framer animates the difference as a
- * transform scale, which stretches the glyphs for the length of the morph.
- * Matching them keeps the handoff pure translation, so the mark stays crisp.
+ * The sign-in mark — the same semibold Instrument Sans mark Home opens with, so
+ * the wordmark never changes face between sign-in and Home. The arrival plate
+ * and the frame must render it at exactly this size: when the two differ,
+ * Framer animates the difference as a transform scale and stretches the glyphs.
  */
 const WORDMARK_FACE =
-  'font-wordmark font-medium leading-[0.9] tracking-[-0.02em] text-[clamp(56px,9vw,96px)]';
+  'font-sans font-semibold leading-tight tracking-[-0.03em] text-[clamp(20px,1.6vw,25px)]';
 
 function LoginField({
   id,
@@ -64,7 +64,7 @@ function LoginField({
     <div className="flex flex-col">
       <label
         htmlFor={id}
-        className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/[0.26]"
+        className="font-mono text-[10px] uppercase tracking-[0.1em] text-oxford/55"
       >
         {label}
       </label>
@@ -315,22 +315,23 @@ export default function LoginPage() {
   const enterDelay = hasStats ? 0.22 + stats.length * 0.07 + 0.1 : 0.2;
   const entryTransition = getLoginEntryTransition(reduceMotion);
 
-  const dateline = new Date()
-    .toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
-    .toUpperCase();
+  const dateline = new Intl.DateTimeFormat(undefined, { dateStyle: 'long' }).format(new Date());
 
+  /* Sign-in sits in brackets sized to the form; the up-to-date step lets them
+     go, and Home draws its own. The atmosphere holds still throughout; the
+     content crossfades. */
   return (
-    <div className="paper-dot-grid flex min-h-[100dvh] flex-col overflow-hidden bg-paper">
+    <div className="aethria-atmosphere relative flex min-h-[100dvh] flex-col overflow-hidden bg-paper">
+      <div className="grain" aria-hidden />
+      <div className="grain" aria-hidden />
       <div
-        className="relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
+        className="aethria-atmosphere__inner relative z-10 flex flex-1 flex-col items-center justify-center overflow-hidden"
         style={{ padding: 'clamp(28px, 6vw, 72px)' }}
       >
       {/* ── The arrival plate ──
-          Absolute so it never occupies flex flow; in flow it shoved the frame
-          down on swap. The brackets and the mark are siblings, not nested: the
-          brackets linger to fade out on their own, while the mark unmounts the
-          instant the frame mounts so Framer can hand it across untouched. Nest
-          them and the brackets' fade would dim the mark mid-morph. */}
+          Absolute so it never occupies flex flow. The brackets and the mark are
+          siblings, not nested: the brackets fade on their own, while the mark
+          unmounts the instant the frame mounts so Framer can hand it across. */}
       <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <AnimatePresence>
           {showIntro && (
@@ -341,15 +342,13 @@ export default function LoginPage() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.34, ease: EASE }}
             >
-              {/* A ghost of the mark sizes the bracket box exactly, without the
-                  brackets ever becoming the mark's parent. */}
               <span className={`invisible ${WORDMARK_FACE}`}>Aethria.</span>
             </motion.span>
           )}
         </AnimatePresence>
 
         {showIntro && (
-          <motion.h1
+          <motion.p
             layoutId={WORDMARK_LAYOUT_ID}
             initial={{ y: 18 }}
             animate={{ y: 0 }}
@@ -365,151 +364,50 @@ export default function LoginPage() {
             >
               .
             </motion.span>
-          </motion.h1>
+          </motion.p>
         )}
       </div>
 
       {!showIntro && (
-      <motion.div
-        key="main"
-        layout
-        className="w-full max-w-[42rem] flex flex-col items-center"
-        animate={
-          entering
-            ? reduceMotion
-              ? { opacity: 0 }
-              : { opacity: 0, y: -12 }
-            : { opacity: 1, y: 0 }
-        }
-        transition={{
-          layout: { duration: 0.42, ease: EASE },
-          duration: entryTransition.contentExitMs / 1000,
-          ease: EASE,
-        }}
-      >
-
-        <AnimatePresence mode="wait" initial={false}>
+        <div className={`aethria-entry-frame focus-frame${phase === 'welcome' ? ' aethria-entry-frame--bare' : ''}`}>
           <motion.div
-            key={phase}
-            initial={phase === 'welcome' ? { opacity: 0, y: 10 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6, transition: { duration: 0.18, ease: EASE } }}
-            transition={{ duration: 0.42, ease: EASE }}
-            className="w-full flex flex-col items-center"
+            className="flex w-full flex-col items-center"
+            animate={entering ? (reduceMotion ? { opacity: 0 } : { opacity: 0, y: -12 }) : { opacity: 1, y: 0 }}
+            transition={{ duration: entryTransition.contentExitMs / 1000, ease: EASE }}
           >
-        {/* Eyebrow */}
-        <AnimatePresence mode="wait">
-          {phase === 'welcome' ? (
+            {/* The mark and date hold across both steps; on Enter everything
+                fades together and Home fades in beneath the still atmosphere. */}
             <motion.p
-              key="eyebrow-report"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
-              transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
-              className="type-label-section text-oxford/50"
-              style={{
-                marginBottom: '16px',
-              }}
+              layoutId={WORDMARK_LAYOUT_ID}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: MORPH_EASE }}
+              className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
             >
-              System Report
+              Aethria<span className="wordmark-dot">.</span>
             </motion.p>
-          ) : null}
-        </AnimatePresence>
+            <motion.p
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.1 }}
+              className="type-label-section mt-phi-3 text-center tabular-nums text-oxford/55"
+            >
+              {dateline}
+            </motion.p>
 
-        {/* Heading */}
-        <AnimatePresence mode="wait">
-          {phase === 'welcome' ? (
-            <motion.div
-              key="welcome-header"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.25, ease: EASE } }}
-              transition={{ duration: 0.5, ease: EASE }}
-              className="flex flex-col items-center"
-            >
-              <h1
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: 'clamp(28px, 3.5vw, 44px)',
-                  fontWeight: 500,
-                  color: 'var(--color-oxford)',
-                  lineHeight: 1.1,
-                  margin: 0,
-                  textAlign: 'center',
-                }}
-              >
-                Welcome back, {welcomeName}.
-              </h1>
-              <p
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  color: 'rgba(var(--color-oxford-rgb), 0.72)',
-                  marginTop: '12px',
-                  marginBottom: '60px',
-                  textAlign: 'center',
-                }}
-              >
-                {hasStats
-                  ? 'Agents continued working. Here is what happened.'
-                  : 'Your workspace is current.'}
-              </p>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="login-frame"
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, transition: { duration: 0.36, ease: EASE } }}
-              className="focus-frame focus-frame--auth w-full flex flex-col items-center"
-            >
-              <motion.p
-                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.2, ease: EASE } }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.05 }}
-                className="type-label-section text-oxford/50 m-0 mb-phi-5 text-center tabular-nums"
-              >
-                {dateline}
-              </motion.p>
-              {/* The wordmark carries no y-translate of its own — it arrives by
-                  morphing out of the arrival plate, and a moving parent would
-                  fight Framer's layout measurement. The tagline animates alone. */}
-              <div className="flex w-full flex-col items-center mb-phi-6">
-                <motion.h1
-                  layoutId={WORDMARK_LAYOUT_ID}
-                  transition={reduceMotion ? { duration: 0 } : { duration: 0.85, ease: MORPH_EASE }}
-                  className={`m-0 text-center ${WORDMARK_FACE} text-oxford`}
-                >
-                  Aethria<span className="wordmark-dot">.</span>
-                </motion.h1>
-                <motion.p
-                  initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            <AnimatePresence mode="wait" initial={false}>
+              {phase === 'form' ? (
+                <motion.div
+                  key="form"
+                  initial={reduceMotion ? false : { opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.12 }}
-                  className="type-label-section text-oxford/50 mt-phi-4"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.22, ease: EASE } }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.2 }}
+                  className="mt-phi-7 w-full max-w-[22rem]"
                 >
-                  Deal flow operating system
-                </motion.p>
-              </div>
-
-              <motion.div
-                key="form-view"
-                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12, transition: { duration: 0.28, ease: EASE } }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.32 }}
-                className="w-full"
-              >
-                <div className="w-full p-0">
-                  <div
-                    ref={formShakeRef}
-                    className="relative p-0"
-                  >
+                  <h1 className="sr-only">Sign in to Aethria</h1>
+                  <div ref={formShakeRef}>
                     <form
                       onSubmit={(e) => { e.preventDefault(); void handleSubmit(); }}
-                      className="flex flex-col gap-4"
+                      className="flex flex-col gap-phi-4 text-left"
                       noValidate
                     >
                       <LoginField
@@ -542,96 +440,75 @@ export default function LoginPage() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.2, ease: EASE }}
-                            className="font-sans text-[14px] font-medium leading-relaxed text-[var(--text-inverse)]"
+                            className="font-sans text-[13px] font-medium leading-relaxed text-escalation"
                           >
                             {error}
                           </motion.p>
                         )}
                       </AnimatePresence>
 
-                      <motion.button
-                        type="submit"
-                        disabled={loading}
-                        whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
-                        transition={{ duration: 0.1 }}
-                        className="group w-full btn-aethria-solid auth-enter-button !bg-[var(--color-oxford)] !text-[var(--color-paper)] hover:!bg-[var(--color-charcoal)] disabled:opacity-40"
-                      >
-                        <span className="flex items-center justify-center">
+                      <span className="aethria-cta-frame mx-auto mt-phi-4">
+                        <button type="submit" disabled={loading} className="aethria-cta type-action">
                           {loading ? (
                             <motion.span
                               animate={reduceMotion ? {} : { opacity: [1, 0.4, 1] }}
                               transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
                             >
-                              Authenticating...
+                              Authenticating…
                             </motion.span>
                           ) : (
-                            <>
-                              <span>Enter</span>
-                              <span
-                                className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
-                                aria-hidden
-                              >
-                                <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
-                              </span>
-                            </>
+                            <>Enter <span aria-hidden>→</span></>
                           )}
-                        </span>
-                      </motion.button>
+                        </button>
+                      </span>
                     </form>
                   </div>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="welcome"
+                  initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={reduceMotion ? { duration: 0 } : { duration: 0.5, ease: EASE }}
+                  className="mt-phi-7 flex w-full flex-col items-center"
+                >
+                  {/* One line: it is a first name or login, never long. */}
+                  <h1 className="aethria-entry-headline m-0 whitespace-nowrap text-center text-oxford">
+                    Welcome back, {welcomeName}.
+                  </h1>
+                  <p className="type-meta mt-phi-2 text-center text-oxford/55">
+                    {hasStats ? 'Agents continued working. Here is what happened.' : 'Your workspace is current.'}
+                  </p>
 
-        {/* Body */}
-        <AnimatePresence mode="wait">
-          {phase === 'welcome' ? (
-            <motion.div
-              key="activity-view"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, ease: EASE, delay: 0.08 }}
-              className="w-full flex flex-col items-center"
-            >
-              {/* Stats — numbers count up on reveal */}
-              {hasStats && (
-                <div style={{ marginBottom: '64px' }}>
-                  <ActivityStatsRow stats={stats} reduceMotion={reduceMotion} />
-                </div>
-              )}
+                  {hasStats ? (
+                    <div className="mt-phi-6">
+                      <ActivityStatsRow stats={stats} reduceMotion={reduceMotion} />
+                    </div>
+                  ) : null}
 
-              {/* The optional activity request must never gate entry. */}
-              <motion.button
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4, ease: EASE, delay: enterDelay }}
-                whileTap={reduceMotion ? {} : { scale: 0.97 }}
-                onClick={handleEnterSystem}
-                disabled={entering}
-                className="group btn-aethria-solid"
-                style={{ padding: '0 72px' }}
-              >
-                <span className="flex items-center justify-center">
-                  <span>Enter Aethria</span>
-                  <span
-                    className="inline-block w-6 shrink-0 overflow-hidden whitespace-nowrap"
-                    aria-hidden
+                  {/* The optional activity request must never gate entry. */}
+                  <motion.span
+                    initial={reduceMotion ? false : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={reduceMotion ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: enterDelay }}
+                    className="aethria-cta-frame mt-phi-6"
                   >
-                    <span className="inline-block -translate-x-2 opacity-0 transition-[transform,opacity] duration-[250ms] ease group-hover:translate-x-0 group-hover:opacity-100">{' →'}</span>
-                  </span>
-                </span>
-              </motion.button>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+                    <button
+                      type="button"
+                      onClick={handleEnterSystem}
+                      disabled={entering}
+                      className="aethria-cta type-action"
+                    >
+                      Enter Aethria <span aria-hidden>→</span>
+                    </button>
+                  </motion.span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
-        </AnimatePresence>
-      </motion.div>
+        </div>
       )}
 
-      {/* Footer */}
       <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: entering || showIntro ? 0 : 1 }}

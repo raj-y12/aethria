@@ -44,9 +44,9 @@ export default function SegmentedPill<T extends string>({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(option.key)}
-            // Colour matches Settings' .compact-seg; sized a step smaller (11px sans),
+            // Colour and type match Settings' .compact-seg (12px sans),
             // oxford at 70% idle, full oxford on hover, paper on the capsule.
-            className={`group relative min-h-[26px] shrink-0 rounded-full px-3 font-sans text-[11px] font-medium cursor-pointer btn-interaction btn-interaction--no-press transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+            className={`group relative min-h-[26px] shrink-0 rounded-full px-3 font-sans text-[12px] font-medium cursor-pointer btn-interaction btn-interaction--no-press transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
               isActive ? 'text-paper' : 'text-oxford/70 hover:text-oxford'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}

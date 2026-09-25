@@ -2,7 +2,6 @@ import { useState, useLayoutEffect, useEffect, useRef, useCallback, lazy, Suspen
 import { useLocation, Navigate } from 'react-router';
 import { useAuth } from '@clerk/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import { setTokenGetter } from './api/auth';
 import { triggerAgents } from './api/agents';
 import AppFrame from './components/AppFrame';
@@ -16,9 +15,8 @@ const SettingsPage = lazy(() => import('./settings/SettingsPage'));
 const AdminDashboardPage = lazy(() => import('./admin/AdminDashboardPage'));
 import { useSystemData } from './hooks/useSystemData';
 import { useAgentsEnabled } from './hooks/useAgentsEnabled';
-import { usePrefersReducedMotion } from './hooks';
 import LoginPage from './components/LoginPage';
-import { getLoginEntryTransition, LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
+import { LOGIN_ENTRY_SESSION_KEY } from './lib/loginEntryTransition';
 import { clearWarmStartSnapshots } from './lib/warmStart';
 import { useForegroundSync } from './hooks/useForegroundSync';
 import { useSinceAwaySummary } from './hooks/useActivitySummary';
@@ -60,12 +58,9 @@ function AppShell() {
   const isFundRoute = pathname.startsWith(`${APP_ROOT}/fund`);
   const isPortfolioRoute = pathname.startsWith(`${APP_ROOT}/portfolio`);
   const isFlowRoute = pathname.startsWith(`${APP_ROOT}/flow`) || pathname.startsWith(`${APP_ROOT}/deal`);
-  const [arrivedFromLogin] = useState(() => sessionStorage.getItem(LOGIN_ENTRY_SESSION_KEY) === '1');
   const triggeredAgentsRef = useRef(false);
   const triggeringAgentsRef = useRef(false);
   const queryClient = useQueryClient();
-  const reduceMotion = usePrefersReducedMotion();
-  const entryTransition = getLoginEntryTransition(reduceMotion);
   const systemData = useSystemData({
     flowPanelOpen: isFlowRoute,
     portfolioPanelOpen: isPortfolioRoute,
@@ -117,18 +112,10 @@ function AppShell() {
   }, [agentsEnabled, isSettingsRoute, systemData.startupsReady]);
 
   return (
-    <motion.div
-      className="min-h-[100dvh]"
-      initial={
-        arrivedFromLogin
-          ? reduceMotion
-            ? { opacity: 0 }
-            : { opacity: 0, y: 16 }
-          : false
-      }
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: entryTransition.appRevealMs / 1000, ease: [0.16, 1, 0.3, 1] }}
-    >
+    // No shell-level entrance: arriving from sign-in, the atmosphere and the
+    // bracket frame are already on screen, so the shell must not fade or slide
+    // them. Only Home's content reveals (its own Reveal stagger).
+    <div className="min-h-[100dvh]">
       {systemData.authorityBlockedReason ? (
         <AuthorityRolloutNotice
           status={systemData.authorityStatus}
@@ -158,7 +145,7 @@ function AppShell() {
           )}
         </ErrorBoundary>
       </AppFrame>
-    </motion.div>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import { transitionOrReduced } from "../design-system/motion";
 import { tokens } from "../design-system/tokens";
 import type { ExecutionReadiness } from "./institutional/ExecutionReadinessPanel";
 import {
+  OPEN_SETTINGS_EVENT,
   SETTINGS_GROUPS,
   SETTINGS_SECTIONS,
   type SectionId,
@@ -172,16 +173,16 @@ export function SettingsDock() {
         staggerChildren: 0.04,
       }),
     },
+    // One motion out: the card settles back toward the cog as a whole. The old
+    // afterChildren stagger emptied the card item by item, then shrank a bare
+    // tinted box — and the pipeline strip, not a variant child, just popped.
     exit: {
       opacity: 0,
-      y: 10,
-      scale: 0.92,
+      y: 6,
+      scale: 0.96,
       transition: transitionOrReduced(reduceMotion, {
-        duration: tokens.motion.duration.short,
-        ease: tokens.motion.ease,
-        when: 'afterChildren',
-        staggerChildren: 0.02,
-        staggerDirection: -1,
+        duration: 0.2,
+        ease: [0.4, 0, 1, 1],
       }),
     },
   };
@@ -195,14 +196,7 @@ export function SettingsDock() {
         ease: tokens.motion.ease,
       }),
     },
-    exit: {
-      opacity: 0,
-      y: 4,
-      transition: transitionOrReduced(reduceMotion, {
-        duration: tokens.motion.duration.micro,
-        ease: tokens.motion.ease,
-      }),
-    },
+    // No item exit: items leave with the card, not ahead of it.
   };
 
   // Closing plays the open animation backwards (panel shrinks into the menu that
@@ -221,6 +215,21 @@ export function SettingsDock() {
   }, [closing, reduceMotion]);
 
   const showBack = panelSection != null && !closing;
+
+  // Other rooms open the pull-out straight onto a group (openSettingsPanel).
+  useEffect(() => {
+    const open = (event: Event) => {
+      const group = (event as CustomEvent<SettingsPersistenceGroup>).detail;
+      const section = SETTINGS_SECTIONS.find((item) => item.group === group);
+      if (!section) return;
+      setSettingsOpen(true);
+      setPanelGroup(group);
+      setPanelSection(section.id);
+      setClosing(false);
+    };
+    window.addEventListener(OPEN_SETTINGS_EVENT, open);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, open);
+  }, []);
 
   // Size the blur halo to whichever surface is open: the panel, or the menu it
   // shrinks back into while closing. Written as CSS vars (no re-render), and

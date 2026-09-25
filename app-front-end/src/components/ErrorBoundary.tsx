@@ -50,8 +50,10 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
       <div
         role="alert"
         aria-live="assertive"
-        className="aethria-error-boundary page-transition-enter flex min-h-[100dvh] w-full items-center justify-center px-phi-4 py-phi-6 lg:px-phi-7"
+        className="aethria-error-boundary aethria-atmosphere page-transition-enter relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-paper px-phi-4 py-phi-6 lg:px-phi-7"
       >
+        <div className="grain" aria-hidden />
+        <div className="grain" aria-hidden />
         <div className="focus-frame w-full max-w-4xl px-phi-5 py-phi-6 text-oxford sm:px-phi-7 sm:py-phi-7">
           <div className="flex flex-wrap items-center justify-between gap-phi-3 border-b border-oxford/[0.12] pb-phi-3">
             <div className="flex items-center gap-phi-2">
@@ -77,13 +79,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
             <div className="border-t border-oxford/[0.12] pt-phi-4 lg:border-l lg:border-t-0 lg:pl-phi-5 lg:pt-0">
               <p className="type-label-section m-0 text-oxford/45">Recovery options</p>
               <div className="mt-phi-3 flex flex-wrap items-center gap-phi-3 lg:flex-col lg:items-stretch">
-            <button
-              type="button"
-              onClick={this.reset}
-              className="btn-aethria-solid min-h-[38px] px-phi-4 type-meta"
-            >
-              Try again
-            </button>
+            <span className="aethria-cta-frame">
+              <button type="button" onClick={this.reset} className="aethria-cta type-action">
+                Try again
+              </button>
+            </span>
             <button
               type="button"
               onClick={this.reload}

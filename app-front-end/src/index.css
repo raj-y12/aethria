@@ -874,15 +874,190 @@
   transform: translate(-50%, -50%);
 }
 
-/* Keep the sign-in brackets square; only the action button uses a pill shape. */
-.focus-frame--auth::before {
-  border-radius: 999px;
+/* ── Entry (LoginPage) — the same set Home opens on, so sign-in, the
+   since-you-left report and Home read as one room. Values mirror Home's frame,
+   headline and Open Flow button in pages/HomePage.css; keep them in step. ── */
+.aethria-atmosphere {
+  /* The host keeps its own positioning (relative page, fixed takeover). */
+  isolation: isolate;
 }
-.focus-frame--auth::after {
-  border-radius: 0;
+
+/* Content above the drifts: the pseudo-element blobs are positioned, so plain
+   children would otherwise paint beneath them. Grain layers stay fixed. */
+.aethria-atmosphere > :not(.grain) {
+  position: relative;
+  z-index: 1;
 }
-.auth-enter-button {
+
+.aethria-atmosphere::before,
+.aethria-atmosphere::after {
+  position: absolute;
+  z-index: 0;
+  width: clamp(300px, 44vw, 680px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(var(--color-oxford-rgb), 0.22);
+  content: '';
+  filter: blur(90px);
+  pointer-events: none;
+  animation: aethria-atmosphere-drift 18s ease-in-out infinite alternate;
+}
+
+.aethria-atmosphere::before {
+  top: 3%;
+  right: 8%;
+}
+
+.aethria-atmosphere::after {
+  bottom: -28%;
+  left: 6%;
+  width: clamp(260px, 35vw, 520px);
+  opacity: 0.58;
+  animation-delay: -9s;
+}
+
+/* Home's inner pair of drifts (HomePage.css `.desk-home__inner::before/::after`),
+   on the sign-in content layer so no blur pops in at the hand-off. */
+.aethria-atmosphere__inner::before,
+.aethria-atmosphere__inner::after {
+  position: absolute;
+  z-index: 0;
+  width: clamp(220px, 28vw, 420px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(var(--color-oxford-rgb), 0.24);
+  content: '';
+  filter: blur(76px);
+  pointer-events: none;
+  animation: aethria-atmosphere-drift 22s ease-in-out infinite alternate;
+}
+
+.aethria-atmosphere__inner::before {
+  top: 14%;
+  left: 18%;
+  animation-delay: -5s;
+}
+
+.aethria-atmosphere__inner::after {
+  right: 16%;
+  bottom: 13%;
+  opacity: 0.78;
+  animation-delay: -13s;
+}
+
+.aethria-atmosphere__inner > * {
+  z-index: 1;
+}
+
+/* Home stacks two grain layers (AppFrame's at .3 plus its own at .42); the
+   sign-in page renders the same pair so the texture doesn't thicken on entry. */
+.aethria-atmosphere > .grain + .grain {
+  opacity: 0.42;
+}
+
+/* The up-to-date step drops the brackets: they fade out, and Home fades its
+   own back in. */
+@keyframes focus-frame-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.aethria-entry-frame--bare::before,
+.aethria-entry-frame--bare::after {
+  animation: focus-frame-out 0.3s var(--motion-ease) forwards;
+}
+
+@keyframes aethria-atmosphere-drift {
+  from { transform: translate3d(-8px, 4px, 0) scale(0.96); }
+  to { transform: translate3d(10px, -8px, 0) scale(1.04); }
+}
+
+.aethria-entry-frame {
+  box-sizing: border-box;
+  display: flex;
+  width: min(100%, 560px);
+  /* Sized to the sign-in form, not Home's 60vh room; the brackets leave on
+     the up-to-date step and Home draws its own. */
+  min-height: 40vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(28px, 5vh, 58px) clamp(28px, 5vw, 64px);
+  text-align: center;
+}
+
+.aethria-entry-headline {
+  font-family: var(--font-display);
+  font-size: clamp(32px, 3.6vw, 50px);
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.08;
+}
+
+/* The bordered pill button: an oxford capsule inset in a hairline ring that
+   fills the ring on hover. */
+.aethria-cta-frame {
+  display: inline-grid;
+  min-width: 184px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.72);
   border-radius: 999px;
+  transition: border-color 240ms ease;
+}
+
+.aethria-cta-frame:hover,
+.aethria-cta-frame:focus-within {
+  border-color: var(--color-oxford);
+}
+
+.aethria-cta {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding-inline: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--color-oxford);
+  color: var(--color-paper);
+  cursor: pointer;
+  clip-path: inset(4px round 999px);
+  transition: clip-path 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.aethria-cta-frame:hover .aethria-cta,
+.aethria-cta-frame:focus-within .aethria-cta {
+  clip-path: inset(0 round 999px);
+}
+
+.aethria-cta:focus-visible {
+  outline: none;
+}
+
+.aethria-cta:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aethria-atmosphere::before,
+  .aethria-atmosphere::after,
+  .aethria-atmosphere__inner::before,
+  .aethria-atmosphere__inner::after {
+    animation: none;
+  }
+
+  .aethria-cta,
+  .aethria-cta-frame {
+    transition: none;
+  }
+
+  .aethria-entry-frame--bare::before,
+  .aethria-entry-frame--bare::after {
+    animation: none;
+    opacity: 0;
+  }
 }
 
 /* Dispatch idle-placeholder caret — ported from web-front-end's `.query-caret`,
@@ -3552,10 +3727,13 @@ textarea {
     mask-composite: intersect;
     opacity: 0;
     pointer-events: none;
+    /* Exit (the transition on the state being entered governs): the blur
+       softens first and the layer fades last, so it melts rather than snaps.
+       Opacity leading made it vanish in ~150ms. */
     transition:
-      opacity 320ms var(--motion-ease),
-      backdrop-filter 420ms var(--motion-ease),
-      -webkit-backdrop-filter 420ms var(--motion-ease),
+      backdrop-filter 520ms cubic-bezier(0.4, 0, 0.2, 1),
+      -webkit-backdrop-filter 520ms cubic-bezier(0.4, 0, 0.2, 1),
+      opacity 320ms cubic-bezier(0.4, 0, 0.2, 1) 220ms,
       width 240ms var(--motion-ease),
       height 240ms var(--motion-ease);
   }
@@ -3564,10 +3742,18 @@ textarea {
     opacity: 1;
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
+    /* Enter: unchanged — the radius grows while the layer fades in. */
+    transition:
+      opacity 320ms var(--motion-ease),
+      backdrop-filter 420ms var(--motion-ease),
+      -webkit-backdrop-filter 420ms var(--motion-ease),
+      width 240ms var(--motion-ease),
+      height 240ms var(--motion-ease);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .aethria-settings-dock__halo {
+    .aethria-settings-dock__halo,
+    .aethria-settings-dock.is-open .aethria-settings-dock__halo {
       transition: none;
     }
   }
@@ -4726,4 +4912,19 @@ textarea {
    Fund header's transparent-tablist rule and must win on source order. */
 .aethria-main nav.segmented-pill[role='tablist'] {
   border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
+}
+
+/* Fund mandate spread (system/internals.tsx): the right column's hairline and
+   each term's top rule. Custom classes, not Tailwind's border-l / border-t —
+   Fund blanks those. */
+.aethria-mandate-term {
+  border-top: 1px solid var(--fey-rule);
+  padding-top: 12px;
+}
+
+@media (min-width: 1024px) {
+  .aethria-mandate-rail {
+    border-left: 1px solid var(--fey-rule);
+    padding-left: var(--space-6, 2rem);
+  }
 }

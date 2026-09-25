@@ -196,7 +196,7 @@ export default function DecisionQueueHeader({
             onChange={(e) => onSortFilterChange(e.target.value as SortFilter)}
             aria-label="Sort deals"
             style={sortSelectStyle}
-            className="type-action h-8 cursor-pointer appearance-none border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 text-oxford/65 outline-none transition-colors hover:text-oxford focus-visible:outline-none"
+            className="h-8 cursor-pointer appearance-none font-sans text-[12px] font-medium border-0 bg-transparent bg-no-repeat bg-[length:8px] bg-[center_right_2px] pr-5 text-oxford/65 outline-none transition-colors hover:text-oxford focus-visible:outline-none"
           >
             {SORT_OPTIONS.map(({ value, label }) => (
               <option key={value} value={value}>
@@ -209,7 +209,7 @@ export default function DecisionQueueHeader({
             type="button"
             onClick={onToggleAdvancedFilters}
             aria-expanded={showAdvancedFilters}
-            className={`type-action inline-flex h-8 shrink-0 items-center gap-phi-1 transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+            className={`inline-flex h-8 shrink-0 items-center gap-phi-1 font-sans text-[12px] font-medium transition-colors btn-interaction btn-interaction--no-press focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
               showAdvancedFilters || hasActiveFilters ? 'text-oxford' : 'text-oxford/65 hover:text-oxford'
             }`}
           >
