@@ -10,6 +10,7 @@ import '@fontsource/instrument-sans/600.css';
 import '@fontsource/playfair-display/400.css';
 import '@fontsource/playfair-display/500.css';
 import '@fontsource/playfair-display/600.css';
+import '@fontsource/playfair-display/600-italic.css';
 import '@fontsource/playfair-display/700.css';
 import '@fontsource/space-mono/400.css';
 import '@fontsource/space-mono/700.css';

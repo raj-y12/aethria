@@ -4,7 +4,8 @@ import { usePrefersReducedMotion } from '../hooks';
 
 /**
  * A segmented pill switch: the active option is a filled oxford capsule that
- * slides between options on a whisper-of-oxford track. Used for page-level
+ * slides between options inside a hairline-bordered track (the same control as
+ * Settings' compact segments, `.compact-seg`; the border lives in index.css). Used for page-level
  * views (Fund facets, Portfolio Held/Decided). `layoutId` must be unique per
  * switch on screen so the capsules don't animate into each other.
  */
@@ -16,8 +17,9 @@ export default function SegmentedPill<T extends string>({
   layoutId,
   className = '',
 }: {
-  /** `count` sits after the label; `tone` marks an inactive option that wants
-   *  attention — escalation tints it burgundy, new adds a breathing dot. */
+  /** `count` sits after the label; `tone: 'new'` adds a breathing dot to an
+   *  inactive option. `'escalation'` is accepted but no longer tints the text —
+   *  the switch keeps the Settings segment's single oxford palette. */
   options: readonly { key: T; label: string; count?: string; tone?: 'escalation' | 'new' }[];
   value: T;
   onChange: (key: T) => void;
@@ -31,7 +33,7 @@ export default function SegmentedPill<T extends string>({
     <nav
       role="tablist"
       aria-label={label}
-      className={`segmented-pill inline-flex items-center rounded-full bg-oxford/[0.06] p-[3px] overflow-x-auto no-scrollbar ${className}`.trim()}
+      className={`segmented-pill inline-flex items-center rounded-full p-[2px] overflow-x-auto no-scrollbar ${className}`.trim()}
     >
       {options.map((option) => {
         const isActive = value === option.key;
@@ -42,12 +44,10 @@ export default function SegmentedPill<T extends string>({
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(option.key)}
-            className={`type-action group relative min-h-[30px] shrink-0 rounded-full px-phi-4 cursor-pointer btn-interaction btn-interaction--no-press transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
-              isActive
-                ? 'text-paper'
-                : option.tone === 'escalation'
-                  ? 'text-escalation/80 hover:text-escalation'
-                  : 'text-oxford/70 hover:text-oxford'
+            // Colour matches Settings' .compact-seg; sized a step smaller (11px sans),
+            // oxford at 70% idle, full oxford on hover, paper on the capsule.
+            className={`group relative min-h-[26px] shrink-0 rounded-full px-3 font-sans text-[11px] font-medium cursor-pointer btn-interaction btn-interaction--no-press transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 ${
+              isActive ? 'text-paper' : 'text-oxford/70 hover:text-oxford'
             }`}
             style={{ transitionTimingFunction: 'var(--motion-ease)' }}
           >

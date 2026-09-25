@@ -33,4 +33,18 @@ describe('LookupReadyNotice', () => {
 
     expect(onOpen).toHaveBeenCalledOnce();
   });
+
+  it('uses the displayed recommendation label in the button accessible name', () => {
+    render(
+      <LookupReadyNotice
+        name="Aethria"
+        recommendation="INVEST"
+        recommendationLabel="More diligence"
+        onOpen={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText('More diligence')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open memo for Aethria, More diligence' })).toBeInTheDocument();
+  });
 });

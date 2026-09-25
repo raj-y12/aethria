@@ -44,7 +44,7 @@ export interface LookupExecution {
   recoveryAction?: string | null;
 }
 
-interface DispatchCommandBarProps {
+export interface DispatchCommandBarProps {
   open: boolean;
   onClose: () => void;
   input: string;

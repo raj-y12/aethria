@@ -73,7 +73,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
   );
 
   return (
-    <div className="w-full font-sans bg-surface-canvas selection:bg-oxford selection:text-paper min-h-full">
+    <div className="flex w-full flex-1 flex-col font-sans bg-surface-canvas selection:bg-oxford selection:text-paper">
       {!props.hideNav ? (
         <div className="sticky top-0 z-20 bg-surface-canvas pt-phi-3">
           <FundFacetNav activeTab={activeTab} onTabChange={setActiveTab} />
@@ -86,6 +86,7 @@ export default function SystemIntelligence(props: SystemIntelligenceProps) {
         animate="visible"
         transition={transitionOrReduced(reduceMotion, { duration: 0.2, ease: tokens.motion.ease })}
         variants={tabContentContainerVariants}
+        className="flex flex-1 flex-col"
       >
           {activeTab === 'intelligence' && (
             <FundObservationsPanel data={props.fundIntelligence} />

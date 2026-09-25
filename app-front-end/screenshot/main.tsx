@@ -16,6 +16,7 @@ import FundPage from '../src/pages/FundPage';
 import SettingsPage from '../src/settings/SettingsPage';
 import LoginPage from '../src/components/LoginPage';
 import { MOCK_SYSTEM_DATA, installMockApi } from './mock';
+import DispatchStageHarness from './dispatchStages';
 import type { SystemData } from '../src/hooks/useSystemData';
 
 /** ?empty=1 — a fresh fund with nothing in the pipeline (zero-state review). */
@@ -75,9 +76,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[route]}>
-        <Routes>
-          <Route path="*" element={<Harness data={harnessData} />} />
-        </Routes>
+        {/* ?dispatch=<stage> — the Dispatch takeover frozen at one stage. */}
+        {params.get('dispatch') ? (
+          <DispatchStageHarness stage={params.get('dispatch')!} />
+        ) : (
+          <Routes>
+            <Route path="*" element={<Harness data={harnessData} />} />
+          </Routes>
+        )}
       </MemoryRouter>
     </QueryClientProvider>
   </React.StrictMode>,

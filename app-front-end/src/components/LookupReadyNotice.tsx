@@ -25,6 +25,7 @@ export default function LookupReadyNotice({
 }: LookupReadyNoticeProps) {
   const reduceMotion = usePrefersReducedMotion();
   const isDispatchPlacement = placement === 'dispatch';
+  const accessibleRecommendation = recommendationLabel ?? recommendation;
 
   return (
     <AnimatePresence initial={false}>
@@ -42,7 +43,7 @@ export default function LookupReadyNotice({
           <button
             type="button"
             onClick={onOpen}
-            aria-label={`Open memo for ${name}${recommendationLabel ? `, ${recommendationLabel}` : ''}`}
+            aria-label={`Open memo for ${name}${accessibleRecommendation ? `, ${accessibleRecommendation}` : ''}`}
             className="lookup-ready-notice__plate mx-auto flex w-full max-w-[1200px] items-center gap-phi-3 rounded-full border border-oxford/30 bg-paper px-phi-4 py-phi-2 text-left transition-colors hover:border-oxford/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 sm:px-phi-5"
           >
             <span className="min-w-0 flex-1">

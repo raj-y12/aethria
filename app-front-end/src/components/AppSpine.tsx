@@ -222,10 +222,36 @@ export function SettingsDock() {
 
   const showBack = panelSection != null && !closing;
 
+  // Size the blur halo to whichever surface is open: the panel, or the menu it
+  // shrinks back into while closing. Written as CSS vars (no re-render), and
+  // re-measured as the panel's content changes height.
+  const dockRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const dock = dockRef.current;
+    if (!dock || !settingsOpen) return;
+    const surface = dock.querySelector<HTMLElement>(
+      closing || !panelSection
+        ? ".aethria-settings-dock__menu"
+        : ".aethria-settings-dock__pullout",
+    );
+    if (!surface) return;
+    const measure = () => {
+      dock.style.setProperty("--halo-w", `${surface.offsetWidth}px`);
+      dock.style.setProperty("--halo-h", `${surface.offsetHeight}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(surface);
+    return () => observer.disconnect();
+  }, [settingsOpen, panelSection, closing]);
+
   return (
     <div
+      ref={dockRef}
       className={`aethria-settings-dock${settingsOpen ? " is-open" : ""}${showBack ? " is-panel" : ""}`}
     >
+      <div className="aethria-settings-dock__halo" aria-hidden />
       {panelSection ? (
         <div
           className={`aethria-settings-dock__pullout${closing ? " is-closing" : ""}`}
@@ -305,7 +331,6 @@ export function SettingsDock() {
           setPanelGroup(null);
           setClosing(false);
         }}
-        whileHover={reduceMotion ? undefined : { y: -1 }}
         whileTap={reduceMotion ? undefined : { scale: 0.94 }}
         transition={transitionOrReduced(reduceMotion, {
           duration: tokens.motion.duration.micro,

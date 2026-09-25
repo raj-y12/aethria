@@ -334,12 +334,30 @@ These are migration debt, not precedent for new code.
 
 ## Investment memo reading surface
 
-The memo uses an editorial, line-free layout: Playfair Display titles, regular
-sans-serif analysis, and compact company facts. Recommendation reasons remain
-visible. At wider memo container widths, the investment case, assessments, and
-risk/diligence sections use reading columns; narrow containers return to one
-column. Sources, detailed company records, and review history share one appendix
-entry. The ruling remains the final section. Decorative rules and framed panels
-are omitted; form boundaries and keyboard focus indicators remain functional.
-Scores, recommendation provenance, and ruling permissions are unchanged by this
-presentation.
+The company workspace uses the product sans and mono register, with no
+Playfair Display memo title. Its compact identity and local tabs remain above
+four distinct views: Decision, Assessment, Evidence, and Memo. The global
+bottom dock remains the workspace navigation; these tabs change only the
+selected company's content.
+
+Decision leads with the partner recommendation, evidence posture, review
+freshness, mandate conflict, and any recorded human ruling as separate states.
+It shows one recorded decision rationale, a compact comparison of canonical
+assessment criteria and their evidence posture, and a leading open question
+when one is recorded. The question is not presented as a guaranteed decision
+trigger. A ruling action remains reachable from the masthead. Company facts
+are concise and omit unavailable values.
+
+Assessment owns the canonical scorecard and deeper criterion reasoning;
+Defensibility remains a separate moat signal outside the four-driver overall
+score. Evidence owns the claim and source ledger, including contradictions,
+provenance, and missing support. Memo owns the longer investment argument,
+company and founder context, risks, diligence, and historical material. Each
+piece of information has one primary home rather than appearing as both a
+summary card and a repeated document section.
+
+The embedded split view is designed for its actual narrow container. The tab
+list stays above its panel, signals stack at narrow widths, long facts wrap,
+and hidden views are removed from keyboard navigation. Loading, unavailable,
+historical, read-only, and sparse-evidence states retain explicit labels. No
+chart or score is synthesized from prose or reviewer fallback data.

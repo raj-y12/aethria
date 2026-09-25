@@ -9,6 +9,7 @@ import {
   buildRowAriaLabel,
   formatRowDate,
   resolutionBadgeLabel,
+  rowLeadRisk,
   type DocketRowModel,
 } from './queueRowShared';
 import { QUEUE_ROW_SELECT_TRANSITION } from './queueRowMotion';
@@ -17,7 +18,6 @@ import { queueRowPadding } from '../../design-system/density';
 interface DocketCaseRowProps {
   model: DocketRowModel;
   isSelected: boolean;
-  rowIndex?: number;
   onClick: () => void;
   onKeyDown: (e: React.KeyboardEvent) => void;
   /** @deprecated Queue uses monochrome type; kept for call-site compatibility. */
@@ -30,7 +30,7 @@ interface DocketCaseRowProps {
  * tint and text share the same horizontal gutter as the system-rail buttons.
  */
 const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function DocketCaseRow(
-  { model, isSelected, rowIndex = 0, onClick, onKeyDown },
+  { model, isSelected, onClick, onKeyDown },
   ref
 ) {
   const reduceMotion = usePrefersReducedMotion();
@@ -46,9 +46,12 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
   const { isDecided, ageDays } = queueContext;
 
   const selectTransition = reduceMotion ? { duration: 0 } : QUEUE_ROW_SELECT_TRANSITION;
-  const ambientPadding =
-    rowIndex % 2 === 0 ? queueRowPadding.ambient : queueRowPadding.ambientAlt;
+  const ambientPadding = queueRowPadding.ambient;
   const selectedPadding = queueRowPadding.selected;
+  // Ambient rows read as a divided list: name, then one quiet line of real data.
+  const ambientLine = [sectorStage, startup.scout.location?.trim(), rowLeadRisk(startup)]
+    .filter(Boolean)
+    .join(' · ');
   const showAttentionBadge =
     !isDecided && shouldRenderAttentionBadge(attentionDriver) && attentionDriver.key !== 'needs_ruling';
   const showDateMeta = isSelected && Boolean(sortKeyValue);
@@ -76,7 +79,7 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
         paddingTop: isSelected ? selectedPadding : ambientPadding,
         paddingBottom: isSelected ? selectedPadding : ambientPadding,
       }}
-      className={`aethria-docket-row group relative w-full min-w-0 cursor-pointer px-phi-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
+      className={`aethria-docket-row group relative w-full min-w-0 cursor-pointer border-b border-oxford/[0.08] px-phi-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/35 focus-visible:ring-inset ${
         isSelected ? 'bg-surface-selected' : 'hover:bg-oxford/[0.04]'
       }`}
       style={{ transitionTimingFunction: 'var(--motion-ease)' }}
@@ -107,12 +110,17 @@ const DocketCaseRow = forwardRef<HTMLDivElement, DocketCaseRowProps>(function Do
               className={`min-w-0 break-words ${
                 isSelected
                   ? 'text-balance font-sans text-[clamp(28px,2.6vw,36px)] font-semibold leading-[1.05] tracking-[-0.035em] text-oxford'
-                  : 'font-sans text-[clamp(16px,1.3vw,19px)] font-medium leading-[1.2] tracking-[-0.01em] text-oxford/[0.72] transition-colors group-hover:text-oxford'
+                  : 'font-sans text-[clamp(16px,1.2vw,18px)] font-medium leading-[1.25] tracking-[-0.01em] text-oxford'
               }`}
               transition={selectTransition}
             >
               {startup.scout.name}
             </motion.h2>
+            {!isSelected && ambientLine ? (
+              <p className="type-note mt-1 truncate text-oxford/60" title={ambientLine}>
+                {ambientLine}
+              </p>
+            ) : null}
           </div>
           <div className={isSelected ? 'shrink-0' : 'shrink-0 sm:text-right sm:pt-px'}>
             <QueueVerdictLine

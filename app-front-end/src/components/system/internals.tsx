@@ -192,15 +192,44 @@ export function AnalyticsTab({ rejection }: {
 
 /** One line of the mandate spec — mono label register, typographic value. No chips, no boxes. */
 /** One mandate term: a mono caption set above its value. Spacing, not rules. */
-export function MandateSpecRow({ label, value }: { label: string; value: string | null }) {
+/**
+ * One mandate term as a tile. Lists (sectors, stages…) read as hairline chips —
+ * the same border as the segmented switches; a single value is set large.
+ */
+function MandateTile({
+  label,
+  items,
+  value,
+  children,
+}: {
+  label: string;
+  items?: string[];
+  value?: string | null;
+  children?: React.ReactNode;
+}) {
+  const empty = !children && !value && !(items && items.length);
   return (
-    <div className="flex min-w-0 flex-col gap-phi-2">
+    <div className="flex min-h-0 min-w-0 flex-col gap-phi-3 rounded-[18px] bg-oxford/[0.04] p-phi-5">
       <span className="type-label-section">{label}</span>
-      {value ? (
-        <p className="type-body-sm leading-relaxed text-oxford">{value}</p>
-      ) : (
-        <p className="type-body-sm text-oxford/45">Not specified</p>
-      )}
+      {children ??
+        (empty ? (
+          <p className="type-body-sm text-oxford/45">Not specified</p>
+        ) : items && items.length ? (
+          <ul className="flex flex-wrap gap-phi-2">
+            {items.map((item) => (
+              <li
+                key={item}
+                className="rounded-full border border-oxford/[0.28] px-3 py-1 font-sans text-[12px] font-medium leading-tight text-oxford"
+              >
+                {item}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="font-sans text-[clamp(18px,1.5vw,22px)] font-medium leading-snug tracking-[-0.01em] text-oxford">
+            {value}
+          </p>
+        ))}
     </div>
   );
 }
@@ -311,62 +340,72 @@ export function InstitutionalMandateTab({
   const versions = data.version_timeline ?? [];
 
   return (
-    /* The mandate as a spread: the statement is the page's headline, the terms
-       sit beneath as a caption grid, and the fund's one reading plus its record
-       share a single soft panel beside them. Whitespace does the structuring. */
-    <div className="flex flex-col gap-phi-7 px-phi-4 pb-phi-7 pt-phi-2">
-      <AnimatedTabBlock>
-        <span className="type-label-section">
-          v{data.active_version_number ?? '01'} · {mandateMode}
-        </span>
-        <p className="type-display mt-phi-4 max-w-[34ch] text-[clamp(24px,2.3vw,34px)] font-medium leading-[1.16] text-oxford">
-          {statement ??
-            'No thesis statement on file. The terms below gate discovery until one is written.'}
-        </p>
-        {notes.length > 0 ? (
-          <div className="mt-phi-4 flex max-w-[44rem] flex-col gap-phi-1">
-            {notes.map((line) => (
-              <p key={line} className="type-body-sm leading-relaxed text-oxford/55">
-                {line}
-              </p>
-            ))}
+    /* The mandate fills the viewport: the statement and the fund's one reading
+       across the top, the terms as a 4 × 2 grid of tiles taking the rest. */
+    <div className="flex flex-1 flex-col gap-phi-5 px-phi-4 pt-phi-2">
+      <div className="grid gap-phi-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] lg:items-end">
+        <AnimatedTabBlock>
+          <div className="flex flex-wrap items-baseline gap-x-phi-4 gap-y-phi-1">
+            <span className="type-label-section">
+              v{data.active_version_number ?? '01'} · {mandateMode}
+            </span>
+            <Link
+              to="/v1/settings"
+              className="type-action text-oxford/55 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
+            >
+              Edit mandate →
+            </Link>
           </div>
-        ) : null}
-      </AnimatedTabBlock>
-
-      <div className="grid gap-phi-7 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:items-start">
-        <AnimatedTabBlock className="grid grid-cols-1 gap-x-phi-6 gap-y-phi-5 sm:grid-cols-2">
-          <MandateSpecRow label="Sectors" value={sectors.length ? sectors.join(', ') : null} />
-          <MandateSpecRow label="Stages" value={stages.length ? stages.join(', ') : null} />
-          <MandateSpecRow label="Geography" value={geographies.length ? geographies.join(', ') : null} />
-          <MandateSpecRow label="Check size" value={checkSize ?? null} />
-          <MandateSpecRow label="Ownership" value={ownership} />
-          <MandateSpecRow label="Excluded" value={exclusions.length ? exclusions.join(', ') : null} />
-          <MandateSpecRow label="Risk profile" value={riskProfile} />
-        </AnimatedTabBlock>
-
-        <AnimatedTabBlock className="flex flex-col gap-phi-6">
-          {data.alignment_stats ? <MandateMatchPanel stats={data.alignment_stats} /> : null}
-          {versions.length > 0 ? (
-            <div className="px-phi-2">
-              <span className="type-label-section">Version history</span>
-              <ul className="mt-phi-3 flex flex-col gap-phi-3">
-                {versions.slice(0, 10).map((v) => (
-                  <li key={v.id} className="flex items-baseline justify-between gap-phi-3">
-                    <span className={`type-body-sm ${v.is_active ? 'text-oxford' : 'text-oxford/55'}`}>
-                      v{v.version_number}
-                      {v.is_active ? ' · active' : ''}
-                    </span>
-                    <span className="type-meta tabular-nums text-oxford/55">
-                      {formatDate(v.created_at)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+          <p className="type-display mt-phi-4 max-w-[34ch] text-[clamp(24px,2.3vw,34px)] font-medium leading-[1.16] text-oxford">
+            {statement ??
+              'No thesis statement on file. The terms below gate discovery until one is written.'}
+          </p>
+          {notes.length > 0 ? (
+            <div className="mt-phi-3 flex max-w-[44rem] flex-col gap-phi-1">
+              {notes.map((line) => (
+                <p key={line} className="type-body-sm leading-relaxed text-oxford/55">
+                  {line}
+                </p>
+              ))}
             </div>
           ) : null}
         </AnimatedTabBlock>
+
+        {data.alignment_stats ? (
+          <AnimatedTabBlock>
+            <MandateMatchPanel stats={data.alignment_stats} />
+          </AnimatedTabBlock>
+        ) : null}
       </div>
+
+      <AnimatedTabBlock className="grid flex-1 auto-rows-fr grid-cols-1 gap-phi-3 sm:grid-cols-2 lg:grid-cols-4">
+        <MandateTile label="Sectors" items={sectors} />
+        <MandateTile label="Stages" items={stages} />
+        <MandateTile label="Geography" items={geographies} />
+        <MandateTile label="Excluded" items={exclusions} />
+        <MandateTile label="Check size" value={checkSize ?? null} />
+        <MandateTile label="Ownership" value={ownership} />
+        <MandateTile label="Risk profile" value={riskProfile} />
+        <MandateTile label="Version history">
+          {versions.length > 0 ? (
+            <ul className="flex flex-col gap-phi-2">
+              {versions.slice(0, 4).map((v) => (
+                <li key={v.id} className="flex items-baseline justify-between gap-phi-3">
+                  <span className={`type-body-sm ${v.is_active ? 'text-oxford' : 'text-oxford/55'}`}>
+                    v{v.version_number}
+                    {v.is_active ? ' · active' : ''}
+                  </span>
+                  <span className="type-meta tabular-nums text-oxford/55">
+                    {formatDate(v.created_at)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="type-body-sm text-oxford/45">No versions recorded</p>
+          )}
+        </MandateTile>
+      </AnimatedTabBlock>
     </div>
   );
 }

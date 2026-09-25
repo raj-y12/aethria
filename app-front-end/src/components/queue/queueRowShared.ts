@@ -31,6 +31,16 @@ export function resolutionBadgeLabel(startup: Startup): string | null {
   return RESOLUTION_BADGE_LABELS[status] ?? null;
 }
 
+/** The one risk a row leads with: the canonical partner judgment's first
+ * principal risk, else the reviewer's first key risk. Null when neither exists —
+ * the row shows nothing rather than a placeholder. */
+export function rowLeadRisk(startup: Startup): string | null {
+  const risk =
+    startup.current_analysis?.partner?.judgment?.principal_risks?.[0] ??
+    startup.review?.key_risks?.[0];
+  return risk?.trim() || null;
+}
+
 export function formatRowDate(value: string): string {
   if (!value) return '';
   return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }).toUpperCase();

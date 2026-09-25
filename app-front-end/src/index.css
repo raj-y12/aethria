@@ -93,6 +93,9 @@
      Previously this literal was typed in three places and would have drifted
      apart the moment one of them changed. */
   --spine-width: clamp(204px, 15vw, 248px);
+  /* The settings surface (cog, menu, panels) as a solid oxford-on-paper tint;
+     Home's workspace circles share it so the controls read as one family. */
+  --dock-surface: color-mix(in srgb, var(--color-oxford) 5%, var(--color-paper));
   /* Secondary type rhythm (~10% below canonical body-sm / data; labels stay 11px floor) */
   --type-body-sm-size: 12px;
   --type-data-size: 12px;
@@ -924,33 +927,37 @@
   will-change: opacity, transform;
 }
 
-/* Decision ladder matrix: one dot mask on the parent turns every child layer into
-   dots, so the bands are 4 flat divs clipped by clip-path instead of ~2700 spans.
-   clip-path animates natively, so moving a boundary tweens for free. */
+/* Decision ladder matrix: one mask on the parent turns every child layer into a
+   lattice of rounded triangles — alternately pointing up and down, checkerboarded
+   across rows — so the bands are 4 flat divs clipped by clip-path instead of
+   ~2700 spans. clip-path animates natively, so moving a boundary tweens for free.
+   The tile is 2×2 cells (--dot-gap each): ▲▼ over ▼▲. */
 .threshold-matrix {
   --dot-gap: 6px;
+  --tri-tile: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cg fill='black' stroke='black' stroke-width='1.1' stroke-linejoin='round'%3E%3Cpath d='M3 1.4 5 4.6H1Z'/%3E%3Cpath d='M7 1.4h4L9 4.6Z'/%3E%3Cpath d='M1 7.4h4L3 10.6Z'/%3E%3Cpath d='M9 7.4 11 10.6H7Z'/%3E%3C/g%3E%3C/svg%3E");
   position: absolute;
   inset: 0;
   -webkit-mask-image:
-    radial-gradient(circle, #000 0 2px, transparent 2.4px),
+    var(--tri-tile),
     linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
   mask-image:
-    radial-gradient(circle, #000 0 2px, transparent 2.4px),
+    var(--tri-tile),
     linear-gradient(to bottom, transparent, #000 10%, #000 90%, transparent);
-  -webkit-mask-size: var(--dot-gap) var(--dot-gap), 100% 100%;
-  mask-size: var(--dot-gap) var(--dot-gap), 100% 100%;
+  -webkit-mask-size: calc(var(--dot-gap) * 2) calc(var(--dot-gap) * 2), 100% 100%;
+  mask-size: calc(var(--dot-gap) * 2) calc(var(--dot-gap) * 2), 100% 100%;
   -webkit-mask-position: 0 0, 0 0;
   mask-position: 0 0, 0 0;
   -webkit-mask-composite: source-in;
   mask-composite: intersect;
-  /* Shift the lattice exactly one cell and loop — reads as a live ticker. */
-  animation: threshold-drift 4.5s linear infinite;
+  /* Shift the lattice exactly one tile (two cells, so orientation never flips
+     mid-loop) and repeat — reads as a live ticker at the original speed. */
+  animation: threshold-drift 9s linear infinite;
 }
 
 @keyframes threshold-drift {
   to {
-    -webkit-mask-position: var(--dot-gap) 0, 0 0;
-    mask-position: var(--dot-gap) 0, 0 0;
+    -webkit-mask-position: calc(var(--dot-gap) * 2) 0, 0 0;
+    mask-position: calc(var(--dot-gap) * 2) 0, 0 0;
   }
 }
 
@@ -1699,14 +1706,10 @@ textarea {
   background: transparent;
 }
 
-/* Segmented pill switches (SegmentedPill.tsx) are not underlined tab rows. */
-.aethria-main .segmented-pill {
-  border-bottom: 0;
-}
 
 .aethria-main .segmented-pill button {
-  min-height: 30px;
-  padding: 0 16px;
+  min-height: 26px;
+  padding: 0 12px;
   border-bottom: 0;
   border-radius: 999px;
 }
@@ -1758,19 +1761,29 @@ textarea {
   }
 }
 
-/* Fey's primary navigation is a floating command dock, not a permanent
-   application sidebar. Keep the existing rail semantics and actions, but
-   present them as the compact bottom navigator used across Fey's workspaces. */
+/* Primary navigation is a floating command dock, not a permanent application
+   sidebar. Keep the existing rail semantics and actions, but present them as a
+   compact vertical navigator pinned to the left edge, vertically centred, at
+   the same inset the bottom dock used. */
 @media (min-width: 1024px) {
   .aethria-spine-dock {
     position: fixed;
     z-index: 45;
-    left: 50%;
-    bottom: var(--dock-bottom);
+    left: var(--dock-bottom);
+    top: 50%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 16px;
-    transform: translateX(-50%) translateY(var(--workspace-chrome-y, 0px));
+    /* --workspace-chrome-y is the entrance offset (64px → 0); on the left edge
+       it slides the dock in from the side instead of up from the bottom. */
+    transform: translateY(-50%) translateX(calc(-1 * var(--workspace-chrome-y, 0px)));
+  }
+
+  /* Keep workspace content clear of the left dock and the top-right logout,
+     symmetrically so rooms stay centred. */
+  .aethria-frame:not(.aethria-frame--home):not(.aethria-frame--settings) .aethria-main {
+    padding-inline: calc(var(--dock-bottom) + var(--dock-size));
   }
 
   :root {
@@ -1788,11 +1801,11 @@ textarea {
     left: auto;
     bottom: auto;
     display: flex;
-    width: auto !important;
-    height: var(--dock-size);
-    min-height: var(--dock-size);
+    width: var(--dock-size) !important;
+    height: auto;
+    min-height: 0;
     transform: none;
-    flex-direction: row;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 4px;
@@ -1814,8 +1827,8 @@ textarea {
   .aethria-spine nav[aria-label='Workspaces'],
   .aethria-spine nav[aria-label='Section navigation'] {
     display: flex;
-    width: max-content;
-    flex-direction: row;
+    height: max-content;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: var(--dock-nav-gap);
@@ -1878,9 +1891,9 @@ textarea {
 
   .aethria-spine .aethria-spine-divider {
     display: block;
-    width: 1px;
-    height: 24px;
-    margin: 0 2px;
+    width: 24px;
+    height: 1px;
+    margin: 2px 0;
     padding: 0;
     background: rgba(255, 255, 255, 0.12);
   }
@@ -1892,8 +1905,8 @@ textarea {
   .aethria-spine nav[aria-label='Workspaces'] button[data-nav-label]::after,
   .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]::after {
     position: absolute;
-    bottom: calc(100% + 9px);
-    left: 50%;
+    top: 50%;
+    left: calc(100% + 9px);
     z-index: 2;
     width: max-content;
     max-width: 140px;
@@ -1910,7 +1923,7 @@ textarea {
     opacity: 0;
     pointer-events: none;
     text-transform: uppercase;
-    transform: translate(-50%, 4px);
+    transform: translate(-4px, -50%);
     transition: opacity 160ms var(--motion-ease), transform 160ms var(--motion-ease);
   }
 
@@ -1919,7 +1932,7 @@ textarea {
   .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]:hover::after,
   .aethria-spine nav[aria-label='Section navigation'] button[data-nav-label]:focus-visible::after {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translate(0, -50%);
   }
 
   .aethria-spine nav[aria-label='Workspaces'] button > span.relative:first-child,
@@ -2138,8 +2151,6 @@ textarea {
 
 .aethria-room-header__readouts {
   align-self: end;
-  border-top: 1px solid var(--fey-rule-soft);
-  padding-top: 10px;
 }
 
 .aethria-room-header__readouts > div {
@@ -2302,13 +2313,6 @@ textarea {
   grid-row: 1;
   align-self: center;
   width: auto;
-}
-
-.aethria-home .desk-home__brand p {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
 }
 
 .aethria-home .desk-home__date {
@@ -3202,13 +3206,8 @@ textarea {
   padding-inline: clamp(20px, 3.5vw, 52px);
 }
 
-.aethria-portfolio,
-.aethria-fund {
+.aethria-portfolio {
   padding-bottom: 72px;
-}
-
-.aethria-fund > div:nth-child(2) > div {
-  padding-bottom: 96px;
 }
 
 .aethria-portfolio section,
@@ -3409,6 +3408,14 @@ textarea {
   background: transparent;
 }
 
+/* The rule above also caught the result card's filled "Open full memo" CTA,
+   leaving paper text on no fill (invisible). Restore its oxford fill. Scoped by
+   component rather than `:not(.bg-oxford)` — Tailwind's @apply of bg-oxford
+   (in .btn-aethria-solid) would clone any rule naming that class. */
+.aethria-dispatch-command .dispatch-result-snapshot button {
+  background-color: rgb(var(--color-oxford-rgb));
+}
+
 .aethria-dispatch-command [role='list'] button[aria-pressed='true'] {
   background: transparent !important;
   font-weight: 600;
@@ -3464,26 +3471,24 @@ textarea {
   .aethria-settings-dock {
     position: fixed;
     bottom: var(--dock-bottom);
-    left: clamp(18px, 2.4vw, 46px);
+    left: var(--dock-left);
     z-index: 46;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    isolation: isolate;
+    /* Same inset as the left nav dock, so the cog sits in its column. */
+    --dock-left: var(--dock-bottom);
     /* Menu rect the panel grows from / shrinks to (see the panel-grow keyframes):
        4 categories + the pipeline block. Keep in step with the menu rules. */
     --dock-menu-w: 184px;
     --dock-menu-h: 336px;
-    /* The toggle's open tint (oxford on paper) as a solid, so the menu and
-       panel are exactly the button's color and hide what is behind them. */
-    --dock-surface: color-mix(in srgb, var(--color-oxford) 5%, var(--color-paper));
   }
 
   .aethria-logout-float {
     position: fixed;
     right: clamp(18px, 2.4vw, 46px);
-    bottom: var(--dock-bottom);
+    top: var(--dock-bottom);
     z-index: 46;
     display: grid;
     width: var(--dock-size);
@@ -3518,28 +3523,59 @@ textarea {
     stroke-linejoin: round;
   }
 
-  .aethria-settings-dock::before {
-    position: absolute;
-    inset: -28px;
+  /* The blur halo. A fixed layer anchored to the bottom-left corner, sized to
+     whichever surface is open (menu or panel; SettingsDock writes --halo-w/-h)
+     plus a feather band. Full blur hugs the surface; the mask fades it to no
+     blur across the band on the open (top and right) edges. It is a sibling of
+     the menu/panel, not a child: their opacity/clip-path animations would make
+     them backdrop roots and blank the blur. */
+  .aethria-settings-dock__halo {
+    --halo-feather: 260px;
+    position: fixed;
+    left: 0;
+    bottom: 0;
     z-index: -1;
-    border-radius: 24px;
-    background: rgba(var(--color-paper-rgb), 0.22);
-    content: '';
+    width: calc(var(--dock-left) + var(--halo-w, 184px) + var(--halo-feather));
+    height: calc(var(--dock-bottom) + var(--dock-size) + 8px + var(--halo-h, 336px) + var(--halo-feather));
+    background: rgba(var(--color-paper-rgb), 0.18);
+    /* Closed: no blur. The radius itself animates open (see .is-open), which
+       reads as blur arriving; fading opacity alone snaps in Chromium. */
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    -webkit-mask-image:
+      linear-gradient(to right, #000 calc(100% - var(--halo-feather)), transparent),
+      linear-gradient(to top, #000 calc(100% - var(--halo-feather)), transparent);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to right, #000 calc(100% - var(--halo-feather)), transparent),
+      linear-gradient(to top, #000 calc(100% - var(--halo-feather)), transparent);
+    mask-composite: intersect;
     opacity: 0;
     pointer-events: none;
-    filter: blur(20px);
-    backdrop-filter: blur(28px);
-    transition: opacity 160ms var(--motion-ease);
+    transition:
+      opacity 320ms var(--motion-ease),
+      backdrop-filter 420ms var(--motion-ease),
+      -webkit-backdrop-filter 420ms var(--motion-ease),
+      width 240ms var(--motion-ease),
+      height 240ms var(--motion-ease);
   }
 
-  .aethria-settings-dock.is-open::before {
+  .aethria-settings-dock.is-open .aethria-settings-dock__halo {
     opacity: 1;
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aethria-settings-dock__halo {
+      transition: none;
+    }
   }
 
   .aethria-settings-dock__pullout {
     position: fixed;
     bottom: calc(var(--dock-bottom) + var(--dock-size) + 8px);
-    left: clamp(18px, 2.4vw, 46px);
+    left: var(--dock-left);
     z-index: 45;
     display: flex;
     flex-direction: column;
@@ -4662,7 +4698,7 @@ textarea {
   z-index: 1;
   right: auto;
   bottom: -2px;
-  left: -18px;
+  left: -21px;
   width: min(310px, calc(100vw - 72px));
   padding: 0;
   pointer-events: auto;
@@ -4677,16 +4713,17 @@ textarea {
   box-shadow: 0 6px 18px -10px rgba(10, 22, 41, 0.24);
 }
 
-/* The docket footer ("Everything else…") clears the floating nav dock on
-   desktop, where the dock tokens exist; elsewhere it sits normally. */
-.aethria-flow-footer {
-  margin-bottom: calc(var(--dock-size, 0px) + var(--dock-bottom, 0px) + 12px);
-}
-
 /* Filled docket verdicts (Advance, Monitor, Pass, More diligence) get the same
    chip as the "Needs ruling" marker beside them; the Flow rule above strips
    padding for flat annotations only. */
 .aethria-flow .aethria-verdict:not(.aethria-verdict--flat) {
   min-height: 22px;
   padding: 4px 8px;
+}
+
+/* Segmented pill switches (SegmentedPill.tsx): a hairline track like Settings'
+   .compact-seg. Last in the file on purpose: it ties on specificity with the
+   Fund header's transparent-tablist rule and must win on source order. */
+.aethria-main nav.segmented-pill[role='tablist'] {
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.28);
 }

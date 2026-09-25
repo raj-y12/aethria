@@ -563,7 +563,6 @@ const WorkGrid = ({
                     }}
                     model={model}
                     isSelected={isSelected}
-                    rowIndex={idx}
                     onClick={() => handleRowSelect(model.startup)}
                     onKeyDown={keyDown}
                     badges={config.verdictBadges}

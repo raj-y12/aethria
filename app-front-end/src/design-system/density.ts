@@ -15,8 +15,7 @@ export const LAPTOP_SPACE_SCALE = 0.9 as const;
 /** Queue row vertical padding (px) — the selected row keeps the same compact
  *  control rhythm as the system rail while its typography carries emphasis. */
 export const queueRowPadding = {
-  ambient: 10,
-  ambientAlt: 11,
+  ambient: 14,
   interrupt: 16,
   selected: 14,
 } as const;

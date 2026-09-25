@@ -1,0 +1,337 @@
+/* Home atmosphere: preserve the existing bracketed briefing and Oxford palette,
+   then add the film grain, soft blue focus, and a little purposeful movement. */
+.aethria-home.grain-home {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+.aethria-home.grain-home::before,
+.aethria-home.grain-home::after {
+  position: absolute;
+  z-index: 0;
+  width: clamp(300px, 44vw, 680px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(var(--color-oxford-rgb), 0.22);
+  content: '';
+  filter: blur(90px);
+  pointer-events: none;
+  animation: home-atmosphere 18s ease-in-out infinite alternate;
+}
+
+.aethria-home.grain-home::before {
+  top: 3%;
+  right: 8%;
+}
+
+.aethria-home.grain-home::after {
+  bottom: -28%;
+  left: 6%;
+  width: clamp(260px, 35vw, 520px);
+  opacity: 0.58;
+  animation-delay: -9s;
+}
+
+.aethria-home.grain-home > .desk-home__inner {
+  position: relative;
+  z-index: 1;
+}
+
+.aethria-home.grain-home > .desk-home__inner::before,
+.aethria-home.grain-home > .desk-home__inner::after {
+  position: absolute;
+  z-index: 0;
+  width: clamp(220px, 28vw, 420px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(var(--color-oxford-rgb), 0.24);
+  content: '';
+  filter: blur(76px);
+  pointer-events: none;
+  animation: home-atmosphere 22s ease-in-out infinite alternate;
+}
+
+.aethria-home.grain-home > .desk-home__inner > * {
+  position: relative;
+  z-index: 1;
+}
+
+.aethria-home.grain-home > .desk-home__inner::before {
+  top: 14%;
+  left: 18%;
+  animation-delay: -5s;
+}
+
+.aethria-home.grain-home > .desk-home__inner::after {
+  right: 16%;
+  bottom: 13%;
+  opacity: 0.78;
+  animation-delay: -13s;
+}
+
+.aethria-home.grain-home > .grain {
+  opacity: 0.42;
+}
+
+.aethria-home.grain-home .desk-home__briefing h1 {
+  font-size: clamp(32px, 3.6vw, 50px) !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.08 !important;
+}
+
+.aethria-home.grain-home .desk-home__attention {
+  transition: background-color 180ms var(--motion-ease), color 180ms var(--motion-ease);
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card {
+  transition: flex-basis 560ms cubic-bezier(0.22, 1, 0.36, 1), background-color 220ms var(--motion-ease);
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card:hover,
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible {
+  transform: none !important;
+}
+
+/* The mark, date, briefing, and workspace actions share one centered bracket. */
+.aethria-home.grain-home > .desk-home__inner {
+  min-height: 100%;
+  justify-content: center;
+  padding-block: 5vh;
+}
+
+.aethria-home.grain-home .desk-home__briefing.focus-frame {
+  box-sizing: border-box;
+  width: min(100%, 760px);
+  height: 60vh;
+  min-height: 60vh;
+  flex: 0 0 60vh;
+  justify-content: center;
+  gap: clamp(12px, 2vh, 22px);
+  margin: 0;
+  padding: clamp(28px, 5vh, 58px) clamp(28px, 5vw, 64px);
+  text-align: center;
+}
+
+.aethria-home.grain-home .desk-home__brand,
+.aethria-home.grain-home .desk-home__date,
+.aethria-home.grain-home .desk-home__attention-section,
+.aethria-home.grain-home .desk-home__workspaces {
+  width: 100%;
+  margin: 0;
+}
+
+.aethria-home.grain-home .desk-home__date p {
+  justify-content: center;
+}
+
+.aethria-home.grain-home .desk-home__briefing > div:not(.desk-home__attention-section),
+.aethria-home.grain-home .desk-home__briefing h1,
+.aethria-home.grain-home .desk-home__briefing p {
+  text-align: center;
+}
+
+.aethria-home.grain-home .desk-home__briefing h1 {
+  max-width: none;
+}
+
+.aethria-home.grain-home .desk-home__attention-section {
+  padding: 8px;
+  text-align: center;
+}
+
+.aethria-home.grain-home .desk-home__attention-frame {
+  display: inline-grid;
+  width: 184px;
+  height: 56px;
+  place-items: center;
+  border: 1px solid rgba(var(--color-oxford-rgb), 0.72);
+  border-radius: 999px;
+  transition: border-color 240ms ease;
+}
+
+.aethria-home.grain-home .desk-home__attention-frame:hover,
+.aethria-home.grain-home .desk-home__attention-frame:focus-within {
+  border-color: var(--color-oxford);
+}
+
+.aethria-home.grain-home .desk-home__attention {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  background: var(--color-oxford) !important;
+  color: var(--color-paper) !important;
+  border-radius: 999px !important;
+  clip-path: inset(4px round 999px);
+  transition: clip-path 400ms cubic-bezier(0.22, 1, 0.36, 1), background-color 180ms ease, color 180ms ease;
+}
+
+.aethria-home.grain-home .desk-home__attention-frame:hover .desk-home__attention,
+.aethria-home.grain-home .desk-home__attention-frame:focus-within .desk-home__attention {
+  clip-path: inset(0 round 999px);
+}
+
+.aethria-home.grain-home .desk-home__attention > span:first-child {
+  display: block !important;
+  background: var(--color-oxford) !important;
+}
+
+.aethria-home.grain-home .desk-home__attention:hover {
+  background: var(--color-oxford) !important;
+  transform: none !important;
+}
+
+.aethria-home.grain-home .desk-home__flow-context {
+  width: 100%;
+}
+
+.aethria-home.grain-home .desk-home__workspaces > p {
+  display: none;
+}
+
+/* Workspaces: three small oxford circles, icon only. The label lives in the
+   tooltip (data-nav-label), which drops below the circle. */
+.aethria-home.grain-home .desk-home__workspaces [role='navigation'] {
+  display: flex !important;
+  justify-content: center;
+  gap: 12px;
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card {
+  box-sizing: border-box;
+  width: var(--dock-size, 40px) !important;
+  height: var(--dock-size, 40px);
+  min-height: 0;
+  flex: 0 0 auto !important;
+  justify-content: center;
+  padding: 0;
+  overflow: visible;
+  /* Grid, not flex: legacy door rules in index.css still set justify/align
+     and padding on this element; place-items centres the icon regardless. */
+  display: grid !important;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dock-surface) !important;
+  color: rgba(var(--color-oxford-rgb), 0.68) !important;
+  transform: none !important;
+  transition: color 150ms var(--motion-ease) !important;
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card > span.relative {
+  display: grid !important;
+  place-items: center;
+  gap: 0;
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card:hover,
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card:focus-visible {
+  color: var(--color-oxford) !important;
+}
+
+/* The hover tint span and the text label have no job on an icon circle. */
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card > span[aria-hidden],
+.aethria-home.grain-home .aethria-home__workspace-label {
+  display: none !important;
+}
+
+.aethria-home.grain-home .aethria-home__workspace-circle {
+  display: grid;
+  width: 18px !important;
+  height: 18px !important;
+  flex: 0 0 18px !important;
+  place-items: center;
+  border: 0 !important;
+  background: transparent !important;
+  color: inherit !important;
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform: translate(-50%, -4px);
+}
+
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:hover::after,
+.aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card[data-nav-label]:focus-visible::after {
+  transform: translate(-50%, 0);
+}
+
+/* The briefing headline in Playfair Display italic; the wordmark in bold
+   Instrument Sans. Both override the app-wide sans heading rule in index.css. */
+.aethria-home.grain-home .desk-home__briefing h1 {
+  font-family: var(--font-display) !important;
+  font-style: italic;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  /* index.css caps this at 18ch (!important), which pinned the block left of
+     the bracket's centre line. */
+  max-width: none !important;
+  margin-inline: auto;
+}
+
+.aethria-home.grain-home .desk-home__brand p {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@media (max-width: 760px) {
+  .aethria-home.grain-home > .desk-home__inner::before {
+    top: 18%;
+    left: -16%;
+  }
+
+  .aethria-home.grain-home > .desk-home__inner::after {
+    right: -20%;
+    bottom: 16%;
+  }
+
+  .aethria-home.grain-home > .desk-home__inner {
+    min-height: 100%;
+    padding: 24px 18px 86px;
+  }
+
+  .aethria-home.grain-home .desk-home__briefing.focus-frame {
+    width: 100%;
+    height: 60vh;
+    min-height: 60vh;
+    padding: 30px 22px;
+  }
+}
+
+@keyframes home-atmosphere {
+  from { transform: translate3d(-8px, 4px, 0) scale(0.96); }
+  to { transform: translate3d(10px, -8px, 0) scale(1.04); }
+}
+
+@media (max-width: 760px) {
+  .aethria-home.grain-home::before {
+    top: 0;
+    right: -35%;
+    width: 90vw;
+  }
+
+  .aethria-home.grain-home::after {
+    bottom: 0;
+    left: -35%;
+    width: 80vw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aethria-home.grain-home::before,
+  .aethria-home.grain-home::after,
+  .aethria-home.grain-home > .desk-home__inner::before,
+  .aethria-home.grain-home > .desk-home__inner::after {
+    animation: none;
+  }
+
+  .aethria-home.grain-home .desk-home__attention,
+  .aethria-home.grain-home .desk-home__attention-frame,
+  .aethria-home.grain-home .desk-home__workspaces .aethria-home__workspace-card {
+    transition: none;
+  }
+}

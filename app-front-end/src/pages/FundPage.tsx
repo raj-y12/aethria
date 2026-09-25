@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import RoomHeader from '../components/RoomHeader';
 import { workspaceLayout } from '../design-system/workspaceLayout';
 import SystemIntelligence, { FundFacetNav, isFundFacetTab, type FundFacetTab } from '../components/SystemIntelligence';
@@ -57,17 +57,7 @@ export default function FundPage({ data }: { data: SystemData }) {
             className={workspaceLayout.headerBottom}
             eyebrow="The instrument"
             title={fundName}
-            readouts={
-              <div className="flex flex-wrap items-center justify-end gap-x-phi-5 gap-y-phi-2">
-                <Link
-                  to="/v1/settings"
-                  className="type-action shrink-0 text-oxford/55 transition-colors hover:text-oxford btn-interaction focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-oxford/30"
-                >
-                  Edit mandate →
-                </Link>
-                <FundFacetNav activeTab={activeTab} onTabChange={changeTab} />
-              </div>
-            }
+            readouts={<FundFacetNav activeTab={activeTab} onTabChange={changeTab} />}
           />
         </div>
       </div>
@@ -76,7 +66,10 @@ export default function FundPage({ data }: { data: SystemData }) {
         ref={bodyScrollRef}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-paper"
       >
-        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} pt-phi-6`}>
+        {/* min-h-full + flex: the mandate tab stretches to the viewport and its
+            terms grid takes the leftover height, so it fits without scrolling.
+            Longer tabs (intelligence, learning) still scroll. */}
+        <div className={`${workspaceLayout.shell} ${workspaceLayout.pageBottom} flex min-h-full flex-col pt-phi-5`}>
           <SystemIntelligence
             activeTab={activeTab}
             onTabChange={changeTab}
